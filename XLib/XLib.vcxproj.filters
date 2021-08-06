@@ -1,0 +1,206 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClInclude Include="Source\XLib.NonCopyable.h" />
+    <ClInclude Include="Source\XLib.Memory.h" />
+    <ClInclude Include="Source\XLib.Random.h" />
+    <ClInclude Include="Source\XLib.h" />
+    <ClInclude Include="Source\XLib.System.Timer.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.System.Window.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.Algorithm.QuickSort.h">
+      <Filter>Algorithm</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.Containers.Set.h">
+      <Filter>Containers</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.System.Threading.Atomics.h">
+      <Filter>System\Threading</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.System.Threading.Event.h">
+      <Filter>System\Threading</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.System.Threading.h">
+      <Filter>System\Threading</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.Float.Conversion.h" />
+    <ClInclude Include="Source\XLib.Float.Consts.h" />
+    <ClInclude Include="Source\XLib.System.AsyncIO.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.Program.h" />
+    <ClInclude Include="Source\XLib.System.Network.Socket.h">
+      <Filter>System\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.System.Network.h">
+      <Filter>System\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.Delegate.h" />
+    <ClInclude Include="Source\XLib.Debug.h" />
+    <ClInclude Include="Source\XLib.StringWriter.h" />
+    <ClInclude Include="Source\XLib.PoolAllocator.h" />
+    <ClInclude Include="Source\XLib.System.VirtualMemory.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.System.File.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.System.NamedPipe.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.System.Threading.Barrier.h">
+      <Filter>System\Threading</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.System.Threading.Lock.h">
+      <Filter>System\Threading</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.System.Threading.ReadersWriterLock.h">
+      <Filter>System\Threading</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.Containers.BinaryHeap.h">
+      <Filter>Containers</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.Containers.CyclicQueue.h">
+      <Filter>Containers</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.Math.Quaternion.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.Math.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.Math.Matrix3x4.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.Math.Matrix4x4.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.Vectors.Math.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.Vectors.Arithmetics.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.Vectors.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.Platform.DXGI.Helpers.h">
+      <Filter>Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.Platform.COMPtr.h">
+      <Filter>Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.Platform.D3D11.Helpers.h">
+      <Filter>Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.Platform.D3D12.Helpers.h">
+      <Filter>Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.Color.h" />
+    <ClInclude Include="Source\XLib.Math.Matrix2x3.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.Containers.IntrusiveDoublyLinkedList.h">
+      <Filter>Containers</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.System.Threading.MTCircularQueue.h">
+      <Filter>System\Threading</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.Path.h" />
+    <ClInclude Include="Source\XLib.Containers.IntrusiveBinaryTree.h">
+      <Filter>Containers</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.FileSystem.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.Containers.ArrayList.h">
+      <Filter>Containers</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\XLib.AllocatorAdapterBase.h" />
+    <ClInclude Include="Source\XLib.SystemHeapAllocator.h" />
+    <ClInclude Include="Source\XLib.Time.h" />
+    <ClInclude Include="Source\XLib.CRC.h" />
+    <ClInclude Include="Source\XLib.TextStream.h" />
+    <ClInclude Include="Source\XLib.String.h" />
+    <ClInclude Include="Source\XLib.Format.h" />
+    <ClInclude Include="Source\XLib.Containers.FlatHashMap.h">
+      <Filter>Containers</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Source\XLib.Memory.cpp" />
+    <ClCompile Include="Source\XLib.Random.cpp" />
+    <ClCompile Include="Source\XLib.System.Timer.cpp">
+      <Filter>System</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\XLib.System.Window.cpp">
+      <Filter>System</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\XLib.System.Threading.Atomics.cpp">
+      <Filter>System\Threading</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\XLib.System.Threading.cpp">
+      <Filter>System\Threading</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\XLib.System.Threading.Event.cpp">
+      <Filter>System\Threading</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\XLib.Program.cpp" />
+    <ClCompile Include="Source\XLib.System.Network.cpp">
+      <Filter>System\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\XLib.Debug.cpp" />
+    <ClCompile Include="Source\XLib.cpp" />
+    <ClCompile Include="Source\XLib.StringWriter.cpp" />
+    <ClCompile Include="Source\XLib.System.AsyncIO.cpp">
+      <Filter>System</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\XLib.System.File.cpp">
+      <Filter>System</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\XLib.System.NamedPipe.cpp">
+      <Filter>System</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\XLib.System.Network.Socket.cpp">
+      <Filter>System\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\XLib.Math.cpp">
+      <Filter>Math</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\XLib.Platform.COMPtr.cpp">
+      <Filter>Platform</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\XLib.FileSystem.cpp">
+      <Filter>System</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\XLib.SystemHeapAllocator.cpp" />
+    <ClCompile Include="Source\XLib.CRC.cpp" />
+    <ClCompile Include="Source\XLib.String.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Algorithm">
+      <UniqueIdentifier>{c88d098c-5348-4a18-8345-0d424751f6fa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Containers">
+      <UniqueIdentifier>{86283fbc-fc5f-4d83-bb5c-ae9788b5086f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="System">
+      <UniqueIdentifier>{5cfaa074-5677-423f-91e2-ebcdf56919e1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="System\Threading">
+      <UniqueIdentifier>{43c90392-b461-4a3c-b74a-9eb797e20393}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="System\Network">
+      <UniqueIdentifier>{d5be2868-222d-4843-a6b4-f497188ebeca}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Math">
+      <UniqueIdentifier>{19a0bd74-1791-426c-abf8-cf43760f75a6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Platform">
+      <UniqueIdentifier>{cf6636c2-8b3a-4c4a-9edd-f657356a96fa}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

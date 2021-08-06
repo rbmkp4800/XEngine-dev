@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClInclude Include="XEngine.Core.DiskWorker.h" />
+    <ClInclude Include="XEngine.Core.Engine.h" />
+    <ClInclude Include="XEngine.Core.GeometryResource.h" />
+    <ClInclude Include="XEngine.Core.Input.h" />
+    <ClInclude Include="XEngine.Core.Output.h" />
+    <ClInclude Include="XEngine.Core.ResourceCacheBase.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="XEngine.Core.DiskWorker.cpp" />
+    <ClCompile Include="XEngine.Core.Engine.cpp" />
+    <ClCompile Include="XEngine.Core.GeometryResource.cpp" />
+    <ClCompile Include="XEngine.Core.Input.cpp" />
+    <ClCompile Include="XEngine.Core.Output.cpp" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,113 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{3d815646-a0c9-4b0b-b754-b6bc3c200afc}</UniqueIdentifier>
+      <Extensions>hlsl;hlsli</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="D3D12Helpers.h" />
+    <ClInclude Include="Shaders\HostAndShadersShared.h" />
+    <ClInclude Include="XEngine.Render.Base.h" />
+    <ClInclude Include="XEngine.Render.Camera.h" />
+    <ClInclude Include="XEngine.Render.Device.BufferHeap.h" />
+    <ClInclude Include="XEngine.Render.Device.GeometryHeap.h" />
+    <ClInclude Include="XEngine.Render.Device.GPUDescriptorHeap.h" />
+    <ClInclude Include="XEngine.Render.Device.h" />
+    <ClInclude Include="XEngine.Render.Device.MaterialHeap.h" />
+    <ClInclude Include="XEngine.Render.Device.Renderer.h" />
+    <ClInclude Include="XEngine.Render.Device.TextureHeap.h" />
+    <ClInclude Include="XEngine.Render.Device.UIResources.h" />
+    <ClInclude Include="XEngine.Render.Device.Uploader.h" />
+    <ClInclude Include="XEngine.Render.GBuffer.h" />
+    <ClInclude Include="XEngine.Render.Internal.Shaders.h" />
+    <ClInclude Include="XEngine.Render.MIPMapGenerator.h" />
+    <ClInclude Include="XEngine.Render.Scene.h" />
+    <ClInclude Include="XEngine.Render.Target.h" />
+    <ClInclude Include="XEngine.Render.CustomDrawBatch.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="XEngine.Render.Device.BufferHeap.cpp" />
+    <ClCompile Include="XEngine.Render.Device.cpp" />
+    <ClCompile Include="XEngine.Render.Device.GeometryHeap.cpp" />
+    <ClCompile Include="XEngine.Render.Device.GPUDescriptorHeap.cpp" />
+    <ClCompile Include="XEngine.Render.Device.MaterialHeap.cpp" />
+    <ClCompile Include="XEngine.Render.Device.Renderer.cpp" />
+    <ClCompile Include="XEngine.Render.Device.TextureHeap.cpp" />
+    <ClCompile Include="XEngine.Render.Device.UIResources.cpp" />
+    <ClCompile Include="XEngine.Render.Device.Uploader.cpp" />
+    <ClCompile Include="XEngine.Render.GBuffer.cpp" />
+    <ClCompile Include="XEngine.Render.Internal.Shaders.cpp" />
+    <ClCompile Include="XEngine.Render.Scene.cpp" />
+    <ClCompile Include="XEngine.Render.Target.cpp" />
+    <ClCompile Include="XEngine.Render.CustomDrawBatch.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="Shaders\BloomBlurHorizontalPS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\BloomBlurVerticalAndAccumulatePS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\BloomBlurVerticalPS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\BloomDownscalePS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\BloomFilterAndDownscalePS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\DebugWhitePS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\DefaultMaterialMS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\DefaultMaterialPS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\DepthDeprojectAndDownscalePS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\DepthDownscalePS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\LightingPassPS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\SceneGeometryAS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\ScreenQuadVS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\ToneMappingPS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\UIColorAlphaTexturePS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\UIColorAlphaTextureVS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\UIColorPS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\UIColorVS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\BloomBlur.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\GBuffer.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\SceneGeometryCommon.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+  </ItemGroup>
+</Project>
