@@ -1,0 +1,6 @@
+.vs/
+*.user
+
+[Bb]uild/
+[Ii]ntermediate/
+[Bb]uild.[Ii]ntermediate/
