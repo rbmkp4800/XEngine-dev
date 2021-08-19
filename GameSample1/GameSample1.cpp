@@ -13,29 +13,71 @@ using namespace GameSample1;
 static constexpr float32 cameraMouseSens = 0.005f;
 static constexpr float32 cameraSpeed = 0.1f;
 
-void GenerateClustersData(const float32x3* vertices, uint32 vertexCount,
-	const uint8x4* indices, uint8 indexCount, byte* output)
+struct Cluster
 {
-	auto encodeClusterDesc = [](uint32 dataRelativeOffsetX64, uint8 vertexCount, uint8 indexCount) -> uint64
+	const float32x3* vertices;
+	const uint8x4* indices;
+	uint8 vertexCount;
+	uint8 indexCount;
+};
+
+uint32 GenerateClustersData(const Cluster* clusters, uint8 clusterCount, byte* output)
+{
+	struct ClusterDescriptor
 	{
-		return uint64(dataRelativeOffsetX64) | (uint64(vertexCount) << 22) | (uint64(indexCount) << 32);
+		uint64 a;
+		uint64 b;
 	};
 
-	auto encodeIndex = [](uint8x4 i) -> uint32
+	auto EncodeClusterDescriptor = [](uint32 dataRelativeOffsetX64, uint8 vertexCount, uint8 indexCount) -> ClusterDescriptor
+	{
+		ClusterDescriptor result = {};
+		result.a = uint64(dataRelativeOffsetX64) | (uint64(vertexCount) << 22) | (uint64(indexCount) << 32);
+		return result;
+	};
+
+	auto EncodeIndex = [](uint8x4 i) -> uint32
 	{
 		return uint32(i.x) | (uint32(i.y) << 7) | (uint32(i.z) << 14);
 	};
 
-	uint64 clusterDesc = encodeClusterDesc(1, vertexCount, indexCount);
-	*to<uint64*>(output) = clusterDesc;
+	constexpr uint32 vertexIndexBlobAlignment = 64;
+	
+	const uint32 headClusterVertexIndexBlobOffset64 =
+		divRoundUp<uint32>(sizeof(ClusterDescriptor) * clusterCount, vertexIndexBlobAlignment);
 
-	float32x4* outputVerticesBlob = to<float32x4*>(output + 64);
-	for (uint8 i = 0; i < vertexCount; i++)
-		outputVerticesBlob[i].xyz = vertices[i];
+	ClusterDescriptor* clusterDescriptorsTable = (ClusterDescriptor*)output;
 
-	uint32* outputIndicesBlob = to<uint32*>(outputVerticesBlob + vertexCount);
-	for (uint8 i = 0; i < indexCount; i++)
-		outputIndicesBlob[i] = encodeIndex(indices[i]);
+	uint32 currentClusterVertexIndexBlobOffset64 = headClusterVertexIndexBlobOffset64;
+
+	for (uint8 clusterIdx = 0; clusterIdx < clusterCount; clusterIdx++)
+	{
+		const Cluster& cluster = clusters[clusterIdx];
+
+		const uint32 vertexIndexBlobOffset64 = currentClusterVertexIndexBlobOffset64;
+		clusterDescriptorsTable[clusterIdx] =
+			EncodeClusterDescriptor(vertexIndexBlobOffset64, cluster.vertexCount, cluster.indexCount);
+
+		float32x4* outputVerticesBlob = to<float32x4*>(output + vertexIndexBlobOffset64 * vertexIndexBlobAlignment);
+		for (uint8 i = 0; i < cluster.vertexCount; i++)
+		{
+			outputVerticesBlob[i].xyz = cluster.vertices[i];
+			outputVerticesBlob[i].w = 0.0f;
+		}
+
+		uint32* outputIndicesBlob = to<uint32*>(outputVerticesBlob + cluster.vertexCount);
+		for (uint8 i = 0; i < cluster.indexCount; i++)
+			outputIndicesBlob[i] = EncodeIndex(cluster.indices[i]);
+
+		const uint32 vertexIndexBlobSize = cluster.vertexCount * sizeof(float32x4) + cluster.indexCount * sizeof(uint32);
+		const uint32 vertexIndexBlobSize64 = divRoundUp<uint32>(vertexIndexBlobSize, vertexIndexBlobAlignment);
+
+		currentClusterVertexIndexBlobOffset64 += vertexIndexBlobSize64;
+	}
+
+	const uint32 usedBytes = currentClusterVertexIndexBlobOffset64 * 64;
+
+	return usedBytes;
 }
 
 void Game::initialize()
@@ -51,15 +93,17 @@ void Game::initialize()
 	defaultMaterialShader = renderDevice.createDefaultMaterialShader();
 	//defaultMaterial = renderDevice.createMaterialInstance(defaultMaterialShader);
 
-	geometryDataBuffer = renderDevice.allocateBuffer(4096);
+	geometryDataBuffer = renderDevice.allocateBuffer(65536);
+
+	uint8 scc = 0;
 
 	{
-		float32x3 vertices[] =
+		float32x3 srcVertices[] =
 		{
-			{ -1.0f, -1.0f, -1.0f  },
-			{  1.0f,  1.0f, -1.0f  },
-			{  1.0f, -1.0f, -1.0f  },
-			{ -1.0f,  1.0f, -1.0f  },
+			{ -1.0f, -1.0f, -1.0f },
+			{  1.0f,  1.0f, -1.0f },
+			{  1.0f, -1.0f, -1.0f },
+			{ -1.0f,  1.0f, -1.0f },
 			{ -1.0f, -1.0f,  1.0f },
 			{  1.0f,  1.0f,  1.0f },
 			{  1.0f, -1.0f,  1.0f },
@@ -68,14 +112,14 @@ void Game::initialize()
 			{  1.0f,  1.0f,  1.0f },
 			{ -1.0f,  1.0f,  1.0f },
 			{  1.0f,  1.0f, -1.0f },
-			{ -1.0f, -1.0f, -1.0f  },
-			{  1.0f, -1.0f,  1.0f  },
-			{  1.0f, -1.0f, -1.0f  },
-			{ -1.0f, -1.0f,  1.0f  },
-			{ -1.0f, -1.0f, -1.0f  },
-			{ -1.0f,  1.0f,  1.0f  },
-			{ -1.0f, -1.0f,  1.0f  },
-			{ -1.0f,  1.0f, -1.0f  },
+			{ -1.0f, -1.0f, -1.0f },
+			{  1.0f, -1.0f,  1.0f },
+			{  1.0f, -1.0f, -1.0f },
+			{ -1.0f, -1.0f,  1.0f },
+			{ -1.0f, -1.0f, -1.0f },
+			{ -1.0f,  1.0f,  1.0f },
+			{ -1.0f, -1.0f,  1.0f },
+			{ -1.0f,  1.0f, -1.0f },
 			{  1.0f, -1.0f, -1.0f },
 			{  1.0f,  1.0f,  1.0f },
 			{  1.0f,  1.0f, -1.0f },
@@ -112,19 +156,43 @@ void Game::initialize()
 			{ 0, 3, 2, 0 },
 		};*/
 
-		byte tmpBuff[4096] = {};
+		byte tmpBuff[65536] = {};
 
-		GenerateClustersData(vertices, countof(vertices), indices, countof(indices), tmpBuff);
+		Cluster clusters[64];
 
-		renderDevice.uploadBufferBlocking(geometryDataBuffer, tmpBuff, 4096);
+		for (uint8 clusterIdx = 0; clusterIdx < countof(clusters); clusterIdx++)
+		{
+			Cluster& c = clusters[clusterIdx];
+
+			float32x3 offset;
+			offset.x = float32((clusterIdx >> 0) & 3) * 2.0f - 3.0f;
+			offset.y = float32((clusterIdx >> 2) & 3) * 2.0f - 3.0f;
+			offset.z = float32((clusterIdx >> 4) & 3) * 2.0f - 3.0f;
+
+			float32x3* vertices = (float32x3*)
+				SystemHeapAllocator::Allocate(countof(srcVertices) * sizeof(float32x3)); // (.-.)
+
+			for (uint8 i = 0; i < countof(srcVertices); i++)
+				vertices[i] = offset + srcVertices[i] * 0.7f;
+
+			c.vertices = vertices;
+			c.indices = indices;
+			c.vertexCount = uint8(countof(srcVertices));
+			c.indexCount = uint8(countof(indices));
+		}
+
+		scc = countof(clusters);
+
+		const uint32 bufferUsedBytes = GenerateClustersData(clusters, countof(clusters), tmpBuff);
+
+		renderDevice.uploadBufferBlocking(geometryDataBuffer, tmpBuff, bufferUsedBytes);
 	}
-
 
 	Render::GeometrySectionDesc geometrySectionsDesc = {};
 	geometrySectionsDesc.clustersAddress = geometryDataBuffer;
 	geometrySectionsDesc.transformsOffset = 0;
 	geometrySectionsDesc.material = defaultMaterial;
-	geometrySectionsDesc.clusterCount = 1;
+	geometrySectionsDesc.clusterCount = scc;
 
 	geometrySectionsBundle = renderDevice.createGeometrySectionBundle(&geometrySectionsDesc, 1);
 

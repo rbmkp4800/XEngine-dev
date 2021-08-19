@@ -26,12 +26,19 @@ void DecodeSectionRecord(in const uint2 record,
 
 // Single wave group
 [numthreads(WAVE_SIZE, 1, 1)]
-void main(
-	const uint globalThreadIdx : SV_DispatchThreadID,
-	const uint groupIdx : SV_GroupID,
-	const uint groupThreadIdx : SV_GroupIndex)
+void main(const uint groupIdx : SV_GroupID)
 {
-	//uint2 clustersVisibilityMask = 0;
+	const uint waveThreadIdx = WaveGetLaneIndex();
+
+#if MAX_CLUSTERS_PER_SECTION != 64
+	#error this code implies `MAX_CLUSTERS_PER_SECTION == 64`
+#endif
+
+#if (MAX_CLUSTERS_PER_SECTION / WAVE_SIZE == 0 || MAX_CLUSTERS_PER_SECTION % WAVE_SIZE != 0)
+	#error this code implies `MAX_CLUSTERS_PER_SECTION = WAVE_SIZE * n`
+#endif
+
+	uint64_t clustersVisibilityMask = 0;
 
 	if (WaveIsFirstLane())
 	{
@@ -46,21 +53,27 @@ void main(
 		payload.baseTransformIndex = baseTransformIndex;
 		payload.materialIndex = materialIndex;
 
-		payload.clustersIndicies[0] = 0;
-
-		//clustersVisibilityMask = inputSectionRecord.xy;
+		clustersVisibilityMask = uint64_t(inputSectionRecord.z) | (uint64_t(inputSectionRecord.w) << 32);
 	}
 
-	/*clustersVisibilityMask = WaveReadLaneFirst(clustersVisibilityMask);
+	clustersVisibilityMask = WaveReadLaneFirst(clustersVisibilityMask);
 
-	// For now we use just first 32 bits of visibility mask
-	bool currentClusterActive = (clustersVisibilityMask.x >> groupThreadIdx) & 1;
-	uint currentClusterOffset = WavePrefixCountBits(currentClusterActive);
-	uint activeClusterCount = WaveActiveCountBits(currentClusterActive);
+	uint interWaveClusterCompactIdxAccum = 0;
 
-	payload.clustersIndicies[currentClusterOffset] = groupThreadIdx;
+	[unroll]
+	for (uint i = 0; i < MAX_CLUSTERS_PER_SECTION / WAVE_SIZE; i++)
+	{
+		const uint clusterIdx = i * WAVE_SIZE + waveThreadIdx;
+		const bool clusterIsActive = ((clustersVisibilityMask >> clusterIdx) & 1) != 0;
+		const uint waveClusterCompactIdx = WavePrefixCountBits(clusterIsActive);
+		const uint waveActiveClusterCount = WaveActiveCountBits(clusterIsActive);
 
-	DispatchMesh(activeClusterCount, 1, 1, payload);*/
+		const uint clusterCompactIdx = interWaveClusterCompactIdxAccum + waveClusterCompactIdx;
+		payload.clustersIndicies[clusterCompactIdx] = clusterIdx;
 
-	DispatchMesh(1, 1, 1, payload);
+		interWaveClusterCompactIdxAccum += waveActiveClusterCount;
+	}
+
+	const uint activeClusterCount = interWaveClusterCompactIdxAccum;
+	DispatchMesh(activeClusterCount, 1, 1, payload);
 }

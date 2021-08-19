@@ -73,7 +73,8 @@ GeometrySectionBundleInstanceHandle Scene::insertGeometrySectionBundleInstance(
 		a |= uint64(baseTransform) << 24;
 		// a |= ... *material* ;
 
-		uint64 b = (uint64(1) << bundle.sections[i].clusterCount) - 1;
+		const uint8 clusterCount = bundle.sections[i].clusterCount;
+		uint64 b = clusterCount == 64 ? uint64(-1) : (uint64(1) << clusterCount) - 1;
 
 		sectionRecords[i] = { a, b };
 	}

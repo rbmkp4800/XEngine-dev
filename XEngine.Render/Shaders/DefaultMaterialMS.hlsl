@@ -59,7 +59,9 @@ void main(
 {
 	const uint clusterIdx = asPayload.clustersIndicies[groupIdx];
 
-	const uint clusterDescAddress = asPayload.clustersDataOffset + clusterIdx * 16;
+	const uint clusterDescriptorStride = 16;
+
+	const uint clusterDescAddress = asPayload.clustersDataOffset + clusterIdx * clusterDescriptorStride;
 	const uint4 encodedClusterDesc = globalBuffer.Load4(clusterDescAddress);
 	const ClusterDesc clusterDesc = DecodeClusterDesc(encodedClusterDesc);
 
@@ -68,7 +70,7 @@ void main(
 	const uint vertexStride = 16;
 	const uint triangleStride = 4;
 
-	const uint verticesBlobAddress = clusterDescAddress + clusterDesc.dataRelativeOffset;
+	const uint verticesBlobAddress = asPayload.clustersDataOffset + clusterDesc.dataRelativeOffset;
 	const uint trianglesBlobAddress = verticesBlobAddress + clusterDesc.vertexCount * vertexStride;
 
 	if (groupThreadIdx < clusterDesc.vertexCount)
@@ -93,7 +95,7 @@ void main(
 		const uint triangleDataAddress = trianglesBlobAddress + groupThreadIdx * triangleStride;
 		const uint triangleData = globalBuffer.Load(triangleDataAddress);
 
-		uint3 triangleIndices = float3(
+		const uint3 triangleIndices = float3(
 			(triangleData >> 0 ) & 0x7F,
 			(triangleData >> 7 ) & 0x7F,
 			(triangleData >> 14) & 0x7F);
