@@ -24,6 +24,7 @@
     <ClInclude Include="Source\XLib.Containers.FlatHashMap.h" />
     <ClInclude Include="Source\XLib.Containers.IntrusiveDoublyLinkedList.h" />
     <ClInclude Include="Source\XLib.Format.h" />
+    <ClInclude Include="Source\XLib.JSON.h" />
     <ClInclude Include="Source\XLib.Math.Quaternion.h" />
     <ClInclude Include="Source\XLib.Algorithm.QuickSort.h" />
     <ClInclude Include="Source\XLib.Containers.BinaryHeap.h" />
@@ -79,6 +80,7 @@
   <ItemGroup>
     <ClCompile Include="Source\XLib.CRC.cpp" />
     <ClCompile Include="Source\XLib.Debug.cpp" />
+    <ClCompile Include="Source\XLib.JSON.cpp" />
     <ClCompile Include="Source\XLib.Platform.COMPtr.cpp" />
     <ClCompile Include="Source\XLib.Program.cpp" />
     <ClCompile Include="Source\XLib.SystemHeapAllocator.cpp" />

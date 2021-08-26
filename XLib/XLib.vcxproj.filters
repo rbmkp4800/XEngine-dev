@@ -129,6 +129,7 @@
     <ClInclude Include="Source\XLib.Containers.FlatHashMap.h">
       <Filter>Containers</Filter>
     </ClInclude>
+    <ClInclude Include="Source\XLib.JSON.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\XLib.Memory.cpp" />
@@ -179,6 +180,7 @@
     <ClCompile Include="Source\XLib.SystemHeapAllocator.cpp" />
     <ClCompile Include="Source\XLib.CRC.cpp" />
     <ClCompile Include="Source\XLib.String.cpp" />
+    <ClCompile Include="Source\XLib.JSON.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Algorithm">

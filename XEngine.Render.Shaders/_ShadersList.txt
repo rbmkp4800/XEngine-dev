@@ -14,3 +14,20 @@ $AS   SceneGeometryAS[wave64]*US1*AFS0   SceneGeometryAS:main   WAVE_SIZE_LOG2="
 
 # Allowed symbols for shader name 0..9 A..Z a..z ()*+,-./:<=>[\]_
 # Allowed symbols for shader source filename 0..9 A..Z a..z _-./
+
+
+// JSON format (maybe even JSON5)
+[
+    {
+        "name" : "SceneGeometryAS[wave32]*US0*AFS0",
+        "type" : "AS",
+        "src" : "SceneGeometryAS.hlsl",
+        "entryPoint" : "main",
+        "defines" : {
+            "WAVE_SIZE_LOG2" : "5",
+            "UNDERSAMPLE" : "0"
+        }
+    },
+    { "name":"SceneGeometryAS[wave32]*US0*AFS0", "type":"AS", "src":"SceneGeometryAS.hlsl", "entryPoint":"main", "defines":{ "WAVE_SIZE_LOG2":"5", "UNDERSAMPLE" : "0" } },
+    { "name":"SceneGeometryAS[wave32]*US0*AFS0", "type":"AS", "src":"SceneGeometryAS.hlsl", "entryPoint":"main", "defines":{ "WAVE_SIZE_LOG2":"5", "UNDERSAMPLE" : "0" } }
+]
