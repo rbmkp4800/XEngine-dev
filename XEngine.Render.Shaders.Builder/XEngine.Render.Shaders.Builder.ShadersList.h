@@ -1,5 +1,6 @@
 #pragma once
 
+#include <XLib.h>
 #include <XLib.Containers.ArrayList.h>
 #include <XLib.Containers.IntrusiveBinaryTree.h>
 #include <XLib.NonCopyable.h>
@@ -39,7 +40,7 @@ namespace XEngine::Render::Shaders::Builder
 		inline void addSourceDependency(SourcesCacheEntryId id) { sourceDependencies.pushBack(id); }
 		inline void clearSourceDependencies() { sourceDependencies.clear(); }
 		inline uint16 getSourceDependencyCount() const { return sourceDependencies.getSize(); }
-		inline SourcesCacheEntryId getSourceDependency(uint16 i) const { return sourceDependencies[i]; }
+		//inline SourcesCacheEntryId getSourceDependency(uint16 i) const { return sourceDependencies[i]; }
 
 		inline void setCompilationRequired() { compilationRequired = true; }
 		inline bool isCompilationRequired() const { return compilationRequired; }
@@ -49,7 +50,7 @@ namespace XEngine::Render::Shaders::Builder
 	{
 	private:
 		using EntriesSearchTree = XLib::IntrusiveBinaryTree<ShadersListEntry, &ShadersListEntry::shadersSearchTreeHook>;
-		using EntriesStorageList = XLib::StaticSegmentedArrayList<SourcesCacheEntry, 5, 16>;
+		using EntriesStorageList = XLib::StaticSegmentedArrayList<ShadersListEntry, 5, 16>;
 
 	private:
 		EntriesSearchTree entriesSearchTree;

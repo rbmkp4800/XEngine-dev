@@ -6,6 +6,8 @@
 using namespace XLib;
 using namespace XEngine::Render::Shaders::Builder;
 
+#if 0
+
 bool IsWhitespace(char c)
 {
 	return c == ' ' || c == '\f' || c == '\n' || c == '\r' || c == '\t' || c == '\v';
@@ -163,3 +165,5 @@ bool XEngine::Render::Shaders::Builder::LoadPrevBuildMetadataFile(const char* me
 
 
 }
+
+#endif

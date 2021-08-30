@@ -14,6 +14,8 @@
 using namespace XLib;
 using namespace XEngine::Render::Shaders::Builder;
 
+#if 0
+
 static void CheckIfShaderRequiresCompilation(ShadersListEntry& shader,
 	SourcesCache& sourcesCache, const char* rootPath, TimePoint& upToDateObjectWriteTime)
 {
@@ -60,10 +62,13 @@ static void CheckIfShaderRequiresCompilation(ShadersListEntry& shader,
 	upToDateObjectWriteTime = objectWriteTime;
 }
 
+#endif
+
 int main()
 {
 	// -slist="/XEngine.Render.Shaders/_ShadersList.txt" -intrmdir="/Build.Intermediate/XEngine.Render.Shaders/" -out="/Build/XEngine.Render.Shaders.xspk" -inc
 
+#if 0
 	const char* args = ...;
 
 	TextStreamReader argsReader(args);
@@ -96,10 +101,12 @@ int main()
 			useIncrementalBuild = true;
 		}
 	}
+#endif
 
 	ShadersList shadersList;
 	SourcesCache sourcesCache;
 
+#if 0
 	if (!LoadShadersListFile(shadersListFilePath.cstr(), shadersList, sourcesCache))
 		return -1;
 
@@ -111,9 +118,11 @@ int main()
 
 	bool relinkPack = false;
 	const bool metadataLoadResult = LoadPrevBuildMetadataFile(, shadersList, sourcesCache, relinkPack);
+#endif
 
 	ArrayList<ShadersListEntry*> shadersToCompile;
 
+#if 0
 	const bool rebuildAll = !metadataLoadResult;
 	if (rebuildAll)
 	{
@@ -146,6 +155,10 @@ int main()
 	}
 
 	relinkPack |= !shadersToCompile.isEmpty();
+#endif
+
+	for (ShadersListEntry& shader : shadersList)
+		shadersToCompile.pushBack(&shader);
 
 	// Compilation
 	for (const ShadersListEntry* shader : shadersToCompile)

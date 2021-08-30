@@ -10,6 +10,8 @@
 using namespace XLib;
 using namespace XEngine::Render::Shaders::Builder;
 
+#if 0
+
 XLib::TimePoint SourcesCacheEntry::checkWriteTime(const char* rootPath)
 {
 	if (writeTimeChecked)
@@ -51,3 +53,4 @@ SourcesCacheEntry& SourcesCache::getEntry(const SourcesCacheEntryId id)
 	ASSERT(id < entriesStorageList.getSize());
 	return entriesStorageList[id];
 }
+#endif
