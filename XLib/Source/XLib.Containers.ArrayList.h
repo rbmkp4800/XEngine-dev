@@ -142,7 +142,6 @@ namespace XLib
 		private AllocatorAdapterBase<AllocatorType>,
 		public NonCopyable
 	{
-		static_assert(MinCapacityLog2 > 0);
 		static_assert(MinCapacityLog2 < MaxCapacityLog2);
 		static_assert(MaxCapacityLog2 <= 32);
 
@@ -153,6 +152,7 @@ namespace XLib
 
 		struct RealIndex;
 		static inline RealIndex ConvertVirtualToRealIndex(uint32 virtualIndex);
+		static inline uint32 CalculateNthBufferSize(uint8 bufferIndex);
 
 	private:
 		Type* buffers[MaxBufferCount] = {};
@@ -361,14 +361,18 @@ namespace XLib
 	inline auto StaticSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
 		ConvertVirtualToRealIndex(const uint32 virtualIndex) -> RealIndex
 	{
-		const uint8 bufferIndex = flo32(virtualIndex >> MinCapacityLog2);;
-
-		// NOTE: `MinCapacityLog2` can't be zero because of this place
-		const uint8 offsetMaskNumBits = bufferIndex + MinCapacityLog2 - 1;
-
+		const uint8 bufferIndex = flo32(virtualIndex >> MinCapacityLog2);
+		const uint8 offsetMaskNumBits = max<sint8>(bufferIndex, 1) + sint8(MinCapacityLog2 - 1);
 		const uint32 offset = virtualIndex & ~(~uint32(0) << offsetMaskNumBits);
-
 		return RealIndex { offset, bufferIndex };
+	}
+
+	template <typename Type, uint8 MinCapacityLog2, uint8 MaxCapacityLog2, bool IsSafe, typename AllocatorType>
+	inline auto StaticSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
+		CalculateNthBufferSize(const uint8 bufferIndex) -> uint32
+	{
+		const uint8 bufferSizeLog2 = max<sint8>(bufferIndex, 1) + sint8(MinCapacityLog2 - 1);
+		return 1 << bufferSizeLog2;
 	}
 
 	template <typename Type, uint8 MinCapacityLog2, uint8 MaxCapacityLog2, bool IsSafe, typename AllocatorType>
@@ -383,7 +387,7 @@ namespace XLib
 		for (uint8 i = allocatedBufferCount; i < requiredBufferCount; i++)
 		{
 			// ASSERT(!buffers[i]);
-			buffers[i] = AllocatorBase::allocate();
+			buffers[i] = (Type*)AllocatorBase::allocate(CalculateNthBufferSize(i));
 		}
 
 		allocatedBufferCount = requiredBufferCount;
