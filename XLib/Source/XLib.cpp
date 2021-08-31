@@ -2,8 +2,7 @@
 
 #include "XLib.h"
 
-uint8 clz32(uint32 value)
-{
-	unsigned long result = 0;
-	return _BitScanReverse(&result, value) ? 31 - uint8(result) : 32;
-}
+uint8 countLeadingZeros32(uint32 value) { return uint8(__lzcnt(value)); }
+uint8 countLeadingZeros64(uint32 value) { return uint8(__lzcnt64(value)); }
+uint8 countTrailingZeros32(uint32 value) { return uint8(_tzcnt_u32(value)); }
+uint8 countTrailingZeros64(uint64 value) { return uint8(_tzcnt_u64(value)); }

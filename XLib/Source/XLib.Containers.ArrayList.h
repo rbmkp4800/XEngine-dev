@@ -373,7 +373,7 @@ namespace XLib
 	inline auto StaticSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
 		ConvertVirtualToRealIndex(const uint32 virtualIndex) -> RealIndex
 	{
-		const uint8 bufferIndex = flo32(virtualIndex >> MinCapacityLog2);
+		const uint8 bufferIndex = 32 - countLeadingZeros32(virtualIndex >> MinCapacityLog2);
 		const uint8 offsetMaskNumBits = max<sint8>(bufferIndex, 1) + sint8(MinCapacityLog2 - 1);
 		const uint32 offset = virtualIndex & ~(~uint32(0) << offsetMaskNumBits);
 		return RealIndex { offset, bufferIndex };

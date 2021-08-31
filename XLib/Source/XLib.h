@@ -115,23 +115,10 @@ constexpr inline VT remap(const XT& x, const XT& fromLeft, const XT& fromRight, 
 
 // Bitwise utils ///////////////////////////////////////////////////////////////////////////////
 
-uint8 clz32(uint32 value);
-uint8 clz64(uint64 value);
-uint8 clo32(uint32 value);
-uint8 clo64(uint64 value);
-
-inline uint8 flo32(uint32 value) { return 32 - clz32(value); }
-inline uint8 flo64(uint64 value) { return 64 - clz64(value); }
-inline uint8 flz32(uint32 value) { return 32 - clo32(value); }
-inline uint8 flz64(uint64 value) { return 64 - clo64(value); }
-
-uint8 cto(uint32 value);
-uint8 cto(uint64 value);
-uint8 ctz(uint32 value);
-uint8 ctz(uint64 value);
-
-template <typename T> constexpr inline T bitfieldExtract(T value, uint32 offset, uint32 numBits);
-template <typename T> constexpr inline T bitfieldInsert(T base, uint64 insert, uint32 offset, uint32 numBits);
+uint8 countLeadingZeros32(uint32 value);
+uint8 countLeadingZeros64(uint64 value);
+uint8 countTrailingZeros32(uint32 value);
+uint8 countTrailingZeros64(uint64 value);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 // TODO:
