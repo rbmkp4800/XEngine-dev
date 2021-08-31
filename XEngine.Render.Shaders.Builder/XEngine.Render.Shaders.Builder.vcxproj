@@ -71,6 +71,10 @@
       <AdditionalLibraryDirectories>$(ProjectDir)..\External\Microsoft.DirectXShaderCompiler\lib\$(Platform);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>dxcompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PostBuildEvent>
+      <Command>copy $(ProjectDir)..\External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\dxcompiler.dll $(OutDir)</Command>
+      <Message>Copying dxcompiler.dll to output directory</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -92,6 +96,10 @@
       <AdditionalLibraryDirectories>$(ProjectDir)..\External\Microsoft.DirectXShaderCompiler\lib\$(Platform);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>dxcompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PostBuildEvent>
+      <Command>copy $(ProjectDir)..\External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\dxcompiler.dll $(OutDir)</Command>
+      <Message>Copying dxcompiler.dll to output directory</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="XEngine.Render.Shaders.Builder.CompilerDXC.cpp" />

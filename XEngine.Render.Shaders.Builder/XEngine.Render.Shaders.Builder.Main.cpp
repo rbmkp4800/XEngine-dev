@@ -160,10 +160,12 @@ int main()
 	for (ShadersListEntry& shader : shadersList)
 		shadersToCompile.pushBack(&shader);
 
+	CompilerDXC compiler;
+
 	// Compilation
 	for (const ShadersListEntry* shader : shadersToCompile)
 	{
-
+		compiler.compile(shader->getShaderType(), shader->getSourceMain(), sourcesCache);
 	}
 
 	return 0;

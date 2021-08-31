@@ -13,6 +13,6 @@ namespace XEngine::Render::Shaders::Builder
 	class CompilerBase abstract
 	{
 	public:
-		virtual CompilerResult compile(ShaderType type, const char* fileName, SourcesCache& sourcesCache) = 0;
+		virtual CompilerResult compile(ShaderType type, SourcesCacheEntryId sourceId, SourcesCache& sourcesCache) = 0;
 	};
 }

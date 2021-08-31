@@ -14,6 +14,12 @@ namespace XEngine::Render::Shaders::Builder
 	using SourcesCacheEntryId = uint16;
 	static constexpr SourcesCacheEntryId InvalidSourceCacheEntryId = SourcesCacheEntryId(-1);
 
+	struct SourceText
+	{
+		const char* ptr;
+		uint32 size;
+	};
+
 	struct SourcesCacheEntry : public XLib::NonCopyable
 	{
 		friend SourcesCache;
@@ -31,7 +37,7 @@ namespace XEngine::Render::Shaders::Builder
 
 		XLib::TimePoint checkWriteTime(const char* rootPath);
 		//const char* getLocalPath() const { return localPath.cstr(); }
-		const char* loadText();
+		SourceText loadText();
 	};
 
 	class SourcesCache : public XLib::NonCopyable

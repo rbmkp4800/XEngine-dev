@@ -29,6 +29,7 @@ namespace XEngine::Render::Shaders::Builder
 
 		SourcesCacheEntryId sourceMain = 0;
 		ShaderType type = ShaderType::None;
+
 		bool compilationRequired = false;
 
 	public:
@@ -36,6 +37,7 @@ namespace XEngine::Render::Shaders::Builder
 		~ShadersListEntry() = default;
 
 		inline SourcesCacheEntryId getSourceMain() const { return sourceMain; }
+		inline ShaderType getShaderType() const { return type; }
 
 		inline void addSourceDependency(SourcesCacheEntryId id) { sourceDependencies.pushBack(id); }
 		inline void clearSourceDependencies() { sourceDependencies.clear(); }

@@ -60,6 +60,10 @@ namespace XLib
 		inline Type& back() { return buffer[size - 1]; }
 
 		inline operator Type*() { return buffer; }
+		inline operator const Type*() const { return buffer; }
+		inline Type* getData() { return buffer; }
+		inline const Type* getData() const { return buffer; }
+
 		inline Type* begin() { return buffer; }
 		inline Type* end() { return (Type*)buffer + size; }
 	};
@@ -94,6 +98,10 @@ namespace XLib
 		inline bool isFull() const { return size == Capacity; }
 
 		inline operator Type*() { return buffer; }
+		inline operator const Type* () const { return buffer; }
+		inline Type* getData() { return buffer; }
+		inline const Type* getData() const { return buffer; }
+
 		inline Type* begin();
 		inline Type* end();
 	};
@@ -132,6 +140,10 @@ namespace XLib
 		inline bool isEmpty() const { return size == 0; }
 
 		inline operator Type*() { return buffer; }
+		inline operator const Type* () const { return buffer; }
+		inline Type* getData() { return buffer; }
+		inline const Type* getData() const { return buffer; }
+
 		inline Type* begin();
 		inline Type* end();
 	};
