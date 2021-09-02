@@ -58,14 +58,7 @@ namespace XLib
 		inline bool isValidNode(NodeId id) const { return uint32(id) < nodes.getSize(); }
 		inline JSONValueType getNodeType(NodeId nodeId) const;
 
-		inline bool isObject(NodeId nodeId) const;
-		inline bool isArray(NodeId nodeId) const;
-		inline bool isString(NodeId nodeId) const;
-		inline bool isNumber(NodeId nodeId) const;
-		inline bool isBool(NodeId nodeId) const;
-		inline bool isNull(NodeId nodeId) const;
-
-		NodeId findObjectProperty(NodeId objectNodeId, const char* key) const;
+		NodeId getProperty(NodeId objectNodeId, const char* key) const;
 		NodeId getByPointer(const char* pointer);
 
 		inline ObjectPropsIterator getObjectPropsBegin(NodeId objectNodeId) const;
@@ -74,6 +67,15 @@ namespace XLib
 
 		inline NodeId getArrayBegin(NodeId arrayNodeId) const;
 		inline NodeId getArrayNext(NodeId arrayElementNodeId) const;
+
+		inline bool isObject(NodeId nodeId) const;
+		inline bool isArray(NodeId nodeId) const;
+		inline bool isString(NodeId nodeId) const;
+		inline bool isNumber(NodeId nodeId) const;
+		inline bool isBool(NodeId nodeId) const;
+		inline bool isNull(NodeId nodeId) const;
+
+		inline bool getStringProperty(NodeId nodeId, StringView& result);
 
 		inline StringView getString(NodeId nodeId) const;
 		inline uint64 getNumberAsI64(NodeId nodeId) const;
@@ -89,12 +91,8 @@ namespace XLib
 {
 	struct JSONDocumentTree::Node
 	{
-		uint typeBit; // 1 bit
-		uint btreeLeftId;
-		uint btreeRightId;
-		uint keyStringOffset; // 34 bit
-		uint keyStringLength; // 12 bit
-		uint nextPropertyKeyId;
+		uint64 a;
+		uint64 b;
 	};
 
 	bool JSONDocumentTree::parse(const char* text, const uint64 length)
