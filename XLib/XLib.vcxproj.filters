@@ -123,9 +123,8 @@
     <ClInclude Include="Source\XLib.SystemHeapAllocator.h" />
     <ClInclude Include="Source\XLib.Time.h" />
     <ClInclude Include="Source\XLib.CRC.h" />
-    <ClInclude Include="Source\XLib.TextStream.h" />
     <ClInclude Include="Source\XLib.String.h" />
-    <ClInclude Include="Source\XLib.Format.h" />
+    <ClInclude Include="Source\XLib.Text.h" />
     <ClInclude Include="Source\XLib.Containers.FlatHashMap.h">
       <Filter>Containers</Filter>
     </ClInclude>

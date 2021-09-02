@@ -23,7 +23,7 @@
     <ClInclude Include="Source\XLib.Color.h" />
     <ClInclude Include="Source\XLib.Containers.FlatHashMap.h" />
     <ClInclude Include="Source\XLib.Containers.IntrusiveDoublyLinkedList.h" />
-    <ClInclude Include="Source\XLib.Format.h" />
+    <ClInclude Include="Source\XLib.Text.h" />
     <ClInclude Include="Source\XLib.JSON.h" />
     <ClInclude Include="Source\XLib.Math.Quaternion.h" />
     <ClInclude Include="Source\XLib.Algorithm.QuickSort.h" />
@@ -70,7 +70,6 @@
     <ClInclude Include="Source\XLib.System.Timer.h" />
     <ClInclude Include="Source\XLib.System.VirtualMemory.h" />
     <ClInclude Include="Source\XLib.System.Window.h" />
-    <ClInclude Include="Source\XLib.TextStream.h" />
     <ClInclude Include="Source\XLib.Time.h" />
     <ClInclude Include="Source\XLib.h" />
     <ClInclude Include="Source\XLib.Vectors.Arithmetics.h" />
