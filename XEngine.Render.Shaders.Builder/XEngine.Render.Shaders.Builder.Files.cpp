@@ -1,151 +1,90 @@
 #include <XLib.h>
-#include <XLib.TextStream.h>
+#include <XLib.JSON.h>
+#include <XLib.System.File.h>
+#include <XLib.SystemHeapAllocator.h>
 
 #include "XEngine.Render.Shaders.Builder.Files.h"
 
 using namespace XLib;
 using namespace XEngine::Render::Shaders::Builder;
 
-#if 0
+//#if 0
 
 bool IsWhitespace(char c)
 {
 	return c == ' ' || c == '\f' || c == '\n' || c == '\r' || c == '\t' || c == '\v';
 }
 
-void SkipToNextLine(TextFileStreamReader& reader)
+static inline ShaderType ShaderTypeFromString(const StringView& str)
 {
-	for (;;)
-	{
-		if (reader.endOfStream())
-			return;
+	if (str.length != 2 || str.data[1] != 'S')
+		return ShaderType::None;
 
-		char c = reader.get();
-		if (c == '\n')
-			return;
-	}
-}
-
-void SkipWhitespacesAndComments(TextFileStreamReader& reader)
-{
-	for (;;)
-	{
-		if (reader.endOfStream())
-			return;
-
-		char c = char(reader.peek());
-		if (IsWhitespace(c))
-			reader.get();
-		else if (c == '#')
-			SkipToNextLine(reader);
-		else
-			return;
-
-		reader.get();
-	}
-}
-
-template <typename StringType>
-bool ReadStringInDoubleQuotes(TextFileStreamReader& reader, StringType& result)
-{
-	SkipWhitespacesAndComments(reader);
-
-	if (reader.eof())
-		return false;
-
-	char c = char(reader.get());
-	if (c != '\"')
-		return false;
-
-	for (;;)
-	{
-		if (reader.endOfStream())
-			return false;
-
-		c = char(reader.get());
-		if (c == '\"')
-			return true;
-		if (c == '\n')
-			return false;
-
-		result.append(c);
-	}
-}
-
-ShaderType ShaderTypeFromFirstLetter(char c)
-{
-	switch (c)
+	switch (str.data[0])
 	{
 		case 'C':	return ShaderType::CS;
 		case 'V':	return ShaderType::VS;
 		case 'M':	return ShaderType::MS;
 		case 'A':	return ShaderType::AS;
 		case 'P':	return ShaderType::PS;
-		default:	return ShaderType::None;
 	}
+	return ShaderType::None;
 }
 
 bool XEngine::Render::Shaders::Builder::LoadShadersListFile(const char* shadersListFilePath,
 	ShadersList& shadersList, SourcesCache& sourcesCache)
 {
-	TextFileStreamReader reader;
-	if (!reader.open(shadersListFilePath))
-	{
-		// Can't open file
+	File file;
+	file.open(shadersListFilePath, FileAccessMode::Read);
+	
+	const uint64 fileSize = file.getSize();
+
+	// TODO: This should be some kind of safe ptr, so we can release on return
+	char* fileContent = (char*)SystemHeapAllocator::Allocate(fileSize);
+
+	using JSONNodeId = JSONDocumentTree::NodeId;
+	static constexpr JSONNodeId JSONRootNodeId = JSONDocumentTree::RootNodeId;
+	static constexpr JSONNodeId JSONInvalidNodeId = JSONDocumentTree::InvalidNodeId;
+
+	JSONDocumentTree jsonTree;
+	if (!jsonTree.parse(fileContent))
 		return false;
-	}
 
-	for (;;)
+	if (jsonTree.isEmpty() || !jsonTree.isArray(JSONRootNodeId))
+		return false;
+
+	for (JSONNodeId jsonRootArrayIt = jsonTree.getArrayBegin(JSONRootNodeId);
+		jsonRootArrayIt != JSONInvalidNodeId;
+		jsonRootArrayIt = jsonTree.getArrayNext(jsonRootArrayIt))
 	{
-		SkipWhitespacesAndComments(reader);
-
-		if (reader.endOfStream())
-			return true;
-
-		char c = reader.get();
-
-		if (c == ';')
-			continue;
-
-		if (c != '$')
-		{
-			// Expected shader decl
+		if (!jsonTree.isObject(jsonRootArrayIt))
 			return false;
+
+		StringView shaderName = {};
+		StringView shaderTypeStr = {};
+		StringView shaderSourcePath = {};
+		StringView shaderEntryPoint = {};
+
+		if (!jsonTree.getStringProperty(jsonRootArrayIt, "name", shaderName))
+			return false;
+		if (!jsonTree.getStringProperty(jsonRootArrayIt, "type", shaderTypeStr))
+			return false;
+		if (!jsonTree.getStringProperty(jsonRootArrayIt, "src", shaderSourcePath))
+			return false;
+
+		const ShaderType shaderType = ShaderTypeFromString(shaderTypeStr);
+		if (shaderType == ShaderType::None)
+			return false;
+
+		JSONNodeId entryPointNameNodeId = jsonTree.getProperty(jsonRootArrayIt, "entryPoint");
+		if (entryPointNameNodeId != JSONInvalidNodeId)
+		{
+			if (!jsonTree.isString(entryPointNameNodeId))
+				return false;
+			shaderEntryPoint = jsonTree.asString(entryPointNameNodeId);
 		}
 
-		ShaderType shaderType = ShaderTypeFromFirstLetter(reader.get());
-
-		char c1 = reader.get();
-		char c2 = reader.get();
-		if (shaderType == ShaderType::None || c1 != 'S' || !IsWhitespace(c2))
-		{
-			// Invalid shader decl
-			return false;
-		}
-
-		ShaderNameString shaderName;
-		if (!ReadStringInDoubleQuotes(reader, shaderName))
-		{
-			// Expected shader name
-			return false;
-		}
-
-		SourcePathString mainSourceFilePath;
-		if (!ReadStringInDoubleQuotes(reader, mainSourceFilePath))
-		{
-			// Expected shader source path
-			return false;
-		}
-
-		SkipWhitespacesAndComments(reader);
-		c = reader.get();
-		if (c != ';')
-		{
-			// Expected `;`
-			return false;
-		}
-
-		const SourcesCacheEntryId mainSourceId = sourcesCache.findOrCreateEntry(mainSourceFilePath.cstr());
+		const SourcesCacheEntryId mainSourceId = sourcesCache.findOrCreateEntry(shaderSourcePath);
 
 		ShadersListEntry* shaderEntry = shadersList.createEntry(shaderName, shaderType, mainSourceId);
 		if (!shaderEntry)
@@ -154,16 +93,12 @@ bool XEngine::Render::Shaders::Builder::LoadShadersListFile(const char* shadersL
 			return false;
 		}
 	}
+
+	SystemHeapAllocator::Release(fileContent);
 }
 
 bool XEngine::Render::Shaders::Builder::LoadPrevBuildMetadataFile(const char* metadataFilePath,
 	ShadersList& shadersList, SourcesCache& sourcesCache, bool& needToRelinkPack)
 {
-	TextFileStreamReader reader;
-	if (!reader.open(metadataFilePath))
-		return false;
-
 
 }
-
-#endif

@@ -24,7 +24,7 @@ namespace XEngine::Render::Shaders::Builder
 		XLib::IntrusiveBinaryTreeNodeHook shadersSearchTreeHook;
 
 		XLib::InplaceString<63, uint8> name;
-		XLib::InplaceString<31, uint8> mainFuncName;
+		XLib::InplaceString<31, uint8> entryPointName;
 		SourceDependenciesList sourceDependencies;
 
 		SourcesCacheEntryId sourceMain = 0;

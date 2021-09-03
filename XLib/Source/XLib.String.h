@@ -7,14 +7,10 @@
 namespace XLib
 {
 	template <typename CharType = char>
-	class BaseStringView
+	struct BaseStringView
 	{
-	private:
-		CharType* str;
+		CharType* data;
 		uintptr length;
-
-	public:
-
 	};
 
 	using StringView = BaseStringView<char>;

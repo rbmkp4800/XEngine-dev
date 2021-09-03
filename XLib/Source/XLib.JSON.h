@@ -75,12 +75,12 @@ namespace XLib
 		inline bool isBool(NodeId nodeId) const;
 		inline bool isNull(NodeId nodeId) const;
 
-		inline bool getStringProperty(NodeId nodeId, StringView& result);
+		inline bool getStringProperty(NodeId objectNodeId, const char* n, StringView& result);
 
-		inline StringView getString(NodeId nodeId) const;
-		inline uint64 getNumberAsI64(NodeId nodeId) const;
-		inline float64 getNumberAsF64(NodeId nodeId) const;
-		inline bool getBool(NodeId nodeId) const;
+		inline StringView asString(NodeId nodeId) const;
+		inline uint64 asNumberI64(NodeId nodeId) const;
+		inline float64 asNumberF64(NodeId nodeId) const;
+		inline bool asBool(NodeId nodeId) const;
 	};
 }
 
