@@ -32,6 +32,7 @@ namespace XEngine::Render::Device_
 		XLib::Platform::COMPtr<ID3D12GraphicsCommandList6> d3dDefaultCL;
 
 		XLib::Platform::COMPtr<ID3D12RootSignature> d3dGBufferPassRS;
+		XLib::Platform::COMPtr<ID3D12RootSignature> d3dDepthDownsampleRS;
 		XLib::Platform::COMPtr<ID3D12RootSignature> d3dLightingPassRS;
 		XLib::Platform::COMPtr<ID3D12RootSignature> d3dPostProcessRS;
 

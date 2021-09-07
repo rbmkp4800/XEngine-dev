@@ -11,6 +11,7 @@
 #include "XEngine.Render.Device.GPUDescriptorHeap.h"
 #include "XEngine.Render.Device.MaterialHeap.h"
 #include "XEngine.Render.Device.Renderer.h"
+#include "XEngine.Render.Device.ShadersLoader.h"
 #include "XEngine.Render.Device.TextureHeap.h"
 #include "XEngine.Render.Device.UIResources.h"
 #include "XEngine.Render.Device.Uploader.h"
@@ -65,8 +66,8 @@ namespace XEngine::Render
 		Device_::MaterialHeap materialHeap;
 		Device_::GeometryHeap geometryHeap;
 
-	//	Device_::ShadersLoader shadersLoader;
-	//	Device_::PSOBuilder psoBuilder;
+		Device_::ShadersLoader shadersLoader;
+	//	Device_::AsyncPSOCompiler asyncPSOCompiler;
 		Device_::Renderer renderer;
 		Device_::Uploader uploader; // TODO: maybe rename to AsyncUploader
 

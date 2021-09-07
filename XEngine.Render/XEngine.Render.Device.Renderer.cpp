@@ -1,5 +1,6 @@
 // TODO: "Downsample" depth, not "downscale"!
 // TODO: Inverse barriers logic. SRV by default, transition to RT before rendering.
+// TODO: Move PS data to the beginning of Root Signature
 
 #include <d3d12.h>
 
@@ -309,7 +310,7 @@ void Renderer::render(Scene& scene, const Camera& camera, GBuffer& gBuffer, Targ
 		d3dDefaultCA->Reset();
 		d3dDefaultCL->Reset(d3dDefaultCA, nullptr);
 
-		ID3D12DescriptorHeap *d3dDescriptorHeaps[] = { device.srvHeap.getD3D12DescriptorHeap() };
+		ID3D12DescriptorHeap* d3dDescriptorHeaps[] = { device.srvHeap.getD3D12DescriptorHeap() };
 		d3dDefaultCL->SetDescriptorHeaps(countof(d3dDescriptorHeaps), d3dDescriptorHeaps);
 	}
 

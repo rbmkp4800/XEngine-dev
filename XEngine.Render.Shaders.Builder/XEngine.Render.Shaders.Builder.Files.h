@@ -15,5 +15,5 @@ namespace XEngine::Render::Shaders::Builder
 
 	bool StoreObjectFile();
 
-	bool StoreShadersPackFile(const char* shadersPackFilePath, const ShadersList& shadersList);
+	bool StoreShaderPackFile(const char* shaderPackFilePath, const ShadersList& shadersList);
 }

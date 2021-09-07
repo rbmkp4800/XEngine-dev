@@ -39,7 +39,7 @@ CompilerResult CompilerDXC::compile(ShaderType type, SourcesCacheEntryId sourceI
 	DxcBuffer dxcSourceBuffer = {};
 	dxcSourceBuffer.Ptr = sourceText.ptr;
 	dxcSourceBuffer.Size = sourceText.size;
-	dxcSourceBuffer.Encoding = 0;
+	dxcSourceBuffer.Encoding = CP_ACP; // CP_UTF8
 
 	using DXCArgsList = ExpandableInplaceArrayList<LPCWSTR, 32, uint16, false>;
 	DXCArgsList dxcArgsList;

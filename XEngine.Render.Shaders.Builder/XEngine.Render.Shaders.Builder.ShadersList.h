@@ -48,7 +48,7 @@ namespace XEngine::Render::Shaders::Builder
 		inline bool isCompilationRequired() const { return compilationRequired; }
 	};
 
-	class ShadersList
+	class ShadersList : public XLib::NonCopyable
 	{
 	private:
 		using EntriesSearchTree = XLib::IntrusiveBinaryTree<ShadersListEntry, &ShadersListEntry::shadersSearchTreeHook>;
@@ -69,6 +69,8 @@ namespace XEngine::Render::Shaders::Builder
 		ShadersListEntry* createEntry(const char* name, ShaderType type, SourcesCacheEntryId mainSourceId);
 
 		inline bool isEmpty() const { return entriesStorageList.isEmpty(); }
+		inline uint32 getSize() const { return entriesStorageList.getSize(); }
+
 		inline Iterator begin() { return entriesSearchTree.begin(); }
 		inline Iterator end() { return entriesSearchTree.end(); }
 	};

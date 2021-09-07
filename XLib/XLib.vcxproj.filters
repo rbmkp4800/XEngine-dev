@@ -179,7 +179,6 @@
     <ClCompile Include="Source\XLib.SystemHeapAllocator.cpp" />
     <ClCompile Include="Source\XLib.CRC.cpp" />
     <ClCompile Include="Source\XLib.String.cpp" />
-    <ClCompile Include="Source\XLib.JSON.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Algorithm">

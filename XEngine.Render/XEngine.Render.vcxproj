@@ -122,6 +122,7 @@
     <ClInclude Include="XEngine.Render.Device.BufferHeap.h" />
     <ClInclude Include="XEngine.Render.Device.MaterialHeap.h" />
     <ClInclude Include="XEngine.Render.Device.Renderer.h" />
+    <ClInclude Include="XEngine.Render.Device.ShadersLoader.h" />
     <ClInclude Include="XEngine.Render.Device.UIResources.h" />
     <ClInclude Include="XEngine.Render.Device.Uploader.h" />
     <ClInclude Include="XEngine.Render.MIPMapGenerator.h" />

@@ -79,7 +79,6 @@
   <ItemGroup>
     <ClCompile Include="Source\XLib.CRC.cpp" />
     <ClCompile Include="Source\XLib.Debug.cpp" />
-    <ClCompile Include="Source\XLib.JSON.cpp" />
     <ClCompile Include="Source\XLib.Platform.COMPtr.cpp" />
     <ClCompile Include="Source\XLib.Program.cpp" />
     <ClCompile Include="Source\XLib.SystemHeapAllocator.cpp" />

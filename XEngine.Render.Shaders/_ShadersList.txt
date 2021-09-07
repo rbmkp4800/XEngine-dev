@@ -19,15 +19,39 @@ $AS   SceneGeometryAS[wave64]*US1*AFS0   SceneGeometryAS:main   WAVE_SIZE_LOG2="
 // JSON format (maybe even JSON5)
 [
     {
-        "name" : "SceneGeometryAS[wave32]*US0*AFS0",
-        "type" : "AS",
-        "src" : "SceneGeometryAS.hlsl",
-        "entryPoint" : "main",
-        "defines" : {
-            "WAVE_SIZE_LOG2" : "5",
-            "UNDERSAMPLE" : "0"
+        type : "AS",
+        name : "SceneGeometryAS[wave32]*US0*AFS0",
+        src : "SceneGeometryAS.hlsl",
+        entryPoint : "main",
+        rootSig : "DefaultRS",
+        defines : {
+            WAVE_SIZE_LOG2 : 5,
+            UNDERSAMPLE : 0,
         }
     },
+    {
+        type : "RootSig",
+        name : "DefaultRS",
+        src : "DefaultRS.json",
+    },
+
     { "name":"SceneGeometryAS[wave32]*US0*AFS0", "type":"AS", "src":"SceneGeometryAS.hlsl", "entryPoint":"main", "defines":{ "WAVE_SIZE_LOG2":"5", "UNDERSAMPLE" : "0" } },
     { "name":"SceneGeometryAS[wave32]*US0*AFS0", "type":"AS", "src":"SceneGeometryAS.hlsl", "entryPoint":"main", "defines":{ "WAVE_SIZE_LOG2":"5", "UNDERSAMPLE" : "0" } }
 ]
+
+
+// Root signature
+{
+    rootFlags : [
+        
+    ],
+    params : [
+        {
+            name : "globalCB",
+            type : "CBV",
+            register : 0,
+            registerSpace : 0,
+            shaderVis : "AS|MS",
+        },
+    ],
+}

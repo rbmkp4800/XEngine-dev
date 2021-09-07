@@ -159,6 +159,11 @@
   <ItemGroup>
     <ClCompile Include="XEngine.GeometryImporter.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\XLib\XLib.vcxproj">
+      <Project>{df81a513-72e3-4b74-b866-97f3bb61d45f}</Project>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

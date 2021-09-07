@@ -5,6 +5,8 @@
 
 #include "XEngine.Render.Shaders.Builder.Files.h"
 
+#include "XEngine.Render.Shaders.PackFile.h"
+
 using namespace XLib;
 using namespace XEngine::Render::Shaders::Builder;
 
@@ -76,7 +78,7 @@ bool XEngine::Render::Shaders::Builder::LoadShadersListFile(const char* shadersL
 		if (shaderType == ShaderType::None)
 			return false;
 
-		JSONNodeId entryPointNameNodeId = jsonTree.getProperty(jsonRootArrayIt, "entryPoint");
+		const JSONNodeId entryPointNameNodeId = jsonTree.getProperty(jsonRootArrayIt, "entryPoint");
 		if (entryPointNameNodeId != JSONInvalidNodeId)
 		{
 			if (!jsonTree.isString(entryPointNameNodeId))
@@ -102,3 +104,24 @@ bool XEngine::Render::Shaders::Builder::LoadPrevBuildMetadataFile(const char* me
 {
 
 }
+
+bool XEngine::Render::Shaders::Builder::StoreShaderPackFile(const char* shaderPackFilePath,
+	const ShadersList& shadersList)
+{
+	File file;
+	file.open(shaderPackFilePath, FileAccessMode::Write, FileOpenMode::Override);
+
+	PackFile::Header header = {};
+	header.signature = PackFile::Signature;
+	header.version = PackFile::CurrentVersion;
+	header.platformFlags = 0;
+	header.rootSignatureCount = 0;
+	// ASSERT(shadersList.getSize() < UINT16_MAX);
+	header.shaderCount = uint32(shadersList.getSize());
+
+	file.write(header);
+
+	file.close();
+}
+
+#endif
