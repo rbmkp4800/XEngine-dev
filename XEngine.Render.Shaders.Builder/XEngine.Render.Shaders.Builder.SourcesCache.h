@@ -14,30 +14,30 @@ namespace XEngine::Render::Shaders::Builder
 	using SourcesCacheEntryId = uint16;
 	static constexpr SourcesCacheEntryId InvalidSourceCacheEntryId = SourcesCacheEntryId(-1);
 
-	struct SourceText
-	{
-		const char* ptr;
-		uint32 size;
-	};
-
 	struct SourcesCacheEntry : public XLib::NonCopyable
 	{
 		friend SourcesCache;
 
 	private:
+		using LocalPathInplaceString = XLib::InplaceString<63, uint8>;
+
+	private:
 		XLib::IntrusiveBinaryTreeNodeHook entriesSearchTreeHook;
-		XLib::InplaceString<63, uint8> localPath;
+		LocalPathInplaceString localPath;
 		XLib::TimePoint writeTime = 0;
 		const char* text = nullptr;
 		bool writeTimeChecked = false;
 
-	public:
+	private:
 		SourcesCacheEntry() = default;
 		~SourcesCacheEntry() = default;
 
+	public:
 		XLib::TimePoint checkWriteTime(const char* rootPath);
 		//const char* getLocalPath() const { return localPath.cstr(); }
-		SourceText loadText();
+		StringView loadText();
+
+		static constexpr uintptr LocalPathLengthLimit = LocalPathInplaceString::GetMaxLength();
 	};
 
 	class SourcesCache : public XLib::NonCopyable
@@ -54,7 +54,7 @@ namespace XEngine::Render::Shaders::Builder
 		SourcesCache() = default;
 		~SourcesCache() = default;
 
-		SourcesCacheEntryId findOrCreateEntry(const char* localPath);
+		SourcesCacheEntryId findOrCreateEntry(StringView localPath);
 		SourcesCacheEntry& getEntry(SourcesCacheEntryId id);
 	};
 }

@@ -13,18 +13,20 @@ namespace XEngine::Render::Shaders::Builder
 {
 	class ShadersList;
 
-	class ShadersListEntry : public XLib::NonCopyable
+	class Shader : public XLib::NonCopyable
 	{
 		friend ShadersList;
 
 	private:
+		using NameInplaceString = XLib::InplaceString<63, uint8>;
+		using EntryPointNameInplaceString = XLib::InplaceString<31, uint8>;
 		using SourceDependenciesList = XLib::ExpandableInplaceArrayList<SourcesCacheEntryId, 14, uint16, false>;
 
 	private:
-		XLib::IntrusiveBinaryTreeNodeHook shadersSearchTreeHook;
+		XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
 
-		XLib::InplaceString<63, uint8> name;
-		XLib::InplaceString<31, uint8> entryPointName;
+		NameInplaceString name;
+		EntryPointNameInplaceString entryPointName;
 		SourceDependenciesList sourceDependencies;
 
 		SourcesCacheEntryId sourceMain = 0;
@@ -32,10 +34,11 @@ namespace XEngine::Render::Shaders::Builder
 
 		bool compilationRequired = false;
 
-	public:
-		ShadersListEntry() = default;
-		~ShadersListEntry() = default;
+	private:
+		Shader() = default;
+		~Shader() = default;
 
+	public:
 		inline SourcesCacheEntryId getSourceMain() const { return sourceMain; }
 		inline ShaderType getShaderType() const { return type; }
 
@@ -46,13 +49,16 @@ namespace XEngine::Render::Shaders::Builder
 
 		inline void setCompilationRequired() { compilationRequired = true; }
 		inline bool isCompilationRequired() const { return compilationRequired; }
+
+		static constexpr uintptr NameLengthLimit = NameInplaceString::GetMaxLength();
+		static constexpr uintptr EntryPointNameLengthLimit = EntryPointNameInplaceString::GetMaxLength();
 	};
 
 	class ShadersList : public XLib::NonCopyable
 	{
 	private:
-		using EntriesSearchTree = XLib::IntrusiveBinaryTree<ShadersListEntry, &ShadersListEntry::shadersSearchTreeHook>;
-		using EntriesStorageList = XLib::StaticSegmentedArrayList<ShadersListEntry, 5, 16>;
+		using EntriesSearchTree = XLib::IntrusiveBinaryTree<Shader, &Shader::searchTreeHook>;
+		using EntriesStorageList = XLib::StaticSegmentedArrayList<Shader, 5, 16>;
 
 	private:
 		EntriesSearchTree entriesSearchTree;
@@ -66,7 +72,7 @@ namespace XEngine::Render::Shaders::Builder
 		~ShadersList() = default;
 
 		// returns null if entry with this name already exists
-		ShadersListEntry* createEntry(const char* name, ShaderType type, SourcesCacheEntryId mainSourceId);
+		Shader* createEntry(StringView name, ShaderType type, SourcesCacheEntryId mainSourceId);
 
 		inline bool isEmpty() const { return entriesStorageList.isEmpty(); }
 		inline uint32 getSize() const { return entriesStorageList.getSize(); }

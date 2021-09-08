@@ -6,11 +6,25 @@
 
 namespace XLib
 {
-	template <typename CharType = char>
-	struct BaseStringView
+	template <typename CharType = char, typename CounterType = uintptr>
+	class BaseStringView
 	{
-		CharType* data;
-		uintptr length;
+	private:
+		const CharType* data = nullptr;
+		CounterType length = 0;
+
+	public:
+		BaseStringView() = default;
+		~BaseStringView() = default;
+
+		inline BaseStringView(const CharType* data, CounterType length) : data(data), length(length) {}
+
+		inline const CharType& operator [] (CounterType index) const { return data[index]; }
+
+		inline const CharType* getData() const { return data; }
+
+		inline CounterType getLength() const { return length; }
+		inline bool isEmpty() const { return length == 0; }
 	};
 
 	using StringView = BaseStringView<char>;
@@ -33,16 +47,18 @@ namespace XLib
 		inline void clear();
 		inline void truncate(CounterType newLength);
 
-		inline const CharType* cstr() const { return buffer; }
+		inline const CharType* getCStr() const { return buffer; }
 
 		inline CounterType getLength() const { return length; }
 		inline bool isEmpty() const { return length == 0; }
 	};
 
 
-	template <uintptr Capacity = 64, typename CounterType = uint8, typename CharType = char>
+	template <uintptr Capacity, typename CounterType = uint8, typename CharType = char>
 	class InplaceString
 	{
+		static_assert(Capacity > 1); // at least one character
+
 	private:
 		CounterType length = 0;
 		CharType storage[Capacity];
@@ -51,25 +67,26 @@ namespace XLib
 		inline InplaceString();
 		~InplaceString() = default;
 
-		inline bool copyFromCStr(const char* string, uintptr lengthLimit = uintptr(-1));
+		inline bool copyFrom(const char* cstr, uintptr lengthLimit = uintptr(-1));
+		inline bool copyFrom(StringView string);
 
-		inline bool append(const char* string, uintptr appendLengthLimit = uintptr(-1));
-		//inline bool append(StringView);
+		inline bool append(const char* cstr, uintptr appendLengthLimit = uintptr(-1));
+		inline bool append(StringView string);
 
 		inline void clear();
 		inline void truncate(CounterType newLength);
 		//inline bool recalculateLength();
 
-		inline const CharType* cstr() const { return &storage; }
-		//inline operator const CharType*() const { return &storage; }
+		inline const CharType* getCStr() const { return &storage; }
+		inline StringView getView() const { return StringView(&storage, length); }
 		inline CharType* getMutableStorage() { return &storage; }
 
+		inline CounterType getLength() const { return length; }
 		inline bool isEmpty() const { return length == 0; }
 		inline bool isFull() const { return length + 1 == Capacity; }
-		inline CounterType getLength() const { return length; }
 
-		inline CounterType getCapacity() const { return Capacity; }
-		static inline CounterType GetCapacity() { return Capacity; }
+		static constexpr CounterType GetCapacity() { return Capacity; }
+		static constexpr CounterType GetMaxLength() { return Capacity - 1; }
 	};
 
 	using InplaceString32 = InplaceString<31, uint8>;		static_assert(sizeof(InplaceString32) == 32);

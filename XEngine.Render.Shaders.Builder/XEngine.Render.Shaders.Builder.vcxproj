@@ -112,6 +112,7 @@
     <ClInclude Include="XEngine.Render.Shaders.Builder.CompilerBase.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.CompilerDXC.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.Files.h" />
+    <ClInclude Include="XEngine.Render.Shaders.Builder.RootSignaturesList.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.ShadersList.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.SourcesCache.h" />
     <ClInclude Include="XEngine.Render.Shaders.PackFile.h" />

@@ -19,10 +19,10 @@ bool IsWhitespace(char c)
 
 static inline ShaderType ShaderTypeFromString(const StringView& str)
 {
-	if (str.length != 2 || str.data[1] != 'S')
+	if (str.getLength() != 2 || str[1] != 'S')
 		return ShaderType::None;
 
-	switch (str.data[0])
+	switch (str[0])
 	{
 		case 'C':	return ShaderType::CS;
 		case 'V':	return ShaderType::VS;
@@ -34,7 +34,7 @@ static inline ShaderType ShaderTypeFromString(const StringView& str)
 }
 
 bool XEngine::Render::Shaders::Builder::LoadShadersListFile(const char* shadersListFilePath,
-	ShadersList& shadersList, SourcesCache& sourcesCache)
+	ShadersList& shadersList, RootSignaturesList& rootSignaturesList, SourcesCache& sourcesCache)
 {
 	File file;
 	file.open(shadersListFilePath, FileAccessMode::Read);
@@ -43,6 +43,11 @@ bool XEngine::Render::Shaders::Builder::LoadShadersListFile(const char* shadersL
 
 	// TODO: This should be some kind of safe ptr, so we can release on return
 	char* fileContent = (char*)SystemHeapAllocator::Allocate(fileSize);
+
+	uint32 readSize = 0;
+	const bool readResult = file.read(fileContent, fileSize, readSize);
+	if (!readResult || readSize != fileSize)
+		return false;
 
 	using JSONNodeId = JSONDocumentTree::NodeId;
 	static constexpr JSONNodeId JSONRootNodeId = JSONDocumentTree::RootNodeId;
@@ -74,6 +79,13 @@ bool XEngine::Render::Shaders::Builder::LoadShadersListFile(const char* shadersL
 		if (!jsonTree.getStringProperty(jsonRootArrayIt, "src", shaderSourcePath))
 			return false;
 
+		if (shaderName.getLength() > Shader::NameLengthLimit)
+			return false;
+		if (shaderEntryPoint.getLength() > Shader::EntryPointNameLengthLimit)
+			return false;
+		if (shaderSourcePath.getLength() > SourcesCacheEntry::LocalPathLengthLimit)
+			return false;
+
 		const ShaderType shaderType = ShaderTypeFromString(shaderTypeStr);
 		if (shaderType == ShaderType::None)
 			return false;
@@ -88,8 +100,8 @@ bool XEngine::Render::Shaders::Builder::LoadShadersListFile(const char* shadersL
 
 		const SourcesCacheEntryId mainSourceId = sourcesCache.findOrCreateEntry(shaderSourcePath);
 
-		ShadersListEntry* shaderEntry = shadersList.createEntry(shaderName, shaderType, mainSourceId);
-		if (!shaderEntry)
+		Shader* shader= shadersList.createEntry(shaderName, shaderType, mainSourceId);
+		if (!shader)
 		{
 			// Duplicate shader
 			return false;
@@ -123,5 +135,3 @@ bool XEngine::Render::Shaders::Builder::StoreShaderPackFile(const char* shaderPa
 
 	file.close();
 }
-
-#endif

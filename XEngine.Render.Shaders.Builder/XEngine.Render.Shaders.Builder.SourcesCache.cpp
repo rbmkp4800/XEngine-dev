@@ -10,25 +10,23 @@
 using namespace XLib;
 using namespace XEngine::Render::Shaders::Builder;
 
-#if 0
-
 XLib::TimePoint SourcesCacheEntry::checkWriteTime(const char* rootPath)
 {
 	if (writeTimeChecked)
 		return writeTime;
 
 	InplaceString1024 fullPath;
-	fullPath.copyFromCStr(rootPath);
-	fullPath.append(localPath);
+	fullPath.copyFrom(rootPath);
+	fullPath.append(localPath.getView());
 	// TODO: Assert total length
 
-	writeTime = XLib::FileSystem::GetFileLastWriteTime(fullPath.cstr());
+	writeTime = XLib::FileSystem::GetFileLastWriteTime(fullPath.getCStr());
 	writeTimeChecked = true;
 
 	return writeTime;
 }
 
-SourcesCacheEntryId SourcesCache::findOrCreateEntry(const char* localPath)
+SourcesCacheEntryId SourcesCache::findOrCreateEntry(StringView localPath)
 {
 	EntriesSearchTree::Iterator it = entriesSearchTree.find(path);
 	if (it.isValid())
@@ -42,7 +40,7 @@ SourcesCacheEntryId SourcesCache::findOrCreateEntry(const char* localPath)
 	{
 		const uintptr index = entriesStorageList.getSize();
 		SourcesCacheEntry& entry = entriesStorageList.emplaceBack();
-		entry.localPath.copyFromCStr(localPath); // TODO: `fillFrom` and check length
+		entry.localPath.copyFrom(localPath); // TODO: `fillFrom` and check length
 		entriesSearchTree.insert(entry);
 		return SourcesCacheEntryId(index);
 	}
@@ -53,4 +51,3 @@ SourcesCacheEntry& SourcesCache::getEntry(const SourcesCacheEntryId id)
 	ASSERT(id < entriesStorageList.getSize());
 	return entriesStorageList[id];
 }
-#endif

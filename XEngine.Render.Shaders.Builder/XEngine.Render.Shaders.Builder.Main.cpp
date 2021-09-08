@@ -1,13 +1,13 @@
 #include <XLib.h>
 #include <XLib.FileSystem.h>
 #include <XLib.String.h>
-#include <XLib.Format.h>
-#include <XLib.TextStream.h>
+#include <XLib.Text.h>
 #include <XLib.Time.h>
 
 #include "XEngine.Render.Shaders.Builder.Common.h"
 #include "XEngine.Render.Shaders.Builder.CompilerDXC.h"
 #include "XEngine.Render.Shaders.Builder.Files.h"
+#include "XEngine.Render.Shaders.Builder.RootSignaturesList.h"
 #include "XEngine.Render.Shaders.Builder.ShadersList.h"
 #include "XEngine.Render.Shaders.Builder.SourcesCache.h"
 
@@ -103,6 +103,7 @@ int main()
 	}
 #endif
 
+	RootSignaturesList rootSignaturesList;
 	ShadersList shadersList;
 	SourcesCache sourcesCache;
 
@@ -120,7 +121,7 @@ int main()
 	const bool metadataLoadResult = LoadPrevBuildMetadataFile(, shadersList, sourcesCache, relinkPack);
 #endif
 
-	ArrayList<ShadersListEntry*> shadersToCompile;
+	ArrayList<Shader*> shadersToCompile;
 
 #if 0
 	const bool rebuildAll = !metadataLoadResult;
@@ -157,13 +158,13 @@ int main()
 	relinkPack |= !shadersToCompile.isEmpty();
 #endif
 
-	for (ShadersListEntry& shader : shadersList)
+	for (Shader& shader : shadersList)
 		shadersToCompile.pushBack(&shader);
 
 	CompilerDXC compiler;
 
 	// Compilation
-	for (const ShadersListEntry* shader : shadersToCompile)
+	for (const Shader* shader : shadersToCompile)
 	{
 		compiler.compile(shader->getShaderType(), shader->getSourceMain(), sourcesCache);
 	}
