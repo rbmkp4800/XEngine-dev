@@ -38,7 +38,7 @@ bool XEngine::Render::Shaders::Builder::LoadShadersListFile(const char* shadersL
 {
 	File file;
 	file.open(shadersListFilePath, FileAccessMode::Read);
-	
+
 	const uint64 fileSize = file.getSize();
 
 	// TODO: This should be some kind of safe ptr, so we can release on return
@@ -46,6 +46,9 @@ bool XEngine::Render::Shaders::Builder::LoadShadersListFile(const char* shadersL
 
 	uint32 readSize = 0;
 	const bool readResult = file.read(fileContent, fileSize, readSize);
+
+	file.close();
+
 	if (!readResult || readSize != fileSize)
 		return false;
 
@@ -100,7 +103,7 @@ bool XEngine::Render::Shaders::Builder::LoadShadersListFile(const char* shadersL
 
 		const SourcesCacheEntryId mainSourceId = sourcesCache.findOrCreateEntry(shaderSourcePath);
 
-		Shader* shader= shadersList.createEntry(shaderName, shaderType, mainSourceId);
+		Shader* shader = shadersList.createEntry(shaderName, shaderType, mainSourceId);
 		if (!shader)
 		{
 			// Duplicate shader

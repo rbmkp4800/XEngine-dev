@@ -115,9 +115,11 @@
     <ClInclude Include="XEngine.Render.Shaders.Builder.RootSignaturesList.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.ShadersList.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.SourcesCache.h" />
-    <ClInclude Include="XEngine.Render.Shaders.PackFile.h" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\XEngine.Render.Shaders.PackFile\XEngine.Render.Shaders.PackFile.vcxproj">
+      <Project>{e41c3648-b10a-4c33-a052-d98f8ed51ab0}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\XLib\XLib.vcxproj">
       <Project>{df81a513-72e3-4b74-b866-97f3bb61d45f}</Project>
     </ProjectReference>

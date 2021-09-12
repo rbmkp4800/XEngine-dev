@@ -19,7 +19,7 @@ namespace XEngine::Render::Shaders::Builder
 		friend SourcesCache;
 
 	private:
-		using LocalPathInplaceString = XLib::InplaceString<63, uint8>;
+		using LocalPathInplaceString = XLib::InplaceString<95, uint8>;
 
 	private:
 		XLib::IntrusiveBinaryTreeNodeHook entriesSearchTreeHook;
@@ -44,7 +44,7 @@ namespace XEngine::Render::Shaders::Builder
 	{
 	private:
 		using EntriesSearchTree = XLib::IntrusiveBinaryTree<SourcesCacheEntry, &SourcesCacheEntry::entriesSearchTreeHook>;
-		using EntriesStorageList = XLib::StaticSegmentedArrayList<SourcesCacheEntry, 5, 14>;
+		using EntriesStorageList = XLib::StaticSegmentedArrayList<SourcesCacheEntry, 5, 16>;
 
 	private:
 		EntriesSearchTree entriesSearchTree;
