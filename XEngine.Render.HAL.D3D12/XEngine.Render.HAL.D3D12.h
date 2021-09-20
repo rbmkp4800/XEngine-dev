@@ -4,14 +4,21 @@
 #include <XLib.NonCopyable.h>
 #include <XLib.Platform.COMPtr.h>
 
-struct ID3D12Device2;
-struct ID3D12DescriptorHeap;
-struct ID3D12GraphicsCommandList;
 struct ID3D12CommandAllocator;
+struct ID3D12DescriptorHeap;
+struct ID3D12Device2;
+struct ID3D12GraphicsCommandList;
+struct ID3D12PipelineState;
+struct ID3D12Resource;
+struct IDXGISwapChain3;
 
 namespace XEngine::Render::HAL
 {
 	class Device;
+
+	using BindPointRef = uint32;
+	using RenderTargetRef = uint32;
+	using DepthStencilRef = uint32;
 
 	enum class BufferType : uint8
 	{
@@ -24,6 +31,16 @@ namespace XEngine::Render::HAL
 	{
 		None = 0,
 		
+	};
+
+	struct RasterizerDesc
+	{
+
+	};
+
+	struct BlendDesc
+	{
+
 	};
 
 	class Buffer : public XLib::NonCopyable
@@ -44,11 +61,25 @@ namespace XEngine::Render::HAL
 	class GraphicsPipeline : public XLib::NonCopyable
 	{
 		friend Device;
+
+	private:
+		ID3D12PipelineState* d3dPSO = nullptr;
+
+	public:
+		GraphicsPipeline() = default;
+		~GraphicsPipeline();
 	};
 
 	class ComputePipeline : public XLib::NonCopyable
 	{
 		friend Device;
+
+	private:
+		ID3D12PipelineState* d3dPSO = nullptr;
+
+	public:
+		ComputePipeline() = default;
+		~ComputePipeline();
 	};
 
 	class GraphicsCommandList : public XLib::NonCopyable
@@ -56,23 +87,32 @@ namespace XEngine::Render::HAL
 		friend Device;
 
 	private:
-		XLib::Platform::COMPtr<ID3D12GraphicsCommandList> d3dCommandList;
-		XLib::Platform::COMPtr<ID3D12CommandAllocator> d3dCommandAllocator;
+		ID3D12GraphicsCommandList* d3dCommandList = nullptr;
+		ID3D12CommandAllocator* d3dCommandAllocator = nullptr;
 
 	public:
 		GraphicsCommandList() = default;
 		~GraphicsCommandList();
 
-		void bindGraphicsPipeline(GraphicsPipeline& pipeline);
-		void bindComputePipeline(ComputePipeline& pipeline);
+		void setRenderTargets();
+		void setViewport();
+		void setScissor();
+
+		void setGraphicsPipeline(GraphicsPipeline& pipeline);
+		void setComputePipeline(ComputePipeline& pipeline);
+
+		void bindGraphicsConstants(BindPointRef bindPoint, const void* data, uint32 size32bitValues);
+		void bindGraphicsConstantBuffer(BindPointRef bindPoint, Buffer& buffer, uint32 offset);
 
 		void drawNonIndexed();
 		void drawIndexed();
 		void drawMesh();
 		void dispatch();
 
-		void copyBufferRegion();
-		void copyTextureRegion();
+		void copyFromBufferToBuffer();
+		void copyFromBufferToTexture();
+		void copyFromTextureToTexture();
+		void copyFromTextureToBuffer();
 	};
 
 	class ComputeCommandList : public XLib::NonCopyable
@@ -80,14 +120,14 @@ namespace XEngine::Render::HAL
 		friend Device;
 
 	private:
-		XLib::Platform::COMPtr<ID3D12GraphicsCommandList> d3dCommandList;
-		XLib::Platform::COMPtr<ID3D12CommandAllocator> d3dCommandAllocator;
+		ID3D12GraphicsCommandList* d3dCommandList = nullptr;
+		ID3D12CommandAllocator* d3dCommandAllocator = nullptr;
 
 	public:
 		ComputeCommandList() = default;
 		~ComputeCommandList();
 
-		void bindComputePipeline(ComputePipeline& pipeline);
+		void setComputePipeline(ComputePipeline& pipeline);
 
 		void dispatch();
 	};
@@ -97,12 +137,24 @@ namespace XEngine::Render::HAL
 		friend Device;
 
 	private:
-		XLib::Platform::COMPtr<ID3D12GraphicsCommandList> d3dCommandList;
-		XLib::Platform::COMPtr<ID3D12CommandAllocator> d3dCommandAllocator;
+		ID3D12GraphicsCommandList* d3dCommandList = nullptr;
+		ID3D12CommandAllocator* d3dCommandAllocator = nullptr;
 
 	public:
 		CopyCommandList() = default;
 		~CopyCommandList();
+	};
+
+	class SwapChain : public XLib::NonCopyable
+	{
+		friend Device;
+
+	private:
+		IDXGISwapChain3* dxgiSwapChain = nullptr;
+
+	public:
+		SwapChain() = default;
+		~SwapChain();
 	};
 
 	class Device : public XLib::NonCopyable
@@ -115,26 +167,43 @@ namespace XEngine::Render::HAL
 
 	public:
 		Device() = default;
-		~Device();
+		~Device() = default;
 
-		void createBuffer(BufferType type, Buffer& buffer);
-		void createTexture2D(Texture& texture);
-		void createTextureDescriptorArray(uint32 descriptorCount);
+		void createBuffer(uint32 size, BufferType type, Buffer& buffer);
+		void createTexture2D(uint16 width, uint16 height, Format format, Texture& texture);
+		void createTextureDescriptorArray(uint32 descriptorCount, TextureDescriptorArray& descriptorArray);
 		void createGraphicsPipeline(GraphicsPipeline& graphicsPipeline);
 		void createComputePipeline(ComputePipeline& graphicsPipeline);
 		void createGraphicsCommandList(GraphicsCommandList& commandList);
 		void createComputeCommandList(ComputeCommandList& commandList);
 		void createCopyCommandList(CopyCommandList& commandList);
+		void createSwapChain(SwapChain& swapChain);
 
-		void writeTextureDescritor(Texture& texture, );
+		void destroyBuffer(Buffer& buffer);
+		void destroyTexture(Texture& texture);
+		void destroyTextureDescriptorArray(TextureDescriptorArray& descriptorArray);
+		void destroyGraphicsPipeline(GraphicsPipeline& graphicsPipeline);
+		void destroyComputePipeline(ComputePipeline& graphicsPipeline);
+		void destroyGraphicsCommandList(GraphicsCommandList& commandList);
+		void destroyComputeCommandList(ComputeCommandList& commandList);
+		void destroyCopyCommandList(CopyCommandList& commandList);
+		void destroySwapChain(SwapChain& swapChain);
 
-		void submitToGraphicsQueue(GraphicsCommandList& commandList);
-		void submitToAsyncComputeQueue(ComputeCommandList& commandList);
-		void submitToCopyQueue(CopyCommandList& commandList);
+		BindPointRef getBindPoint(GraphicsPipeline& pipeline, uint64 bindPointNameHash);
+
+		void writeTextureDescritor(Texture& texture, TextureDescriptorArray& descriptorArray, uint32 arrayOffset);
+
+		void submitGraphics(GraphicsCommandList& commandList);
+		void submitAsyncCompute(ComputeCommandList& commandList);
+		void submitCopy(CopyCommandList& commandList);
+		void submitFlip(SwapChain& swapChain);
+
+		const char* getName() const;
 	};
 
 	class Host abstract final
 	{
-
+	public:
+		static void CreateDevice(Device& device);
 	};
 }
