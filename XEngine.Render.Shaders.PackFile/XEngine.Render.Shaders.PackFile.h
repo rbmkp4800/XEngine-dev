@@ -21,26 +21,18 @@ namespace XEngine::Render::Shaders::PackFile
 		uint32 signature;
 		uint16 version;
 		uint16 platformFlags;
-		uint16 rootSignatureCount;
-		uint16 shaderCount;
+		uint16 pipelineCount;
 	};
 
-	struct RootSignatureTableEntry
+	struct PipelineDesc
 	{
 		uint64 nameHash;
-		uint64 dataHash;
-		uint32 dataOffset;
-		uint32 dataSize;
-	};
-
-	struct ShaderTableEntry
-	{
-		uint64 nameHash;
-		uint64 dataHash;
-		uint32 dataOffset;
-		uint32 dataSize;
-		uint16 rootSignatureIndex;
 		uint8 type;
 		uint8 _padding0;
+	};
+
+	struct ShaderBlobDesc
+	{
+
 	};
 }

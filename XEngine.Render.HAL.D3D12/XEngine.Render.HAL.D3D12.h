@@ -58,6 +58,11 @@ namespace XEngine::Render::HAL
 		friend Device;
 	};
 
+	class BindingLayout : public XLib::NonCopyable
+	{
+		friend Device;
+	};
+
 	class GraphicsPipeline : public XLib::NonCopyable
 	{
 		friend Device;
@@ -98,15 +103,21 @@ namespace XEngine::Render::HAL
 		void setViewport();
 		void setScissor();
 
+		void setGraphicsBindingLayout(BindingLayout& layout);
+		void setComputeBindingLayout(BindingLayout& layout);
+
 		void setGraphicsPipeline(GraphicsPipeline& pipeline);
 		void setComputePipeline(ComputePipeline& pipeline);
 
 		void bindGraphicsConstants(BindPointRef bindPoint, const void* data, uint32 size32bitValues);
 		void bindGraphicsConstantBuffer(BindPointRef bindPoint, Buffer& buffer, uint32 offset);
+		void bindGraphicsReadOnlyBuffer(BindPointRef bindPoint, Buffer& buffer, uint32 offset);
+		void bindGraphicsReadWriteBuffer(BindPointRef bindPoint, Buffer& buffer, uint32 offset);
 
 		void drawNonIndexed();
 		void drawIndexed();
 		void drawMesh();
+
 		void dispatch();
 
 		void copyFromBufferToBuffer();
@@ -172,8 +183,9 @@ namespace XEngine::Render::HAL
 		void createBuffer(uint32 size, BufferType type, Buffer& buffer);
 		void createTexture2D(uint16 width, uint16 height, Format format, Texture& texture);
 		void createTextureDescriptorArray(uint32 descriptorCount, TextureDescriptorArray& descriptorArray);
-		void createGraphicsPipeline(GraphicsPipeline& graphicsPipeline);
-		void createComputePipeline(ComputePipeline& graphicsPipeline);
+		void createBindingLayout(BindingLayout& bindingLayout);
+		void createGraphicsPipeline(BindingLayout& bindlingLayout, const RasterizerDesc& rasterizerDesc, const BlendDesc& blendDesc, GraphicsPipeline& graphicsPipeline);
+		void createComputePipeline(BindingLayout& bindlingLayout, ComputePipeline& graphicsPipeline);
 		void createGraphicsCommandList(GraphicsCommandList& commandList);
 		void createComputeCommandList(ComputeCommandList& commandList);
 		void createCopyCommandList(CopyCommandList& commandList);
@@ -189,13 +201,13 @@ namespace XEngine::Render::HAL
 		void destroyCopyCommandList(CopyCommandList& commandList);
 		void destroySwapChain(SwapChain& swapChain);
 
-		BindPointRef getBindPoint(GraphicsPipeline& pipeline, uint64 bindPointNameHash);
+		BindPointRef getBindPoint(BindingLayout& layout, uint64 bindPointNameCRC);
 
 		void writeTextureDescritor(Texture& texture, TextureDescriptorArray& descriptorArray, uint32 arrayOffset);
 
 		void submitGraphics(GraphicsCommandList& commandList);
 		void submitAsyncCompute(ComputeCommandList& commandList);
-		void submitCopy(CopyCommandList& commandList);
+		void submitAsyncCopy(CopyCommandList& commandList);
 		void submitFlip(SwapChain& swapChain);
 
 		const char* getName() const;

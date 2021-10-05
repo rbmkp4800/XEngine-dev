@@ -2,6 +2,8 @@
 
 #include <XLib.h>
 
+//#include <XEngine.Render.HAL.D3D12.h>
+
 namespace XEngine::Render::Device_
 {
 	class ShadersLoader
@@ -9,23 +11,15 @@ namespace XEngine::Render::Device_
 	private:
 
 	public:
-		using PSOToken = uint32;
-
-		struct PSODesc
-		{
-			const char* vsName;
-			const char* asName;
-			const char* msName;
-			const char* psName;
-		};
+		using PipelineToken = uint32;
 
 	public:
 		ShadersLoader() = default;
 		~ShadersLoader() = default;
 
-		PSOToken registerPSO(PSODesc& desc);
-		void unregisterPSO(PSOToken token);
+		PipelineToken registerPipeline(uint64 nameCRC);
+		void unregisterPipeline(PipelineToken token);
 
-		void* acquirePSO(PSOToken token);
+		//HAL::GraphicsPipeline& acquirePipeline(PipelineToken token);
 	};
 }
