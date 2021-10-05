@@ -21,8 +21,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{1ed495b0-b69b-4409-83fc-587f590eab29}</ProjectGuid>
-    <RootNamespace>XEngineRenderHALD3D12</RootNamespace>
+    <ProjectGuid>{102d6f8c-faad-4fd3-9b3a-16923042465e}</ProjectGuid>
+    <RootNamespace>XEngineRenderHALCommon</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.19041.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -80,16 +80,14 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <PublicIncludeDirectories>$(ProjectDir);$(PublicIncludeDirectories)</PublicIncludeDirectories>
-    <OutDir>$(SolutionDir)Build\</OutDir>
     <IntDir>$(SolutionDir)Build.Intermediate\$(PlatformName).$(Configuration)\$(ProjectName)\</IntDir>
+    <OutDir>$(SolutionDir)Build\</OutDir>
     <TargetName>$(ProjectName)_$(PlatformName).$(Configuration)</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <PublicIncludeDirectories>$(ProjectDir);$(PublicIncludeDirectories)</PublicIncludeDirectories>
-    <OutDir>$(SolutionDir)Build\</OutDir>
     <IntDir>$(SolutionDir)Build.Intermediate\$(PlatformName).$(Configuration)\$(ProjectName)\</IntDir>
+    <OutDir>$(SolutionDir)Build\</OutDir>
     <TargetName>$(ProjectName)_$(PlatformName).$(Configuration)</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -163,12 +161,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="XEngine.Render.HAL.D3D12.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\XLib\XLib.vcxproj">
-      <Project>{df81a513-72e3-4b74-b866-97f3bb61d45f}</Project>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -30,8 +30,7 @@ namespace XLib
 	using StringView = BaseStringView<char>;
 
 	template <typename CharType = char, typename CounterType = uint32, typename AllocatorType = SystemHeapAllocator>
-	class String
-		: private AllocatorAdapterBase<AllocatorType>
+	class String : private AllocatorAdapterBase<AllocatorType>
 	{
 	private:
 		CharType* buffer = nullptr;

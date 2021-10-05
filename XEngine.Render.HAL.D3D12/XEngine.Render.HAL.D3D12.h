@@ -183,9 +183,9 @@ namespace XEngine::Render::HAL
 		void createBuffer(uint32 size, BufferType type, Buffer& buffer);
 		void createTexture2D(uint16 width, uint16 height, Format format, Texture& texture);
 		void createTextureDescriptorArray(uint32 descriptorCount, TextureDescriptorArray& descriptorArray);
-		void createBindingLayout(BindingLayout& bindingLayout);
-		void createGraphicsPipeline(BindingLayout& bindlingLayout, const RasterizerDesc& rasterizerDesc, const BlendDesc& blendDesc, GraphicsPipeline& graphicsPipeline);
-		void createComputePipeline(BindingLayout& bindlingLayout, ComputePipeline& graphicsPipeline);
+		void createBindingLayout(const void* compiledData, uint32 compiledDataSize, BindingLayout& bindingLayout);
+		void createGraphicsPipeline(BindingLayout& bindingLayout, const RasterizerDesc& rasterizerDesc, const BlendDesc& blendDesc, GraphicsPipeline& graphicsPipeline);
+		void createComputePipeline(BindingLayout& bindingLayout, ComputePipeline& graphicsPipeline);
 		void createGraphicsCommandList(GraphicsCommandList& commandList);
 		void createComputeCommandList(ComputeCommandList& commandList);
 		void createCopyCommandList(CopyCommandList& commandList);

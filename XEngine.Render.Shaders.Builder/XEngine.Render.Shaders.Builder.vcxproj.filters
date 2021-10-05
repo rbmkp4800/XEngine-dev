@@ -14,5 +14,6 @@
     <ClInclude Include="XEngine.Render.Shaders.Builder.ShadersList.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.Common.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.BindingLayoutsList.h" />
+    <ClInclude Include="XEngine.Render.Shaders.Builder.PipelinesList.h" />
   </ItemGroup>
 </Project>
