@@ -6,6 +6,7 @@
 #include <XLib.NonCopyable.h>
 #include <XLib.String.h>
 
+#include "XEngine.Render.Shaders.Builder.BindingLayoutsList.h"
 #include "XEngine.Render.Shaders.Builder.ShadersList.h"
 
 namespace XEngine::Render::Shaders::Builder
@@ -29,9 +30,10 @@ namespace XEngine::Render::Shaders::Builder
 		XLib::InplaceString<63, uint8> name;
 		PipelineType type = PipelineType::None;
 
-		ShaderId cs;
-		ShaderId vs;
-		ShaderId ps;
+		BindingLayoutRef bindingLayout;
+		ShaderRef cs;
+		ShaderRef vs;
+		ShaderRef ps;
 
 	private:
 		Pipeline() = default;

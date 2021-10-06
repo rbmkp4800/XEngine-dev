@@ -8,11 +8,14 @@
 
 #include <XEngine.Render.HAL.ShaderCompiler.h>
 
+#include "XEngine.Render.Shaders.Builder.BindingLayoutsList.h"
 #include "XEngine.Render.Shaders.Builder.SourcesCache.h"
 
 namespace XEngine::Render::Shaders::Builder
 {
 	class ShadersList;
+
+	using ShaderRef = uint16;
 
 	class Shader : public XLib::NonCopyable
 	{
@@ -31,6 +34,7 @@ namespace XEngine::Render::Shaders::Builder
 		SourceDependenciesList sourceDependencies;
 
 		SourcesCacheEntryId sourceMain = 0;
+		BindingLayoutRef bindingLayout = BindingLayoutRef(0);
 		HAL::ShaderCompiler::ShaderType type = HAL::ShaderCompiler::ShaderType::None;
 
 		bool compilationRequired = false;
