@@ -4,15 +4,11 @@
     <ClCompile Include="XEngine.Render.Shaders.Builder.Main.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.SourcesCache.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.Files.cpp" />
-    <ClCompile Include="XEngine.Render.Shaders.Builder.CompilerDXC.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="XEngine.Render.Shaders.Builder.CompilerBase.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.SourcesCache.h" />
-    <ClInclude Include="XEngine.Render.Shaders.Builder.CompilerDXC.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.Files.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.ShadersList.h" />
-    <ClInclude Include="XEngine.Render.Shaders.Builder.Common.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.BindingLayoutsList.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.PipelinesList.h" />
   </ItemGroup>

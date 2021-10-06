@@ -6,23 +6,16 @@
 #include <XLib.NonCopyable.h>
 #include <XLib.String.h>
 
+#include <XEngine.Render.HAL.ShaderCompiler.h>
+
 namespace XEngine::Render::Shaders::Builder
 {
 	class BindingLayoutsList;
 
-	enum class BindPointType : uint8
-	{
-		None = 0,
-		Constants,
-		ConstantBuffer,
-		ReadOnlyBuffer,
-		ReadWriteBuffer,
-	};
-
 	struct BindPointDesc
 	{
 		XLib::InplaceString<28, uint8> name;
-		BindPointType type;
+		HAL::ShaderCompiler::BindPointType type;
 		uint8 constantCount;
 		uint8 shaderVisibility;
 	};

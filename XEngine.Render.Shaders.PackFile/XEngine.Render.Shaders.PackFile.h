@@ -9,11 +9,13 @@ namespace XEngine::Render::Shaders::PackFile
 
 	enum class Patform : uint8
 	{
-		Invalid = 0,
-		PC_D3D12,
-		//PC_Vulkan,
-		//Scarlett,
-		//Prospero,
+		D3D12,
+	};
+
+	enum class PipelineType : uint8
+	{
+		Graphics,
+		Compute,
 	};
 
 	struct Header
@@ -21,18 +23,27 @@ namespace XEngine::Render::Shaders::PackFile
 		uint32 signature;
 		uint16 version;
 		uint16 platformFlags;
+		uint16 bindingLayoutCount;
 		uint16 pipelineCount;
+		uint16 binaryBlobCount;
+	};
+
+	struct BindingLayoutDesc
+	{
+		uint64 nameHash;
 	};
 
 	struct PipelineDesc
 	{
 		uint64 nameHash;
-		uint8 type;
-		uint8 _padding0;
+		uint16 bindingLayoutIndex;
+		PipelineType type;
+		uint8 binaryBlobCount;
 	};
 
-	struct ShaderBlobDesc
+	struct BinaryBlobDesc
 	{
-
+		uint32 offset;
+		uint32 size;
 	};
 }

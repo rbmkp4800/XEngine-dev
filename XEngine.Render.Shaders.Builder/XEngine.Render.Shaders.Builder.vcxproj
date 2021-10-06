@@ -15,7 +15,7 @@
     <ProjectGuid>{981D9FCB-69BD-47D9-8033-15F5B4621A85}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>XEngineRenderShadersBuilder</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.19041.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -63,13 +63,11 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\External\Microsoft.DirectXShaderCompiler\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(ProjectDir)..\External\Microsoft.DirectXShaderCompiler\lib\$(Platform);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>dxcompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>copy $(ProjectDir)..\External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\dxcompiler.dll $(OutDir)</Command>
@@ -86,7 +84,6 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\External\Microsoft.DirectXShaderCompiler\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -94,7 +91,6 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(ProjectDir)..\External\Microsoft.DirectXShaderCompiler\lib\$(Platform);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>dxcompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>copy $(ProjectDir)..\External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\dxcompiler.dll $(OutDir)</Command>
@@ -102,15 +98,11 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="XEngine.Render.Shaders.Builder.CompilerDXC.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.Files.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.Main.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.SourcesCache.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="XEngine.Render.Shaders.Builder.Common.h" />
-    <ClInclude Include="XEngine.Render.Shaders.Builder.CompilerBase.h" />
-    <ClInclude Include="XEngine.Render.Shaders.Builder.CompilerDXC.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.Files.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.BindingLayoutsList.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.PipelinesList.h" />
@@ -118,6 +110,9 @@
     <ClInclude Include="XEngine.Render.Shaders.Builder.SourcesCache.h" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\XEngine.Render.HAL.ShaderCompiler\XEngine.Render.HAL.ShaderCompiler.vcxproj">
+      <Project>{0e31d4f6-c1d4-4a6f-8c42-a0f7b2e4d9d9}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\XEngine.Render.Shaders.PackFile\XEngine.Render.Shaders.PackFile.vcxproj">
       <Project>{e41c3648-b10a-4c33-a052-d98f8ed51ab0}</Project>
     </ProjectReference>

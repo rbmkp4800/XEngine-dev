@@ -31,6 +31,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XC.Compiler", "XC.Compiler\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.HAL.Common", "XEngine.Render.HAL.Common\XEngine.Render.HAL.Common.vcxproj", "{102D6F8C-FAAD-4FD3-9B3A-16923042465E}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.HAL.ShaderCompiler", "XEngine.Render.HAL.ShaderCompiler\XEngine.Render.HAL.ShaderCompiler.vcxproj", "{0E31D4F6-C1D4-4A6F-8C42-A0F7B2E4D9D9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -93,6 +95,10 @@ Global
 		{102D6F8C-FAAD-4FD3-9B3A-16923042465E}.Debug|x64.Build.0 = Debug|x64
 		{102D6F8C-FAAD-4FD3-9B3A-16923042465E}.Release|x64.ActiveCfg = Release|x64
 		{102D6F8C-FAAD-4FD3-9B3A-16923042465E}.Release|x64.Build.0 = Release|x64
+		{0E31D4F6-C1D4-4A6F-8C42-A0F7B2E4D9D9}.Debug|x64.ActiveCfg = Debug|x64
+		{0E31D4F6-C1D4-4A6F-8C42-A0F7B2E4D9D9}.Debug|x64.Build.0 = Debug|x64
+		{0E31D4F6-C1D4-4A6F-8C42-A0F7B2E4D9D9}.Release|x64.ActiveCfg = Release|x64
+		{0E31D4F6-C1D4-4A6F-8C42-A0F7B2E4D9D9}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

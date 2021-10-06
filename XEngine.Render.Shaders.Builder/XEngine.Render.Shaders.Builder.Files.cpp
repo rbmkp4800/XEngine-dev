@@ -3,11 +3,14 @@
 #include <XLib.System.File.h>
 #include <XLib.SystemHeapAllocator.h>
 
+#include <XEngine.Render.HAL.ShaderCompiler.h>
+
 #include "XEngine.Render.Shaders.Builder.Files.h"
 
 #include "XEngine.Render.Shaders.PackFile.h"
 
 using namespace XLib;
+using namespace XEngine::Render::HAL::ShaderCompiler;
 using namespace XEngine::Render::Shaders::Builder;
 
 //#if 0
@@ -34,7 +37,7 @@ static inline ShaderType ShaderTypeFromString(const StringView& str)
 }
 
 bool XEngine::Render::Shaders::Builder::LoadShadersListFile(const char* shadersListFilePath,
-	ShadersList& shadersList, RootSignaturesList& rootSignaturesList, SourcesCache& sourcesCache)
+	ShadersList& shadersList, BindingLayoutsList& bindingLayoutsList, SourcesCache& sourcesCache)
 {
 	File file;
 	file.open(shadersListFilePath, FileAccessMode::Read);

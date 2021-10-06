@@ -6,7 +6,8 @@
 #include <XLib.NonCopyable.h>
 #include <XLib.String.h>
 
-#include "XEngine.Render.Shaders.Builder.Common.h"
+#include <XEngine.Render.HAL.ShaderCompiler.h>
+
 #include "XEngine.Render.Shaders.Builder.SourcesCache.h"
 
 namespace XEngine::Render::Shaders::Builder
@@ -30,7 +31,7 @@ namespace XEngine::Render::Shaders::Builder
 		SourceDependenciesList sourceDependencies;
 
 		SourcesCacheEntryId sourceMain = 0;
-		ShaderType type = ShaderType::None;
+		HAL::ShaderCompiler::ShaderType type = HAL::ShaderCompiler::ShaderType::None;
 
 		bool compilationRequired = false;
 
@@ -40,7 +41,7 @@ namespace XEngine::Render::Shaders::Builder
 
 	public:
 		inline SourcesCacheEntryId getSourceMain() const { return sourceMain; }
-		inline ShaderType getShaderType() const { return type; }
+		inline HAL::ShaderCompiler::ShaderType getShaderType() const { return type; }
 
 		inline void addSourceDependency(SourcesCacheEntryId id) { sourceDependencies.pushBack(id); }
 		inline void clearSourceDependencies() { sourceDependencies.clear(); }
@@ -72,7 +73,7 @@ namespace XEngine::Render::Shaders::Builder
 		~ShadersList() = default;
 
 		// returns null if entry with this name already exists
-		Shader* createEntry(StringView name, ShaderType type, SourcesCacheEntryId mainSourceId);
+		Shader* createEntry(StringView name, HAL::ShaderCompiler::ShaderType type, SourcesCacheEntryId mainSourceId);
 
 		inline bool isEmpty() const { return entriesStorageList.isEmpty(); }
 		inline uint32 getSize() const { return entriesStorageList.getSize(); }

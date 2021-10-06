@@ -104,7 +104,7 @@
     <ProjectGuid>{DF81A513-72E3-4B74-B866-97F3BB61D45F}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>XLib</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.19041.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

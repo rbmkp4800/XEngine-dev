@@ -4,14 +4,15 @@
 #include <XLib.Text.h>
 #include <XLib.Time.h>
 
-#include "XEngine.Render.Shaders.Builder.Common.h"
-#include "XEngine.Render.Shaders.Builder.CompilerDXC.h"
+#include <XEngine.Render.HAL.ShaderCompiler.h>
+
+#include "XEngine.Render.Shaders.Builder.BindingLayoutsList.h"
 #include "XEngine.Render.Shaders.Builder.Files.h"
-#include "XEngine.Render.Shaders.Builder.RootSignaturesList.h"
 #include "XEngine.Render.Shaders.Builder.ShadersList.h"
 #include "XEngine.Render.Shaders.Builder.SourcesCache.h"
 
 using namespace XLib;
+using namespace XEngine::Render::HAL::ShaderCompiler;
 using namespace XEngine::Render::Shaders::Builder;
 
 #if 0
@@ -103,7 +104,7 @@ int main()
 	}
 #endif
 
-	RootSignaturesList rootSignaturesList;
+	BindingLayoutsList bindingLayoutsList;
 	ShadersList shadersList;
 	SourcesCache sourcesCache;
 
@@ -161,12 +162,10 @@ int main()
 	for (Shader& shader : shadersList)
 		shadersToCompile.pushBack(&shader);
 
-	CompilerDXC compiler;
-
 	// Compilation
 	for (const Shader* shader : shadersToCompile)
 	{
-		compiler.compile(shader->getShaderType(), shader->getSourceMain(), sourcesCache);
+		CompileShader(Platform::D3D12, )
 	}
 
 	return 0;

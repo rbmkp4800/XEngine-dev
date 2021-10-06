@@ -55,3 +55,39 @@ $AS   SceneGeometryAS[wave64]*US1*AFS0   SceneGeometryAS:main   WAVE_SIZE_LOG2="
         },
     ],
 }
+
+{
+	bindingLayouts : [
+		{
+			name : "MYLAYOUT0",
+			bindPoints : [
+				{
+					name : "FRAMECONSTANTS",
+					type : ConstantBuffer,
+					shaderVisibility : ALL,
+				},
+				{
+					name : "BINDPOINT0",
+					type : ReadOnlyBuffer, // ReadWriteBuffer, ConstantBuffer, Constants
+					shaderVisibility : "VS,CS,PS",
+					// constantCount : 4,
+					// dataVolatility : volatile/static
+				},
+			]
+		}
+	],
+	pipelines : [
+		{
+			name : "MYPSO0",
+			bindingLayout : "MYLAYOUT0",
+			CS : {
+				src : "SomeRandom.hlsl",
+			}
+		},
+		{
+			name : "MYPSO0",
+			bindingLayout : "SOMEOTHERLAYOUT"
+			PS : 
+		}
+	]
+}
