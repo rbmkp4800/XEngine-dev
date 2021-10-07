@@ -1,14 +1,13 @@
 #include <XLib.FileSystem.h>
 #include <XLib.String.h>
 
-#include "XEngine.Render.Shaders.Builder.Common.h"
 #include "XEngine.Render.Shaders.Builder.SourcesCache.h"
 
 // TODO:
 #define ASSERT(...)
 
 using namespace XLib;
-using namespace XEngine::Render::Shaders::Builder;
+using namespace XEngine::Render::Shaders::Builder_;
 
 XLib::TimePoint SourcesCacheEntry::checkWriteTime(const char* rootPath)
 {
@@ -28,7 +27,7 @@ XLib::TimePoint SourcesCacheEntry::checkWriteTime(const char* rootPath)
 
 SourcesCacheEntryId SourcesCache::findOrCreateEntry(StringView localPath)
 {
-	EntriesSearchTree::Iterator it = entriesSearchTree.find(path);
+	EntriesSearchTree::Iterator it = entriesSearchTree.find(localPath);
 	if (it.isValid())
 	{
 		const SourcesCacheEntry& entry = it.get();

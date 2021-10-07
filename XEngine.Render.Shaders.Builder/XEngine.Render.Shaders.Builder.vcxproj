@@ -98,13 +98,13 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="XEngine.Render.Shaders.Builder.Files.cpp" />
-    <ClCompile Include="XEngine.Render.Shaders.Builder.Main.cpp" />
+    <ClCompile Include="XEngine.Render.Shaders.Builder.cpp" />
+    <ClCompile Include="XEngine.Render.Shaders.Builder.EntryPoint.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.SourcesCache.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="XEngine.Render.Shaders.Builder.Files.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.BindingLayoutsList.h" />
+    <ClInclude Include="XEngine.Render.Shaders.Builder.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.PipelinesList.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.ShadersList.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.SourcesCache.h" />

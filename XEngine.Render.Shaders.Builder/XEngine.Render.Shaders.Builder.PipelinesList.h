@@ -9,11 +9,11 @@
 #include "XEngine.Render.Shaders.Builder.BindingLayoutsList.h"
 #include "XEngine.Render.Shaders.Builder.ShadersList.h"
 
-namespace XEngine::Render::Shaders::Builder
+namespace XEngine::Render::Shaders::Builder_
 {
 	class PipelinesList;
 
-	enum class PipelineType : uint8
+	enum class PipelineConfig : uint8
 	{
 		None = 0,
 		Compute,
@@ -28,19 +28,24 @@ namespace XEngine::Render::Shaders::Builder
 		XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
 
 		XLib::InplaceString<63, uint8> name;
-		PipelineType type = PipelineType::None;
+		uint64 nameCRC = 0;
+		BindingLayoutRef bindingLayout = InvalidBindingLayoutRef;
 
-		BindingLayoutRef bindingLayout;
+		PipelineConfig type = PipelineConfig::None;
 		ShaderRef cs;
 		ShaderRef vs;
 		ShaderRef ps;
+
+		XLib::InplaceArrayList<HAL::ShaderCompiler::BinaryBlob*, 8, uint8> compiledBlobs;
 
 	private:
 		Pipeline() = default;
 		~Pipeline() = default;
 
 	public:
+		inline uint64 getNameCRC() const;
 
+		inline XLib::ArrayView<HAL::ShaderCompiler::BinaryBlob*> getCompiledBlobs();
 	};
 
 	class PipelinesList : public XLib::NonCopyable

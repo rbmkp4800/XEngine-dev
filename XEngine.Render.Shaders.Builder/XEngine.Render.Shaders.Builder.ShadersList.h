@@ -11,7 +11,7 @@
 #include "XEngine.Render.Shaders.Builder.BindingLayoutsList.h"
 #include "XEngine.Render.Shaders.Builder.SourcesCache.h"
 
-namespace XEngine::Render::Shaders::Builder
+namespace XEngine::Render::Shaders::Builder_
 {
 	class ShadersList;
 
@@ -45,7 +45,8 @@ namespace XEngine::Render::Shaders::Builder
 
 	public:
 		inline SourcesCacheEntryId getSourceMain() const { return sourceMain; }
-		inline HAL::ShaderCompiler::ShaderType getShaderType() const { return type; }
+		inline BindingLayoutRef getBindingLayout() const { return bindingLayout; }
+		inline HAL::ShaderCompiler::ShaderType getType() const { return type; }
 
 		inline void addSourceDependency(SourcesCacheEntryId id) { sourceDependencies.pushBack(id); }
 		inline void clearSourceDependencies() { sourceDependencies.clear(); }

@@ -7,12 +7,11 @@
 #include <XLib.String.h>
 #include <XLib.Time.h>
 
-namespace XEngine::Render::Shaders::Builder
+namespace XEngine::Render::Shaders::Builder_
 {
 	class SourcesCache;
 
 	using SourcesCacheEntryId = uint16;
-	static constexpr SourcesCacheEntryId InvalidSourceCacheEntryId = SourcesCacheEntryId(-1);
 
 	struct SourcesCacheEntry : public XLib::NonCopyable
 	{
@@ -35,7 +34,7 @@ namespace XEngine::Render::Shaders::Builder
 	public:
 		XLib::TimePoint checkWriteTime(const char* rootPath);
 		//const char* getLocalPath() const { return localPath.cstr(); }
-		StringView loadText();
+		XLib::StringView loadText();
 
 		static constexpr uintptr LocalPathLengthLimit = LocalPathInplaceString::GetMaxLength();
 	};
@@ -54,7 +53,7 @@ namespace XEngine::Render::Shaders::Builder
 		SourcesCache() = default;
 		~SourcesCache() = default;
 
-		SourcesCacheEntryId findOrCreateEntry(StringView localPath);
+		SourcesCacheEntryId findOrCreateEntry(XLib::StringView localPath);
 		SourcesCacheEntry& getEntry(SourcesCacheEntryId id);
 	};
 }

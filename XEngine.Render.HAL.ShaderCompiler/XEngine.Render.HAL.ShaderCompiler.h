@@ -46,12 +46,21 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		uint8 bindPointCount;
 	};
 
+	class CompiledBindingLayout
+	{
+	private:
+
+
+	public:
+		//void* getBytecode();
+	};
+
 	class BinaryBlob
 	{
 
 	};
 
-	void CompileBindingLayout(Platform platform, const BindingLayoutDesc& desc, BinaryBlob** result);
-	void CompileShader(Platform platform, ShaderType shaderType, BinaryBlob* bindingLayoutBlob, );
+	void CompileBindingLayout(Platform platform, const BindingLayoutDesc& desc, CompiledBindingLayout& compiledBindingLayout);
+	void CompileShader(Platform platform, ShaderType shaderType, const CompiledBindingLayout& compiledBindingLayout, ...);
 	void CompilePipeline(Platform platform);
 }
