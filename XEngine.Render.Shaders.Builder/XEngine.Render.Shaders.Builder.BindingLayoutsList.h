@@ -1,6 +1,7 @@
 #pragma once
 
 #include <XLib.h>
+#include <XLib.Containers.ArrayList.h>
 #include <XLib.Containers.IntrusiveBinaryTree.h>
 #include <XLib.NonCopyable.h>
 #include <XLib.String.h>
@@ -46,7 +47,7 @@ namespace XEngine::Render::Shaders::Builder_
 		BindingLayoutsList() = default;
 		~BindingLayoutsList() = default;
 
-		BindingLayoutRef createAndCompileEntry(const char* name, const BindingLayoutDesc& desc);
+		BindingLayoutRef createAndCompileEntry(const char* name, const HAL::ShaderCompiler::BindingLayoutDesc& desc);
 
 		BindingLayoutRef findEntry(const char* name) const;
 		const BindingLayout& getEntry(BindingLayoutRef ref) const;

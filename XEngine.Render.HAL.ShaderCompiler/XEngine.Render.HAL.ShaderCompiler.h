@@ -1,6 +1,7 @@
 #pragma once
 
 #include <XLib.h>
+#include <XLib.NonCopyable.h>
 
 namespace XEngine::Render::HAL::ShaderCompiler
 {
@@ -46,13 +47,14 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		uint8 bindPointCount;
 	};
 
-	class CompiledBindingLayout
+	class CompiledBindingLayout : public XLib::NonCopyable
 	{
 	private:
 
 
 	public:
-		//void* getBytecode();
+		const void* getBinaryBlobData() const;
+		uint32 getBinaryBlobSize() const;
 	};
 
 	class BinaryBlob

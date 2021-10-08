@@ -205,36 +205,76 @@ void Builder::build()
 
 void Builder::storePackage(const char* packagePath)
 {
-	struct BinaryBlobOrderedRecord
+	// NOTE: Binary blobs in package should have deterministic order
+
+	struct PipelineBlobsDeduplicationListItem
 	{
 		BinaryBlob* blob;
-		uint64 pipelineNameCRC;
-		uint8 pipelineLocalBlobIndex;
+		uint32 globalPipelineBlobIndex;
 	};
 
-	ArrayList<BinaryBlobOrderedRecord, uint32, false> pipelinesBinaryBlobsCompactionList;
+	ArrayList<PipelineBlobsDeduplicationListItem, uint32, false> pipelineBlobsDeduplicationList;
 
+	uint32 globalPipelineBlobIndex = 0;
 	for (const Pipeline& pipeline : pipelinesList)
 	{
-		ArrayView<BinaryBlob*> pipelineCompiledBlobs = pipeline.getCompiledBlobs();
-
-		for (uint8 i = 0; i < pipelineCompiledBlobs.getSize(); i++)
+		for (BinaryBlob* blob : pipeline.getCompiledBlobs())
 		{
-			BinaryBlobOrderedRecord record;
-			record.blob = pipelineCompiledBlobs[i];
-			record.pipelineNameCRC = pipeline.getNameCRC();
-			record.pipelineLocalBlobIndex = i;
-			pipelinesBinaryBlobsCompactionList.pushBack(record);
+			PipelineBlobsDeduplicationListItem item = {};
+			item.blob = blob;
+			item.globalPipelineBlobIndex = globalPipelineBlobIndex;
+			pipelineBlobsDeduplicationList.pushBack(item);
+
+			globalPipelineBlobIndex++;
 		}
 	}
 
-	// Remove duplicates from `binaryBlobs` ...
+	pipelineBlobsDeduplicationList.compact();
+
+	SortStable(pipelineBlobsDeduplicationList, ...);
+
+	ArrayList<uint32, uint32, false> pipelinesToCompactedBlobsMap;
+	pipelinesToCompactedBlobsMap.resize(pipelineBlobsDeduplicationList.getSize());
+
+	for (uint32 i = 0; i < pipelinesToCompactedBlobsMap.getSize(); i++)
+		pipelinesToCompactedBlobsMap[i] = i;
+
+
+
+
+	BinaryBlob* prevBlobsCompactionListItemBlobPtr = nullptr;
+	uint32 pipelineBlobsTotalCountAccumulator = 0;
+	for (PipelineBlobsCompactionListItem& blobsCompactionListItem : pipelineBlobsCompactionList)
+	{
+		if (prevBlobsCompactionListItemBlobPtr != blobsCompactionListItem.blob)
+			pipelineBlobsTotalCountAccumulator++;
+		blobsCompactionListItem.globalSerializedPipelineBlobIndex = pipelineBlobsTotalCountAccumulator;
+	}
+
+	// Remove duplicates from `pipelineBlobsCompactionList` ...
 
 	ArrayList<PackFile::BinaryBlobDesc> serializedBinaryBlobs;
 
-	// Fill `serializedBinaryBlobs`
+	uint32 blobsTotalSizeAccumulator = 0;
 
-	// NOTE: Binary blobs in package file should have deterministic order
+	for (const BindingLayout& bindingLayout : bindingLayoutsList)
+	{
+		const CompiledBindingLayout& compiledLayout = bindingLayout.getCompiled();
+
+		PackFile::BinaryBlobDesc desc = {};
+		desc.offset = blobsTotalSizeAccumulator;
+		desc.size = compiledLayout.getBinaryBlobSize();
+		serializedBinaryBlobs.pushBack(desc);
+
+		blobsTotalSizeAccumulator += compiledLayout.getBinaryBlobSize();
+	}
+
+	for (const PipelineBlobOrderedRecord& pipelineRecord : pipelineBlobsCompactionList)
+	{
+
+	}
+
+	// ...
 
 	File file;
 	file.open(packagePath, FileAccessMode::Write, FileOpenMode::Override);

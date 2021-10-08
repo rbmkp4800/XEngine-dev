@@ -22,19 +22,17 @@ namespace XEngine::Render::Shaders::Builder_
 		friend ShadersList;
 
 	private:
-		using NameInplaceString = XLib::InplaceString<63, uint8>;
 		using EntryPointNameInplaceString = XLib::InplaceString<31, uint8>;
 		using SourceDependenciesList = XLib::ExpandableInplaceArrayList<SourcesCacheEntryId, 14, uint16, false>;
 
 	private:
 		XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
 
-		NameInplaceString name;
 		EntryPointNameInplaceString entryPointName;
 		SourceDependenciesList sourceDependencies;
 
-		SourcesCacheEntryId sourceMain = 0;
-		BindingLayoutRef bindingLayout = BindingLayoutRef(0);
+		SourcesCacheEntryId sourceMain = InvalidSourcesCacheEntryId;
+		BindingLayoutRef bindingLayout = InvalidBindingLayoutRef;
 		HAL::ShaderCompiler::ShaderType type = HAL::ShaderCompiler::ShaderType::None;
 
 		bool compilationRequired = false;
@@ -56,7 +54,6 @@ namespace XEngine::Render::Shaders::Builder_
 		inline void setCompilationRequired() { compilationRequired = true; }
 		inline bool isCompilationRequired() const { return compilationRequired; }
 
-		static constexpr uintptr NameLengthLimit = NameInplaceString::GetMaxLength();
 		static constexpr uintptr EntryPointNameLengthLimit = EntryPointNameInplaceString::GetMaxLength();
 	};
 
@@ -78,7 +75,7 @@ namespace XEngine::Render::Shaders::Builder_
 		~ShadersList() = default;
 
 		// returns null if entry with this name already exists
-		Shader* createEntry(StringView name, HAL::ShaderCompiler::ShaderType type, SourcesCacheEntryId mainSourceId);
+		Shader* createEntry(HAL::ShaderCompiler::ShaderType type, SourcesCacheEntryId mainSourceId);
 
 		inline bool isEmpty() const { return entriesStorageList.isEmpty(); }
 		inline uint32 getSize() const { return entriesStorageList.getSize(); }
