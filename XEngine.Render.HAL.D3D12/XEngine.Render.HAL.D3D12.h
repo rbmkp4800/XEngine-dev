@@ -10,6 +10,7 @@ struct ID3D12Device2;
 struct ID3D12GraphicsCommandList;
 struct ID3D12PipelineState;
 struct ID3D12Resource;
+struct ID3D12RootSignature;
 struct IDXGISwapChain3;
 
 namespace XEngine::Render::HAL
@@ -27,10 +28,10 @@ namespace XEngine::Render::HAL
 		Readback,
 	};
 
-	enum class Format : uint8
+	enum class TextureFormat : uint8
 	{
-		None = 0,
-		
+		Undefined = 0,
+		R8G8B8A8_UNORM,
 	};
 
 	struct RasterizerDesc
@@ -46,11 +47,25 @@ namespace XEngine::Render::HAL
 	class Buffer : public XLib::NonCopyable
 	{
 		friend Device;
+
+	private:
+		ID3D12Resource* d3dResource = nullptr;
+
+	public:
+		Buffer() = default;
+		~Buffer();
 	};
 
 	class Texture : public XLib::NonCopyable
 	{
 		friend Device;
+
+	private:
+		ID3D12Resource* d3dResource = nullptr;
+
+	public:
+		Texture() = default;
+		~Texture();
 	};
 
 	class TextureDescriptorArray : public XLib::NonCopyable
@@ -61,6 +76,13 @@ namespace XEngine::Render::HAL
 	class BindingLayout : public XLib::NonCopyable
 	{
 		friend Device;
+
+	private:
+		ID3D12RootSignature* d3dRootSignature = nullptr;
+
+	public:
+		BindingLayout() = default;
+		~BindingLayout();
 	};
 
 	class GraphicsPipeline : public XLib::NonCopyable
@@ -68,7 +90,7 @@ namespace XEngine::Render::HAL
 		friend Device;
 
 	private:
-		ID3D12PipelineState* d3dPSO = nullptr;
+		ID3D12PipelineState* d3dPipelineState = nullptr;
 
 	public:
 		GraphicsPipeline() = default;
@@ -80,7 +102,7 @@ namespace XEngine::Render::HAL
 		friend Device;
 
 	private:
-		ID3D12PipelineState* d3dPSO = nullptr;
+		ID3D12PipelineState* d3dPipelineState = nullptr;
 
 	public:
 		ComputePipeline() = default;
@@ -181,7 +203,7 @@ namespace XEngine::Render::HAL
 		~Device() = default;
 
 		void createBuffer(uint32 size, BufferType type, Buffer& buffer);
-		void createTexture2D(uint16 width, uint16 height, Format format, Texture& texture);
+		void createTexture2D(uint16 width, uint16 height, TextureFormat format, Texture& texture);
 		void createTextureDescriptorArray(uint32 descriptorCount, TextureDescriptorArray& descriptorArray);
 		void createBindingLayout(const void* compiledData, uint32 compiledDataSize, BindingLayout& bindingLayout);
 		void createGraphicsPipeline(BindingLayout& bindingLayout, const RasterizerDesc& rasterizerDesc, const BlendDesc& blendDesc, GraphicsPipeline& graphicsPipeline);
