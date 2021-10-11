@@ -34,6 +34,16 @@ namespace XEngine::Render::HAL
 		R8G8B8A8_UNORM,
 	};
 
+	struct TextureFlag abstract final
+	{
+		enum : uint32
+		{
+			AllowRenderTarget = 0x01,
+			AllowDepthStencil = 0x02,
+			AllowShaderWrite = 0x04,
+		};
+	};
+
 	struct RasterizerDesc
 	{
 
@@ -197,13 +207,16 @@ namespace XEngine::Render::HAL
 		XLib::Platform::COMPtr<ID3D12DescriptorHeap> d3dSRVHeap;
 		XLib::Platform::COMPtr<ID3D12DescriptorHeap> d3dRTVHeap;
 		XLib::Platform::COMPtr<ID3D12DescriptorHeap> d3dDSVHeap;
+		XLib::Platform::COMPtr<ID3D12CommandQueue> d3dGraphicsQueue;
+		XLib::Platform::COMPtr<ID3D12CommandQueue> d3dAsyncComputeQueue;
+		XLib::Platform::COMPtr<ID3D12CommandQueue> d3dAsyncCopyQueue;
 
 	public:
 		Device() = default;
 		~Device() = default;
 
 		void createBuffer(uint32 size, BufferType type, Buffer& buffer);
-		void createTexture2D(uint16 width, uint16 height, TextureFormat format, Texture& texture);
+		void createTexture2D(uint16 width, uint16 height, TextureFormat format, uint32 flags, Texture& texture);
 		void createTextureDescriptorArray(uint32 descriptorCount, TextureDescriptorArray& descriptorArray);
 		void createBindingLayout(const void* compiledData, uint32 compiledDataSize, BindingLayout& bindingLayout);
 		void createGraphicsPipeline(BindingLayout& bindingLayout, const RasterizerDesc& rasterizerDesc, const BlendDesc& blendDesc, GraphicsPipeline& graphicsPipeline);
@@ -211,7 +224,7 @@ namespace XEngine::Render::HAL
 		void createGraphicsCommandList(GraphicsCommandList& commandList);
 		void createComputeCommandList(ComputeCommandList& commandList);
 		void createCopyCommandList(CopyCommandList& commandList);
-		void createSwapChain(SwapChain& swapChain);
+		void createSwapChain(uint16 width, uint16 height, void* hWnd, SwapChain& swapChain);
 
 		void destroyBuffer(Buffer& buffer);
 		void destroyTexture(Texture& texture);
