@@ -210,48 +210,58 @@ void Builder::storePackage(const char* packagePath)
 	struct PipelineBlobsDeduplicationListItem
 	{
 		BinaryBlob* blob;
-		uint32 globalPipelineBlobIndex;
+		uint32 blobsMapEntryIndex;
 	};
+
+	ArrayList<PackFile::PipelineDesc, uint32, false> serializedPipelines;
+	serializedPipelines.reserve(pipelinesList.getSize());
 
 	ArrayList<PipelineBlobsDeduplicationListItem, uint32, false> pipelineBlobsDeduplicationList;
 
-	uint32 globalPipelineBlobIndex = 0;
+	uint32 pipelineBlobsMapEntryIndexAccum = 0;
 	for (const Pipeline& pipeline : pipelinesList)
 	{
-		for (BinaryBlob* blob : pipeline.getCompiledBlobs())
-		{
-			PipelineBlobsDeduplicationListItem item = {};
-			item.blob = blob;
-			item.globalPipelineBlobIndex = globalPipelineBlobIndex;
-			pipelineBlobsDeduplicationList.pushBack(item);
+		const ArrayView<HAL::ShaderCompiler::BinaryBlob*>& pipelineBlobs = pipeline.getCompiledBinaryBlobs();
 
-			globalPipelineBlobIndex++;
+		PackFile::PipelineDesc& serializedPipelineDesc = serializedPipelines.emplaceBack();
+		serializedPipelineDesc.nameCRC = pipeline.getNameCRC();
+		serializedPipelineDesc.bindingLayoutIndex = ...;
+		serializedPipelineDesc.type = ...;
+		serializedPipelineDesc.binaryBlobCount = pipelineBlobs.getSize();
+		serializedPipelineDesc.binaryBlobsMapOffset = pipelineBlobsMapEntryIndexAccum;
+
+		for (BinaryBlob* blob : pipelineBlobs)
+		{
+			PipelineBlobsDeduplicationListItem& item = pipelineBlobsDeduplicationList.emplaceBack();
+			item.blob = blob;
+			item.blobsMapEntryIndex = pipelineBlobsMapEntryIndexAccum;
+			pipelineBlobsMapEntryIndexAccum++;
 		}
 	}
-
 	pipelineBlobsDeduplicationList.compact();
 
-	SortStable(pipelineBlobsDeduplicationList, ...);
+	const uint32 pipelineBlobsMapSize = pipelineBlobsMapEntryIndexAccum;
 
-	ArrayList<uint32, uint32, false> pipelinesToCompactedBlobsMap;
-	pipelinesToCompactedBlobsMap.resize(pipelineBlobsDeduplicationList.getSize());
+	Sort(pipelineBlobsDeduplicationList, ...);
 
-	for (uint32 i = 0; i < pipelinesToCompactedBlobsMap.getSize(); i++)
-		pipelinesToCompactedBlobsMap[i] = i;
+	ArrayList<uint32, uint32, false> pipelineBlobsMap;
+	pipelineBlobsMap.resize(pipelineBlobsMapSize);
 
-
-
-
-	BinaryBlob* prevBlobsCompactionListItemBlobPtr = nullptr;
-	uint32 pipelineBlobsTotalCountAccumulator = 0;
-	for (PipelineBlobsCompactionListItem& blobsCompactionListItem : pipelineBlobsCompactionList)
 	{
-		if (prevBlobsCompactionListItemBlobPtr != blobsCompactionListItem.blob)
-			pipelineBlobsTotalCountAccumulator++;
-		blobsCompactionListItem.globalSerializedPipelineBlobIndex = pipelineBlobsTotalCountAccumulator;
-	}
+		BinaryBlob* prevDeduplicatedBlob = nullptr;
+		uint32 prevDeduplicatedBlobsMapEntryIndex = 0;
+		for (PipelineBlobsDeduplicationListItem& item : pipelineBlobsDeduplicationList)
+		{
+			if (prevDeduplicatedBlob != item.blob)
+			{
+				prevDeduplicatedBlob = item.blob;
+				prevDeduplicatedBlobsMapEntryIndex = item.blobsMapEntryIndex;
+			}
 
-	// Remove duplicates from `pipelineBlobsCompactionList` ...
+			ASSERT(item.blobsMapEntryIndex < pipelineBlobsMapSize);
+			pipelineBlobsMap[item.blobsMapEntryIndex] = prevDeduplicatedBlobsMapEntryIndex;
+		}
+	}
 
 	ArrayList<PackFile::BinaryBlobDesc> serializedBinaryBlobs;
 
@@ -268,13 +278,6 @@ void Builder::storePackage(const char* packagePath)
 
 		blobsTotalSizeAccumulator += compiledLayout.getBinaryBlobSize();
 	}
-
-	for (const PipelineBlobOrderedRecord& pipelineRecord : pipelineBlobsCompactionList)
-	{
-
-	}
-
-	// ...
 
 	File file;
 	file.open(packagePath, FileAccessMode::Write, FileOpenMode::Override);

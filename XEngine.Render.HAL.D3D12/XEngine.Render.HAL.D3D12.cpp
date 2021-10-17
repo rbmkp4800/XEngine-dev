@@ -12,7 +12,7 @@ static COMPtr<IDXGIFactory7> dxgiFactory;
 
 // Device //////////////////////////////////////////////////////////////////////////////////////////
 
-static inline D3D12_HEAP_TYPE TranslateBuffetTypeToD3D12HeapType(BufferType type)
+static inline D3D12_HEAP_TYPE TranslateBufferTypeToD3D12HeapType(BufferType type)
 {
 	switch (type)
 	{
@@ -21,7 +21,7 @@ static inline D3D12_HEAP_TYPE TranslateBuffetTypeToD3D12HeapType(BufferType type
 		case BufferType::Readback:	return D3D12_HEAP_TYPE_READBACK;
 	}
 
-	UNREACHABLE_CODE();
+	XE_MASTER_ASSERT_UNREACHABLE_CODE();
 }
 
 static inline DXGI_FORMAT TranslateTextureFormatToDXGIFormat(TextureFormat format)
@@ -32,14 +32,14 @@ static inline DXGI_FORMAT TranslateTextureFormatToDXGIFormat(TextureFormat forma
 		case TextureFormat::R8G8B8A8_UNORM:	return DXGI_FORMAT_R8G8B8A8_UNORM;
 	}
 
-	UNREACHABLE_CODE();
+	XE_MASTER_ASSERT_UNREACHABLE_CODE();
 }
 
 void Device::createBuffer(uint32 size, BufferType type, Buffer& buffer)
 {
-	RELEASE_ASSERT(!buffer.d3dResource);
+	XE_MASTER_ASSERT(!buffer.d3dResource);
 
-	const D3D12_HEAP_TYPE d3dHeapType = TranslateBuffetTypeToD3D12HeapType(type);
+	const D3D12_HEAP_TYPE d3dHeapType = TranslateBufferTypeToD3D12HeapType(type);
 	const D3D12_HEAP_PROPERTIES d3dHeapProps = D3D12Helpers::HeapProperties(d3dHeapType);
 	const D3D12_RESOURCE_DESC d3dResourceDesc = D3D12Helpers::ResourceDescForBuffer(size);
 
@@ -50,7 +50,7 @@ void Device::createBuffer(uint32 size, BufferType type, Buffer& buffer)
 
 void Device::createTexture2D(uint16 width, uint16 height, TextureFormat format, uint32 flags, Texture& texture)
 {
-	RELEASE_ASSERT(!texture.d3dResource);
+	XE_MASTER_ASSERT(!texture.d3dResource);
 
 	D3D12_RESOURCE_FLAGS d3dResourceFlags = D3D12_RESOURCE_FLAG_NONE;
 	if (flags & TextureFlag::AllowRenderTarget)

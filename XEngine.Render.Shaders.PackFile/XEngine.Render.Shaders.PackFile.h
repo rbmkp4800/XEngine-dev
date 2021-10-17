@@ -25,20 +25,17 @@ namespace XEngine::Render::Shaders::PackFile
 		uint16 platformFlags;
 		uint16 bindingLayoutCount;
 		uint16 pipelineCount;
-		uint16 binaryBlobCount;
-	};
-
-	struct BindingLayoutDesc
-	{
-		uint64 nameHash;
+		uint32 pipelineBinaryBlobsMapSize;
+		uint32 binaryBlobCount;
 	};
 
 	struct PipelineDesc
 	{
-		uint64 nameHash;
+		uint64 nameCRC;
 		uint16 bindingLayoutIndex;
 		PipelineType type;
 		uint8 binaryBlobCount;
+		uint32 binaryBlobsMapOffset;
 	};
 
 	struct BinaryBlobDesc

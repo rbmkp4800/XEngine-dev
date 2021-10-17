@@ -13,7 +13,7 @@ namespace XEngine::Render::Shaders::Builder_
 	class BindingLayoutsList;
 
 	using BindingLayoutRef = uint16;
-	static constexpr BindingLayoutRef InvalidBindingLayoutRef = BindingLayoutRef(0);
+	static constexpr BindingLayoutRef ZeroBindingLayoutRef = BindingLayoutRef(0);
 
 	class BindingLayout : public XLib::NonCopyable
 	{

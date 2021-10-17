@@ -12,7 +12,7 @@ namespace XEngine::Render::Shaders::Builder_
 	class SourcesCache;
 
 	using SourcesCacheEntryId = uint16;
-	static constexpr SourcesCacheEntryId InvalidSourcesCacheEntryId = SourcesCacheEntryId(0);
+	static constexpr SourcesCacheEntryId ZeroSourcesCacheEntryId = SourcesCacheEntryId(0);
 
 	struct SourcesCacheEntry : public XLib::NonCopyable
 	{

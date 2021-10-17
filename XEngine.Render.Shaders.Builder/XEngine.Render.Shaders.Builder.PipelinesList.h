@@ -29,7 +29,7 @@ namespace XEngine::Render::Shaders::Builder_
 
 		XLib::InplaceString<63, uint8> name;
 		uint64 nameCRC = 0;
-		BindingLayoutRef bindingLayout = InvalidBindingLayoutRef;
+		BindingLayoutRef bindingLayout = ZeroBindingLayoutRef;
 
 		PipelineConfig type = PipelineConfig::None;
 		ShaderRef cs;
@@ -44,8 +44,7 @@ namespace XEngine::Render::Shaders::Builder_
 
 	public:
 		inline uint64 getNameCRC() const;
-
-		inline XLib::ArrayView<HAL::ShaderCompiler::BinaryBlob*> getCompiledBlobs();
+		inline XLib::ArrayView<HAL::ShaderCompiler::BinaryBlob*> getCompiledBinaryBlobs() const;
 	};
 
 	class PipelinesList : public XLib::NonCopyable
@@ -61,5 +60,7 @@ namespace XEngine::Render::Shaders::Builder_
 	public:
 		PipelinesList() = default;
 		~PipelinesList() = default;
+
+		inline uint32 getSize() const;
 	};
 }

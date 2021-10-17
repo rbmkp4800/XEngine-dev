@@ -31,8 +31,8 @@ namespace XEngine::Render::Shaders::Builder_
 		EntryPointNameInplaceString entryPointName;
 		SourceDependenciesList sourceDependencies;
 
-		SourcesCacheEntryId sourceMain = InvalidSourcesCacheEntryId;
-		BindingLayoutRef bindingLayout = InvalidBindingLayoutRef;
+		SourcesCacheEntryId sourceMain = ZeroSourcesCacheEntryId;
+		BindingLayoutRef bindingLayout = ZeroBindingLayoutRef;
 		HAL::ShaderCompiler::ShaderType type = HAL::ShaderCompiler::ShaderType::None;
 
 		bool compilationRequired = false;

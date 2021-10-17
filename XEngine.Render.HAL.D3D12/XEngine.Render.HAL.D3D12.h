@@ -17,7 +17,6 @@ namespace XEngine::Render::HAL
 {
 	class Device;
 
-	using BindPointRef = uint32;
 	using RenderTargetRef = uint32;
 	using DepthStencilRef = uint32;
 
@@ -135,22 +134,19 @@ namespace XEngine::Render::HAL
 		void setViewport();
 		void setScissor();
 
-		void setGraphicsBindingLayout(BindingLayout& layout);
-		void setComputeBindingLayout(BindingLayout& layout);
-
 		void setGraphicsPipeline(GraphicsPipeline& pipeline);
 		void setComputePipeline(ComputePipeline& pipeline);
 
-		void bindGraphicsConstants(BindPointRef bindPoint, const void* data, uint32 size32bitValues);
-		void bindGraphicsConstantBuffer(BindPointRef bindPoint, Buffer& buffer, uint32 offset);
-		void bindGraphicsReadOnlyBuffer(BindPointRef bindPoint, Buffer& buffer, uint32 offset);
-		void bindGraphicsReadWriteBuffer(BindPointRef bindPoint, Buffer& buffer, uint32 offset);
+		void bindConstants(uint32 bindPointNameCRC, const void* data, uint32 size32bitValues);
+		void bindConstantBuffer(uint32 bindPointNameCRC, Buffer& buffer, uint32 offset);
+		void bindReadOnlyBuffer(uint32 bindPointNameCRC, Buffer& buffer, uint32 offset);
+		void bindReadWriteBuffer(uint32 bindPointNameCRC, Buffer& buffer, uint32 offset);
 
 		void drawNonIndexed();
 		void drawIndexed();
 		void drawMesh();
 
-		void dispatch();
+		void dispatch(uint32 groupCountX, uint32 groupCountY = 1, uint32 groupCountZ = 1);
 
 		void copyFromBufferToBuffer();
 		void copyFromBufferToTexture();
@@ -235,8 +231,6 @@ namespace XEngine::Render::HAL
 		void destroyComputeCommandList(ComputeCommandList& commandList);
 		void destroyCopyCommandList(CopyCommandList& commandList);
 		void destroySwapChain(SwapChain& swapChain);
-
-		BindPointRef getBindPoint(BindingLayout& layout, uint64 bindPointNameCRC);
 
 		void writeTextureDescritor(Texture& texture, TextureDescriptorArray& descriptorArray, uint32 arrayOffset);
 
