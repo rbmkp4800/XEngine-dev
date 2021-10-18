@@ -3,6 +3,7 @@
 #include <XLib.h>
 #include <XLib.NonCopyable.h>
 #include <XLib.Platform.COMPtr.h>
+#include <XLib.Containers.BitSet.h>
 
 struct ID3D12CommandAllocator;
 struct ID3D12DescriptorHeap;
@@ -11,14 +12,20 @@ struct ID3D12GraphicsCommandList;
 struct ID3D12PipelineState;
 struct ID3D12Resource;
 struct ID3D12RootSignature;
+
+struct IDXGIAdapter4;
 struct IDXGISwapChain3;
 
 namespace XEngine::Render::HAL
 {
 	class Device;
+	class Host;
 
-	using RenderTargetRef = uint32;
-	using DepthStencilRef = uint32;
+	enum class RenderTargetViewHandle : uint32;
+	enum class DepthStencilViewHandle : uint32;
+
+	static constexpr RenderTargetViewHandle ZeroRenderTargetViewHandle = RenderTargetViewHandle(0);
+	static constexpr DepthStencilViewHandle ZeroDepthStencilViewHandle = DepthStencilViewHandle(0);
 
 	enum class BufferType : uint8
 	{
@@ -51,6 +58,16 @@ namespace XEngine::Render::HAL
 	struct BlendDesc
 	{
 
+	};
+
+	struct Viewport
+	{
+		float32 top;
+		float32 left;
+		float32 right;
+		float32 bottom;
+		float32 depthMin;
+		float32 depthMax;
 	};
 
 	class Buffer : public XLib::NonCopyable
@@ -130,8 +147,9 @@ namespace XEngine::Render::HAL
 		GraphicsCommandList() = default;
 		~GraphicsCommandList();
 
-		void setRenderTargets();
-		void setViewport();
+		void setRenderTargets(uint8 rtvCount, const RenderTargetViewHandle* rtvs, DepthStencilViewHandle dsv = ZeroDepthStencilViewHandle);
+		void setRenderTarget(RenderTargetViewHandle rtv, DepthStencilViewHandle dsv = ZeroDepthStencilViewHandle) { setRenderTargets(1, &rtv, dsv); }
+		void setViewport(const Viewport& viewport);
 		void setScissor();
 
 		void setGraphicsPipeline(GraphicsPipeline& pipeline);
@@ -198,6 +216,8 @@ namespace XEngine::Render::HAL
 
 	class Device : public XLib::NonCopyable
 	{
+		friend Host;
+
 	private:
 		XLib::Platform::COMPtr<ID3D12Device2> d3dDevice;
 		XLib::Platform::COMPtr<ID3D12DescriptorHeap> d3dSRVHeap;
@@ -207,29 +227,47 @@ namespace XEngine::Render::HAL
 		XLib::Platform::COMPtr<ID3D12CommandQueue> d3dAsyncComputeQueue;
 		XLib::Platform::COMPtr<ID3D12CommandQueue> d3dAsyncCopyQueue;
 
+		XLib::BitSet<64> rtvHeapAllocationMask;
+		XLib::BitSet<64> dsvHeapAllocationMask;
+
+	private:
+		void initialize(IDXGIAdapter4* dxgiAdapter);
+
 	public:
 		Device() = default;
 		~Device() = default;
 
 		void createBuffer(uint32 size, BufferType type, Buffer& buffer);
-		void createTexture2D(uint16 width, uint16 height, TextureFormat format, uint32 flags, Texture& texture);
-		void createTextureDescriptorArray(uint32 descriptorCount, TextureDescriptorArray& descriptorArray);
-		void createBindingLayout(const void* compiledData, uint32 compiledDataSize, BindingLayout& bindingLayout);
-		void createGraphicsPipeline(BindingLayout& bindingLayout, const RasterizerDesc& rasterizerDesc, const BlendDesc& blendDesc, GraphicsPipeline& graphicsPipeline);
-		void createComputePipeline(BindingLayout& bindingLayout, ComputePipeline& graphicsPipeline);
-		void createGraphicsCommandList(GraphicsCommandList& commandList);
-		void createComputeCommandList(ComputeCommandList& commandList);
-		void createCopyCommandList(CopyCommandList& commandList);
-		void createSwapChain(uint16 width, uint16 height, void* hWnd, SwapChain& swapChain);
-
 		void destroyBuffer(Buffer& buffer);
+
+		void createTexture2D(uint16 width, uint16 height, TextureFormat format, uint32 flags, Texture& texture);
 		void destroyTexture(Texture& texture);
-		void destroyTextureDescriptorArray(TextureDescriptorArray& descriptorArray);
+
+		RenderTargetViewHandle createRenderTargetView(Texture& texture);
+		void destroyRenderTargetView(RenderTargetViewHandle handle);
+
+		DepthStencilViewHandle createDepthStencilView(Texture& texture);
+		void destroyDepthStencilView(DepthStencilViewHandle handle);
+
+		//void createTextureDescriptorArray(uint32 descriptorCount, TextureDescriptorArray& descriptorArray);
+		//void destroyTextureDescriptorArray(TextureDescriptorArray& descriptorArray);
+
+		void createGraphicsPipeline(BindingLayout& bindingLayout, const RasterizerDesc& rasterizerDesc, const BlendDesc& blendDesc, GraphicsPipeline& graphicsPipeline);
 		void destroyGraphicsPipeline(GraphicsPipeline& graphicsPipeline);
+
+		void createComputePipeline(BindingLayout& bindingLayout, ComputePipeline& graphicsPipeline);
 		void destroyComputePipeline(ComputePipeline& graphicsPipeline);
+
+		void createGraphicsCommandList(GraphicsCommandList& commandList);
 		void destroyGraphicsCommandList(GraphicsCommandList& commandList);
-		void destroyComputeCommandList(ComputeCommandList& commandList);
-		void destroyCopyCommandList(CopyCommandList& commandList);
+
+		//void createComputeCommandList(ComputeCommandList& commandList);
+		//void destroyComputeCommandList(ComputeCommandList& commandList);
+
+		//void createCopyCommandList(CopyCommandList& commandList);
+		//void destroyCopyCommandList(CopyCommandList& commandList);
+
+		void createSwapChain(uint16 width, uint16 height, void* hWnd, SwapChain& swapChain);
 		void destroySwapChain(SwapChain& swapChain);
 
 		void writeTextureDescritor(Texture& texture, TextureDescriptorArray& descriptorArray, uint32 arrayOffset);

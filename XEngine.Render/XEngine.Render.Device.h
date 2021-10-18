@@ -67,7 +67,6 @@ namespace XEngine::Render
 		Device_::GeometryHeap geometryHeap;
 
 		Device_::ShadersLoader shadersLoader;
-	//	Device_::AsyncPSOCompiler asyncPSOCompiler;
 		Device_::Renderer renderer;
 		Device_::Uploader uploader; // TODO: maybe rename to AsyncUploader
 

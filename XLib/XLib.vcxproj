@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClInclude Include="Source\XLib.AllocatorAdapterBase.h" />
     <ClInclude Include="Source\XLib.Color.h" />
+    <ClInclude Include="Source\XLib.Containers.BitSet.h" />
     <ClInclude Include="Source\XLib.Containers.FlatHashMap.h" />
     <ClInclude Include="Source\XLib.Containers.IntrusiveDoublyLinkedList.h" />
     <ClInclude Include="Source\XLib.Text.h" />

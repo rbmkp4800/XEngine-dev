@@ -5,12 +5,15 @@
 
 #include "XEngine.Render.HAL.D3D12.h"
 
+#define XE_ASSERT
+#define XE_ASSERT_UNREACHABLE_CODE
+#define XE_MASTER_ASSERT
+#define XE_MASTER_ASSERT_UNREACHABLE_CODE
+
 using namespace XLib::Platform;
 using namespace XEngine::Render::HAL;
 
 static COMPtr<IDXGIFactory7> dxgiFactory;
-
-// Device //////////////////////////////////////////////////////////////////////////////////////////
 
 static inline D3D12_HEAP_TYPE TranslateBufferTypeToD3D12HeapType(BufferType type)
 {
@@ -33,6 +36,39 @@ static inline DXGI_FORMAT TranslateTextureFormatToDXGIFormat(TextureFormat forma
 	}
 
 	XE_MASTER_ASSERT_UNREACHABLE_CODE();
+}
+
+// GraphicsCommandList /////////////////////////////////////////////////////////////////////////////
+
+void GraphicsCommandList::setRenderTargets(uint8 rtvCount, const RenderTargetViewHandle* rtvs, DepthStencilViewHandle dsv)
+{
+	d3dCommandList->OMSetRenderTargets(rtvCount, )
+}
+
+// Device //////////////////////////////////////////////////////////////////////////////////////////
+
+void Device::initialize(IDXGIAdapter4* dxgiAdapter)
+{
+	XE_MASTER_ASSERT(!d3dDevice);
+
+	D3D12CreateDevice(dxgiAdapter, D3D_FEATURE_LEVEL_12_1, d3dDevice.uuid(), d3dDevice.voidInitRef());
+
+	const D3D12_DESCRIPTOR_HEAP_DESC d3dSRVHeapDesc =
+		D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 64, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
+	const D3D12_DESCRIPTOR_HEAP_DESC d3dRTVHeapDesc =
+		D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 64);
+	const D3D12_DESCRIPTOR_HEAP_DESC d3dDSVHeapDesc =
+		D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 64);
+
+	d3dDevice->CreateDescriptorHeap(&d3dSRVHeapDesc, d3dSRVHeap.uuid(), d3dSRVHeap.voidInitRef());
+	d3dDevice->CreateDescriptorHeap(&d3dRTVHeapDesc, d3dRTVHeap.uuid(), d3dRTVHeap.voidInitRef());
+	d3dDevice->CreateDescriptorHeap(&d3dDSVHeapDesc, d3dDSVHeap.uuid(), d3dDSVHeap.voidInitRef());
+
+	const D3D12_COMMAND_QUEUE_DESC d3dGraphicsQueueDesc = D3D12Helpers::CommandQueueDesc(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	d3dDevice->CreateCommandQueue(&d3dGraphicsQueueDesc, d3dGraphicsQueue.uuid(), d3dGraphicsQueue.voidInitRef());
+
+	rtvHeapAllocationMask.clear();
+	dsvHeapAllocationMask.clear();
 }
 
 void Device::createBuffer(uint32 size, BufferType type, Buffer& buffer)
@@ -70,10 +106,36 @@ void Device::createTexture2D(uint16 width, uint16 height, TextureFormat format, 
 		IID_PPV_ARGS(&texture.d3dResource));
 }
 
-void Device::createBindingLayout(const void* compiledData, uint32 compiledDataSize, BindingLayout& bindingLayout)
+RenderTargetViewHandle Device::createRenderTargetView(Texture& texture)
 {
-	d3dDevice->CreateRootSignature(0, compiledData, compiledDataSize,
-		__uuidof(*bindingLayout.d3dRootSignature), (void**)&bindingLayout.d3dRootSignature);
+	XE_MASTER_ASSERT(texture.d3dResource);
+
+	const sint32 freeDescriptorIndex = rtvHeapAllocationMask.findFirstZero();
+	XE_MASTER_ASSERT(freeDescriptorIndex >= 0);
+	rtvHeapAllocationMask.set(freeDescriptorIndex);
+
+	const uint32 descriptorSize = d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	const uint64 descriptorAddress = d3dRTVHeap->GetCPUDescriptorHandleForHeapStart().ptr + descriptorSize * freeDescriptorIndex;
+
+	d3dDevice->CreateRenderTargetView(texture.d3dResource, nullptr, D3D12_CPU_DESCRIPTOR_HANDLE{ descriptorAddress });
+
+	return RenderTargetViewHandle(freeDescriptorIndex);
+}
+
+DepthStencilViewHandle Device::createDepthStencilView(Texture& texture)
+{
+	XE_MASTER_ASSERT(texture.d3dResource);
+
+	const sint32 freeDescriptorIndex = dsvHeapAllocationMask.findFirstZero();
+	XE_MASTER_ASSERT(freeDescriptorIndex >= 0);
+	dsvHeapAllocationMask.set(freeDescriptorIndex);
+
+	const uint32 descriptorSize = d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+	const uint64 descriptorAddress = d3dDSVHeap->GetCPUDescriptorHandleForHeapStart().ptr + descriptorSize * freeDescriptorIndex;
+
+	d3dDevice->CreateDepthStencilView(texture.d3dResource, nullptr, D3D12_CPU_DESCRIPTOR_HANDLE{ descriptorAddress });
+
+	return DepthStencilViewHandle(freeDescriptorIndex);
 }
 
 void Device::createGraphicsCommandList(GraphicsCommandList& commandList)

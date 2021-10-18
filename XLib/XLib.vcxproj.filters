@@ -129,6 +129,7 @@
       <Filter>Containers</Filter>
     </ClInclude>
     <ClInclude Include="Source\XLib.JSON.h" />
+    <ClInclude Include="Source\XLib.Containers.BitSet.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\XLib.Memory.cpp" />
