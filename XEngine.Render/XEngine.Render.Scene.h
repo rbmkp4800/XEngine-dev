@@ -66,8 +66,8 @@ namespace XEngine::Render
 		void initialize(Device& device);
 		void destroy();
 
-		TransformAddress allocateTransformsBlock(uint32 size = 1);
-		void releaseTransformsBlock(TransformAddress address);
+		TransformAddress allocateTransforms(uint32 size = 1);
+		void releaseTransforms(TransformAddress address);
 
 		//InplaceGeometrySectionsInstanceHandle insertInplaceGeometrySections(SectionDesc* sectionDescs, uint32 sectionCount,);
 		//void removeInplaceGeometrySections(InplaceGeometrySectionsInstanceHandle handle);

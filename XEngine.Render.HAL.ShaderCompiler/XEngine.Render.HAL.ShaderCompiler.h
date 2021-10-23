@@ -21,6 +21,9 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		ConstantBuffer,
 		ReadOnlyBuffer,
 		ReadWriteBuffer,
+		//Descriptor,
+		//DescriptorBundle,
+		//DescriptorArray,
 	};
 
 	enum class ShaderType : uint8
@@ -28,8 +31,8 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		None = 0,
 		CS,
 		VS,
-		MS,
 		AS,
+		MS,
 		PS,
 	};
 
@@ -37,8 +40,10 @@ namespace XEngine::Render::HAL::ShaderCompiler
 	{
 		const char* name;
 		BindPointType type;
+
 		uint8 constantCount;
 		uint8 shaderVisibility;
+		// or compiled DescriptorBundleLayout
 	};
 
 	struct BindingLayoutDesc
@@ -62,6 +67,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 
 	};
 
+	//void CompileDescriptorBundleLayout();
 	void CompileBindingLayout(Platform platform, const BindingLayoutDesc& desc, CompiledBindingLayout& compiledBindingLayout);
 	void CompileShader(Platform platform, ShaderType shaderType, const CompiledBindingLayout& compiledBindingLayout, ...);
 	void CompilePipeline(Platform platform);

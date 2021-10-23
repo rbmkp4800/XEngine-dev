@@ -196,7 +196,7 @@ void Game::initialize()
 
 	geometrySectionsBundle = renderDevice.createGeometrySectionBundle(&geometrySectionsDesc, 1);
 
-	scene.allocateTransformsBlock(2);
+	scene.allocateTransforms(2);
 	scene.insertGeometrySectionBundleInstance(geometrySectionsBundle, 0);
 	scene.insertGeometrySectionBundleInstance(geometrySectionsBundle, 1);
 

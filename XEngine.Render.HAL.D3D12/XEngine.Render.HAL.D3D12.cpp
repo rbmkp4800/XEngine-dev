@@ -5,9 +5,9 @@
 
 #include "XEngine.Render.HAL.D3D12.h"
 
-#define XE_ASSERT
+#define XE_ASSERT(...)
 #define XE_ASSERT_UNREACHABLE_CODE
-#define XE_MASTER_ASSERT
+#define XE_MASTER_ASSERT(...)
 #define XE_MASTER_ASSERT_UNREACHABLE_CODE
 
 using namespace XLib::Platform;
@@ -24,7 +24,7 @@ static inline D3D12_HEAP_TYPE TranslateBufferTypeToD3D12HeapType(BufferType type
 		case BufferType::Readback:	return D3D12_HEAP_TYPE_READBACK;
 	}
 
-	XE_MASTER_ASSERT_UNREACHABLE_CODE();
+	XE_MASTER_ASSERT_UNREACHABLE_CODE;
 }
 
 static inline DXGI_FORMAT TranslateTextureFormatToDXGIFormat(TextureFormat format)
@@ -35,14 +35,41 @@ static inline DXGI_FORMAT TranslateTextureFormatToDXGIFormat(TextureFormat forma
 		case TextureFormat::R8G8B8A8_UNORM:	return DXGI_FORMAT_R8G8B8A8_UNORM;
 	}
 
-	XE_MASTER_ASSERT_UNREACHABLE_CODE();
+	XE_MASTER_ASSERT_UNREACHABLE_CODE;
 }
 
 // GraphicsCommandList /////////////////////////////////////////////////////////////////////////////
 
 void GraphicsCommandList::setRenderTargets(uint8 rtvCount, const RenderTargetViewHandle* rtvs, DepthStencilViewHandle dsv)
 {
-	d3dCommandList->OMSetRenderTargets(rtvCount, )
+	XE_ASSERT(device);
+
+	D3D12_CPU_DESCRIPTOR_HANDLE d3dRTVDescriptorAddresses[4] = {};
+	D3D12_CPU_DESCRIPTOR_HANDLE d3dDSVDescriptorAddress = {};
+
+	const bool useRTVs = rtvCount > 0;
+	if (useRTVs)
+	{
+		XE_ASSERT(rtvs);
+		XE_ASSERT(rtvCount < countof(d3dRTVDescriptorAddresses));
+		for (uint8 i = 0; i < rtvCount; i++)
+		{
+			XE_ASSERT(rtvs[i] != ZeroRenderTargetViewHandle);
+			const uint32 descriptorIndex = uint32(rtvs[i]); // TODO: Proper handle decode
+			d3dRTVDescriptorAddresses[i].ptr = device->rtvHeapStartAddress + descriptorIndex * device->rtvDescriptorSize;
+		}
+	}
+
+	const bool useDSVs = dsv != ZeroDepthStencilViewHandle;
+	if (useDSVs)
+	{
+		const uint32 descriptorIndex = uint32(dsv); // TODO: Proper handle decode
+		d3dDSVDescriptorAddress.ptr = device->dsvHeapStartAddress + uint32(dsv) * device->dsvHeapStartAddress;
+	}
+
+	d3dCommandList->OMSetRenderTargets(rtvCount,
+		useRTVs ? d3dRTVDescriptorAddresses : nullptr, FALSE,
+		useDSVs ? &d3dDSVDescriptorAddress : nullptr);
 }
 
 // Device //////////////////////////////////////////////////////////////////////////////////////////
@@ -53,14 +80,18 @@ void Device::initialize(IDXGIAdapter4* dxgiAdapter)
 
 	D3D12CreateDevice(dxgiAdapter, D3D_FEATURE_LEVEL_12_1, d3dDevice.uuid(), d3dDevice.voidInitRef());
 
-	const D3D12_DESCRIPTOR_HEAP_DESC d3dSRVHeapDesc =
-		D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 64, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
+	const D3D12_DESCRIPTOR_HEAP_DESC d3dReferenceSRVHeapDesc =
+		D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, ReferenceSRVHeapSize);
+	const D3D12_DESCRIPTOR_HEAP_DESC d3dShaderVisbileSRVHeapDesc =
+		D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+			ShaderVisibleSRVHeapSize, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
 	const D3D12_DESCRIPTOR_HEAP_DESC d3dRTVHeapDesc =
-		D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 64);
+		D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, RTVHeapSize);
 	const D3D12_DESCRIPTOR_HEAP_DESC d3dDSVHeapDesc =
-		D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 64);
+		D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, DSVHeapSize);
 
-	d3dDevice->CreateDescriptorHeap(&d3dSRVHeapDesc, d3dSRVHeap.uuid(), d3dSRVHeap.voidInitRef());
+	d3dDevice->CreateDescriptorHeap(&d3dReferenceSRVHeapDesc, d3dReferenceSRVHeap.uuid(), d3dReferenceSRVHeap.voidInitRef());
+	d3dDevice->CreateDescriptorHeap(&d3dShaderVisbileSRVHeapDesc, d3dShaderVisbileSRVHeap.uuid(), d3dShaderVisbileSRVHeap.voidInitRef());
 	d3dDevice->CreateDescriptorHeap(&d3dRTVHeapDesc, d3dRTVHeap.uuid(), d3dRTVHeap.voidInitRef());
 	d3dDevice->CreateDescriptorHeap(&d3dDSVHeapDesc, d3dDSVHeap.uuid(), d3dDSVHeap.voidInitRef());
 
@@ -69,6 +100,12 @@ void Device::initialize(IDXGIAdapter4* dxgiAdapter)
 
 	rtvHeapAllocationMask.clear();
 	dsvHeapAllocationMask.clear();
+
+	rtvHeapStartAddress = d3dRTVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
+	dsvHeapStartAddress = d3dDSVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
+	rtvDescriptorSize = uint16(d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV));
+	dsvDescriptorSize = uint16(d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
+	srvDescriptorSize = uint16(d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
 }
 
 void Device::createBuffer(uint32 size, BufferType type, Buffer& buffer)
@@ -106,46 +143,6 @@ void Device::createTexture2D(uint16 width, uint16 height, TextureFormat format, 
 		IID_PPV_ARGS(&texture.d3dResource));
 }
 
-RenderTargetViewHandle Device::createRenderTargetView(Texture& texture)
-{
-	XE_MASTER_ASSERT(texture.d3dResource);
-
-	const sint32 freeDescriptorIndex = rtvHeapAllocationMask.findFirstZero();
-	XE_MASTER_ASSERT(freeDescriptorIndex >= 0);
-	rtvHeapAllocationMask.set(freeDescriptorIndex);
-
-	const uint32 descriptorSize = d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	const uint64 descriptorAddress = d3dRTVHeap->GetCPUDescriptorHandleForHeapStart().ptr + descriptorSize * freeDescriptorIndex;
-
-	d3dDevice->CreateRenderTargetView(texture.d3dResource, nullptr, D3D12_CPU_DESCRIPTOR_HANDLE{ descriptorAddress });
-
-	return RenderTargetViewHandle(freeDescriptorIndex);
-}
-
-DepthStencilViewHandle Device::createDepthStencilView(Texture& texture)
-{
-	XE_MASTER_ASSERT(texture.d3dResource);
-
-	const sint32 freeDescriptorIndex = dsvHeapAllocationMask.findFirstZero();
-	XE_MASTER_ASSERT(freeDescriptorIndex >= 0);
-	dsvHeapAllocationMask.set(freeDescriptorIndex);
-
-	const uint32 descriptorSize = d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
-	const uint64 descriptorAddress = d3dDSVHeap->GetCPUDescriptorHandleForHeapStart().ptr + descriptorSize * freeDescriptorIndex;
-
-	d3dDevice->CreateDepthStencilView(texture.d3dResource, nullptr, D3D12_CPU_DESCRIPTOR_HANDLE{ descriptorAddress });
-
-	return DepthStencilViewHandle(freeDescriptorIndex);
-}
-
-void Device::createGraphicsCommandList(GraphicsCommandList& commandList)
-{
-	d3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandList.d3dCommandAllocator));
-	d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandList.d3dCommandAllocator, nullptr,
-		IID_PPV_ARGS(&commandList.d3dCommandList));
-	commandList.d3dCommandList->Close();
-}
-
 void Device::createSwapChain(uint16 width, uint16 height, void* hWnd, SwapChain& swapChain)
 {
 	DXGI_SWAP_CHAIN_DESC1 dxgiSwapChainDesc = {};
@@ -167,6 +164,47 @@ void Device::createSwapChain(uint16 width, uint16 height, void* hWnd, SwapChain&
 		&dxgiSwapChainDesc, nullptr, nullptr, dxgiSwapChain1.initRef());
 
 	dxgiSwapChain1->QueryInterface(IID_PPV_ARGS(&swapChain.dxgiSwapChain));
+}
+
+ResourceViewHandle Device::createResourceView(const ResourceViewDesc& desc)
+{
+
+}
+
+RenderTargetViewHandle Device::createRenderTargetView(Texture& texture)
+{
+	XE_MASTER_ASSERT(texture.d3dResource);
+
+	const sint32 freeDescriptorIndex = rtvHeapAllocationMask.findFirstZero();
+	XE_MASTER_ASSERT(freeDescriptorIndex >= 0);
+	rtvHeapAllocationMask.set(freeDescriptorIndex);
+
+	const uint64 descriptorAddress = rtvHeapStartAddress + rtvDescriptorSize * freeDescriptorIndex;
+	d3dDevice->CreateRenderTargetView(texture.d3dResource, nullptr, D3D12_CPU_DESCRIPTOR_HANDLE{ descriptorAddress });
+
+	return RenderTargetViewHandle(freeDescriptorIndex); // TODO: Proper handle encode
+}
+
+DepthStencilViewHandle Device::createDepthStencilView(Texture& texture)
+{
+	XE_MASTER_ASSERT(texture.d3dResource);
+
+	const sint32 freeDescriptorIndex = dsvHeapAllocationMask.findFirstZero();
+	XE_MASTER_ASSERT(freeDescriptorIndex >= 0);
+	dsvHeapAllocationMask.set(freeDescriptorIndex);
+
+	const uint64 descriptorAddress = dsvHeapStartAddress + dsvDescriptorSize * freeDescriptorIndex;
+	d3dDevice->CreateDepthStencilView(texture.d3dResource, nullptr, D3D12_CPU_DESCRIPTOR_HANDLE{ descriptorAddress });
+
+	return DepthStencilViewHandle(freeDescriptorIndex); // TODO: Proper handle encode
+}
+
+void Device::createGraphicsCommandList(GraphicsCommandList& commandList)
+{
+	d3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandList.d3dCommandAllocator));
+	d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandList.d3dCommandAllocator, nullptr,
+		IID_PPV_ARGS(&commandList.d3dCommandList));
+	commandList.d3dCommandList->Close();
 }
 
 // Host ////////////////////////////////////////////////////////////////////////////////////////////

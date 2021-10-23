@@ -21,11 +21,15 @@ namespace XEngine::Render::HAL
 	class Device;
 	class Host;
 
+	enum class ResourceViewHandle : uint32;
 	enum class RenderTargetViewHandle : uint32;
 	enum class DepthStencilViewHandle : uint32;
 
+	static constexpr ResourceViewHandle ZeroResourceViewHandle = ResourceViewHandle(0);
 	static constexpr RenderTargetViewHandle ZeroRenderTargetViewHandle = RenderTargetViewHandle(0);
 	static constexpr DepthStencilViewHandle ZeroDepthStencilViewHandle = DepthStencilViewHandle(0);
+
+	using DescriptorAddress = uint32;
 
 	enum class BufferType : uint8
 	{
@@ -44,10 +48,25 @@ namespace XEngine::Render::HAL
 	{
 		enum : uint32
 		{
-			AllowRenderTarget = 0x01,
-			AllowDepthStencil = 0x02,
-			AllowShaderWrite = 0x04,
+			None = 0,
+			AllowRenderTarget	= 0x01,
+			AllowDepthStencil	= 0x02,
+			AllowShaderWrite	= 0x04,
 		};
+	};
+
+	enum class ResourceViewType : uint8
+	{
+		Undefined = 0,
+		ReadOnlyBuffer,
+		ReadWriteBuffer,
+		ReadOnlyTexture2D,
+		ReadWriteTexture2D,
+	};
+
+	struct ResourceViewDesc
+	{
+		ResourceViewType type;
 	};
 
 	struct RasterizerDesc
@@ -94,9 +113,16 @@ namespace XEngine::Render::HAL
 		~Texture();
 	};
 
-	class TextureDescriptorArray : public XLib::NonCopyable
+	class SwapChain : public XLib::NonCopyable
 	{
 		friend Device;
+
+	private:
+		IDXGISwapChain3* dxgiSwapChain = nullptr;
+
+	public:
+		SwapChain() = default;
+		~SwapChain();
 	};
 
 	class BindingLayout : public XLib::NonCopyable
@@ -140,6 +166,7 @@ namespace XEngine::Render::HAL
 		friend Device;
 
 	private:
+		Device* device = nullptr;
 		ID3D12GraphicsCommandList* d3dCommandList = nullptr;
 		ID3D12CommandAllocator* d3dCommandAllocator = nullptr;
 
@@ -159,6 +186,9 @@ namespace XEngine::Render::HAL
 		void bindConstantBuffer(uint32 bindPointNameCRC, Buffer& buffer, uint32 offset);
 		void bindReadOnlyBuffer(uint32 bindPointNameCRC, Buffer& buffer, uint32 offset);
 		void bindReadWriteBuffer(uint32 bindPointNameCRC, Buffer& buffer, uint32 offset);
+		//void bindDescriptor(uint32 bindPointNameCRC, DescriptorAddress address);
+		//void bindDescriptorBundle(uint32 bindPointNameCRC, DescriptorBundleHandle bundle);
+		//void bindDescriptorArray(uint32 bindPointNameCRC, DescriptorAddress arrayStartAddress);
 
 		void drawNonIndexed();
 		void drawIndexed();
@@ -202,33 +232,35 @@ namespace XEngine::Render::HAL
 		~CopyCommandList();
 	};
 
-	class SwapChain : public XLib::NonCopyable
-	{
-		friend Device;
-
-	private:
-		IDXGISwapChain3* dxgiSwapChain = nullptr;
-
-	public:
-		SwapChain() = default;
-		~SwapChain();
-	};
-
 	class Device : public XLib::NonCopyable
 	{
 		friend Host;
+		friend GraphicsCommandList;
+
+	private:
+		static constexpr uint32 ReferenceSRVHeapSize = 1024;
+		static constexpr uint32 ShaderVisibleSRVHeapSize = 4096;
+		static constexpr uint32 RTVHeapSize = 64;
+		static constexpr uint32 DSVHeapSize = 64;
 
 	private:
 		XLib::Platform::COMPtr<ID3D12Device2> d3dDevice;
-		XLib::Platform::COMPtr<ID3D12DescriptorHeap> d3dSRVHeap;
+		XLib::Platform::COMPtr<ID3D12DescriptorHeap> d3dReferenceSRVHeap;
+		XLib::Platform::COMPtr<ID3D12DescriptorHeap> d3dShaderVisbileSRVHeap;
 		XLib::Platform::COMPtr<ID3D12DescriptorHeap> d3dRTVHeap;
 		XLib::Platform::COMPtr<ID3D12DescriptorHeap> d3dDSVHeap;
 		XLib::Platform::COMPtr<ID3D12CommandQueue> d3dGraphicsQueue;
 		XLib::Platform::COMPtr<ID3D12CommandQueue> d3dAsyncComputeQueue;
 		XLib::Platform::COMPtr<ID3D12CommandQueue> d3dAsyncCopyQueue;
 
-		XLib::BitSet<64> rtvHeapAllocationMask;
-		XLib::BitSet<64> dsvHeapAllocationMask;
+		XLib::BitSet<RTVHeapSize> rtvHeapAllocationMask;
+		XLib::BitSet<DSVHeapSize> dsvHeapAllocationMask;
+
+		uint64 rtvHeapStartAddress = 0;
+		uint64 dsvHeapStartAddress = 0;
+		uint16 rtvDescriptorSize = 0;
+		uint16 dsvDescriptorSize = 0;
+		uint16 srvDescriptorSize = 0;
 
 	private:
 		void initialize(IDXGIAdapter4* dxgiAdapter);
@@ -243,14 +275,23 @@ namespace XEngine::Render::HAL
 		void createTexture2D(uint16 width, uint16 height, TextureFormat format, uint32 flags, Texture& texture);
 		void destroyTexture(Texture& texture);
 
+		void createSwapChain(uint16 width, uint16 height, void* hWnd, SwapChain& swapChain);
+		void destroySwapChain(SwapChain& swapChain);
+
+		ResourceViewHandle createResourceView(const ResourceViewDesc& desc);
+		void destroyResourceView(ResourceViewHandle handle);
+
 		RenderTargetViewHandle createRenderTargetView(Texture& texture);
 		void destroyRenderTargetView(RenderTargetViewHandle handle);
 
 		DepthStencilViewHandle createDepthStencilView(Texture& texture);
 		void destroyDepthStencilView(DepthStencilViewHandle handle);
 
-		//void createTextureDescriptorArray(uint32 descriptorCount, TextureDescriptorArray& descriptorArray);
-		//void destroyTextureDescriptorArray(TextureDescriptorArray& descriptorArray);
+		DescriptorAddress allocateDescriptors(uint32 count = 1);
+		void releaseDescriptors(DescriptorAddress address);
+
+		//DescriptorBundleLayoutHandle createDescriptorBundleLayout();
+		//DescriptorBundleHandle createDescriptorBundle(DescriptorBundleLayoutHandle layout);
 
 		void createGraphicsPipeline(BindingLayout& bindingLayout, const RasterizerDesc& rasterizerDesc, const BlendDesc& blendDesc, GraphicsPipeline& graphicsPipeline);
 		void destroyGraphicsPipeline(GraphicsPipeline& graphicsPipeline);
@@ -267,15 +308,15 @@ namespace XEngine::Render::HAL
 		//void createCopyCommandList(CopyCommandList& commandList);
 		//void destroyCopyCommandList(CopyCommandList& commandList);
 
-		void createSwapChain(uint16 width, uint16 height, void* hWnd, SwapChain& swapChain);
-		void destroySwapChain(SwapChain& swapChain);
-
-		void writeTextureDescritor(Texture& texture, TextureDescriptorArray& descriptorArray, uint32 arrayOffset);
+		void writeDescriptor(DescriptorAddress address, ResourceViewHandle resourceViewHandle);
+		//void writeBundleDescriptor(DescriptorBundleHandle bundle, uint32 entryNameCRC, ResourceViewHandle resourceViewHandle);
 
 		void submitGraphics(GraphicsCommandList& commandList);
 		void submitAsyncCompute(ComputeCommandList& commandList);
 		void submitAsyncCopy(CopyCommandList& commandList);
 		void submitFlip(SwapChain& swapChain);
+
+		//DescriptorAddress getDescriptorBundleStartAddress(DescriptorBundleHandle bundle) const;
 
 		const char* getName() const;
 	};

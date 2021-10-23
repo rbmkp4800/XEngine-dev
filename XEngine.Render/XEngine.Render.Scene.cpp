@@ -34,7 +34,7 @@ void Scene::initialize(Device& device)
 	d3dDrawArgsBuffer->Map(0, &D3D12Range(), to<void**>(&mappedDrawArgsBuffer));
 }
 
-TransformAddress Scene::allocateTransformsBlock(uint32 size)
+TransformAddress Scene::allocateTransforms(uint32 size)
 {
 	const uint32 baseTransformIndex = allocatedTansformCount;
 	allocatedTansformCount += size;
