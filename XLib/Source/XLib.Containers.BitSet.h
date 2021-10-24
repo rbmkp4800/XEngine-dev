@@ -22,6 +22,8 @@ namespace XLib
 		inline sint32 findFirstOne() const;
 		inline sint32 findFirstZero() const;
 
+		inline sint32 findFirstZeroAndSet() const;
+
 
 	};
 }

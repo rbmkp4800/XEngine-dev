@@ -21,26 +21,62 @@ namespace XEngine::Render::HAL
 	class Device;
 	class Host;
 
+	enum class ResourceHandle : uint32;
 	enum class ResourceViewHandle : uint32;
 	enum class RenderTargetViewHandle : uint32;
 	enum class DepthStencilViewHandle : uint32;
+	enum class DescriptorBundleLayoutHandle : uint32;
+	enum class DescriptorBundleHandle : uint32;
+	enum class BindingLayoutHandle : uint32;
+	enum class GraphicsPipelineHandle : uint32;
+	enum class ComputePipelineHandle : uint32;
+	enum class FenceHandle : uint32;
+	enum class SwapChainHandle : uint32;
 
+	using DescriptorAddress = uint32;
+
+	static constexpr ResourceHandle ZeroResourceHandle = ResourceHandle(0);
 	static constexpr ResourceViewHandle ZeroResourceViewHandle = ResourceViewHandle(0);
 	static constexpr RenderTargetViewHandle ZeroRenderTargetViewHandle = RenderTargetViewHandle(0);
 	static constexpr DepthStencilViewHandle ZeroDepthStencilViewHandle = DepthStencilViewHandle(0);
 
-	using DescriptorAddress = uint32;
-
-	enum class DescriptorBundleLayoutHandle : uint32;
-	enum class DescriptorBundleHandle : uint32;
-
-	enum class FenceHandle : uint32;
-
-	enum class BufferType : uint8
+	enum class ResourceType : uint8
 	{
-		Default = 0,
+		Undefined = 0,
+		Buffer,
+		Texture,
+	};
+
+	enum class ResourceViewType : uint8
+	{
+		Undefined = 0,
+		ReadOnlyBuffer,
+		ReadWriteBuffer,
+		ReadOnlyTexture1D,
+		ReadWriteTexture1D,
+		ReadOnlyTexture2D,
+		ReadWriteTexture2D,
+		ReadOnlyTexture3D,
+		ReadWriteTexture3D,
+		ReadOnlyTextureCube,
+		RaytracingAccelerationStructure,
+	};
+
+	enum class BufferMemoryType : uint8
+	{
+		Undefined = 0,
+		Local,
 		Upload,
 		Readback,
+	};
+
+	enum class TextureDimType : uint8
+	{
+		Undefined = 0,
+		Texture1D,
+		Texture2D,
+		Texture2DArray,
+		Texture3D,
 	};
 
 	enum class TextureFormat : uint8
@@ -60,18 +96,42 @@ namespace XEngine::Render::HAL
 		};
 	};
 
-	enum class ResourceViewType : uint8
+	struct TextureDim
 	{
-		Undefined = 0,
-		ReadOnlyBuffer,
-		ReadWriteBuffer,
-		ReadOnlyTexture2D,
-		ReadWriteTexture2D,
+		TextureDimType type;
+		uint16 width;
+		uint16 height;
+		uint16 depth;
 	};
 
 	struct ResourceViewDesc
 	{
 		ResourceViewType type;
+		union
+		{
+			struct
+			{
+
+			} readOnlyBuffer;
+
+			struct
+			{
+
+			} readWriteBuffer;
+
+			struct
+			{
+				uint8 startMipIndex;
+				uint8 mipLevelCount;
+				uint8 plane;
+			} readOnlyTexture2D;
+
+			struct
+			{
+				uint8 mipIndex;
+				uint8 plane;
+			} readWriteTexture2D;
+		};
 	};
 
 	struct RasterizerDesc
@@ -96,83 +156,19 @@ namespace XEngine::Render::HAL
 
 	struct FenceSignalDesc
 	{
-		FenceHandle fence;
+		FenceHandle fenceHandle;
 		uint64 value;
 	};
 
-	class Buffer : public XLib::NonCopyable
+	enum class CommandListType : uint8
 	{
-		friend Device;
-
-	private:
-		ID3D12Resource* d3dResource = nullptr;
-
-	public:
-		Buffer() = default;
-		~Buffer();
+		Undefined = 0,
+		Graphics,
+		Compute,
+		Copy,
 	};
 
-	class Texture : public XLib::NonCopyable
-	{
-		friend Device;
-
-	private:
-		ID3D12Resource* d3dResource = nullptr;
-
-	public:
-		Texture() = default;
-		~Texture();
-	};
-
-	class SwapChain : public XLib::NonCopyable
-	{
-		friend Device;
-
-	private:
-		IDXGISwapChain3* dxgiSwapChain = nullptr;
-
-	public:
-		SwapChain() = default;
-		~SwapChain();
-	};
-
-	class BindingLayout : public XLib::NonCopyable
-	{
-		friend Device;
-
-	private:
-		ID3D12RootSignature* d3dRootSignature = nullptr;
-
-	public:
-		BindingLayout() = default;
-		~BindingLayout();
-	};
-
-	class GraphicsPipeline : public XLib::NonCopyable
-	{
-		friend Device;
-
-	private:
-		ID3D12PipelineState* d3dPipelineState = nullptr;
-
-	public:
-		GraphicsPipeline() = default;
-		~GraphicsPipeline();
-	};
-
-	class ComputePipeline : public XLib::NonCopyable
-	{
-		friend Device;
-
-	private:
-		ID3D12PipelineState* d3dPipelineState = nullptr;
-
-	public:
-		ComputePipeline() = default;
-		~ComputePipeline();
-	};
-
-	class GraphicsCommandList : public XLib::NonCopyable
+	class CommandList : public XLib::NonCopyable
 	{
 		friend Device;
 
@@ -180,25 +176,26 @@ namespace XEngine::Render::HAL
 		Device* device = nullptr;
 		ID3D12GraphicsCommandList* d3dCommandList = nullptr;
 		ID3D12CommandAllocator* d3dCommandAllocator = nullptr;
+		CommandListType type = CommandListType::Undefined;
 
 	public:
-		GraphicsCommandList() = default;
-		~GraphicsCommandList();
+		CommandList() = default;
+		~CommandList();
 
 		void setRenderTargets(uint8 rtvCount, const RenderTargetViewHandle* rtvs, DepthStencilViewHandle dsv = ZeroDepthStencilViewHandle);
 		void setRenderTarget(RenderTargetViewHandle rtv, DepthStencilViewHandle dsv = ZeroDepthStencilViewHandle) { setRenderTargets(1, &rtv, dsv); }
 		void setViewport(const Viewport& viewport);
 		void setScissor();
 
-		void setGraphicsPipeline(GraphicsPipeline& pipeline);
-		void setComputePipeline(ComputePipeline& pipeline);
+		void setGraphicsPipeline(GraphicsPipelineHandle pipeline);
+		void setComputePipeline(ComputePipelineHandle pipeline);
 
 		void bindConstants(uint32 bindPointNameCRC, const void* data, uint32 size32bitValues);
-		void bindConstantBuffer(uint32 bindPointNameCRC, Buffer& buffer, uint32 offset);
-		void bindReadOnlyBuffer(uint32 bindPointNameCRC, Buffer& buffer, uint32 offset);
-		void bindReadWriteBuffer(uint32 bindPointNameCRC, Buffer& buffer, uint32 offset);
+		void bindConstantBuffer(uint32 bindPointNameCRC, ResourceHandle bufferHandle, uint32 offset);
+		void bindReadOnlyBuffer(uint32 bindPointNameCRC, ResourceHandle bufferHandle, uint32 offset);
+		void bindReadWriteBuffer(uint32 bindPointNameCRC, ResourceHandle bufferHandle, uint32 offset);
 		void bindDescriptor(uint32 bindPointNameCRC, DescriptorAddress address);
-		void bindDescriptorBundle(uint32 bindPointNameCRC, DescriptorBundleHandle bundle);
+		void bindDescriptorBundle(uint32 bindPointNameCRC, DescriptorBundleHandle bundleHandle);
 		void bindDescriptorArray(uint32 bindPointNameCRC, DescriptorAddress arrayStartAddress);
 
 		void drawNonIndexed();
@@ -213,46 +210,27 @@ namespace XEngine::Render::HAL
 		void copyFromTextureToBuffer();
 	};
 
-	class ComputeCommandList : public XLib::NonCopyable
-	{
-		friend Device;
-
-	private:
-		ID3D12GraphicsCommandList* d3dCommandList = nullptr;
-		ID3D12CommandAllocator* d3dCommandAllocator = nullptr;
-
-	public:
-		ComputeCommandList() = default;
-		~ComputeCommandList();
-
-		void setComputePipeline(ComputePipeline& pipeline);
-
-		void dispatch();
-	};
-
-	class CopyCommandList : public XLib::NonCopyable
-	{
-		friend Device;
-
-	private:
-		ID3D12GraphicsCommandList* d3dCommandList = nullptr;
-		ID3D12CommandAllocator* d3dCommandAllocator = nullptr;
-
-	public:
-		CopyCommandList() = default;
-		~CopyCommandList();
-	};
-
 	class Device : public XLib::NonCopyable
 	{
 		friend Host;
-		friend GraphicsCommandList;
+		friend CommandList;
 
 	private:
-		static constexpr uint32 ReferenceSRVHeapSize = 1024;
+		static constexpr uint32 MaxResourceCount = 1024;
+		static constexpr uint32 MaxResourceViewCount = 1024;
 		static constexpr uint32 ShaderVisibleSRVHeapSize = 4096;
-		static constexpr uint32 RTVHeapSize = 64;
-		static constexpr uint32 DSVHeapSize = 64;
+		static constexpr uint32 MaxRenderTargetViewCount = 64;
+		static constexpr uint32 MaxDepthStencilViewCount = 64;
+		static constexpr uint32 MaxPipelineCount = 1024;
+		static constexpr uint32 MaxFenceCount = 64;
+		static constexpr uint32 MaxSwapChainCount = 4;
+		static constexpr uint32 SwapChainPlaneCount = 2;
+
+		struct Resource;
+		struct ResourceView;
+		struct Pipeline;
+		struct Fence;
+		struct SwapChain;
 
 	private:
 		XLib::Platform::COMPtr<ID3D12Device2> d3dDevice;
@@ -264,18 +242,43 @@ namespace XEngine::Render::HAL
 		XLib::Platform::COMPtr<ID3D12CommandQueue> d3dAsyncComputeQueue;
 		XLib::Platform::COMPtr<ID3D12CommandQueue> d3dAsyncCopyQueue;
 
-		XLib::BitSet<RTVHeapSize> rtvHeapAllocationMask;
-		XLib::BitSet<DSVHeapSize> dsvHeapAllocationMask;
+		Resource* resourcesTable = nullptr;
+		ResourceView* resourceViewsTable = nullptr;
+		Pipeline* pipelinesTable = nullptr;
+		Fence* fencesTable = nullptr;
+		SwapChain* swapChainsTable = nullptr;
 
-		uint64 referenceSRVHeapStartAddress = 0;
-		uint64 shaderVisbileSRVHeapStartAddressCPU = 0;
-		uint64 shaderVisbileSRVHeapStartAddressGPU = 0;
-		uint64 rtvHeapStartAddress = 0;
-		uint64 dsvHeapStartAddress = 0;
+		XLib::BitSet<MaxResourceCount> resourcesAllocationMask;
+		XLib::BitSet<MaxResourceViewCount> resourceViewsAllocationMask;
+		XLib::BitSet<MaxRenderTargetViewCount> renderTargetViewsAllocationMask;
+		XLib::BitSet<MaxDepthStencilViewCount> depthStencilViewsAllocationMask;
+		XLib::BitSet<MaxFenceCount> fencesAllocationMask;
+		XLib::BitSet<MaxSwapChainCount> swapChainsAllocationMask;
+
+		uint64 referenceSRVHeapStartPtr = 0;
+		uint64 shaderVisbileSRVHeapStartPtrCPU = 0;
+		uint64 shaderVisbileSRVHeapStartPtrGPU = 0;
+		uint64 rtvHeapStartPtr = 0;
+		uint64 dsvHeapStartPtr = 0;
 
 		uint16 srvDescriptorSize = 0;
 		uint16 rtvDescriptorSize = 0;
 		uint16 dsvDescriptorSize = 0;
+
+	private:
+		inline ResourceHandle encodeResourceHandle(uint32 resourceIndex) const;
+		inline ResourceViewHandle encodeResourceViewHandle(uint32 resourceViewIndex) const;
+		inline RenderTargetViewHandle encodeRenderTargetViewHandle(uint32 renderTargetIndex) const;
+		inline DepthStencilViewHandle encodeDepthStencilViewHandle(uint32 depthStencilIndex) const;
+		inline FenceHandle encodeFenceHandle(uint32 fenceIndex) const;
+		inline SwapChainHandle encodeSwapChainHandle(uint32 swapChainIndex) const;
+
+		inline uint32 decodeResourceHandle(ResourceHandle handle);
+		inline uint32 decodeResourceViewHandle(ResourceViewHandle handle);
+		inline uint32 decodeFenceHandle(FenceHandle handle);
+
+		inline DescriptorAddress encodeDescriptorAddress(uint32 srvHeapDescriptorIndex);
+		inline uint32 decodeDescriptorAddress(DescriptorAddress address);
 
 	private:
 		void initialize(IDXGIAdapter4* dxgiAdapter);
@@ -284,22 +287,19 @@ namespace XEngine::Render::HAL
 		Device() = default;
 		~Device() = default;
 
-		void createBuffer(uint32 size, BufferType type, Buffer& buffer);
-		void destroyBuffer(Buffer& buffer);
+		ResourceHandle createBuffer(uint32 size, BufferMemoryType memoryType);
+		void destroyBuffer(ResourceHandle handle);
 
-		void createTexture2D(uint16 width, uint16 height, TextureFormat format, uint32 flags, Texture& texture);
-		void destroyTexture(Texture& texture);
+		ResourceHandle createTexture(const TextureDim& dim, TextureFormat format, uint32 flags);
+		void destroyTexture(ResourceHandle handle);
 
-		void createSwapChain(uint16 width, uint16 height, void* hWnd, SwapChain& swapChain);
-		void destroySwapChain(SwapChain& swapChain);
-
-		ResourceViewHandle createResourceView(const ResourceViewDesc& desc);
+		ResourceViewHandle createResourceView(ResourceHandle resourceHandle, const ResourceViewDesc& viewDesc);
 		void destroyResourceView(ResourceViewHandle handle);
 
-		RenderTargetViewHandle createRenderTargetView(Texture& texture);
+		RenderTargetViewHandle createRenderTargetView(ResourceHandle textureHandle);
 		void destroyRenderTargetView(RenderTargetViewHandle handle);
 
-		DepthStencilViewHandle createDepthStencilView(Texture& texture);
+		DepthStencilViewHandle createDepthStencilView(ResourceHandle textureHandle);
 		void destroyDepthStencilView(DepthStencilViewHandle handle);
 
 		DescriptorAddress allocateDescriptors(uint32 count = 1);
@@ -308,41 +308,43 @@ namespace XEngine::Render::HAL
 		DescriptorBundleLayoutHandle createDescriptorBundleLayout();
 		void destroyDescriptorBundleLayout(DescriptorBundleLayoutHandle handle);
 
-		DescriptorBundleHandle createDescriptorBundle(DescriptorBundleLayoutHandle layout);
+		DescriptorBundleHandle createDescriptorBundle(DescriptorBundleLayoutHandle layoutHandle);
 		void destroyDescriptorBundle(DescriptorBundleHandle handle);
+
+		BindingLayoutHandle createBindingLayout();
+		void destroyBindingLayout(BindingLayoutHandle handle);
+
+		GraphicsPipelineHandle createGraphicsPipeline(BindingLayoutHandle bindingLayoutHandle, const RasterizerDesc& rasterizerDesc, const BlendDesc& blendDesc);
+		void destroyGraphicsPipeline(GraphicsPipelineHandle handle);
+
+		ComputePipelineHandle createComputePipeline(BindingLayoutHandle bindingLayoutHandle);
+		void destroyComputePipeline(ComputePipelineHandle handle);
 
 		FenceHandle createFence(uint64 initialValue);
 		void destroyFence(FenceHandle handle);
 
-		void createGraphicsPipeline(BindingLayout& bindingLayout, const RasterizerDesc& rasterizerDesc, const BlendDesc& blendDesc, GraphicsPipeline& graphicsPipeline);
-		void destroyGraphicsPipeline(GraphicsPipeline& graphicsPipeline);
+		SwapChainHandle createSwapChain(uint16 width, uint16 height, void* hWnd);
+		void destroySwapChain(SwapChainHandle handle);
 
-		void createComputePipeline(BindingLayout& bindingLayout, ComputePipeline& graphicsPipeline);
-		void destroyComputePipeline(ComputePipeline& graphicsPipeline);
+		void createCommandList(CommandList& commandList, CommandListType type);
+		void destroyCommandList(CommandList& commandList);
 
-		void createGraphicsCommandList(GraphicsCommandList& commandList);
-		void destroyGraphicsCommandList(GraphicsCommandList& commandList);
-
-		//void createComputeCommandList(ComputeCommandList& commandList);
-		//void destroyComputeCommandList(ComputeCommandList& commandList);
-
-		//void createCopyCommandList(CopyCommandList& commandList);
-		//void destroyCopyCommandList(CopyCommandList& commandList);
-
-		void writeDescriptor(DescriptorAddress address, ResourceViewHandle resourceViewHandle);
+		void writeDescriptor(DescriptorAddress descriptorAddress, ResourceViewHandle resourceViewHandle);
 		void writeBundleDescriptor(DescriptorBundleHandle bundle, uint32 entryNameCRC, ResourceViewHandle resourceViewHandle);
 
-		void submitGraphics(GraphicsCommandList& commandList, const FenceSignalDesc* fenceSignals = nullptr, uint32 fenceSignalCount = 0);
-		void submitAsyncCompute(ComputeCommandList& commandList, const FenceSignalDesc* fenceSignals = nullptr, uint32 fenceSignalCount = 0);
-		void submitAsyncCopy(CopyCommandList& commandList, const FenceSignalDesc* fenceSignals = nullptr, uint32 fenceSignalCount = 0);
-		void submitFlip(SwapChain& swapChain);
+		void submitGraphics(CommandList& commandList, const FenceSignalDesc* fenceSignals = nullptr, uint32 fenceSignalCount = 0);
+		void submitAsyncCompute(CommandList& commandList, const FenceSignalDesc* fenceSignals = nullptr, uint32 fenceSignalCount = 0);
+		void submitAsyncCopy(CommandList& commandList, const FenceSignalDesc* fenceSignals = nullptr, uint32 fenceSignalCount = 0);
+		void submitFlip(SwapChainHandle swapChainHandle);
 
-		inline void submitGraphics(GraphicsCommandList& commandList, const FenceSignalDesc& fenceSignal) { submitGraphics(commandList, &fenceSignal, 1); }
-		inline void submitAsyncCompute(ComputeCommandList& commandList, const FenceSignalDesc& fenceSignal) { submitAsyncCompute(commandList, &fenceSignal, 1); }
-		inline void submitAsyncCopy(CopyCommandList& commandList, const FenceSignalDesc& fenceSignal) { submitAsyncCopy(commandList, &fenceSignal, 1); }
+		inline void submitGraphics(CommandList& commandList, const FenceSignalDesc& fenceSignal) { submitGraphics(commandList, &fenceSignal, 1); }
+		inline void submitAsyncCompute(CommandList& commandList, const FenceSignalDesc& fenceSignal) { submitAsyncCompute(commandList, &fenceSignal, 1); }
+		inline void submitAsyncCopy(CommandList& commandList, const FenceSignalDesc& fenceSignal) { submitAsyncCopy(commandList, &fenceSignal, 1); }
 
+		void* getUploadBufferCPUPtr(ResourceHandle uploadBuffer);
 		DescriptorAddress getDescriptorBundleStartAddress(DescriptorBundleHandle bundle) const;
 		uint64 getFenceValue(FenceHandle fence) const;
+		ResourceHandle getSwapChainPlaneTexture(SwapChainHandle swapChain, uint32 planeIndex) const;
 
 		const char* getName() const;
 	};

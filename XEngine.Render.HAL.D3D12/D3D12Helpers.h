@@ -87,4 +87,19 @@ namespace D3D12Helpers
 		desc.Flags = flags;
 		return desc;
 	}
+
+	inline D3D12_SHADER_RESOURCE_VIEW_DESC ShaderResourceViewDescForTexture2D(DXGI_FORMAT format,
+		UINT mostDetailedMip, UINT mipLevels, UINT planeSlice = 0, FLOAT resourceMinLODClamp = 0.0f,
+		UINT shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING)
+	{
+		D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+		desc.Format = format;
+		desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		desc.Shader4ComponentMapping = shader4ComponentMapping;
+		desc.Texture2D.MostDetailedMip = mostDetailedMip;
+		desc.Texture2D.MipLevels = mipLevels;
+		desc.Texture2D.PlaneSlice = planeSlice;
+		desc.Texture2D.ResourceMinLODClamp = resourceMinLODClamp;
+		return desc;
+	}
 }
