@@ -5,11 +5,6 @@
 
 #include "XEngine.Render.HAL.D3D12.h"
 
-#define XE_ASSERT(...)
-#define XE_ASSERT_UNREACHABLE_CODE
-#define XE_MASTER_ASSERT(...)
-#define XE_MASTER_ASSERT_UNREACHABLE_CODE
-
 using namespace XLib::Platform;
 using namespace XEngine::Render::HAL;
 
@@ -40,9 +35,17 @@ static inline DXGI_FORMAT TranslateTextureFormatToDXGIFormat(TextureFormat forma
 
 // CommandList /////////////////////////////////////////////////////////////////////////////////////
 
+enum class CommandList::State
+{
+	Idle = 0,
+	Recording,
+	Executing,
+};
+
 void CommandList::setRenderTargets(uint8 rtvCount, const RenderTargetViewHandle* rtvs, DepthStencilViewHandle dsv)
 {
 	XE_ASSERT(device);
+	XE_ASSERT(state == State::Recording);
 
 	D3D12_CPU_DESCRIPTOR_HANDLE d3dRTVDescriptorPtrs[4] = {};
 	D3D12_CPU_DESCRIPTOR_HANDLE d3dDSVDescriptorPtr = {};
@@ -55,21 +58,53 @@ void CommandList::setRenderTargets(uint8 rtvCount, const RenderTargetViewHandle*
 		for (uint8 i = 0; i < rtvCount; i++)
 		{
 			XE_ASSERT(rtvs[i] != ZeroRenderTargetViewHandle);
-			const uint32 descriptorIndex = uint32(rtvs[i]); // TODO: Proper handle decode
+			const uint32 descriptorIndex = device->decodeRenderTargetViewHandle(rtvs[i]);
 			d3dRTVDescriptorPtrs[i].ptr = device->rtvHeapStartPtr + descriptorIndex * device->rtvDescriptorSize;
 		}
 	}
 
-	const bool useDSVs = dsv != ZeroDepthStencilViewHandle;
-	if (useDSVs)
+	const bool useDSV = dsv != ZeroDepthStencilViewHandle;
+	if (useDSV)
 	{
-		const uint32 descriptorIndex = uint32(dsv); // TODO: Proper handle decode
+		const uint32 descriptorIndex = device->decodeDepthStencilViewHandle(dsv);
 		d3dDSVDescriptorPtr.ptr = device->dsvHeapStartPtr + uint32(dsv) * device->dsvDescriptorSize;
 	}
 
 	d3dCommandList->OMSetRenderTargets(rtvCount,
 		useRTVs ? d3dRTVDescriptorPtrs : nullptr, FALSE,
-		useDSVs ? &d3dDSVDescriptorPtr : nullptr);
+		useDSV ? &d3dDSVDescriptorPtr : nullptr);
+}
+
+void CommandList::setGraphicsPipeline(PipelineHandle pipelineHandle)
+{
+	XE_ASSERT(device);
+	XE_ASSERT(state == State::Recording);
+
+	Device::Pipeline& pipeline = device->pipelinesTable[device->decodePipelineHandle(pipelineHandle)];
+	XE_ASSERT(pipeline.type == PipelineType::Graphics);
+	XE_ASSERT(pipeline.d3dPipelineState);
+
+	// TODO: Update root signature
+
+	d3dCommandList->SetPipelineState(pipeline.d3dPipelineState);
+
+	currentPipelineType = PipelineType::Graphics;
+}
+
+void CommandList::bindConstants(uint32 bindPointNameCRC, const void* data, uint32 size32bitValues)
+{
+	XE_ASSERT(device);
+	XE_ASSERT(state == State::Recording);
+	XE_ASSERT(currentPipelineType != PipelineType::Undefined);
+
+	UINT rootParameterIndex = ...; // TODO: ...
+
+	if (currentPipelineType == PipelineType::Graphics)
+		d3dCommandList->SetGraphicsRoot32BitConstants(rootParameterIndex, size32bitValues, data, 0);
+	else if (currentPipelineType == PipelineType::Compute)
+		d3dCommandList->SetComputeRoot32BitConstants(rootParameterIndex, size32bitValues, data, 0);
+	else
+		XE_ASSERT_UNREACHABLE_CODE;
 }
 
 // Device //////////////////////////////////////////////////////////////////////////////////////////
@@ -92,7 +127,7 @@ struct Device::ResourceView
 struct Device::Pipeline
 {
 	ID3D12PipelineState* d3dPipelineState;
-	bool isCompute;
+	PipelineType type;
 	uint8 handleGeneration;
 };
 
@@ -117,7 +152,7 @@ void Device::initialize(IDXGIAdapter4* dxgiAdapter)
 		D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, MaxResourceViewCount);
 	const D3D12_DESCRIPTOR_HEAP_DESC d3dShaderVisbileSRVHeapDesc =
 		D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
-			ShaderVisibleSRVHeapSize, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
+			MaxResourceDescriptorCount, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
 	const D3D12_DESCRIPTOR_HEAP_DESC d3dRTVHeapDesc =
 		D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, MaxRenderTargetViewCount);
 	const D3D12_DESCRIPTOR_HEAP_DESC d3dDSVHeapDesc =
@@ -137,6 +172,7 @@ void Device::initialize(IDXGIAdapter4* dxgiAdapter)
 	depthStencilViewsAllocationMask.clear();
 	fencesAllocationMask.clear();
 	swapChainsAllocationMask.clear();
+	allocatedResourceDescriptorCount = 0;
 
 	referenceSRVHeapStartPtr = d3dReferenceSRVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
 	shaderVisbileSRVHeapStartPtrCPU = d3dShaderVisbileSRVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
@@ -209,6 +245,8 @@ ResourceViewHandle Device::createResourceView(ResourceHandle resourceHandle, con
 	const Resource& resource = resourcesTable[decodeResourceHandle(resourceHandle)];
 	XE_ASSERT(resource.d3dResource);
 
+	const D3D12_RESOURCE_DESC d3dResourceDesc = resource.d3dResource->GetDesc();
+
 	const sint32 viewIndex = resourceViewsAllocationMask.findFirstZeroAndSet();
 	XE_MASTER_ASSERT(viewIndex >= 0);
 
@@ -225,7 +263,7 @@ ResourceViewHandle Device::createResourceView(ResourceHandle resourceHandle, con
 	if (viewDesc.type == ResourceViewType::ReadOnlyTexture2D)
 	{
 		XE_ASSERT(resource.type == ResourceType::Texture);
-		d3dSRVDesc = D3D12Helpers::ShaderResourceViewDescForTexture2D(format,
+		d3dSRVDesc = D3D12Helpers::ShaderResourceViewDescForTexture2D(d3dResourceDesc.Format,
 			viewDesc.readOnlyTexture2D.startMipIndex,
 			viewDesc.readOnlyTexture2D.mipLevelCount,
 			viewDesc.readOnlyTexture2D.plane);
@@ -281,7 +319,11 @@ DepthStencilViewHandle Device::createDepthStencilView(ResourceHandle textureHand
 
 DescriptorAddress Device::allocateDescriptors(uint32 count)
 {
+	const uint32 startIndex = allocatedResourceDescriptorCount;
+	allocatedResourceDescriptorCount += count;
+	XE_ASSERT(allocatedResourceDescriptorCount < ShaderVisibleSRVHeapSize);
 
+	return encodeDescriptorAddress(startIndex);
 }
 
 FenceHandle Device::createFence(uint64 initialValue)
@@ -348,6 +390,8 @@ SwapChainHandle Device::createSwapChain(uint16 width, uint16 height, void* hWnd)
 		resource.internalOwnership = true;
 
 		dxgiSwapChain1->GetBuffer(i, IID_PPV_ARGS(&resource.d3dResource));
+		
+		swapChain.planeTextures[i] = encodeResourceHandle(resourceIndex);
 	}
 
 	return encodeSwapChainHandle(swapChainIndex);
@@ -368,6 +412,8 @@ void Device::writeDescriptor(DescriptorAddress descriptorAddress, ResourceViewHa
 
 void Device::submitGraphics(CommandList& commandList, const FenceSignalDesc* fenceSignals = nullptr, uint32 fenceSignalCount = 0)
 {
+	XE_ASSERT(commandList.state != CommandList::State::Executing);
+
 	commandList.d3dCommandList->Close();
 
 	ID3D12CommandList* d3dCommandListsToExecute[] = { commandList.d3dCommandList };
@@ -382,7 +428,8 @@ void Device::submitGraphics(CommandList& commandList, const FenceSignalDesc* fen
 
 void Device::submitFlip(SwapChainHandle swapChainHandle)
 {
-
+	SwapChain& swapChain = swapChainsTable[decodeSwapChainHandle(swapChainHandle)];
+	swapChain.dxgiSwapChain->Present(1, 0);
 }
 
 // Host ////////////////////////////////////////////////////////////////////////////////////////////

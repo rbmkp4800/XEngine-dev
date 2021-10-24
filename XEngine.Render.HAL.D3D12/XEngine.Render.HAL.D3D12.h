@@ -5,6 +5,11 @@
 #include <XLib.Platform.COMPtr.h>
 #include <XLib.Containers.BitSet.h>
 
+#define XE_ASSERT(...)
+#define XE_ASSERT_UNREACHABLE_CODE
+#define XE_MASTER_ASSERT(...)
+#define XE_MASTER_ASSERT_UNREACHABLE_CODE
+
 struct ID3D12CommandAllocator;
 struct ID3D12DescriptorHeap;
 struct ID3D12Device2;
@@ -28,8 +33,7 @@ namespace XEngine::Render::HAL
 	enum class DescriptorBundleLayoutHandle : uint32;
 	enum class DescriptorBundleHandle : uint32;
 	enum class BindingLayoutHandle : uint32;
-	enum class GraphicsPipelineHandle : uint32;
-	enum class ComputePipelineHandle : uint32;
+	enum class PipelineHandle : uint32;
 	enum class FenceHandle : uint32;
 	enum class SwapChainHandle : uint32;
 
@@ -104,6 +108,21 @@ namespace XEngine::Render::HAL
 		uint16 depth;
 	};
 
+	enum class PipelineType : uint8
+	{
+		Undefined = 0,
+		Graphics,
+		Compute,
+	};
+
+	enum class CommandListType : uint8
+	{
+		Undefined = 0,
+		Graphics,
+		Compute,
+		Copy,
+	};
+
 	struct ResourceViewDesc
 	{
 		ResourceViewType type;
@@ -134,6 +153,12 @@ namespace XEngine::Render::HAL
 		};
 	};
 
+	struct DataBuffer
+	{
+		const void* data;
+		uint32 size;
+	};
+
 	struct RasterizerDesc
 	{
 
@@ -160,17 +185,12 @@ namespace XEngine::Render::HAL
 		uint64 value;
 	};
 
-	enum class CommandListType : uint8
-	{
-		Undefined = 0,
-		Graphics,
-		Compute,
-		Copy,
-	};
-
 	class CommandList : public XLib::NonCopyable
 	{
 		friend Device;
+
+	private:
+		enum class State : uint8;
 
 	private:
 		Device* device = nullptr;
@@ -178,17 +198,23 @@ namespace XEngine::Render::HAL
 		ID3D12CommandAllocator* d3dCommandAllocator = nullptr;
 		CommandListType type = CommandListType::Undefined;
 
+		State state = State(0);
+		PipelineType currentPipelineType = PipelineType::Undefined;
+
 	public:
 		CommandList() = default;
 		~CommandList();
 
+		void begin();
+
 		void setRenderTargets(uint8 rtvCount, const RenderTargetViewHandle* rtvs, DepthStencilViewHandle dsv = ZeroDepthStencilViewHandle);
-		void setRenderTarget(RenderTargetViewHandle rtv, DepthStencilViewHandle dsv = ZeroDepthStencilViewHandle) { setRenderTargets(1, &rtv, dsv); }
 		void setViewport(const Viewport& viewport);
 		void setScissor();
 
-		void setGraphicsPipeline(GraphicsPipelineHandle pipeline);
-		void setComputePipeline(ComputePipelineHandle pipeline);
+		inline void setRenderTarget(RenderTargetViewHandle rtv, DepthStencilViewHandle dsv = ZeroDepthStencilViewHandle) { setRenderTargets(1, &rtv, dsv); }
+
+		void setGraphicsPipeline(PipelineHandle pipelineHandle);
+		void setComputePipeline(PipelineHandle pipelineHandle);
 
 		void bindConstants(uint32 bindPointNameCRC, const void* data, uint32 size32bitValues);
 		void bindConstantBuffer(uint32 bindPointNameCRC, ResourceHandle bufferHandle, uint32 offset);
@@ -204,6 +230,8 @@ namespace XEngine::Render::HAL
 
 		void dispatch(uint32 groupCountX, uint32 groupCountY = 1, uint32 groupCountZ = 1);
 
+		void resourceStateTransition(ResourceHandle resourceHandle);
+
 		void copyFromBufferToBuffer();
 		void copyFromBufferToTexture();
 		void copyFromTextureToTexture();
@@ -218,7 +246,7 @@ namespace XEngine::Render::HAL
 	private:
 		static constexpr uint32 MaxResourceCount = 1024;
 		static constexpr uint32 MaxResourceViewCount = 1024;
-		static constexpr uint32 ShaderVisibleSRVHeapSize = 4096;
+		static constexpr uint32 MaxResourceDescriptorCount = 4096;
 		static constexpr uint32 MaxRenderTargetViewCount = 64;
 		static constexpr uint32 MaxDepthStencilViewCount = 64;
 		static constexpr uint32 MaxPipelineCount = 1024;
@@ -228,6 +256,7 @@ namespace XEngine::Render::HAL
 
 		struct Resource;
 		struct ResourceView;
+		struct BindingLayout;
 		struct Pipeline;
 		struct Fence;
 		struct SwapChain;
@@ -254,6 +283,7 @@ namespace XEngine::Render::HAL
 		XLib::BitSet<MaxDepthStencilViewCount> depthStencilViewsAllocationMask;
 		XLib::BitSet<MaxFenceCount> fencesAllocationMask;
 		XLib::BitSet<MaxSwapChainCount> swapChainsAllocationMask;
+		uint32 allocatedResourceDescriptorCount = 0;
 
 		uint64 referenceSRVHeapStartPtr = 0;
 		uint64 shaderVisbileSRVHeapStartPtrCPU = 0;
@@ -275,7 +305,11 @@ namespace XEngine::Render::HAL
 
 		inline uint32 decodeResourceHandle(ResourceHandle handle);
 		inline uint32 decodeResourceViewHandle(ResourceViewHandle handle);
+		inline uint32 decodeRenderTargetViewHandle(RenderTargetViewHandle handle);
+		inline uint32 decodeDepthStencilViewHandle(DepthStencilViewHandle handle);
+		inline uint32 decodePipelineHandle(PipelineHandle handle);
 		inline uint32 decodeFenceHandle(FenceHandle handle);
+		inline uint32 decodeSwapChainHandle(SwapChainHandle handle);
 
 		inline DescriptorAddress encodeDescriptorAddress(uint32 srvHeapDescriptorIndex);
 		inline uint32 decodeDescriptorAddress(DescriptorAddress address);
@@ -305,20 +339,20 @@ namespace XEngine::Render::HAL
 		DescriptorAddress allocateDescriptors(uint32 count = 1);
 		void releaseDescriptors(DescriptorAddress address);
 
-		DescriptorBundleLayoutHandle createDescriptorBundleLayout();
+		DescriptorBundleLayoutHandle createDescriptorBundleLayout(DataBuffer bytecodeBlob);
 		void destroyDescriptorBundleLayout(DescriptorBundleLayoutHandle handle);
 
 		DescriptorBundleHandle createDescriptorBundle(DescriptorBundleLayoutHandle layoutHandle);
 		void destroyDescriptorBundle(DescriptorBundleHandle handle);
 
-		BindingLayoutHandle createBindingLayout();
+		BindingLayoutHandle createBindingLayout(DataBuffer bytecodeBlob);
 		void destroyBindingLayout(BindingLayoutHandle handle);
 
-		GraphicsPipelineHandle createGraphicsPipeline(BindingLayoutHandle bindingLayoutHandle, const RasterizerDesc& rasterizerDesc, const BlendDesc& blendDesc);
-		void destroyGraphicsPipeline(GraphicsPipelineHandle handle);
-
-		ComputePipelineHandle createComputePipeline(BindingLayoutHandle bindingLayoutHandle);
-		void destroyComputePipeline(ComputePipelineHandle handle);
+		PipelineHandle createGraphicsPipeline(BindingLayoutHandle bindingLayoutHandle,
+			uint32 bytecodeBlobsCount, const DataBuffer* bytecodeBlobs,
+			const RasterizerDesc& rasterizerDesc, const BlendDesc& blendDesc);
+		PipelineHandle createComputePipeline(BindingLayoutHandle bindingLayoutHandle);
+		void destroyPipeline(PipelineHandle handle);
 
 		FenceHandle createFence(uint64 initialValue);
 		void destroyFence(FenceHandle handle);
@@ -330,7 +364,7 @@ namespace XEngine::Render::HAL
 		void destroyCommandList(CommandList& commandList);
 
 		void writeDescriptor(DescriptorAddress descriptorAddress, ResourceViewHandle resourceViewHandle);
-		void writeBundleDescriptor(DescriptorBundleHandle bundle, uint32 entryNameCRC, ResourceViewHandle resourceViewHandle);
+		void writeBundleDescriptor(DescriptorBundleHandle bundle, uint32 bindPointNameCRC, ResourceViewHandle resourceViewHandle);
 
 		void submitGraphics(CommandList& commandList, const FenceSignalDesc* fenceSignals = nullptr, uint32 fenceSignalCount = 0);
 		void submitAsyncCompute(CommandList& commandList, const FenceSignalDesc* fenceSignals = nullptr, uint32 fenceSignalCount = 0);
@@ -354,4 +388,15 @@ namespace XEngine::Render::HAL
 	public:
 		static void CreateDevice(Device& device);
 	};
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Definition //////////////////////////////////////////////////////////////////////////////////////
+
+namespace XEngine::Render::HAL
+{
+	inline ResourceHandle Device::encodeResourceHandle(uint32 resourceIndex) const
+	{
+		XE_ASSERT(resourceIndex < MaxResourceCount);
+	}
 }
