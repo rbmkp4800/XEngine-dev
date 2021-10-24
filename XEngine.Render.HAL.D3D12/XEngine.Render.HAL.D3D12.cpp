@@ -101,8 +101,12 @@ void Device::initialize(IDXGIAdapter4* dxgiAdapter)
 	rtvHeapAllocationMask.clear();
 	dsvHeapAllocationMask.clear();
 
+	referenceSRVHeapStartAddress = d3dReferenceSRVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
+	shaderVisbileSRVHeapStartAddressCPU = d3dShaderVisbileSRVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
+	shaderVisbileSRVHeapStartAddressGPU = d3dShaderVisbileSRVHeap->GetGPUDescriptorHandleForHeapStart().ptr;
 	rtvHeapStartAddress = d3dRTVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
 	dsvHeapStartAddress = d3dDSVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
+
 	rtvDescriptorSize = uint16(d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV));
 	dsvDescriptorSize = uint16(d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
 	srvDescriptorSize = uint16(d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
@@ -199,12 +203,50 @@ DepthStencilViewHandle Device::createDepthStencilView(Texture& texture)
 	return DepthStencilViewHandle(freeDescriptorIndex); // TODO: Proper handle encode
 }
 
+DescriptorAddress Device::allocateDescriptors(uint32 count)
+{
+
+}
+
+FenceHandle Device::createFence(uint64 initialValue)
+{
+	//d3dDevice->CreateFence(initialValue, D3D12_FENCE_FLAG_NONE, ...);
+}
+
 void Device::createGraphicsCommandList(GraphicsCommandList& commandList)
 {
 	d3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandList.d3dCommandAllocator));
 	d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandList.d3dCommandAllocator, nullptr,
 		IID_PPV_ARGS(&commandList.d3dCommandList));
 	commandList.d3dCommandList->Close();
+}
+
+void Device::writeDescriptor(DescriptorAddress address, ResourceViewHandle resourceViewHandle)
+{
+	// TODO: Proper handles decode
+	const uint32 sourceDescriptorIndex = uint32(resourceViewHandle);
+	const uint32 destDescriptorIndex = uint32(address);
+
+	const uint64 sourceAddress = referenceSRVHeapStartAddress + sourceDescriptorIndex * srvDescriptorSize;
+	const uint64 destAddress = shaderVisbileSRVHeapStartAddressCPU + destDescriptorIndex * srvDescriptorSize;
+	d3dDevice->CopyDescriptorsSimple(1,
+		D3D12_CPU_DESCRIPTOR_HANDLE{ destAddress },
+		D3D12_CPU_DESCRIPTOR_HANDLE{ sourceAddress },
+		D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+}
+
+void Device::submitGraphics(GraphicsCommandList& commandList, const FenceSignalDesc* fenceSignals = nullptr, uint32 fenceSignalCount = 0)
+{
+	commandList.d3dCommandList->Close();
+
+	ID3D12CommandList* d3dCommandListsToExecute[] = { commandList.d3dCommandList };
+	d3dGraphicsQueue->ExecuteCommandLists(1, d3dCommandListsToExecute);
+
+	for (uint32 i = 0; i < fenceSignalCount; i++)
+	{
+		ID3D12Fence* d3dFence = ...; // TODO: proper handle decode
+		d3dGraphicsQueue->Signal(d3dFence, fenceSignals[i].value);
+	}
 }
 
 // Host ////////////////////////////////////////////////////////////////////////////////////////////

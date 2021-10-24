@@ -31,6 +31,11 @@ namespace XEngine::Render::HAL
 
 	using DescriptorAddress = uint32;
 
+	enum class DescriptorBundleLayoutHandle : uint32;
+	enum class DescriptorBundleHandle : uint32;
+
+	enum class FenceHandle : uint32;
+
 	enum class BufferType : uint8
 	{
 		Default = 0,
@@ -87,6 +92,12 @@ namespace XEngine::Render::HAL
 		float32 bottom;
 		float32 depthMin;
 		float32 depthMax;
+	};
+
+	struct FenceSignalDesc
+	{
+		FenceHandle fence;
+		uint64 value;
 	};
 
 	class Buffer : public XLib::NonCopyable
@@ -186,9 +197,9 @@ namespace XEngine::Render::HAL
 		void bindConstantBuffer(uint32 bindPointNameCRC, Buffer& buffer, uint32 offset);
 		void bindReadOnlyBuffer(uint32 bindPointNameCRC, Buffer& buffer, uint32 offset);
 		void bindReadWriteBuffer(uint32 bindPointNameCRC, Buffer& buffer, uint32 offset);
-		//void bindDescriptor(uint32 bindPointNameCRC, DescriptorAddress address);
-		//void bindDescriptorBundle(uint32 bindPointNameCRC, DescriptorBundleHandle bundle);
-		//void bindDescriptorArray(uint32 bindPointNameCRC, DescriptorAddress arrayStartAddress);
+		void bindDescriptor(uint32 bindPointNameCRC, DescriptorAddress address);
+		void bindDescriptorBundle(uint32 bindPointNameCRC, DescriptorBundleHandle bundle);
+		void bindDescriptorArray(uint32 bindPointNameCRC, DescriptorAddress arrayStartAddress);
 
 		void drawNonIndexed();
 		void drawIndexed();
@@ -256,11 +267,15 @@ namespace XEngine::Render::HAL
 		XLib::BitSet<RTVHeapSize> rtvHeapAllocationMask;
 		XLib::BitSet<DSVHeapSize> dsvHeapAllocationMask;
 
+		uint64 referenceSRVHeapStartAddress = 0;
+		uint64 shaderVisbileSRVHeapStartAddressCPU = 0;
+		uint64 shaderVisbileSRVHeapStartAddressGPU = 0;
 		uint64 rtvHeapStartAddress = 0;
 		uint64 dsvHeapStartAddress = 0;
+
+		uint16 srvDescriptorSize = 0;
 		uint16 rtvDescriptorSize = 0;
 		uint16 dsvDescriptorSize = 0;
-		uint16 srvDescriptorSize = 0;
 
 	private:
 		void initialize(IDXGIAdapter4* dxgiAdapter);
@@ -290,8 +305,14 @@ namespace XEngine::Render::HAL
 		DescriptorAddress allocateDescriptors(uint32 count = 1);
 		void releaseDescriptors(DescriptorAddress address);
 
-		//DescriptorBundleLayoutHandle createDescriptorBundleLayout();
-		//DescriptorBundleHandle createDescriptorBundle(DescriptorBundleLayoutHandle layout);
+		DescriptorBundleLayoutHandle createDescriptorBundleLayout();
+		void destroyDescriptorBundleLayout(DescriptorBundleLayoutHandle handle);
+
+		DescriptorBundleHandle createDescriptorBundle(DescriptorBundleLayoutHandle layout);
+		void destroyDescriptorBundle(DescriptorBundleHandle handle);
+
+		FenceHandle createFence(uint64 initialValue);
+		void destroyFence(FenceHandle handle);
 
 		void createGraphicsPipeline(BindingLayout& bindingLayout, const RasterizerDesc& rasterizerDesc, const BlendDesc& blendDesc, GraphicsPipeline& graphicsPipeline);
 		void destroyGraphicsPipeline(GraphicsPipeline& graphicsPipeline);
@@ -309,14 +330,19 @@ namespace XEngine::Render::HAL
 		//void destroyCopyCommandList(CopyCommandList& commandList);
 
 		void writeDescriptor(DescriptorAddress address, ResourceViewHandle resourceViewHandle);
-		//void writeBundleDescriptor(DescriptorBundleHandle bundle, uint32 entryNameCRC, ResourceViewHandle resourceViewHandle);
+		void writeBundleDescriptor(DescriptorBundleHandle bundle, uint32 entryNameCRC, ResourceViewHandle resourceViewHandle);
 
-		void submitGraphics(GraphicsCommandList& commandList);
-		void submitAsyncCompute(ComputeCommandList& commandList);
-		void submitAsyncCopy(CopyCommandList& commandList);
+		void submitGraphics(GraphicsCommandList& commandList, const FenceSignalDesc* fenceSignals = nullptr, uint32 fenceSignalCount = 0);
+		void submitAsyncCompute(ComputeCommandList& commandList, const FenceSignalDesc* fenceSignals = nullptr, uint32 fenceSignalCount = 0);
+		void submitAsyncCopy(CopyCommandList& commandList, const FenceSignalDesc* fenceSignals = nullptr, uint32 fenceSignalCount = 0);
 		void submitFlip(SwapChain& swapChain);
 
-		//DescriptorAddress getDescriptorBundleStartAddress(DescriptorBundleHandle bundle) const;
+		inline void submitGraphics(GraphicsCommandList& commandList, const FenceSignalDesc& fenceSignal) { submitGraphics(commandList, &fenceSignal, 1); }
+		inline void submitAsyncCompute(ComputeCommandList& commandList, const FenceSignalDesc& fenceSignal) { submitAsyncCompute(commandList, &fenceSignal, 1); }
+		inline void submitAsyncCopy(CopyCommandList& commandList, const FenceSignalDesc& fenceSignal) { submitAsyncCopy(commandList, &fenceSignal, 1); }
+
+		DescriptorAddress getDescriptorBundleStartAddress(DescriptorBundleHandle bundle) const;
+		uint64 getFenceValue(FenceHandle fence) const;
 
 		const char* getName() const;
 	};
