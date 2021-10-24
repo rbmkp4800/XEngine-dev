@@ -5,9 +5,11 @@
 #include <XLib.Platform.COMPtr.h>
 #include <XLib.Containers.BitSet.h>
 
-#define XE_ASSERT(...)
+#define XE_ASSERT(cond)
+#define XE_ASSERT_IMPLY(cond0, cond1)
 #define XE_ASSERT_UNREACHABLE_CODE
-#define XE_MASTER_ASSERT(...)
+#define XE_MASTER_ASSERT(cond)
+#define XE_MASTER_ASSERT_IMPLY(cond0, cond1)
 #define XE_MASTER_ASSERT_UNREACHABLE_CODE
 
 struct ID3D12CommandAllocator;
@@ -123,6 +125,14 @@ namespace XEngine::Render::HAL
 		Copy,
 	};
 
+	enum class BufferBindType : uint8
+	{
+		Undefined = 0,
+		Constant,
+		ReadOnly,
+		ReadWrite,
+	};
+
 	struct ResourceViewDesc
 	{
 		ResourceViewType type;
@@ -192,6 +202,8 @@ namespace XEngine::Render::HAL
 	private:
 		enum class State : uint8;
 
+		struct BindPointDesc;
+
 	private:
 		Device* device = nullptr;
 		ID3D12GraphicsCommandList* d3dCommandList = nullptr;
@@ -200,6 +212,13 @@ namespace XEngine::Render::HAL
 
 		State state = State(0);
 		PipelineType currentPipelineType = PipelineType::Undefined;
+
+		uint8 bindPointNameHashToLUTIndexShift = 0;
+		uint8 bindPointNameHashToLUTIndexAndMask = 0;
+		const BindPointDesc* bindPointsLUT = nullptr;
+
+	private:
+		BindPointDesc lookupBindPointsLUT(uint32 bindPointNameHash) const;
 
 	public:
 		CommandList() = default;
@@ -216,15 +235,13 @@ namespace XEngine::Render::HAL
 		void setGraphicsPipeline(PipelineHandle pipelineHandle);
 		void setComputePipeline(PipelineHandle pipelineHandle);
 
-		void bindConstants(uint32 bindPointNameCRC, const void* data, uint32 size32bitValues);
-		void bindConstantBuffer(uint32 bindPointNameCRC, ResourceHandle bufferHandle, uint32 offset);
-		void bindReadOnlyBuffer(uint32 bindPointNameCRC, ResourceHandle bufferHandle, uint32 offset);
-		void bindReadWriteBuffer(uint32 bindPointNameCRC, ResourceHandle bufferHandle, uint32 offset);
+		void bindConstants(uint32 bindPointNameCRC, const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0);
+		void bindBuffer(BufferBindType bindType, uint32 bindPointNameCRC, ResourceHandle bufferHandle, uint32 offset = 0);
 		void bindDescriptor(uint32 bindPointNameCRC, DescriptorAddress address);
 		void bindDescriptorBundle(uint32 bindPointNameCRC, DescriptorBundleHandle bundleHandle);
 		void bindDescriptorArray(uint32 bindPointNameCRC, DescriptorAddress arrayStartAddress);
 
-		void drawNonIndexed();
+		void drawNonIndexed(uint32 vertexCount, uint32 baseVertexIndex = 0);
 		void drawIndexed();
 		void drawMesh();
 
@@ -296,23 +313,23 @@ namespace XEngine::Render::HAL
 		uint16 dsvDescriptorSize = 0;
 
 	private:
-		inline ResourceHandle encodeResourceHandle(uint32 resourceIndex) const;
-		inline ResourceViewHandle encodeResourceViewHandle(uint32 resourceViewIndex) const;
-		inline RenderTargetViewHandle encodeRenderTargetViewHandle(uint32 renderTargetIndex) const;
-		inline DepthStencilViewHandle encodeDepthStencilViewHandle(uint32 depthStencilIndex) const;
-		inline FenceHandle encodeFenceHandle(uint32 fenceIndex) const;
-		inline SwapChainHandle encodeSwapChainHandle(uint32 swapChainIndex) const;
+		inline ResourceHandle composeResourceHandle(uint32 resourceIndex) const;
+		inline ResourceViewHandle composeResourceViewHandle(uint32 resourceViewIndex) const;
+		inline RenderTargetViewHandle composeRenderTargetViewHandle(uint32 renderTargetIndex) const;
+		inline DepthStencilViewHandle composeDepthStencilViewHandle(uint32 depthStencilIndex) const;
+		inline FenceHandle composeFenceHandle(uint32 fenceIndex) const;
+		inline SwapChainHandle composeSwapChainHandle(uint32 swapChainIndex) const;
 
-		inline uint32 decodeResourceHandle(ResourceHandle handle);
-		inline uint32 decodeResourceViewHandle(ResourceViewHandle handle);
-		inline uint32 decodeRenderTargetViewHandle(RenderTargetViewHandle handle);
-		inline uint32 decodeDepthStencilViewHandle(DepthStencilViewHandle handle);
-		inline uint32 decodePipelineHandle(PipelineHandle handle);
-		inline uint32 decodeFenceHandle(FenceHandle handle);
-		inline uint32 decodeSwapChainHandle(SwapChainHandle handle);
+		inline uint32 resolveResourceHandle(ResourceHandle handle) const;
+		inline uint32 resolveResourceViewHandle(ResourceViewHandle handle) const;
+		inline uint32 resolveRenderTargetViewHandle(RenderTargetViewHandle handle) const;
+		inline uint32 resolveDepthStencilViewHandle(DepthStencilViewHandle handle) const;
+		inline uint32 resolvePipelineHandle(PipelineHandle handle) const;
+		inline uint32 resolveFenceHandle(FenceHandle handle) const;
+		inline uint32 resolveSwapChainHandle(SwapChainHandle handle) const;
 
-		inline DescriptorAddress encodeDescriptorAddress(uint32 srvHeapDescriptorIndex);
-		inline uint32 decodeDescriptorAddress(DescriptorAddress address);
+		inline DescriptorAddress composeDescriptorAddress(uint32 srvHeapDescriptorIndex) const;
+		inline uint32 resolveDescriptorAddress(DescriptorAddress address) const;
 
 	private:
 		void initialize(IDXGIAdapter4* dxgiAdapter);
@@ -395,7 +412,7 @@ namespace XEngine::Render::HAL
 
 namespace XEngine::Render::HAL
 {
-	inline ResourceHandle Device::encodeResourceHandle(uint32 resourceIndex) const
+	inline ResourceHandle Device::composeResourceHandle(uint32 resourceIndex) const
 	{
 		XE_ASSERT(resourceIndex < MaxResourceCount);
 	}
