@@ -15,6 +15,7 @@
 #define XE_MASTER_ASSERT_UNREACHABLE_CODE
 
 struct ID3D12CommandAllocator;
+struct ID3D12CommandQueue;
 struct ID3D12DescriptorHeap;
 struct ID3D12Device2;
 struct ID3D12GraphicsCommandList;
@@ -42,6 +43,7 @@ namespace XEngine::Render::HAL
 	static constexpr ResourceViewHandle ZeroResourceViewHandle = ResourceViewHandle(0);
 	static constexpr RenderTargetViewHandle ZeroRenderTargetViewHandle = RenderTargetViewHandle(0);
 	static constexpr DepthStencilViewHandle ZeroDepthStencilViewHandle = DepthStencilViewHandle(0);
+	static constexpr BindingLayoutHandle ZeroBindingLayoutHandle = BindingLayoutHandle(0);
 
 	enum class ResourceType : uint8
 	{
@@ -124,6 +126,29 @@ namespace XEngine::Render::HAL
 		ReadWrite,
 	};
 
+	enum class ResourceImmutableState : uint8
+	{
+		None = 0,
+		//VertexBuffer,
+		//IndexBuffer,
+		//ConstantBuffer
+		DepthRead,
+		ArbitraryShaderRead,
+		PixelShaderRead,
+		NonPixelShaderRead,
+		CopySource,
+		//IndirectArgument,
+	};
+
+	enum class ResourceMutableState : uint8
+	{
+		None = 0,
+		RenderTarget,
+		DepthWrite,
+		ShaderReadWrite,
+		CopyDestination,
+	};
+
 	struct ResourceViewDesc
 	{
 		ResourceViewType type;
@@ -203,9 +228,9 @@ namespace XEngine::Render::HAL
 
 		State state = State(0);
 		PipelineType currentPipelineType = PipelineType::Undefined;
-
-		uint8 bindPointNameHashToLUTIndexShift = 0;
-		uint8 bindPointNameHashToLUTIndexAndMask = 0;
+		BindingLayoutHandle currentBindingLayoutHandle = ZeroBindingLayoutHandle;
+		uint8 bindPointsLUTKeyShift = 0;
+		uint8 bindPointsLUTKeyAndMask = 0;
 		const BindPointDesc* bindPointsLUT = nullptr;
 
 	private:
@@ -217,14 +242,16 @@ namespace XEngine::Render::HAL
 
 		void begin();
 
+		void clearRenderTarget(RenderTargetViewHandle rtv, const float32* color);
+		void clearDepthStencil(DepthStencilViewHandle dsv, bool clearDepth, bool clearStencil, float32 depth, uint8 stencil);
+
 		void setRenderTargets(uint8 rtvCount, const RenderTargetViewHandle* rtvs, DepthStencilViewHandle dsv = ZeroDepthStencilViewHandle);
 		void setViewport(const Viewport& viewport);
 		void setScissor();
 
 		inline void setRenderTarget(RenderTargetViewHandle rtv, DepthStencilViewHandle dsv = ZeroDepthStencilViewHandle) { setRenderTargets(1, &rtv, dsv); }
 
-		void setGraphicsPipeline(PipelineHandle pipelineHandle);
-		void setComputePipeline(PipelineHandle pipelineHandle);
+		void setPipeline(PipelineType pipelineType, PipelineHandle pipelineHandle);
 
 		void bindConstants(uint32 bindPointNameCRC, const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0);
 		void bindBuffer(BufferBindType bindType, uint32 bindPointNameCRC, ResourceHandle bufferHandle, uint32 offset = 0);
@@ -232,7 +259,7 @@ namespace XEngine::Render::HAL
 		void bindDescriptorBundle(uint32 bindPointNameCRC, DescriptorBundleHandle bundleHandle);
 		void bindDescriptorArray(uint32 bindPointNameCRC, DescriptorAddress arrayStartAddress);
 
-		void drawNonIndexed(uint32 vertexCount, uint32 baseVertexIndex = 0);
+		void drawNonIndexed(uint32 vertexCount, uint32 startVertexIndex = 0);
 		void drawIndexed();
 		void drawMesh();
 
@@ -313,12 +340,15 @@ namespace XEngine::Render::HAL
 		inline RenderTargetViewHandle composeRenderTargetViewHandle(uint32 renderTargetIndex) const;
 		inline DepthStencilViewHandle composeDepthStencilViewHandle(uint32 depthStencilIndex) const;
 		inline FenceHandle composeFenceHandle(uint32 fenceIndex) const;
+		inline BindingLayoutHandle composeBindingLayoutHandle(uint32 bindingLayoutIndex) const;
+		inline PipelineHandle composePipelineHandle(uint32 pipelineIndex) const;
 		inline SwapChainHandle composeSwapChainHandle(uint32 swapChainIndex) const;
 
 		inline uint32 resolveResourceHandle(ResourceHandle handle) const;
 		inline uint32 resolveResourceViewHandle(ResourceViewHandle handle) const;
 		inline uint32 resolveRenderTargetViewHandle(RenderTargetViewHandle handle) const;
 		inline uint32 resolveDepthStencilViewHandle(DepthStencilViewHandle handle) const;
+		inline uint32 resolveBindingLayoutHandle(BindingLayoutHandle handle) const;
 		inline uint32 resolvePipelineHandle(PipelineHandle handle) const;
 		inline uint32 resolveFenceHandle(FenceHandle handle) const;
 		inline uint32 resolveSwapChainHandle(SwapChainHandle handle) const;

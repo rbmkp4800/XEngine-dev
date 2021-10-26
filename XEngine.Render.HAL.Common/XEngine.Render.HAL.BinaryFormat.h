@@ -21,9 +21,8 @@ namespace XEngine::Render::HAL::BinaryFormat
 		uint32 thisBlobHash;
 		uint32 sourceHash;
 		uint8 bindPointCount;
-		uint8 bindPointNameHashToLUTIndex_shift;
-		uint8 bindPointNameHashToLUTIndex_andMask;
-		uint8 _padding0;
+		uint8 bindPointsLUTKeyShift;
+		uint16 _padding0;
 	};
 
 	struct PipelinePartHeader
