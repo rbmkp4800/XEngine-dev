@@ -16,17 +16,17 @@ using namespace XEngine::Render::Shaders::Builder_;
 static inline ShaderType ShaderTypeFromString(const StringView& str)
 {
 	if (str.getLength() != 2 || str[1] != 'S')
-		return ShaderType::None;
+		return ShaderType::Undefined;
 
 	switch (str[0])
 	{
-		case 'C':	return ShaderType::CS;
-		case 'V':	return ShaderType::VS;
-		case 'M':	return ShaderType::MS;
-		case 'A':	return ShaderType::AS;
-		case 'P':	return ShaderType::PS;
+		case 'C':	return ShaderType::Compute;
+		case 'V':	return ShaderType::Vertex;
+		case 'A':	return ShaderType::Amplification;
+		case 'M':	return ShaderType::Mesh;
+		case 'P':	return ShaderType::Pixel;
 	}
-	return ShaderType::None;
+	return ShaderType::Undefined;
 }
 
 #if 0
@@ -199,7 +199,7 @@ void Builder::build()
 	for (Shader& shader : shadersList)
 	{
 		const BindingLayout& bindingLayout = bindingLayoutsList.getEntry(shader.getBindingLayout());
-		CompileShader(Platform::D3D12, shader.getType(), bindingLayout.getCompiled(), ...);
+		Host::CompileShader(Platform::D3D12, bindingLayout.getCompiled(), shader.getType(), ...);
 	}
 }
 

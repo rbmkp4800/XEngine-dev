@@ -3,9 +3,14 @@
 #include <XLib.h>
 #include <XLib.NonCopyable.h>
 
+#include <XEngine.Render.HAL.Common.h>
+
 namespace XEngine::Render::HAL::ShaderCompiler
 {
 	class CompiledDescriptorBundleLayout;
+	class CompiledBindingLayout;
+	class CompiledShader;
+	class CompiledPipeline;
 
 	enum class Platform : uint8
 	{
@@ -19,11 +24,11 @@ namespace XEngine::Render::HAL::ShaderCompiler
 	enum class ShaderType : uint8
 	{
 		Undefined = 0,
-		CS,
-		VS,
-		AS,
-		MS,
-		PS,
+		Compute,
+		Vertex,
+		Amplification,
+		Mesh,
+		Pixel,
 	};
 
 	enum class RootBindPointType : uint8
@@ -75,28 +80,73 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		uint8 bindPointCount;
 	};
 
-	class CompiledBindingLayout : public XLib::NonCopyable
+	struct GraphicsPipelineDesc
+	{
+		// TODO: Input assempler?
+		CompiledShader* vertexShader;
+		CompiledShader* amplificationShader;
+		CompiledShader* meshShader;
+		CompiledShader* pixelShader;
+		TextureFormat renderTargetsFormats[4];
+		TextureFormat depthStencilFormat;
+	};
+	
+	struct ComputePipelineDesc
+	{
+		CompiledShader* computeShader;
+	};
+
+	class CompiledDescriptorBundleLayout : public XLib::NonCopyable
 	{
 	private:
-
 
 	public:
 		const void* getBinaryBlobData() const;
 		uint32 getBinaryBlobSize() const;
 	};
 
-	class CompiledDescriptorBundleLayout : public XLib::NonCopyable
+	class CompiledBindingLayout : public XLib::NonCopyable
 	{
+	private:
+
+	public:
+		const void* getBinaryBlobData() const;
+		uint32 getBinaryBlobSize() const;
+	};
+
+	class CompiledShader : public XLib::NonCopyable
+	{
+	private:
+
+	public:
+		const void* getBinaryBlobData() const;
+		uint32 getBinaryBlobSize() const;
+	};
+
+	class CompiledPipeline : public XLib::NonCopyable
+	{
+	private:
+
+	public:
 
 	};
 
-	class BinaryBlob
+	class Host abstract final
 	{
+	public:
+		static bool CompileDescriptorBundleLayout(Platform platform,
+			DescriptorBundleLayoutDesc& desc, CompiledDescriptorBundleLayout& result);
 
+		static bool CompileBindingLayout(Platform platform,
+			const BindingLayoutDesc& desc, CompiledBindingLayout& result);
+
+		static bool CompileShader(Platform platform, const CompiledBindingLayout& compiledBindingLayout,
+			ShaderType shaderType, const char* source, uint32 sourceLength, CompiledShader& result);
+
+		static bool CompileGraphicsPipeline(Platform platform, const CompiledBindingLayout& compiledBindingLayout,
+			const GraphicsPipelineDesc& pipelineDesc, CompiledPipeline& result);
+
+		static bool CompileComputePipeline(Platform platform, const CompiledBindingLayout& compiledBindingLayout,
+			const ComputePipelineDesc& pipelineDesc, CompiledPipeline& result);
 	};
-
-	void CompileDescriptorBundleLayout(Platform platform, const char* name, DescriptorBundleLayoutDesc& desc, CompiledDescriptorBundleLayout& result);
-	void CompileBindingLayout(Platform platform, const char* name, const BindingLayoutDesc& desc, CompiledBindingLayout& result);
-	void CompileShader(Platform platform, ShaderType shaderType, const CompiledBindingLayout& compiledBindingLayout, ...);
-	void CompilePipeline(Platform platform);
 }

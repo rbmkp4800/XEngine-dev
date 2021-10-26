@@ -1,6 +1,8 @@
 #include <d3d12.h>
 #include <dxgi1_6.h>
 
+#include <XEngine.Render.HAL.BinaryFormat.h>
+
 #include "D3D12Helpers.h"
 
 #include "XEngine.Render.HAL.D3D12.h"
@@ -208,14 +210,25 @@ struct Device::Resource
 
 struct Device::ResourceView
 {
-	ResourceHandle resource;
+	ResourceHandle resourceHandle;
 	ResourceViewType type;
 	uint8 handleGeneration;
+};
+
+struct Device::BindingLayout
+{
+	ID3D12RootSignature* d3dRootSignature;
+	uint8 bindPointNameHashToLUTIndexShift;
+	uint8 bindPointNameHashToLUTIndexAndMask;
+	uint8 handleGeneration;
+
+	uint32 bindPointsLUT[MaxRootBindPointCount];
 };
 
 struct Device::Pipeline
 {
 	ID3D12PipelineState* d3dPipelineState;
+	BindingLayout bindingLayoutHandle;
 	PipelineType type;
 	uint8 handleGeneration;
 };
@@ -255,12 +268,14 @@ void Device::initialize(IDXGIAdapter4* dxgiAdapter)
 	const D3D12_COMMAND_QUEUE_DESC d3dGraphicsQueueDesc = D3D12Helpers::CommandQueueDesc(D3D12_COMMAND_LIST_TYPE_DIRECT);
 	d3dDevice->CreateCommandQueue(&d3dGraphicsQueueDesc, d3dGraphicsQueue.uuid(), d3dGraphicsQueue.voidInitRef());
 
-	resourcesAllocationMask.clear();
-	resourceViewsAllocationMask.clear();
-	renderTargetViewsAllocationMask.clear();
-	depthStencilViewsAllocationMask.clear();
-	fencesAllocationMask.clear();
-	swapChainsAllocationMask.clear();
+	resourcesTableAllocationMask.clear();
+	resourceViewsTableAllocationMask.clear();
+	renderTargetViewsTableAllocationMask.clear();
+	depthStencilViewsTableAllocationMask.clear();
+	bindingLayoutsTableAllocationMask.clear();
+	pipelinesTableAllocationMask.clear();
+	fencesTableAllocationMask.clear();
+	swapChainsTableAllocationMask.clear();
 	allocatedResourceDescriptorCount = 0;
 
 	referenceSRVHeapStartPtr = d3dReferenceSRVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
@@ -276,7 +291,7 @@ void Device::initialize(IDXGIAdapter4* dxgiAdapter)
 
 ResourceHandle Device::createBuffer(uint32 size, BufferMemoryType memoryType)
 {
-	const sint32 resourceIndex = resourcesAllocationMask.findFirstZeroAndSet();
+	const sint32 resourceIndex = resourcesTableAllocationMask.findFirstZeroAndSet();
 	XE_MASTER_ASSERT(resourceIndex >= 0);
 
 	Resource& resource = resourcesTable[resourceIndex];
@@ -298,7 +313,7 @@ ResourceHandle Device::createBuffer(uint32 size, BufferMemoryType memoryType)
 
 ResourceHandle Device::createTexture(const TextureDim& dim, TextureFormat format, uint32 flags)
 {
-	const sint32 resourceIndex = resourcesAllocationMask.findFirstZeroAndSet();
+	const sint32 resourceIndex = resourcesTableAllocationMask.findFirstZeroAndSet();
 	XE_MASTER_ASSERT(resourceIndex >= 0);
 
 	Resource& resource = resourcesTable[resourceIndex];
@@ -336,12 +351,12 @@ ResourceViewHandle Device::createResourceView(ResourceHandle resourceHandle, con
 
 	const D3D12_RESOURCE_DESC d3dResourceDesc = resource.d3dResource->GetDesc();
 
-	const sint32 viewIndex = resourceViewsAllocationMask.findFirstZeroAndSet();
+	const sint32 viewIndex = resourceViewsTableAllocationMask.findFirstZeroAndSet();
 	XE_MASTER_ASSERT(viewIndex >= 0);
 
 	ResourceView& resourceView = resourceViewsTable[viewIndex];
 	XE_ASSERT(resourceView.type == ResourceViewType::Undefined);
-	resourceView.resource = resourceHandle;
+	resourceView.resourceHandle = resourceHandle;
 	resourceView.type = viewDesc.type;
 
 	bool useSRV = false;
@@ -382,7 +397,7 @@ RenderTargetViewHandle Device::createRenderTargetView(ResourceHandle textureHand
 	XE_ASSERT(resource.type == ResourceType::Texture);
 	XE_ASSERT(resource.d3dResource);
 
-	const sint32 viewIndex = renderTargetViewsAllocationMask.findFirstZeroAndSet();
+	const sint32 viewIndex = renderTargetViewsTableAllocationMask.findFirstZeroAndSet();
 	XE_MASTER_ASSERT(viewIndex >= 0);
 
 	const uint64 descriptorPtr = rtvHeapStartPtr + rtvDescriptorSize * viewIndex;
@@ -397,7 +412,7 @@ DepthStencilViewHandle Device::createDepthStencilView(ResourceHandle textureHand
 	XE_ASSERT(resource.type == ResourceType::Texture);
 	XE_ASSERT(resource.d3dResource);
 
-	const sint32 viewIndex = depthStencilViewsAllocationMask.findFirstZeroAndSet();
+	const sint32 viewIndex = depthStencilViewsTableAllocationMask.findFirstZeroAndSet();
 	XE_MASTER_ASSERT(viewIndex >= 0);
 
 	const uint64 descriptorPtr = dsvHeapStartPtr + dsvDescriptorSize * viewIndex;
@@ -415,9 +430,47 @@ DescriptorAddress Device::allocateDescriptors(uint32 count)
 	return composeDescriptorAddress(startIndex);
 }
 
+BindingLayoutHandle Device::createBindingLayout(const void* compiledData, uint32 compiledDataLength)
+{
+	const byte* compiledDataBytes = (const byte*)compiledData;
+
+	XE_MASTER_ASSERT(compiledDataLength > sizeof(BinaryFormat::BindingLayoutBlobHeader));
+	const BinaryFormat::BindingLayoutBlobHeader& header =
+		*(const BinaryFormat::BindingLayoutBlobHeader*)compiledDataBytes;
+
+	XE_MASTER_ASSERT(header.signature == BinaryFormat::BindingLayoutBlobSignature);
+	XE_MASTER_ASSERT(header.version == BinaryFormat::BindingLayoutBlobCurrentVerstion);
+	XE_MASTER_ASSERT(header.thisBlobSize == compiledDataLength);
+	XE_MASTER_ASSERT(header.bindPointCount > 0);
+	XE_MASTER_ASSERT(header.bindPointCount <= MaxRootBindPointCount);
+
+	const BinaryFormat::RootBindPointRecord* bindPoints =
+		(const BinaryFormat::RootBindPointRecord*)(compiledDataBytes + sizeof(BinaryFormat::BindingLayoutBlobHeader));
+
+	//const 
+
+	// ...
+
+	const uint32 headerAndBindPointsLength =
+		sizeof(BinaryFormat::BindingLayoutBlobHeader) +
+		sizeof(BinaryFormat::RootBindPointRecord) * header.bindPointCount;
+	XE_MASTER_ASSERT(compiledDataLength > headerAndBindPointsLength);
+
+	const void* d3dRootSignatureData = compiledDataBytes + headerAndBindPointsLength;
+	const uint32 d3dRootSignatureSize = compiledDataLength - headerAndBindPointsLength;
+
+	const sint32 bindingLayoutIndex = bindingLayoutsTableAllocationMask.findFirstZeroAndSet();
+	XE_MASTER_ASSERT(bindingLayoutIndex >= 0);
+
+	BindingLayout& bindingLayout = bindingLayoutsTable[bindingLayoutIndex];
+	XE_ASSERT(!bindingLayout.d3dRootSignature);
+	d3dDevice->CreateRootSignature(0, d3dRootSignatureData, d3dRootSignatureSize,
+		IID_PPV_ARGS(&bindingLayout.d3dRootSignature));
+}
+
 FenceHandle Device::createFence(uint64 initialValue)
 {
-	const sint32 fenceIndex = fencesAllocationMask.findFirstZeroAndSet();
+	const sint32 fenceIndex = fencesTableAllocationMask.findFirstZeroAndSet();
 	XE_MASTER_ASSERT(fenceIndex >= 0);
 
 	Fence& fence = fencesTable[fenceIndex];
@@ -440,7 +493,7 @@ void Device::createCommandList(CommandList& commandList, CommandListType type)
 
 SwapChainHandle Device::createSwapChain(uint16 width, uint16 height, void* hWnd)
 {
-	const sint32 swapChainIndex = swapChainsAllocationMask.findFirstZeroAndSet();
+	const sint32 swapChainIndex = swapChainsTableAllocationMask.findFirstZeroAndSet();
 	XE_MASTER_ASSERT(swapChainIndex >= 0);
 
 	SwapChain& swapChain = swapChainsTable[swapChainIndex];
@@ -469,7 +522,7 @@ SwapChainHandle Device::createSwapChain(uint16 width, uint16 height, void* hWnd)
 	// Allocate resources for planes
 	for (uint32 i = 0; i < SwapChainPlaneCount; i++)
 	{
-		const sint32 resourceIndex = resourcesAllocationMask.findFirstZeroAndSet();
+		const sint32 resourceIndex = resourcesTableAllocationMask.findFirstZeroAndSet();
 		XE_MASTER_ASSERT(resourceIndex >= 0);
 
 		Resource& resource = resourcesTable[resourceIndex];
@@ -525,6 +578,19 @@ void Device::submitFlip(SwapChainHandle swapChainHandle)
 {
 	SwapChain& swapChain = swapChainsTable[resolveSwapChainHandle(swapChainHandle)];
 	swapChain.dxgiSwapChain->Present(1, 0);
+}
+
+uint64 Device::getFenceValue(FenceHandle fenceHandle) const
+{
+	const Fence& fence = fencesTable[resolveFenceHandle(fenceHandle)];
+	return fence.d3dFence->GetCompletedValue();
+}
+
+ResourceHandle Device::getSwapChainPlaneTexture(SwapChainHandle swapChainHandle, uint32 planeIndex) const
+{
+	const SwapChain& swapChain = swapChainsTable[resolveSwapChainHandle(swapChainHandle)];
+	XE_ASSERT(planeIndex < countof(swapChain.planeTextures));
+	return swapChain.planeTextures[planeIndex];
 }
 
 // Host ////////////////////////////////////////////////////////////////////////////////////////////

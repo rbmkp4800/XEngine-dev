@@ -5,6 +5,8 @@
 #include <XLib.Platform.COMPtr.h>
 #include <XLib.Containers.BitSet.h>
 
+#include <XEngine.Render.HAL.Common.h>
+
 #define XE_ASSERT(cond)
 #define XE_ASSERT_IMPLY(cond0, cond1)
 #define XE_ASSERT_UNREACHABLE_CODE
@@ -16,12 +18,7 @@ struct ID3D12CommandAllocator;
 struct ID3D12DescriptorHeap;
 struct ID3D12Device2;
 struct ID3D12GraphicsCommandList;
-struct ID3D12PipelineState;
-struct ID3D12Resource;
-struct ID3D12RootSignature;
-
 struct IDXGIAdapter4;
-struct IDXGISwapChain3;
 
 namespace XEngine::Render::HAL
 {
@@ -83,12 +80,6 @@ namespace XEngine::Render::HAL
 		Texture2D,
 		Texture2DArray,
 		Texture3D,
-	};
-
-	enum class TextureFormat : uint8
-	{
-		Undefined = 0,
-		R8G8B8A8_UNORM,
 	};
 
 	struct TextureFlag abstract final
@@ -266,6 +257,7 @@ namespace XEngine::Render::HAL
 		static constexpr uint32 MaxResourceDescriptorCount = 4096;
 		static constexpr uint32 MaxRenderTargetViewCount = 64;
 		static constexpr uint32 MaxDepthStencilViewCount = 64;
+		static constexpr uint32 MaxBindingLayoutCount = 64;
 		static constexpr uint32 MaxPipelineCount = 1024;
 		static constexpr uint32 MaxFenceCount = 64;
 		static constexpr uint32 MaxSwapChainCount = 4;
@@ -290,16 +282,19 @@ namespace XEngine::Render::HAL
 
 		Resource* resourcesTable = nullptr;
 		ResourceView* resourceViewsTable = nullptr;
+		BindingLayout* bindingLayoutsTable = nullptr;
 		Pipeline* pipelinesTable = nullptr;
 		Fence* fencesTable = nullptr;
 		SwapChain* swapChainsTable = nullptr;
 
-		XLib::BitSet<MaxResourceCount> resourcesAllocationMask;
-		XLib::BitSet<MaxResourceViewCount> resourceViewsAllocationMask;
-		XLib::BitSet<MaxRenderTargetViewCount> renderTargetViewsAllocationMask;
-		XLib::BitSet<MaxDepthStencilViewCount> depthStencilViewsAllocationMask;
-		XLib::BitSet<MaxFenceCount> fencesAllocationMask;
-		XLib::BitSet<MaxSwapChainCount> swapChainsAllocationMask;
+		XLib::BitSet<MaxResourceCount> resourcesTableAllocationMask;
+		XLib::BitSet<MaxResourceViewCount> resourceViewsTableAllocationMask;
+		XLib::BitSet<MaxRenderTargetViewCount> renderTargetViewsTableAllocationMask;
+		XLib::BitSet<MaxDepthStencilViewCount> depthStencilViewsTableAllocationMask;
+		XLib::BitSet<MaxBindingLayoutCount> bindingLayoutsTableAllocationMask;
+		XLib::BitSet<MaxPipelineCount> pipelinesTableAllocationMask;
+		XLib::BitSet<MaxFenceCount> fencesTableAllocationMask;
+		XLib::BitSet<MaxSwapChainCount> swapChainsTableAllocationMask;
 		uint32 allocatedResourceDescriptorCount = 0;
 
 		uint64 referenceSRVHeapStartPtr = 0;
@@ -362,11 +357,11 @@ namespace XEngine::Render::HAL
 		DescriptorBundleHandle createDescriptorBundle(DescriptorBundleLayoutHandle layoutHandle);
 		void destroyDescriptorBundle(DescriptorBundleHandle handle);
 
-		BindingLayoutHandle createBindingLayout(DataBuffer bytecodeBlob);
+		BindingLayoutHandle createBindingLayout(const void* compiledData, uint32 compiledDataLength);
 		void destroyBindingLayout(BindingLayoutHandle handle);
 
 		PipelineHandle createGraphicsPipeline(BindingLayoutHandle bindingLayoutHandle,
-			uint32 bytecodeBlobsCount, const DataBuffer* bytecodeBlobs,
+			uint32 bytecodeBlobCount, const DataBuffer* bytecodeBlobs,
 			const RasterizerDesc& rasterizerDesc, const BlendDesc& blendDesc);
 		PipelineHandle createComputePipeline(BindingLayoutHandle bindingLayoutHandle);
 		void destroyPipeline(PipelineHandle handle);
@@ -392,10 +387,10 @@ namespace XEngine::Render::HAL
 		inline void submitAsyncCompute(CommandList& commandList, const FenceSignalDesc& fenceSignal) { submitAsyncCompute(commandList, &fenceSignal, 1); }
 		inline void submitAsyncCopy(CommandList& commandList, const FenceSignalDesc& fenceSignal) { submitAsyncCopy(commandList, &fenceSignal, 1); }
 
-		void* getUploadBufferCPUPtr(ResourceHandle uploadBuffer);
-		DescriptorAddress getDescriptorBundleStartAddress(DescriptorBundleHandle bundle) const;
-		uint64 getFenceValue(FenceHandle fence) const;
-		ResourceHandle getSwapChainPlaneTexture(SwapChainHandle swapChain, uint32 planeIndex) const;
+		void* getUploadBufferCPUPtr(ResourceHandle uploadBufferHandle);
+		DescriptorAddress getDescriptorBundleStartAddress(DescriptorBundleHandle bundleHandle) const;
+		uint64 getFenceValue(FenceHandle fenceHandle) const;
+		ResourceHandle getSwapChainPlaneTexture(SwapChainHandle swapChainHandle, uint32 planeIndex) const;
 
 		const char* getName() const;
 	};

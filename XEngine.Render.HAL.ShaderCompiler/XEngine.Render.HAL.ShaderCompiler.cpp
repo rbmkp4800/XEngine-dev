@@ -1,4 +1,5 @@
-#include <Windows.h>
+#include <d3d12.h>
+//#include <d3d12shader.h>
 #include <dxcapi.h>
 
 #include <XLib.Containers.ArrayList.h>
@@ -27,14 +28,31 @@ HRESULT __stdcall ::DXCIncludeHandler::LoadSource(LPCWSTR pFilename, IDxcBlob** 
 	return S_FALSE;
 }
 
-void XEngine::Render::HAL::ShaderCompiler::CompileBindingLayout(Platform platform,
-	const BindingLayoutDesc& desc, BinaryBlob** result)
+bool Host::CompileBindingLayout(Platform platform, const BindingLayoutDesc& desc, CompiledBindingLayout& result)
 {
+	InplaceArrayList<D3D12_ROOT_PARAMETER1, 32> d3dRootParamsList;
 
+	for (uint32 i = 0; i < desc.bindPointCount; i++)
+	{
+		const RootBindPointDesc& bindPoint = desc.bindPoints[i];
+
+		D3D12_ROOT_PARAMETER1 d3dRootParam = {};
+		// ...
+		d3dRootParamsList.pushBack(d3dRootParam);
+	}
+
+	D3D12_VERSIONED_ROOT_SIGNATURE_DESC d3dRootSignatureDesc = {};
+	d3dRootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
+	d3dRootSignatureDesc.Desc_1_1.pParameters = d3dRootParamsList.getData();
+	d3dRootSignatureDesc.Desc_1_1.NumParameters = d3dRootParamsList.getSize();
+	d3dRootSignatureDesc.Desc_1_1.Flags = ;// D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED;
+
+	COMPtr<ID3DBlob> d3dRootSignature, d3dError;
+	D3D12SerializeVersionedRootSignature(&d3dRootSignatureDesc, d3dRootSignature.initRef(), d3dError.initRef());
 }
 
-void XEngine::Render::HAL::ShaderCompiler::CompileShader(Platform platform,
-	ShaderType shaderType, BinaryBlob* bindingLayoutBlob, )
+bool Host::CompileShader(Platform platform, const CompiledBindingLayout& compiledBindingLayout,
+	ShaderType shaderType, const char* source, uint32 sourceLength, CompiledShader& result)
 {
 	COMPtr<IDxcCompiler3> dxcCompiler;
 	DxcCreateInstance(CLSID_DxcCompiler, dxcCompiler.uuid(), dxcCompiler.voidInitRef());
@@ -54,11 +72,11 @@ void XEngine::Render::HAL::ShaderCompiler::CompileShader(Platform platform,
 		LPCWSTR dxcProfile = nullptr;
 		switch (shaderType)
 		{
-			case ShaderType::CS: dxcProfile = L"-Tcs_6_6"; break;
-			case ShaderType::VS: dxcProfile = L"-Tvs_6_6"; break;
-			case ShaderType::MS: dxcProfile = L"-Tms_6_6"; break;
-			case ShaderType::AS: dxcProfile = L"-Tas_6_6"; break;
-			case ShaderType::PS: dxcProfile = L"-Tps_6_6"; break;
+			case ShaderType::Compute:		dxcProfile = L"-Tcs_6_6"; break;
+			case ShaderType::Vertex:		dxcProfile = L"-Tvs_6_6"; break;
+			case ShaderType::Amplification: dxcProfile = L"-Tas_6_6"; break;
+			case ShaderType::Mesh:			dxcProfile = L"-Tms_6_6"; break;
+			case ShaderType::Pixel:			dxcProfile = L"-Tps_6_6"; break;
 		}
 		// ASSERT(dxcTargetProfile);
 		dxcArgsList.pushBack(dxcProfile);
@@ -72,7 +90,8 @@ void XEngine::Render::HAL::ShaderCompiler::CompileShader(Platform platform,
 		&dxcIncludeHandler, dxcResult.uuid(), dxcResult.voidInitRef());
 }
 
-void XEngine::Render::HAL::ShaderCompiler::CompilePipeline(Platform platform)
+bool Host::CompileGraphicsPipeline(Platform platform, const CompiledBindingLayout& compiledBindingLayout,
+	const GraphicsPipelineDesc& pipelineDesc, CompiledPipeline& result)
 {
 
 }

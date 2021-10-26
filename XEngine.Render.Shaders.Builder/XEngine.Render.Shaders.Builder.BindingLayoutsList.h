@@ -23,14 +23,14 @@ namespace XEngine::Render::Shaders::Builder_
 		XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
 
 		XLib::InplaceString<63, uint8> name;
-		HAL::ShaderCompiler::CompiledBindingLayout compiled;
+		HAL::ShaderCompiler::CompiledBindingLayout compilationResult;
 
 	private:
 		BindingLayout() = default;
 		~BindingLayout() = default;
 
 	public:
-		inline const HAL::ShaderCompiler::CompiledBindingLayout& getCompiled() const { return compiled; }
+		inline const HAL::ShaderCompiler::CompiledBindingLayout& getCompiled() const { return compilationResult; }
 	};
 
 	class BindingLayoutsList : public XLib::NonCopyable

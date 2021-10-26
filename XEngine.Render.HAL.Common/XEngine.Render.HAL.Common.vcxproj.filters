@@ -2,5 +2,6 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClInclude Include="XEngine.Render.HAL.BinaryFormat.h" />
+    <ClInclude Include="XEngine.Render.HAL.Common.h" />
   </ItemGroup>
 </Project>
