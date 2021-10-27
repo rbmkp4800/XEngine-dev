@@ -7,12 +7,12 @@
 
 #include <XEngine.Render.HAL.Common.h>
 
-#define XE_ASSERT(cond)
-#define XE_ASSERT_IMPLY(cond0, cond1)
-#define XE_ASSERT_UNREACHABLE_CODE
-#define XE_MASTER_ASSERT(cond)
-#define XE_MASTER_ASSERT_IMPLY(cond0, cond1)
-#define XE_MASTER_ASSERT_UNREACHABLE_CODE
+#define XEAssert(cond)
+#define XEAssertImply(cond0, cond1)
+#define XEAssertUnreachableCode()
+#define XEMasterAssert(cond)
+#define XEMasterAssertImply(cond0, cond1)
+#define XEMasterAssertUnreachableCode()
 
 struct ID3D12CommandAllocator;
 struct ID3D12CommandQueue;
@@ -52,6 +52,35 @@ namespace XEngine::Render::HAL
 		Texture,
 	};
 
+	enum class BufferMemoryType : uint8
+	{
+		Undefined = 0,
+		Local,
+		Upload,
+		Readback,
+	};
+
+	struct BufferCreationFlags
+	{
+		bool allowShaderWrite : 1;
+	};
+
+	enum class TextureType : uint8
+	{
+		Undefined = 0,
+		Texture1D,
+		Texture2D,
+		Texture2DArray,
+		Texture3D,
+	};
+
+	struct TextureCreationFlags
+	{
+		bool allowRenderTarget : 1;
+		bool allowDepthStencil : 1;
+		bool allowShaderWrite : 1;
+	};
+
 	enum class ResourceViewType : uint8
 	{
 		Undefined = 0,
@@ -65,42 +94,6 @@ namespace XEngine::Render::HAL
 		ReadWriteTexture3D,
 		ReadOnlyTextureCube,
 		RaytracingAccelerationStructure,
-	};
-
-	enum class BufferMemoryType : uint8
-	{
-		Undefined = 0,
-		Local,
-		Upload,
-		Readback,
-	};
-
-	enum class TextureDimType : uint8
-	{
-		Undefined = 0,
-		Texture1D,
-		Texture2D,
-		Texture2DArray,
-		Texture3D,
-	};
-
-	struct TextureFlag abstract final
-	{
-		enum : uint32
-		{
-			None = 0,
-			AllowRenderTarget	= 0x01,
-			AllowDepthStencil	= 0x02,
-			AllowShaderWrite	= 0x04,
-		};
-	};
-
-	struct TextureDim
-	{
-		TextureDimType type;
-		uint16 width;
-		uint16 height;
-		uint16 depth;
 	};
 
 	enum class PipelineType : uint8
@@ -126,18 +119,16 @@ namespace XEngine::Render::HAL
 		ReadWrite,
 	};
 
-	enum class ResourceImmutableState : uint8
+	struct ResourceImmutableStateFlags
 	{
-		None = 0,
-		//VertexBuffer,
-		//IndexBuffer,
-		//ConstantBuffer
-		DepthRead,
-		ArbitraryShaderRead,
-		PixelShaderRead,
-		NonPixelShaderRead,
-		CopySource,
-		//IndirectArgument,
+		bool vertexBuffer : 1;
+		bool indexBuffer : 1;
+		bool constantBuffer : 1;
+		bool pixelShaderRead : 1;
+		bool nonPixelShaderRead : 1;
+		bool depthRead : 1;
+		bool indirectArgument : 1;
+		bool copySource : 1;
 	};
 
 	enum class ResourceMutableState : uint8
@@ -147,6 +138,14 @@ namespace XEngine::Render::HAL
 		DepthWrite,
 		ShaderReadWrite,
 		CopyDestination,
+	};
+
+	struct TextureDim
+	{
+		TextureType type;
+		uint16 width;
+		uint16 height;
+		uint16 depth;
 	};
 
 	struct ResourceViewDesc
@@ -363,10 +362,10 @@ namespace XEngine::Render::HAL
 		Device() = default;
 		~Device() = default;
 
-		ResourceHandle createBuffer(uint32 size, BufferMemoryType memoryType);
+		ResourceHandle createBuffer(uint32 size, BufferMemoryType memoryType, BufferCreationFlags flags);
 		void destroyBuffer(ResourceHandle handle);
 
-		ResourceHandle createTexture(const TextureDim& dim, TextureFormat format, uint32 flags);
+		ResourceHandle createTexture(const TextureDim& dim, TextureFormat format, TextureCreationFlags flags);
 		void destroyTexture(ResourceHandle handle);
 
 		ResourceViewHandle createResourceView(ResourceHandle resourceHandle, const ResourceViewDesc& viewDesc);
@@ -439,6 +438,6 @@ namespace XEngine::Render::HAL
 {
 	inline ResourceHandle Device::composeResourceHandle(uint32 resourceIndex) const
 	{
-		XE_ASSERT(resourceIndex < MaxResourceCount);
+		XEAssert(resourceIndex < MaxResourceCount);
 	}
 }
