@@ -198,8 +198,8 @@ void Builder::build()
 
 	for (Shader& shader : shadersList)
 	{
-		const BindingLayout& bindingLayout = bindingLayoutsList.getEntry(shader.getBindingLayout());
-		Host::CompileShader(Platform::D3D12, bindingLayout.getCompiled(), shader.getType(), ...);
+		const PipelineLayout& pipelineLayout = pipelineLayoutsList.getEntry(shader.getPipelineLayout());
+		Host::CompileShader(Platform::D3D12, pipelineLayout.getCompiled(), shader.getType(), ...);
 	}
 }
 
@@ -225,7 +225,7 @@ void Builder::storePackage(const char* packagePath)
 
 		PackFile::PipelineDesc& serializedPipelineDesc = serializedPipelines.emplaceBack();
 		serializedPipelineDesc.nameCRC = pipeline.getNameCRC();
-		serializedPipelineDesc.bindingLayoutIndex = ...;
+		serializedPipelineDesc.pipelineLayoutIndex = ...;
 		serializedPipelineDesc.type = ...;
 		serializedPipelineDesc.binaryBlobCount = pipelineBlobs.getSize();
 		serializedPipelineDesc.binaryBlobsMapOffset = pipelineBlobsMapEntryIndexAccum;
@@ -267,9 +267,9 @@ void Builder::storePackage(const char* packagePath)
 
 	uint32 blobsTotalSizeAccumulator = 0;
 
-	for (const BindingLayout& bindingLayout : bindingLayoutsList)
+	for (const PipelineLayout& PipelineLayout : pipelineLayoutsList)
 	{
-		const CompiledBindingLayout& compiledLayout = bindingLayout.getCompiled();
+		const CompiledPipelineLayout& compiledLayout = PipelineLayout.getCompiled();
 
 		PackFile::BinaryBlobDesc desc = {};
 		desc.offset = blobsTotalSizeAccumulator;
@@ -286,7 +286,7 @@ void Builder::storePackage(const char* packagePath)
 	header.signature = PackFile::Signature;
 	header.version = PackFile::CurrentVersion;
 	header.platformFlags = 0;
-	header.bindingLayoutCount = 0;
+	header.pipelineLayoutCount = 0;
 	header.pipelineCount = 0;
 	header.binaryBlobCount = 0;
 	file.write(header);

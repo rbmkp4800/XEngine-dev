@@ -8,8 +8,8 @@
   <ItemGroup>
     <ClInclude Include="XEngine.Render.Shaders.Builder.SourcesCache.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.ShadersList.h" />
-    <ClInclude Include="XEngine.Render.Shaders.Builder.BindingLayoutsList.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.PipelinesList.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.h" />
+    <ClInclude Include="XEngine.Render.Shaders.Builder.PipelineLayoutsList.h" />
   </ItemGroup>
 </Project>

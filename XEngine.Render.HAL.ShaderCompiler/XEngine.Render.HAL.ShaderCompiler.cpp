@@ -28,7 +28,7 @@ HRESULT __stdcall ::DXCIncludeHandler::LoadSource(LPCWSTR pFilename, IDxcBlob** 
 	return S_FALSE;
 }
 
-bool Host::CompileBindingLayout(Platform platform, const BindingLayoutDesc& desc, CompiledBindingLayout& result)
+bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& desc, CompiledPipelineLayout& result)
 {
 	InplaceArrayList<D3D12_ROOT_PARAMETER1, 32> d3dRootParamsList;
 
@@ -51,7 +51,7 @@ bool Host::CompileBindingLayout(Platform platform, const BindingLayoutDesc& desc
 	D3D12SerializeVersionedRootSignature(&d3dRootSignatureDesc, d3dRootSignature.initRef(), d3dError.initRef());
 }
 
-bool Host::CompileShader(Platform platform, const CompiledBindingLayout& compiledBindingLayout,
+bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& compiledPipelineLayout,
 	ShaderType shaderType, const char* source, uint32 sourceLength, CompiledShader& result)
 {
 	COMPtr<IDxcCompiler3> dxcCompiler;
@@ -90,7 +90,7 @@ bool Host::CompileShader(Platform platform, const CompiledBindingLayout& compile
 		&dxcIncludeHandler, dxcResult.uuid(), dxcResult.voidInitRef());
 }
 
-bool Host::CompileGraphicsPipeline(Platform platform, const CompiledBindingLayout& compiledBindingLayout,
+bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayout& compiledPipelineLayout,
 	const GraphicsPipelineDesc& pipelineDesc, CompiledPipeline& result)
 {
 

@@ -4,8 +4,8 @@
 
 namespace XEngine::Render::HAL
 {
-	static constexpr uint32 MaxRootBindPointCountLog2 = 4;
-	static constexpr uint32 MaxRootBindPointCount = 1 << MaxRootBindPointCountLog2;
+	static constexpr uint32 MaxPipelineBindPointCountLog2 = 4;
+	static constexpr uint32 MaxPipelineBindPointCount = 1 << MaxPipelineBindPointCountLog2;
 
 	enum class TextureFormat : uint8
 	{

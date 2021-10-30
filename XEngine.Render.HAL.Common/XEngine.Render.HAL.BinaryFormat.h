@@ -4,16 +4,16 @@
 
 namespace XEngine::Render::HAL::BinaryFormat
 {
-	static constexpr uint32 BindingLayoutBlobSignature = 0;
-	static constexpr uint32 BindingLayoutBlobCurrentVerstion = 0;
+	static constexpr uint32 PipelineLayoutBlobSignature = 0;
+	static constexpr uint32 PipelineLayoutBlobCurrentVerstion = 0;
 
-	struct RootBindPointRecord
+	struct PipelineBindPointRecord
 	{
 		uint32 bindPointNameHash;
 		uint32 bindPointDesc;
 	};
 
-	struct BindingLayoutBlobHeader
+	struct PipelineLayoutHeader
 	{
 		uint32 signature;
 		uint32 version;

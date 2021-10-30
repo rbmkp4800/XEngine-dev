@@ -8,7 +8,7 @@
 namespace XEngine::Render::HAL::ShaderCompiler
 {
 	class CompiledDescriptorBundleLayout;
-	class CompiledBindingLayout;
+	class CompiledPipelineLayout;
 	class CompiledShader;
 	class CompiledPipeline;
 
@@ -31,7 +31,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		Pixel,
 	};
 
-	enum class RootBindPointType : uint8
+	enum class PipelineBindPointType : uint8
 	{
 		Undefined = 0,
 		Constants,
@@ -53,10 +53,10 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		RaytracingAccelerationStructure,
 	};
 
-	struct RootBindPointDesc
+	struct PipelineBindPointDesc
 	{
 		const char* name;
-		RootBindPointType type;
+		PipelineBindPointType type;
 		uint8 shaderVisibility;
 		uint8 constantCount;
 		const CompiledDescriptorBundleLayout* descriptorBundleLayout;
@@ -68,9 +68,9 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		DescriptorBindPointType type;
 	};
 
-	struct BindingLayoutDesc
+	struct PipelineLayoutDesc
 	{
-		const RootBindPointDesc* bindPoints;
+		const PipelineBindPointDesc* bindPoints;
 		uint8 bindPointCount;
 	};
 
@@ -105,7 +105,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		uint32 getBinaryBlobSize() const;
 	};
 
-	class CompiledBindingLayout : public XLib::NonCopyable
+	class CompiledPipelineLayout : public XLib::NonCopyable
 	{
 	private:
 
@@ -137,16 +137,16 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		static bool CompileDescriptorBundleLayout(Platform platform,
 			DescriptorBundleLayoutDesc& desc, CompiledDescriptorBundleLayout& result);
 
-		static bool CompileBindingLayout(Platform platform,
-			const BindingLayoutDesc& desc, CompiledBindingLayout& result);
+		static bool CompilePipelineLayout(Platform platform,
+			const PipelineLayoutDesc& desc, CompiledPipelineLayout& result);
 
-		static bool CompileShader(Platform platform, const CompiledBindingLayout& compiledBindingLayout,
+		static bool CompileShader(Platform platform, const CompiledPipelineLayout& compiledPipelineLayout,
 			ShaderType shaderType, const char* source, uint32 sourceLength, CompiledShader& result);
 
-		static bool CompileGraphicsPipeline(Platform platform, const CompiledBindingLayout& compiledBindingLayout,
+		static bool CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayout& compiledPipelineLayout,
 			const GraphicsPipelineDesc& pipelineDesc, CompiledPipeline& result);
 
-		static bool CompileComputePipeline(Platform platform, const CompiledBindingLayout& compiledBindingLayout,
+		static bool CompileComputePipeline(Platform platform, const CompiledPipelineLayout& compiledPipelineLayout,
 			const ComputePipelineDesc& pipelineDesc, CompiledPipeline& result);
 	};
 }

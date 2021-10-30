@@ -8,7 +8,7 @@
 
 #include <XEngine.Render.HAL.ShaderCompiler.h>
 
-#include "XEngine.Render.Shaders.Builder.BindingLayoutsList.h"
+#include "XEngine.Render.Shaders.Builder.PipelineLayoutsList.h"
 #include "XEngine.Render.Shaders.Builder.SourcesCache.h"
 
 namespace XEngine::Render::Shaders::Builder_
@@ -34,7 +34,7 @@ namespace XEngine::Render::Shaders::Builder_
 		HAL::ShaderCompiler::CompiledShader compilationResult;
 
 		SourcesCacheEntryId sourceMain = ZeroSourcesCacheEntryId;
-		BindingLayoutRef bindingLayout = ZeroBindingLayoutRef;
+		PipelineLayoutRef pipelineLayout = ZeroPipelineLayoutRef;
 		HAL::ShaderCompiler::ShaderType type = HAL::ShaderCompiler::ShaderType::Undefined;
 
 		bool compilationRequired = false;
@@ -45,7 +45,7 @@ namespace XEngine::Render::Shaders::Builder_
 
 	public:
 		inline SourcesCacheEntryId getSourceMain() const { return sourceMain; }
-		inline BindingLayoutRef getBindingLayout() const { return bindingLayout; }
+		inline PipelineLayoutRef getPipelineLayout() const { return pipelineLayout; }
 		inline HAL::ShaderCompiler::ShaderType getType() const { return type; }
 
 		inline void addSourceDependency(SourcesCacheEntryId id) { sourceDependencies.pushBack(id); }

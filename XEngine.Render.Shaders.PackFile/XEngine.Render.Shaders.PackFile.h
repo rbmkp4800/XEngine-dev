@@ -23,7 +23,7 @@ namespace XEngine::Render::Shaders::PackFile
 		uint32 signature;
 		uint16 version;
 		uint16 platformFlags;
-		uint16 bindingLayoutCount;
+		uint16 pipelineLayoutCount;
 		uint16 pipelineCount;
 		uint32 pipelineBinaryBlobsMapSize;
 		uint32 binaryBlobCount;
@@ -32,7 +32,7 @@ namespace XEngine::Render::Shaders::PackFile
 	struct PipelineDesc
 	{
 		uint64 nameCRC;
-		uint16 bindingLayoutIndex;
+		uint16 pipelineLayoutIndex;
 		PipelineType type;
 		uint8 binaryBlobCount;
 		uint32 binaryBlobsMapOffset;

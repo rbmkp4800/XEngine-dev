@@ -27,12 +27,12 @@ namespace XEngine::Render::HAL
 	class Host;
 
 	enum class ResourceHandle : uint32;
-	enum class ResourceViewHandle : uint32;
+	enum class ShaderResourceViewHandle : uint32;
 	enum class RenderTargetViewHandle : uint32;
 	enum class DepthStencilViewHandle : uint32;
 	enum class DescriptorBundleLayoutHandle : uint32;
 	enum class DescriptorBundleHandle : uint32;
-	enum class BindingLayoutHandle : uint32;
+	enum class PipelineLayoutHandle : uint32;
 	enum class PipelineHandle : uint32;
 	enum class FenceHandle : uint32;
 	enum class SwapChainHandle : uint32;
@@ -40,10 +40,10 @@ namespace XEngine::Render::HAL
 	using DescriptorAddress = uint32;
 
 	static constexpr ResourceHandle ZeroResourceHandle = ResourceHandle(0);
-	static constexpr ResourceViewHandle ZeroResourceViewHandle = ResourceViewHandle(0);
+	static constexpr ShaderResourceViewHandle ZeroShaderResourceViewHandle = ShaderResourceViewHandle(0);
 	static constexpr RenderTargetViewHandle ZeroRenderTargetViewHandle = RenderTargetViewHandle(0);
 	static constexpr DepthStencilViewHandle ZeroDepthStencilViewHandle = DepthStencilViewHandle(0);
-	static constexpr BindingLayoutHandle ZeroBindingLayoutHandle = BindingLayoutHandle(0);
+	static constexpr PipelineLayoutHandle ZeroPipelineLayoutHandle = PipelineLayoutHandle(0);
 
 	enum class ResourceType : uint8
 	{
@@ -81,7 +81,7 @@ namespace XEngine::Render::HAL
 		bool allowShaderWrite : 1;
 	};
 
-	enum class ResourceViewType : uint8
+	enum class ShaderResourceViewType : uint8
 	{
 		Undefined = 0,
 		ReadOnlyBuffer,
@@ -148,9 +148,9 @@ namespace XEngine::Render::HAL
 		uint16 depth;
 	};
 
-	struct ResourceViewDesc
+	struct ShaderResourceViewDesc
 	{
-		ResourceViewType type;
+		ShaderResourceViewType type;
 		union
 		{
 			struct
@@ -227,7 +227,7 @@ namespace XEngine::Render::HAL
 
 		State state = State(0);
 		PipelineType currentPipelineType = PipelineType::Undefined;
-		BindingLayoutHandle currentBindingLayoutHandle = ZeroBindingLayoutHandle;
+		PipelineLayoutHandle currentPipelineLayoutHandle = ZeroPipelineLayoutHandle;
 		uint8 bindPointsLUTKeyShift = 0;
 		uint8 bindPointsLUTKeyAndMask = 0;
 		const BindPointDesc* bindPointsLUT = nullptr;
@@ -279,19 +279,19 @@ namespace XEngine::Render::HAL
 
 	private:
 		static constexpr uint32 MaxResourceCount = 1024;
-		static constexpr uint32 MaxResourceViewCount = 1024;
+		static constexpr uint32 MaxShaderResourceViewCount = 1024;
 		static constexpr uint32 MaxResourceDescriptorCount = 4096;
 		static constexpr uint32 MaxRenderTargetViewCount = 64;
 		static constexpr uint32 MaxDepthStencilViewCount = 64;
-		static constexpr uint32 MaxBindingLayoutCount = 64;
+		static constexpr uint32 MaxPipelineLayoutCount = 64;
 		static constexpr uint32 MaxPipelineCount = 1024;
 		static constexpr uint32 MaxFenceCount = 64;
 		static constexpr uint32 MaxSwapChainCount = 4;
 		static constexpr uint32 SwapChainPlaneCount = 2;
 
 		struct Resource;
-		struct ResourceView;
-		struct BindingLayout;
+		struct ShaderResourceView;
+		struct PipelineLayout;
 		struct Pipeline;
 		struct Fence;
 		struct SwapChain;
@@ -307,17 +307,17 @@ namespace XEngine::Render::HAL
 		XLib::Platform::COMPtr<ID3D12CommandQueue> d3dAsyncCopyQueue;
 
 		Resource* resourcesTable = nullptr;
-		ResourceView* resourceViewsTable = nullptr;
-		BindingLayout* bindingLayoutsTable = nullptr;
+		ShaderResourceView* shaderResourceViewsTable = nullptr;
+		PipelineLayout* pipelineLayoutsTable = nullptr;
 		Pipeline* pipelinesTable = nullptr;
 		Fence* fencesTable = nullptr;
 		SwapChain* swapChainsTable = nullptr;
 
 		XLib::BitSet<MaxResourceCount> resourcesTableAllocationMask;
-		XLib::BitSet<MaxResourceViewCount> resourceViewsTableAllocationMask;
+		XLib::BitSet<MaxShaderResourceViewCount> shaderResourceViewsTableAllocationMask;
 		XLib::BitSet<MaxRenderTargetViewCount> renderTargetViewsTableAllocationMask;
 		XLib::BitSet<MaxDepthStencilViewCount> depthStencilViewsTableAllocationMask;
-		XLib::BitSet<MaxBindingLayoutCount> bindingLayoutsTableAllocationMask;
+		XLib::BitSet<MaxPipelineLayoutCount> pipelineLayoutsTableAllocationMask;
 		XLib::BitSet<MaxPipelineCount> pipelinesTableAllocationMask;
 		XLib::BitSet<MaxFenceCount> fencesTableAllocationMask;
 		XLib::BitSet<MaxSwapChainCount> swapChainsTableAllocationMask;
@@ -335,19 +335,19 @@ namespace XEngine::Render::HAL
 
 	private:
 		inline ResourceHandle composeResourceHandle(uint32 resourceIndex) const;
-		inline ResourceViewHandle composeResourceViewHandle(uint32 resourceViewIndex) const;
+		inline ShaderResourceViewHandle composeShaderResourceViewHandle(uint32 resourceViewIndex) const;
 		inline RenderTargetViewHandle composeRenderTargetViewHandle(uint32 renderTargetIndex) const;
 		inline DepthStencilViewHandle composeDepthStencilViewHandle(uint32 depthStencilIndex) const;
 		inline FenceHandle composeFenceHandle(uint32 fenceIndex) const;
-		inline BindingLayoutHandle composeBindingLayoutHandle(uint32 bindingLayoutIndex) const;
+		inline PipelineLayoutHandle composePipelineLayoutHandle(uint32 pipelineLayoutIndex) const;
 		inline PipelineHandle composePipelineHandle(uint32 pipelineIndex) const;
 		inline SwapChainHandle composeSwapChainHandle(uint32 swapChainIndex) const;
 
 		inline uint32 resolveResourceHandle(ResourceHandle handle) const;
-		inline uint32 resolveResourceViewHandle(ResourceViewHandle handle) const;
+		inline uint32 resolveShaderResourceViewHandle(ShaderResourceViewHandle handle) const;
 		inline uint32 resolveRenderTargetViewHandle(RenderTargetViewHandle handle) const;
 		inline uint32 resolveDepthStencilViewHandle(DepthStencilViewHandle handle) const;
-		inline uint32 resolveBindingLayoutHandle(BindingLayoutHandle handle) const;
+		inline uint32 resolvePipelineLayoutHandle(PipelineLayoutHandle handle) const;
 		inline uint32 resolvePipelineHandle(PipelineHandle handle) const;
 		inline uint32 resolveFenceHandle(FenceHandle handle) const;
 		inline uint32 resolveSwapChainHandle(SwapChainHandle handle) const;
@@ -368,8 +368,8 @@ namespace XEngine::Render::HAL
 		ResourceHandle createTexture(const TextureDim& dim, TextureFormat format, TextureCreationFlags flags);
 		void destroyTexture(ResourceHandle handle);
 
-		ResourceViewHandle createResourceView(ResourceHandle resourceHandle, const ResourceViewDesc& viewDesc);
-		void destroyResourceView(ResourceViewHandle handle);
+		ShaderResourceViewHandle createShaderResourceView(ResourceHandle resourceHandle, const ShaderResourceViewDesc& viewDesc);
+		void destroyShaderResourceView(ShaderResourceViewHandle handle);
 
 		RenderTargetViewHandle createRenderTargetView(ResourceHandle textureHandle);
 		void destroyRenderTargetView(RenderTargetViewHandle handle);
@@ -386,13 +386,13 @@ namespace XEngine::Render::HAL
 		DescriptorBundleHandle createDescriptorBundle(DescriptorBundleLayoutHandle layoutHandle);
 		void destroyDescriptorBundle(DescriptorBundleHandle handle);
 
-		BindingLayoutHandle createBindingLayout(const void* compiledData, uint32 compiledDataLength);
-		void destroyBindingLayout(BindingLayoutHandle handle);
+		PipelineLayoutHandle createPipelineLayout(const void* compiledData, uint32 compiledDataLength);
+		void destroyPipelineLayout(PipelineLayoutHandle handle);
 
-		PipelineHandle createGraphicsPipeline(BindingLayoutHandle bindingLayoutHandle,
+		PipelineHandle createGraphicsPipeline(PipelineLayoutHandle pipelineLayoutHandle,
 			uint32 bytecodeBlobCount, const DataBuffer* bytecodeBlobs,
 			const RasterizerDesc& rasterizerDesc, const BlendDesc& blendDesc);
-		PipelineHandle createComputePipeline(BindingLayoutHandle bindingLayoutHandle);
+		PipelineHandle createComputePipeline(PipelineLayoutHandle pipelineLayoutHandle);
 		void destroyPipeline(PipelineHandle handle);
 
 		FenceHandle createFence(uint64 initialValue);
@@ -404,8 +404,8 @@ namespace XEngine::Render::HAL
 		void createCommandList(CommandList& commandList, CommandListType type);
 		void destroyCommandList(CommandList& commandList);
 
-		void writeDescriptor(DescriptorAddress descriptorAddress, ResourceViewHandle resourceViewHandle);
-		void writeBundleDescriptor(DescriptorBundleHandle bundle, uint32 bindPointNameCRC, ResourceViewHandle resourceViewHandle);
+		void writeDescriptor(DescriptorAddress descriptorAddress, ShaderResourceViewHandle srvHandle);
+		void writeBundleDescriptor(DescriptorBundleHandle bundle, uint32 bindPointNameCRC, ShaderResourceViewHandle srvHandle);
 
 		void submitGraphics(CommandList& commandList, const FenceSignalDesc* fenceSignals = nullptr, uint32 fenceSignalCount = 0);
 		void submitAsyncCompute(CommandList& commandList, const FenceSignalDesc* fenceSignals = nullptr, uint32 fenceSignalCount = 0);

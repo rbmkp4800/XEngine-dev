@@ -6,7 +6,7 @@
 #include <XLib.NonCopyable.h>
 #include <XLib.String.h>
 
-#include "XEngine.Render.Shaders.Builder.BindingLayoutsList.h"
+#include "XEngine.Render.Shaders.Builder.PipelineLayoutsList.h"
 #include "XEngine.Render.Shaders.Builder.ShadersList.h"
 
 namespace XEngine::Render::Shaders::Builder_
@@ -29,7 +29,7 @@ namespace XEngine::Render::Shaders::Builder_
 
 		XLib::InplaceString<63, uint8> name;
 		uint64 nameCRC = 0;
-		BindingLayoutRef bindingLayout = ZeroBindingLayoutRef;
+		PipelineLayoutRef PipelineLayout = ZeroPipelineLayoutRef;
 
 		PipelineConfig type = PipelineConfig::None;
 		ShaderRef cs;

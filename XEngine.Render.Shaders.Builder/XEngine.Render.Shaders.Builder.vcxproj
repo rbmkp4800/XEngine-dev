@@ -103,7 +103,7 @@
     <ClCompile Include="XEngine.Render.Shaders.Builder.SourcesCache.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="XEngine.Render.Shaders.Builder.BindingLayoutsList.h" />
+    <ClInclude Include="XEngine.Render.Shaders.Builder.PipelineLayoutsList.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.PipelinesList.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.ShadersList.h" />

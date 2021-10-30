@@ -160,24 +160,24 @@ void CommandList::setPipeline(PipelineType pipelineType, PipelineHandle pipeline
 	const Device::Pipeline& pipeline = device->pipelinesTable[device->resolvePipelineHandle(pipelineHandle)];
 	XEAssert(pipeline.type == pipelineType);
 
-	if (currentBindingLayoutHandle != pipeline.bindingLayoutHandle)
+	if (currentPipelineLayoutHandle != pipeline.layoutHandle)
 	{
-		const Device::BindingLayout& bindingLayout =
-			device->bindingLayoutsTable[device->resolveBindingLayoutHandle(pipeline.bindingLayoutHandle)];
+		const Device::PipelineLayout& pipelineLayout =
+			device->pipelineLayoutsTable[device->resolvePipelineLayoutHandle(pipeline.layoutHandle)];
 
-		bindPointsLUTKeyShift = bindingLayout.bindPointsLUTKeyShift;
-		bindPointsLUTKeyAndMask = bindingLayout.bindPointsLUTKeyAndMask;
-		bindPointsLUT = (const BindPointDesc*)bindingLayout.bindPointsLUT;
+		bindPointsLUTKeyShift = pipelineLayout.bindPointsLUTKeyShift;
+		bindPointsLUTKeyAndMask = pipelineLayout.bindPointsLUTKeyAndMask;
+		bindPointsLUT = (const BindPointDesc*)pipelineLayout.bindPointsLUT;
 
-		XEAssert(bindingLayout.d3dRootSignature);
+		XEAssert(pipelineLayout.d3dRootSignature);
 		if (pipelineType == PipelineType::Graphics)
-			d3dCommandList->SetGraphicsRootSignature(bindingLayout.d3dRootSignature);
+			d3dCommandList->SetGraphicsRootSignature(pipelineLayout.d3dRootSignature);
 		else if (pipelineType == PipelineType::Compute)
-			d3dCommandList->SetComputeRootSignature(bindingLayout.d3dRootSignature);
+			d3dCommandList->SetComputeRootSignature(pipelineLayout.d3dRootSignature);
 		else
 			XEAssertUnreachableCode();
 
-		currentBindingLayoutHandle = pipeline.bindingLayoutHandle;
+		currentPipelineLayoutHandle = pipeline.layoutHandle;
 	}
 
 	XEAssert(pipeline.d3dPipelineState);
@@ -271,27 +271,27 @@ struct Device::Resource
 	bool internalOwnership; // For example swap chain. User can't release it
 };
 
-struct Device::ResourceView
+struct Device::ShaderResourceView
 {
 	ResourceHandle resourceHandle;
-	ResourceViewType type;
+	ShaderResourceViewType type;
 	uint8 handleGeneration;
 };
 
-struct Device::BindingLayout
+struct Device::PipelineLayout
 {
 	ID3D12RootSignature* d3dRootSignature;
 	uint8 bindPointsLUTKeyShift;
 	uint8 bindPointsLUTKeyAndMask;
 	uint8 handleGeneration;
 
-	uint32 bindPointsLUT[MaxRootBindPointCount];
+	uint32 bindPointsLUT[MaxPipelineBindPointCount];
 };
 
 struct Device::Pipeline
 {
 	ID3D12PipelineState* d3dPipelineState;
-	BindingLayoutHandle bindingLayoutHandle;
+	PipelineLayoutHandle layoutHandle;
 	PipelineType type;
 	uint8 handleGeneration;
 };
@@ -314,7 +314,7 @@ void Device::initialize(IDXGIAdapter4* dxgiAdapter)
 	D3D12CreateDevice(dxgiAdapter, D3D_FEATURE_LEVEL_12_1, d3dDevice.uuid(), d3dDevice.voidInitRef());
 
 	const D3D12_DESCRIPTOR_HEAP_DESC d3dReferenceSRVHeapDesc =
-		D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, MaxResourceViewCount);
+		D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, MaxShaderResourceViewCount);
 	const D3D12_DESCRIPTOR_HEAP_DESC d3dShaderVisbileSRVHeapDesc =
 		D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
 			MaxResourceDescriptorCount, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
@@ -332,10 +332,10 @@ void Device::initialize(IDXGIAdapter4* dxgiAdapter)
 	d3dDevice->CreateCommandQueue(&d3dGraphicsQueueDesc, d3dGraphicsQueue.uuid(), d3dGraphicsQueue.voidInitRef());
 
 	resourcesTableAllocationMask.clear();
-	resourceViewsTableAllocationMask.clear();
+	shaderResourceViewsTableAllocationMask.clear();
 	renderTargetViewsTableAllocationMask.clear();
 	depthStencilViewsTableAllocationMask.clear();
-	bindingLayoutsTableAllocationMask.clear();
+	pipelineLayoutsTableAllocationMask.clear();
 	pipelinesTableAllocationMask.clear();
 	fencesTableAllocationMask.clear();
 	swapChainsTableAllocationMask.clear();
@@ -412,27 +412,27 @@ ResourceHandle Device::createTexture(const TextureDim& dim, TextureFormat format
 	return composeResourceHandle(resourceIndex);
 }
 
-ResourceViewHandle Device::createResourceView(ResourceHandle resourceHandle, const ResourceViewDesc& viewDesc)
+ShaderResourceViewHandle Device::createShaderResourceView(ResourceHandle resourceHandle, const ShaderResourceViewDesc& viewDesc)
 {
 	const Resource& resource = resourcesTable[resolveResourceHandle(resourceHandle)];
 	XEAssert(resource.d3dResource);
 
 	const D3D12_RESOURCE_DESC d3dResourceDesc = resource.d3dResource->GetDesc();
 
-	const sint32 viewIndex = resourceViewsTableAllocationMask.findFirstZeroAndSet();
+	const sint32 viewIndex = shaderResourceViewsTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(viewIndex >= 0);
 
-	ResourceView& resourceView = resourceViewsTable[viewIndex];
-	XEAssert(resourceView.type == ResourceViewType::Undefined);
-	resourceView.resourceHandle = resourceHandle;
-	resourceView.type = viewDesc.type;
+	ShaderResourceView& shaderResourceView = shaderResourceViewsTable[viewIndex];
+	XEAssert(shaderResourceView.type == ResourceViewType::Undefined);
+	shaderResourceView.resourceHandle = resourceHandle;
+	shaderResourceView.type = viewDesc.type;
 
 	bool useSRV = false;
 	bool useUAV = false;
 	D3D12_SHADER_RESOURCE_VIEW_DESC d3dSRVDesc = {};
 	D3D12_UNORDERED_ACCESS_VIEW_DESC d3dUAVDesc = {};
 
-	if (viewDesc.type == ResourceViewType::ReadOnlyTexture2D)
+	if (viewDesc.type == ShaderResourceViewType::ReadOnlyTexture2D)
 	{
 		XEAssert(resource.type == ResourceType::Texture);
 		d3dSRVDesc = D3D12Helpers::ShaderResourceViewDescForTexture2D(d3dResourceDesc.Format,
@@ -441,7 +441,7 @@ ResourceViewHandle Device::createResourceView(ResourceHandle resourceHandle, con
 			viewDesc.readOnlyTexture2D.plane);
 		useSRV = true;
 	}
-	else if (viewDesc.type == ResourceViewType::ReadWriteTexture2D)
+	else if (viewDesc.type == ShaderResourceViewType::ReadWriteTexture2D)
 	{
 		XEAssert(resource.type == ResourceType::Texture);
 		//d3dUAVDesc = D3D12Helpers::UnorderedAccessViewDescForTexture2D(...);
@@ -456,7 +456,7 @@ ResourceViewHandle Device::createResourceView(ResourceHandle resourceHandle, con
 	if (useSRV)
 		d3dDevice->CreateUnorderedAccessView(resource.d3dResource, nullptr, &d3dUAVDesc, D3D12_CPU_DESCRIPTOR_HANDLE{ descriptorPtr });
 
-	return composeResourceViewHandle(viewIndex);
+	return composeShaderResourceViewHandle(viewIndex);
 }
 
 RenderTargetViewHandle Device::createRenderTargetView(ResourceHandle textureHandle)
@@ -498,25 +498,24 @@ DescriptorAddress Device::allocateDescriptors(uint32 count)
 	return composeDescriptorAddress(startIndex);
 }
 
-BindingLayoutHandle Device::createBindingLayout(const void* compiledData, uint32 compiledDataLength)
+PipelineLayoutHandle Device::createPipelineLayout(const void* compiledData, uint32 compiledDataLength)
 {
-	const sint32 bindingLayoutIndex = bindingLayoutsTableAllocationMask.findFirstZeroAndSet();
-	XEMasterAssert(bindingLayoutIndex >= 0);
+	const sint32 pipelineLayoutIndex = pipelineLayoutsTableAllocationMask.findFirstZeroAndSet();
+	XEMasterAssert(pipelineLayoutIndex >= 0);
 
-	BindingLayout& bindingLayout = bindingLayoutsTable[bindingLayoutIndex];
+	PipelineLayout& pipelineLayout = pipelineLayoutsTable[pipelineLayoutIndex];
 
 	const byte* compiledDataBytes = (const byte*)compiledData;
 
-	XEMasterAssert(compiledDataLength > sizeof(BinaryFormat::BindingLayoutBlobHeader));
-	const BinaryFormat::BindingLayoutBlobHeader& header =
-		*(const BinaryFormat::BindingLayoutBlobHeader*)compiledDataBytes;
+	XEMasterAssert(compiledDataLength > sizeof(BinaryFormat::PipelineLayoutHeader));
+	const BinaryFormat::PipelineLayoutHeader& header = *(const BinaryFormat::PipelineLayoutHeader*)compiledDataBytes;
 
-	XEMasterAssert(header.signature == BinaryFormat::BindingLayoutBlobSignature);
-	XEMasterAssert(header.version == BinaryFormat::BindingLayoutBlobCurrentVerstion);
+	XEMasterAssert(header.signature == BinaryFormat::PipelineLayoutBlobSignature);
+	XEMasterAssert(header.version == BinaryFormat::PipelineLayoutBlobCurrentVerstion);
 	XEMasterAssert(header.thisBlobSize == compiledDataLength);
 
 	XEMasterAssert(header.bindPointCount > 0);
-	XEMasterAssert(header.bindPointCount <= MaxRootBindPointCount);
+	XEMasterAssert(header.bindPointCount <= MaxPipelineBindPointCount);
 	const uint8 bindPointsLUTSizeLog2 = uint8(32 - countLeadingZeros32(header.bindPointCount));
 	const uint8 bindPointsLUTSize = 1 << bindPointsLUTSizeLog2;
 
@@ -524,35 +523,35 @@ BindingLayoutHandle Device::createBindingLayout(const void* compiledData, uint32
 	const uint8 bindPointsLUTKeyShift = header.bindPointsLUTKeyShift;
 	const uint8 bindPointsLUTKeyAndMask = bindPointsLUTSize - 1;
 
-	bindingLayout.bindPointsLUTKeyShift = bindPointsLUTKeyShift;
-	bindingLayout.bindPointsLUTKeyAndMask = bindPointsLUTKeyAndMask;
+	pipelineLayout.bindPointsLUTKeyShift = bindPointsLUTKeyShift;
+	pipelineLayout.bindPointsLUTKeyAndMask = bindPointsLUTKeyAndMask;
 
-	const BinaryFormat::RootBindPointRecord* bindPoints =
-		(const BinaryFormat::RootBindPointRecord*)(compiledDataBytes + sizeof(BinaryFormat::BindingLayoutBlobHeader));
+	const BinaryFormat::PipelineBindPointRecord* bindPoints =
+		(const BinaryFormat::PipelineBindPointRecord*)(compiledDataBytes + sizeof(BinaryFormat::PipelineLayoutHeader));
 
 	for (uint8 i = 0; i < header.bindPointCount; i++)
 	{
-		const BinaryFormat::RootBindPointRecord& bindPoint = bindPoints[i];
+		const BinaryFormat::PipelineBindPointRecord& bindPoint = bindPoints[i];
 		XEMasterAssert(bindPoint.bindPointNameHash);
 		const uint8 lutIndex = (bindPoint.bindPointNameHash >> bindPointsLUTKeyShift) & bindPointsLUTKeyAndMask;
 
-		XEMasterAssert(!bindingLayout.bindPointsLUT[lutIndex]); // Check collision
-		bindingLayout.bindPointsLUT[lutIndex] = ...;
+		XEMasterAssert(!pipelineLayout.bindPointsLUT[lutIndex]); // Check collision
+		pipelineLayout.bindPointsLUT[lutIndex] = ...;
 	}
 
 	const uint32 headerAndBindPointsLength =
-		sizeof(BinaryFormat::BindingLayoutBlobHeader) +
-		sizeof(BinaryFormat::RootBindPointRecord) * header.bindPointCount;
+		sizeof(BinaryFormat::PipelineLayoutHeader) +
+		sizeof(BinaryFormat::PipelineBindPointRecord) * header.bindPointCount;
 	XEMasterAssert(compiledDataLength > headerAndBindPointsLength);
 
 	const void* d3dRootSignatureData = compiledDataBytes + headerAndBindPointsLength;
 	const uint32 d3dRootSignatureSize = compiledDataLength - headerAndBindPointsLength;
 
-	XEAssert(!bindingLayout.d3dRootSignature);
+	XEAssert(!pipelineLayout.d3dRootSignature);
 	d3dDevice->CreateRootSignature(0, d3dRootSignatureData, d3dRootSignatureSize,
-		IID_PPV_ARGS(&bindingLayout.d3dRootSignature));
+		IID_PPV_ARGS(&pipelineLayout.d3dRootSignature));
 
-	return composeBindingLayoutHandle(bindingLayoutIndex);
+	return composePipelineLayoutHandle(pipelineLayoutIndex);
 }
 
 FenceHandle Device::createFence(uint64 initialValue)
@@ -628,9 +627,9 @@ SwapChainHandle Device::createSwapChain(uint16 width, uint16 height, void* hWnd)
 	return composeSwapChainHandle(swapChainIndex);
 }
 
-void Device::writeDescriptor(DescriptorAddress descriptorAddress, ResourceViewHandle resourceViewHandle)
+void Device::writeDescriptor(DescriptorAddress descriptorAddress, ShaderResourceViewHandle srvHandle)
 {
-	const uint32 sourceDescriptorIndex = resolveResourceViewHandle(resourceViewHandle);
+	const uint32 sourceDescriptorIndex = resolveShaderResourceViewHandle(srvHandle);
 	const uint32 destDescriptorIndex = resolveDescriptorAddress(descriptorAddress);
 
 	const uint64 sourcePtr = referenceSRVHeapStartPtr + sourceDescriptorIndex * srvDescriptorSize;
@@ -649,7 +648,7 @@ void Device::submitGraphics(CommandList& commandList, const FenceSignalDesc* fen
 
 	commandList.state = CommandList::State::Executing;
 	commandList.currentPipelineType = PipelineType::Undefined;
-	commandList.currentBindingLayoutHandle = ZeroBindingLayoutHandle;
+	commandList.currentPipelineLayoutHandle = ZeroPipelineLayoutHandle;
 	commandList.bindPointsLUTKeyShift = 0;
 	commandList.bindPointsLUTKeyAndMask = 0;
 	commandList.bindPointsLUT = nullptr;

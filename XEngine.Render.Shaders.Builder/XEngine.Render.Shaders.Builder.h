@@ -3,7 +3,7 @@
 #include <XLib.h>
 #include <XLib.NonCopyable.h>
 
-#include "XEngine.Render.Shaders.Builder.BindingLayoutsList.h"
+#include "XEngine.Render.Shaders.Builder.PipelineLayoutsList.h"
 #include "XEngine.Render.Shaders.Builder.PipelinesList.h"
 #include "XEngine.Render.Shaders.Builder.ShadersList.h"
 #include "XEngine.Render.Shaders.Builder.SourcesCache.h"
@@ -13,7 +13,7 @@ namespace XEngine::Render::Shaders
 	class Builder : public XLib::NonCopyable
 	{
 	private:
-		Builder_::BindingLayoutsList bindingLayoutsList;
+		Builder_::PipelineLayoutsList pipelineLayoutsList;
 		Builder_::PipelinesList pipelinesList;
 		Builder_::ShadersList shadersList;
 		Builder_::SourcesCache sourcesCache;
