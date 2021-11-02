@@ -34,7 +34,7 @@ bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& de
 
 	for (uint32 i = 0; i < desc.bindPointCount; i++)
 	{
-		const RootBindPointDesc& bindPoint = desc.bindPoints[i];
+		const PipelineBindPointDesc& bindPoint = desc.bindPoints[i];
 
 		D3D12_ROOT_PARAMETER1 d3dRootParam = {};
 		// ...

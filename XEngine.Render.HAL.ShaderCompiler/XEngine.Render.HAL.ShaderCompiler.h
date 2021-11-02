@@ -87,8 +87,8 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		CompiledShader* amplificationShader;
 		CompiledShader* meshShader;
 		CompiledShader* pixelShader;
-		TextureFormat renderTargetsFormats[4];
-		TextureFormat depthStencilFormat;
+		TexelFormat renderTargetsFormats[4];
+		TexelFormat depthStencilFormat;
 	};
 	
 	struct ComputePipelineDesc

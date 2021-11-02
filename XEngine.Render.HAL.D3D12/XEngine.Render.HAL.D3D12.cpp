@@ -24,15 +24,52 @@ static inline D3D12_HEAP_TYPE TranslateBufferMemoryTypeToD3D12HeapType(BufferMem
 	XEMasterAssertUnreachableCode();
 }
 
-static inline DXGI_FORMAT TranslateTextureFormatToDXGIFormat(TextureFormat format)
+static inline DXGI_FORMAT TranslateTextureFormatToDXGIFormat(TexelFormat format)
 {
 	switch (format)
 	{
-		case TextureFormat::Undefined:		return DXGI_FORMAT_UNKNOWN;
-		case TextureFormat::R8G8B8A8_UNORM:	return DXGI_FORMAT_R8G8B8A8_UNORM;
+		case TexelFormat::Undefined:		return DXGI_FORMAT_UNKNOWN;
+		case TexelFormat::R8G8B8A8_UNORM:	return DXGI_FORMAT_R8G8B8A8_UNORM;
 	}
 
 	XEMasterAssertUnreachableCode();
+}
+
+static inline D3D12_RESOURCE_STATES TranslateResourceStateToD3D12ResourceState(ResourceState state)
+{
+	if (state.isMutable())
+	{
+		switch (state.getMutable())
+		{
+			case ResourceMutableState::RenderTarget:	return D3D12_RESOURCE_STATE_RENDER_TARGET;
+			case ResourceMutableState::DepthWrite:		return D3D12_RESOURCE_STATE_DEPTH_WRITE;
+			case ResourceMutableState::ShaderReadWrite:	return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+			case ResourceMutableState::CopyDestination:	return D3D12_RESOURCE_STATE_COPY_DEST;
+		}
+		return D3D12_RESOURCE_STATE_COMMON;
+	}
+	else
+	{
+		const ResourceImmutableState immutableState = state.getImmutable();
+		D3D12_RESOURCE_STATES d3dResultStates = D3D12_RESOURCE_STATES(0);
+		if (immutableState.vertexBuffer)
+			d3dResultStates |= D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+		if (immutableState.indexBuffer)
+			d3dResultStates |= D3D12_RESOURCE_STATE_INDEX_BUFFER;
+		if (immutableState.constantBuffer)
+			d3dResultStates |= D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+		if (immutableState.pixelShaderRead)
+			d3dResultStates |= D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		if (immutableState.nonPixelShaderRead)
+			d3dResultStates |= D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+		if (immutableState.depthRead)
+			d3dResultStates |= D3D12_RESOURCE_STATE_DEPTH_READ;
+		if (immutableState.indirectArgument)
+			d3dResultStates |= D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
+		if (immutableState.copySource)
+			d3dResultStates |= D3D12_RESOURCE_STATE_COPY_SOURCE;
+		return d3dResultStates;
+	}
 }
 
 // CommandList /////////////////////////////////////////////////////////////////////////////////////
@@ -261,6 +298,22 @@ void CommandList::dispatch(uint32 groupCountX, uint32 groupCountY, uint32 groupC
 	d3dCommandList->Dispatch(groupCountX, groupCountY, groupCountZ);
 }
 
+void CommandList::resourceStateTransition(ResourceHandle resourceHandle,
+	ResourceState stateBefore, ResourceState stateAfter)
+{
+	XEAssert(state == State::Recording);
+
+	const Device::Resource& resource = device->resourcesTable[device->resolveResourceHandle(resourceHandle)];
+	XEAssert(resource.d3dResource);
+
+	const D3D12_RESOURCE_BARRIER d3dBarrier =
+		D3D12Helpers::ResourceBarrierTransition(resource.d3dResource,
+			D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+			TranslateResourceStateToD3D12ResourceState(stateBefore),
+			TranslateResourceStateToD3D12ResourceState(stateAfter));
+	d3dCommandList->ResourceBarrier(1, &d3dBarrier);
+}
+
 // Device //////////////////////////////////////////////////////////////////////////////////////////
 
 struct Device::Resource
@@ -379,7 +432,7 @@ ResourceHandle Device::createBuffer(uint32 size, BufferMemoryType memoryType, Bu
 	return composeResourceHandle(resourceIndex);
 }
 
-ResourceHandle Device::createTexture(const TextureDim& dim, TextureFormat format, TextureCreationFlags flags)
+ResourceHandle Device::createTexture(const TextureDim& dim, TexelFormat format, TextureCreationFlags flags)
 {
 	const sint32 resourceIndex = resourcesTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(resourceIndex >= 0);

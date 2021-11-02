@@ -86,6 +86,8 @@ namespace XEngine::Render::HAL
 		Undefined = 0,
 		ReadOnlyBuffer,
 		ReadWriteBuffer,
+		//ReadOnlyTexelBuffer,
+		//ReadWriteTexelBuffer,
 		ReadOnlyTexture1D,
 		ReadWriteTexture1D,
 		ReadOnlyTexture2D,
@@ -119,7 +121,7 @@ namespace XEngine::Render::HAL
 		ReadWrite,
 	};
 
-	struct ResourceImmutableStateFlags
+	struct ResourceImmutableState
 	{
 		bool vertexBuffer : 1;
 		bool indexBuffer : 1;
@@ -138,6 +140,30 @@ namespace XEngine::Render::HAL
 		DepthWrite,
 		ShaderReadWrite,
 		CopyDestination,
+	};
+
+	class ResourceState
+	{
+		static_assert(sizeof(ResourceImmutableState) <= sizeof(uint16));
+		static_assert(sizeof(ResourceMutableState) <= sizeof(uint16));
+
+	private:
+		union
+		{
+			uint16 rawState;
+			ResourceImmutableState immutableState;
+			ResourceMutableState mutableState;
+		};
+
+	public:
+		ResourceState() = default;
+
+		inline ResourceState(ResourceImmutableState immutalbeState);
+		inline ResourceState(ResourceMutableState mutalbeState);
+
+		inline bool isMutable() const;
+		inline ResourceImmutableState getImmutable() const;
+		inline ResourceMutableState getMutable() const;
 	};
 
 	struct TextureDim
@@ -264,7 +290,7 @@ namespace XEngine::Render::HAL
 
 		void dispatch(uint32 groupCountX, uint32 groupCountY = 1, uint32 groupCountZ = 1);
 
-		void resourceStateTransition(ResourceHandle resourceHandle);
+		void resourceStateTransition(ResourceHandle resourceHandle, ResourceState stateBefore, ResourceState stateAfter);
 
 		void copyFromBufferToBuffer();
 		void copyFromBufferToTexture();
@@ -365,7 +391,7 @@ namespace XEngine::Render::HAL
 		ResourceHandle createBuffer(uint32 size, BufferMemoryType memoryType, BufferCreationFlags flags);
 		void destroyBuffer(ResourceHandle handle);
 
-		ResourceHandle createTexture(const TextureDim& dim, TextureFormat format, TextureCreationFlags flags);
+		ResourceHandle createTexture(const TextureDim& dim, TexelFormat format, TextureCreationFlags flags);
 		void destroyTexture(ResourceHandle handle);
 
 		ShaderResourceViewHandle createShaderResourceView(ResourceHandle resourceHandle, const ShaderResourceViewDesc& viewDesc);

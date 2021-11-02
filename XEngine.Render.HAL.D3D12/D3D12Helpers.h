@@ -52,6 +52,20 @@ namespace D3D12Helpers
 		return desc;
 	}
 
+	inline D3D12_RESOURCE_BARRIER ResourceBarrierTransition(ID3D12Resource* resource, UINT subresource,
+		D3D12_RESOURCE_STATES stateBefore, D3D12_RESOURCE_STATES stateAfter,
+		D3D12_RESOURCE_BARRIER_FLAGS flags = D3D12_RESOURCE_BARRIER_FLAG_NONE)
+	{
+		D3D12_RESOURCE_BARRIER barrier = {};
+		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		barrier.Flags = flags;
+		barrier.Transition.pResource = resource;
+		barrier.Transition.Subresource = subresource;
+		barrier.Transition.StateBefore = stateBefore;
+		barrier.Transition.StateAfter = stateAfter;
+		return barrier;
+	}
+
 	inline D3D12_RESOURCE_DESC ResourceDescForBuffer(UINT64 size,
 		D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE)
 	{
