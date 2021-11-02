@@ -148,9 +148,12 @@ namespace XEngine::Render::HAL
 		static_assert(sizeof(ResourceMutableState) <= sizeof(uint16));
 
 	private:
+		static constexpr uint16 MutableFlag = 0x8000;
+
+	private:
 		union
 		{
-			uint16 rawState;
+			uint16 rawState = 0;
 			ResourceImmutableState immutableState;
 			ResourceMutableState mutableState;
 		};
@@ -158,12 +161,12 @@ namespace XEngine::Render::HAL
 	public:
 		ResourceState() = default;
 
-		inline ResourceState(ResourceImmutableState immutalbeState);
-		inline ResourceState(ResourceMutableState mutalbeState);
+		inline ResourceState(ResourceImmutableState immutableState);
+		inline ResourceState(ResourceMutableState mutableState);
 
-		inline bool isMutable() const;
-		inline ResourceImmutableState getImmutable() const;
-		inline ResourceMutableState getMutable() const;
+		inline bool isMutable() const { return (rawState & MutableFlag) != 0; }
+		inline ResourceImmutableState getImmutable() const { XEAssert(!isMutable()); return immutableState; }
+		inline ResourceMutableState getMutable() const { XEAssert(isMutable()); return mutableState; }
 	};
 
 	struct TextureDim
@@ -300,8 +303,8 @@ namespace XEngine::Render::HAL
 
 	class Device : public XLib::NonCopyable
 	{
-		friend Host;
 		friend CommandList;
+		friend Host;
 
 	private:
 		static constexpr uint32 MaxResourceCount = 1024;

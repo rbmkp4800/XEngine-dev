@@ -24,7 +24,7 @@ static inline D3D12_HEAP_TYPE TranslateBufferMemoryTypeToD3D12HeapType(BufferMem
 	XEMasterAssertUnreachableCode();
 }
 
-static inline DXGI_FORMAT TranslateTextureFormatToDXGIFormat(TexelFormat format)
+static inline DXGI_FORMAT TranslateTexelFormatToDXGIFormat(TexelFormat format)
 {
 	switch (format)
 	{
@@ -443,7 +443,7 @@ ResourceHandle Device::createTexture(const TextureDim& dim, TexelFormat format, 
 	resource.type = ResourceType::Texture;
 	resource.internalOwnership = false;
 
-	const DXGI_FORMAT dxgiFormat = TranslateTextureFormatToDXGIFormat(format);
+	const DXGI_FORMAT dxgiFormat = TranslateTexelFormatToDXGIFormat(format);
 	const D3D12_HEAP_PROPERTIES d3dHeapProps = D3D12Helpers::HeapProperties(D3D12_HEAP_TYPE_DEFAULT);
 
 	D3D12_RESOURCE_FLAGS d3dResourceFlags = D3D12_RESOURCE_FLAG_NONE;
