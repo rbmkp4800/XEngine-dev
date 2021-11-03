@@ -11,6 +11,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 	class CompiledPipelineLayout;
 	class CompiledShader;
 	class CompiledPipeline;
+	class Host;
 
 	enum class Platform : uint8
 	{
@@ -96,39 +97,102 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		CompiledShader* computeShader;
 	};
 
+	struct DataView
+	{
+		const void* data;
+		uint32 size;
+	};
+
+	namespace Internal
+	{
+		class SharedDataBufferRef : public XLib::NonCopyable
+		{
+		private:
+			struct Header
+			{
+				uint32 referenceCount;
+				uint32 dataSize;
+			};
+
+		private:
+			Header* block = nullptr;
+
+		public:
+			SharedDataBufferRef() = default;
+			inline ~SharedDataBufferRef() { release(); }
+
+			void allocate(const DataView* segments, uint32 segmentCount);
+
+			SharedDataBufferRef addReference();
+			void release();
+
+			inline bool isValid() const { return block != nullptr; }
+		};
+	}
+
 	class CompiledDescriptorBundleLayout : public XLib::NonCopyable
 	{
+		friend Host;
+
 	private:
+		Internal::SharedDataBufferRef dataBuffer;
 
 	public:
-		const void* getBinaryBlobData() const;
-		uint32 getBinaryBlobSize() const;
+		CompiledDescriptorBundleLayout() = default;
+		~CompiledDescriptorBundleLayout() = default;
+
+		inline bool isInitialized() const;
+		inline DataView getData() const;
 	};
 
 	class CompiledPipelineLayout : public XLib::NonCopyable
 	{
+		friend Host;
+
 	private:
+		Internal::SharedDataBufferRef dataBuffer;
 
 	public:
-		const void* getBinaryBlobData() const;
-		uint32 getBinaryBlobSize() const;
+		CompiledPipelineLayout() = default;
+		~CompiledPipelineLayout() = default;
+
+		inline bool isInitialized() const;
+		inline DataView getData() const;
+
+		inline uint32 getBindPointId(uint8 bindPointIndex) const;
 	};
 
 	class CompiledShader : public XLib::NonCopyable
 	{
+		friend Host;
+
 	private:
+		Internal::SharedDataBufferRef dataBuffer;
 
 	public:
-		const void* getBinaryBlobData() const;
-		uint32 getBinaryBlobSize() const;
+		CompiledShader() = default;
+		~CompiledShader() = default;
+
+		inline bool isInitialized() const;
+		inline DataView getData() const;
 	};
 
 	class CompiledPipeline : public XLib::NonCopyable
 	{
+		friend Host;
+
 	private:
+		Internal::SharedDataBufferRef metadataBuffer;
+		Internal::SharedDataBufferRef bytecodeChunksDataBuffers[4];
 
 	public:
+		CompiledPipeline() = default;
+		~CompiledPipeline() = default;
 
+		inline bool isInitialized() const;
+		inline DataView getMetadata() const;
+		inline DataView getBytecodeChunkData(uint8 bytecodeChunkIndex) const;
+		inline uint8 getBytecodeChunkCount() const;
 	};
 
 	class Host abstract final

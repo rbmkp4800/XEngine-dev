@@ -5,10 +5,13 @@
 #include <XLib.Containers.ArrayList.h>
 #include <XLib.Platform.COMPtr.h>
 
+#include <XEngine.Render.HAL.BinaryFormat.h>
+
 #include "XEngine.Render.HAL.ShaderCompiler.h"
 
 using namespace XLib;
 using namespace XLib::Platform;
+using namespace XEngine::Render::HAL;
 using namespace XEngine::Render::HAL::ShaderCompiler;
 
 namespace
@@ -30,7 +33,10 @@ HRESULT __stdcall ::DXCIncludeHandler::LoadSource(LPCWSTR pFilename, IDxcBlob** 
 
 bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& desc, CompiledPipelineLayout& result)
 {
-	InplaceArrayList<D3D12_ROOT_PARAMETER1, 32> d3dRootParamsList;
+	if (desc.bindPointCount >= MaxPipelineBindPointCount)
+		return false;
+
+	InplaceArrayList<D3D12_ROOT_PARAMETER1, MaxPipelineBindPointCount> d3dRootParamsList;
 
 	for (uint32 i = 0; i < desc.bindPointCount; i++)
 	{
@@ -49,6 +55,13 @@ bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& de
 
 	COMPtr<ID3DBlob> d3dRootSignature, d3dError;
 	D3D12SerializeVersionedRootSignature(&d3dRootSignatureDesc, d3dRootSignature.initRef(), d3dError.initRef());
+
+	BinaryFormat::PipelineLayoutHeader header = {};
+
+	result.dataBuffer.release();
+	result.dataBuffer.allocate(...);
+
+	return true;
 }
 
 bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& compiledPipelineLayout,

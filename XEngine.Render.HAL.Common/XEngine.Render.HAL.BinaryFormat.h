@@ -25,7 +25,7 @@ namespace XEngine::Render::HAL::BinaryFormat
 		uint16 _padding0;
 	};
 
-	struct PipelinePartHeader
+	struct PipelineBytecodeChunkHeader
 	{
 
 	};
