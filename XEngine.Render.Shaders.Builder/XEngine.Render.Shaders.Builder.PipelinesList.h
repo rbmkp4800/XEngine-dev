@@ -36,7 +36,7 @@ namespace XEngine::Render::Shaders::Builder_
 		ShaderRef vs;
 		ShaderRef ps;
 
-		XLib::InplaceArrayList<HAL::ShaderCompiler::BinaryBlob*, 8, uint8> compiledBlobs;
+		HAL::ShaderCompiler::CompiledPipeline compiledPipeline;
 
 	private:
 		Pipeline() = default;
@@ -44,7 +44,7 @@ namespace XEngine::Render::Shaders::Builder_
 
 	public:
 		inline uint64 getNameCRC() const;
-		inline XLib::ArrayView<HAL::ShaderCompiler::BinaryBlob*> getCompiledBinaryBlobs() const;
+		inline const HAL::ShaderCompiler::CompiledPipeline& getCompiled() const { return compiledPipeline; }
 	};
 
 	class PipelinesList : public XLib::NonCopyable

@@ -25,8 +25,8 @@ namespace XEngine::Render::Shaders::PackFile
 		uint16 platformFlags;
 		uint16 pipelineLayoutCount;
 		uint16 pipelineCount;
-		uint32 pipelineBinaryBlobsMapSize;
-		uint32 binaryBlobCount;
+		uint32 pipelineBytecodeObjectsMapSize;
+		uint32 objectCount;
 	};
 
 	struct PipelineDesc

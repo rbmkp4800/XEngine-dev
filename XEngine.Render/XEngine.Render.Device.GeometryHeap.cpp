@@ -1,4 +1,3 @@
-#include <XLib.Memory.h>
 #include <XLib.SystemHeapAllocator.h>
 
 #include "XEngine.Render.Device.h"

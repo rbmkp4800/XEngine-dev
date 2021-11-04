@@ -23,14 +23,14 @@ namespace XEngine::Render::Shaders::Builder_
 		XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
 
 		XLib::InplaceString<63, uint8> name;
-		HAL::ShaderCompiler::CompiledPipelineLayout compilationResult;
+		HAL::ShaderCompiler::CompiledPipelineLayout compiledPipelineLayout;
 
 	private:
 		PipelineLayout() = default;
 		~PipelineLayout() = default;
 
 	public:
-		inline const HAL::ShaderCompiler::CompiledPipelineLayout& getCompiled() const { return compilationResult; }
+		inline const HAL::ShaderCompiler::CompiledPipelineLayout& getCompiled() const { return compiledPipelineLayout; }
 	};
 
 	class PipelineLayoutsList : public XLib::NonCopyable

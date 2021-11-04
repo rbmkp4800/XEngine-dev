@@ -1,7 +1,6 @@
 #include <d3d12.h>
 
 #include <XLib.Debug.h>
-#include <XLib.Memory.h>
 #include <XLib.Platform.D3D12.Helpers.h>
 
 #include "XEngine.Render.Device.Uploader.h"

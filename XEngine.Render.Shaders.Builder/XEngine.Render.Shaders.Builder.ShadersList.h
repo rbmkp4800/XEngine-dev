@@ -31,7 +31,7 @@ namespace XEngine::Render::Shaders::Builder_
 		EntryPointNameInplaceString entryPointName;
 		SourceDependenciesList sourceDependencies;
 
-		HAL::ShaderCompiler::CompiledShader compilationResult;
+		HAL::ShaderCompiler::CompiledShader compiledShader;
 
 		SourcesCacheEntryId sourceMain = ZeroSourcesCacheEntryId;
 		PipelineLayoutRef pipelineLayout = ZeroPipelineLayoutRef;
@@ -56,7 +56,7 @@ namespace XEngine::Render::Shaders::Builder_
 		inline void setCompilationRequired() { compilationRequired = true; }
 		inline bool isCompilationRequired() const { return compilationRequired; }
 
-		inline const HAL::ShaderCompiler::CompiledShader& getCompiled() const { return compilationResult; }
+		inline const HAL::ShaderCompiler::CompiledShader& getCompiled() const { return compiledShader; }
 
 		static constexpr uintptr EntryPointNameLengthLimit = EntryPointNameInplaceString::GetMaxLength();
 	};

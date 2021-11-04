@@ -207,7 +207,7 @@ namespace XEngine::Render::HAL
 		};
 	};
 
-	struct DataBuffer
+	struct ObjectDataView
 	{
 		const void* data;
 		uint32 size;
@@ -409,19 +409,20 @@ namespace XEngine::Render::HAL
 		DescriptorAddress allocateDescriptors(uint32 count = 1);
 		void releaseDescriptors(DescriptorAddress address);
 
-		DescriptorBundleLayoutHandle createDescriptorBundleLayout(DataBuffer bytecodeBlob);
+		DescriptorBundleLayoutHandle createDescriptorBundleLayout(ObjectDataView objectData);
 		void destroyDescriptorBundleLayout(DescriptorBundleLayoutHandle handle);
 
 		DescriptorBundleHandle createDescriptorBundle(DescriptorBundleLayoutHandle layoutHandle);
 		void destroyDescriptorBundle(DescriptorBundleHandle handle);
 
-		PipelineLayoutHandle createPipelineLayout(const void* compiledData, uint32 compiledDataLength);
+		PipelineLayoutHandle createPipelineLayout(ObjectDataView objectData);
 		void destroyPipelineLayout(PipelineLayoutHandle handle);
 
 		PipelineHandle createGraphicsPipeline(PipelineLayoutHandle pipelineLayoutHandle,
-			uint32 bytecodeBlobCount, const DataBuffer* bytecodeBlobs,
+			ObjectDataView baseObjectData, const ObjectDataView* bytecodeObjectsData, uint8 bytecodeObjectCount,
 			const RasterizerDesc& rasterizerDesc, const BlendDesc& blendDesc);
-		PipelineHandle createComputePipeline(PipelineLayoutHandle pipelineLayoutHandle);
+		PipelineHandle createComputePipeline(PipelineLayoutHandle pipelineLayoutHandle,
+			ObjectDataView baseObjectData, ObjectDataView bytecodeObjectData);
 		void destroyPipeline(PipelineHandle handle);
 
 		FenceHandle createFence(uint64 initialValue);

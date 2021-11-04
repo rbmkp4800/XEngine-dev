@@ -551,21 +551,21 @@ DescriptorAddress Device::allocateDescriptors(uint32 count)
 	return composeDescriptorAddress(startIndex);
 }
 
-PipelineLayoutHandle Device::createPipelineLayout(const void* compiledData, uint32 compiledDataLength)
+PipelineLayoutHandle Device::createPipelineLayout(ObjectDataView objectData)
 {
 	const sint32 pipelineLayoutIndex = pipelineLayoutsTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(pipelineLayoutIndex >= 0);
 
 	PipelineLayout& pipelineLayout = pipelineLayoutsTable[pipelineLayoutIndex];
 
-	const byte* compiledDataBytes = (const byte*)compiledData;
+	const byte* objectDataBytes = (const byte*)objectData.data;
 
-	XEMasterAssert(compiledDataLength > sizeof(BinaryFormat::PipelineLayoutHeader));
-	const ObjectFormat::PipelineLayoutHeader& header = *(const ObjectFormat::PipelineLayoutHeader*)compiledDataBytes;
+	XEMasterAssert(objectData.size > sizeof(ObjectFormat::PipelineLayoutObjectHeader));
+	const ObjectFormat::PipelineLayoutObjectHeader& header = *(const ObjectFormat::PipelineLayoutObjectHeader*)objectDataBytes;
 
-	XEMasterAssert(header.signature == ObjectFormat::PipelineLayoutSignature);
-	XEMasterAssert(header.version == ObjectFormat::PipelineLayoutCurrentVerstion);
-	XEMasterAssert(header.thisBlobSize == compiledDataLength);
+	XEMasterAssert(header.signature == ObjectFormat::PipelineLayoutObjectSignature);
+	XEMasterAssert(header.version == ObjectFormat::PipelineLayoutObjectCurrentVerstion);
+	XEMasterAssert(header.objectSize == objectData.size);
 
 	XEMasterAssert(header.bindPointCount > 0);
 	XEMasterAssert(header.bindPointCount <= MaxPipelineBindPointCount);
@@ -580,7 +580,7 @@ PipelineLayoutHandle Device::createPipelineLayout(const void* compiledData, uint
 	pipelineLayout.bindPointsLUTKeyAndMask = bindPointsLUTKeyAndMask;
 
 	const ObjectFormat::PipelineBindPointRecord* bindPoints =
-		(const ObjectFormat::PipelineBindPointRecord*)(compiledDataBytes + sizeof(ObjectFormat::PipelineLayoutHeader));
+		(const ObjectFormat::PipelineBindPointRecord*)(objectDataBytes + sizeof(ObjectFormat::PipelineLayoutHeader));
 
 	for (uint8 i = 0; i < header.bindPointCount; i++)
 	{
@@ -593,12 +593,12 @@ PipelineLayoutHandle Device::createPipelineLayout(const void* compiledData, uint
 	}
 
 	const uint32 headerAndBindPointsLength =
-		sizeof(ObjectFormat::PipelineLayoutHeader) +
-		sizeof(ObjectFormat::PipelineBindPointRecord) * header.bindPointCount;
-	XEMasterAssert(compiledDataLength > headerAndBindPointsLength);
+		sizeof(ObjectFormat::PipelineLayoutObjectHeader) +
+		sizeof(BindPointId) * header.bindPointCount;
+	XEMasterAssert(objectData.size > headerAndBindPointsLength);
 
-	const void* d3dRootSignatureData = compiledDataBytes + headerAndBindPointsLength;
-	const uint32 d3dRootSignatureSize = compiledDataLength - headerAndBindPointsLength;
+	const void* d3dRootSignatureData = objectDataBytes + headerAndBindPointsLength;
+	const uint32 d3dRootSignatureSize = objectData.size - headerAndBindPointsLength;
 
 	XEAssert(!pipelineLayout.d3dRootSignature);
 	d3dDevice->CreateRootSignature(0, d3dRootSignatureData, d3dRootSignatureSize,

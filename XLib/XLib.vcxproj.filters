@@ -2,7 +2,6 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClInclude Include="Source\XLib.NonCopyable.h" />
-    <ClInclude Include="Source\XLib.Memory.h" />
     <ClInclude Include="Source\XLib.Random.h" />
     <ClInclude Include="Source\XLib.h" />
     <ClInclude Include="Source\XLib.System.Timer.h">
@@ -132,7 +131,6 @@
     <ClInclude Include="Source\XLib.Containers.BitSet.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Source\XLib.Memory.cpp" />
     <ClCompile Include="Source\XLib.Random.cpp" />
     <ClCompile Include="Source\XLib.System.Timer.cpp">
       <Filter>System</Filter>

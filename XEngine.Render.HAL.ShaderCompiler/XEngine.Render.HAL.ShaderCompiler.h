@@ -54,18 +54,28 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		RaytracingAccelerationStructure,
 	};
 
+	enum class PipelineBindPointShaderVisibility : uint8
+	{
+		All = 0,
+		Vertex,
+		Amplification,
+		Mesh,
+		Pixel,
+	};
+
 	struct PipelineBindPointDesc
 	{
-		const char* name;
 		PipelineBindPointType type;
-		uint8 shaderVisibility;
-		uint8 constantCount;
-		const CompiledDescriptorBundleLayout* descriptorBundleLayout;
+		PipelineBindPointShaderVisibility shaderVisibility;
+		union
+		{
+			uint8 constantsSize32bitValues;
+			const CompiledDescriptorBundleLayout* descriptorBundleLayout;
+		};
 	};
 
 	struct DescriptorBindPointDesc
 	{
-		const char* name;
 		DescriptorBindPointType type;
 	};
 
@@ -121,7 +131,9 @@ namespace XEngine::Render::HAL::ShaderCompiler
 			SharedDataBufferRef() = default;
 			inline ~SharedDataBufferRef() { release(); }
 
-			void allocate(const DataView* segments, uint32 segmentCount);
+			void allocate(uint32 size);
+
+			void* getMutablePointer();
 
 			SharedDataBufferRef addReference();
 			void release();

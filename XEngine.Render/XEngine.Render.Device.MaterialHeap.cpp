@@ -2,7 +2,6 @@
 
 #include "D3D12Helpers.h"
 
-#include <XLib.Memory.h>
 #include <XLib.Platform.D3D12.Helpers.h>
 
 #include "XEngine.Render.Device.MaterialHeap.h"

@@ -51,7 +51,6 @@
     <ClInclude Include="Source\XLib.Math.Matrix4x4.h" />
     <ClInclude Include="Source\XLib.NonCopyable.h" />
     <ClInclude Include="Source\XLib.Math.h" />
-    <ClInclude Include="Source\XLib.Memory.h" />
     <ClInclude Include="Source\XLib.Random.h" />
     <ClInclude Include="Source\XLib.String.h" />
     <ClInclude Include="Source\XLib.StringWriter.h" />
@@ -84,7 +83,6 @@
     <ClCompile Include="Source\XLib.Program.cpp" />
     <ClCompile Include="Source\XLib.SystemHeapAllocator.cpp" />
     <ClCompile Include="Source\XLib.Math.cpp" />
-    <ClCompile Include="Source\XLib.Memory.cpp" />
     <ClCompile Include="Source\XLib.Random.cpp" />
     <ClCompile Include="Source\XLib.String.cpp" />
     <ClCompile Include="Source\XLib.StringWriter.cpp" />

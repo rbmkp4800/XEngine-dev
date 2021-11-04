@@ -2,7 +2,6 @@
 
 #include <XLib.Math.Matrix3x4.h>
 #include <XLib.Math.Matrix4x4.h>
-#include <XLib.Memory.h>
 #include <XLib.Platform.D3D12.Helpers.h>
 
 #include "XEngine.Render.Scene.h"

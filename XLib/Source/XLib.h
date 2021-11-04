@@ -120,6 +120,19 @@ uint8 countLeadingZeros64(uint64 value);
 uint8 countTrailingZeros32(uint32 value);
 uint8 countTrailingZeros64(uint64 value);
 
+// Memory utils ////////////////////////////////////////////////////////////////////////////////
+
+namespace XLib
+{
+	class Memory abstract final
+	{
+	public:
+		static void Set(void* memory, byte value, uintptr size);
+		static void Copy(void* destination, const void* source, uintptr size);
+		static void Move(void* destination, const void* source, uintptr size);
+	};
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////
 // TODO:
 

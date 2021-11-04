@@ -1,7 +1,5 @@
 #include "XEngine.ThreadPoolUtils.h"
 
-#include <XLib.Memory.h>
-
 #include "XEngine.ThreadPool.h"
 
 using namespace XLib;

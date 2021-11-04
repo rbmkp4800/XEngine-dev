@@ -3,7 +3,6 @@
 #include "XLib.h"
 #include "XLib.NonCopyable.h"
 #include "XLib.Delegate.h"
-#include "XLib.Memory.h"
 
 namespace XLib
 {
