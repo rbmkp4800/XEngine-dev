@@ -5,7 +5,7 @@
 #include <XLib.Containers.ArrayList.h>
 #include <XLib.Platform.COMPtr.h>
 
-#include <XEngine.Render.HAL.BinaryFormat.h>
+#include <XEngine.Render.HAL.ObjectFormat.h>
 
 #include "XEngine.Render.HAL.ShaderCompiler.h"
 
@@ -56,10 +56,10 @@ bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& de
 	COMPtr<ID3DBlob> d3dRootSignature, d3dError;
 	D3D12SerializeVersionedRootSignature(&d3dRootSignatureDesc, d3dRootSignature.initRef(), d3dError.initRef());
 
-	BinaryFormat::PipelineLayoutHeader header = {};
+	ObjectFormat::PipelineLayoutHeader header = {};
 
-	result.dataBuffer.release();
-	result.dataBuffer.allocate(...);
+	result.objectData.release();
+	result.objectData.allocate(...);
 
 	return true;
 }

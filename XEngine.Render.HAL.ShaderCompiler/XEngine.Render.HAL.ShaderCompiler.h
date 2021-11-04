@@ -135,14 +135,14 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		friend Host;
 
 	private:
-		Internal::SharedDataBufferRef dataBuffer;
+		Internal::SharedDataBufferRef objectData;
 
 	public:
 		CompiledDescriptorBundleLayout() = default;
 		~CompiledDescriptorBundleLayout() = default;
 
 		inline bool isInitialized() const;
-		inline DataView getData() const;
+		inline DataView getObjectData() const;
 	};
 
 	class CompiledPipelineLayout : public XLib::NonCopyable
@@ -150,16 +150,16 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		friend Host;
 
 	private:
-		Internal::SharedDataBufferRef dataBuffer;
+		Internal::SharedDataBufferRef objectData;
 
 	public:
 		CompiledPipelineLayout() = default;
 		~CompiledPipelineLayout() = default;
 
 		inline bool isInitialized() const;
-		inline DataView getData() const;
+		inline DataView getObjectData() const;
 
-		inline uint32 getBindPointId(uint8 bindPointIndex) const;
+		inline BindPointId getBindPointId(uint8 bindPointIndex) const;
 	};
 
 	class CompiledShader : public XLib::NonCopyable
@@ -167,14 +167,14 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		friend Host;
 
 	private:
-		Internal::SharedDataBufferRef dataBuffer;
+		Internal::SharedDataBufferRef objectData;
 
 	public:
 		CompiledShader() = default;
 		~CompiledShader() = default;
 
 		inline bool isInitialized() const;
-		inline DataView getData() const;
+		inline DataView getObjectData() const;
 	};
 
 	class CompiledPipeline : public XLib::NonCopyable
@@ -182,17 +182,17 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		friend Host;
 
 	private:
-		Internal::SharedDataBufferRef metadataBuffer;
-		Internal::SharedDataBufferRef bytecodeChunksDataBuffers[4];
+		Internal::SharedDataBufferRef baseObjectData;
+		Internal::SharedDataBufferRef bytecodeObjectsData[4];
 
 	public:
 		CompiledPipeline() = default;
 		~CompiledPipeline() = default;
 
 		inline bool isInitialized() const;
-		inline DataView getMetadata() const;
-		inline DataView getBytecodeChunkData(uint8 bytecodeChunkIndex) const;
-		inline uint8 getBytecodeChunkCount() const;
+		inline DataView getBaseObjectData() const;
+		inline DataView getBytecodeObjectData(uint8 bytecodeObjectIndex) const;
+		inline uint8 getBytecodeObjectCount() const;
 	};
 
 	class Host abstract final

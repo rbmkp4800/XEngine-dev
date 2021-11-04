@@ -1,7 +1,7 @@
 #include <d3d12.h>
 #include <dxgi1_6.h>
 
-#include <XEngine.Render.HAL.BinaryFormat.h>
+#include <XEngine.Render.HAL.ObjectFormat.h>
 
 #include "D3D12Helpers.h"
 
@@ -561,10 +561,10 @@ PipelineLayoutHandle Device::createPipelineLayout(const void* compiledData, uint
 	const byte* compiledDataBytes = (const byte*)compiledData;
 
 	XEMasterAssert(compiledDataLength > sizeof(BinaryFormat::PipelineLayoutHeader));
-	const BinaryFormat::PipelineLayoutHeader& header = *(const BinaryFormat::PipelineLayoutHeader*)compiledDataBytes;
+	const ObjectFormat::PipelineLayoutHeader& header = *(const ObjectFormat::PipelineLayoutHeader*)compiledDataBytes;
 
-	XEMasterAssert(header.signature == BinaryFormat::PipelineLayoutBlobSignature);
-	XEMasterAssert(header.version == BinaryFormat::PipelineLayoutBlobCurrentVerstion);
+	XEMasterAssert(header.signature == ObjectFormat::PipelineLayoutSignature);
+	XEMasterAssert(header.version == ObjectFormat::PipelineLayoutCurrentVerstion);
 	XEMasterAssert(header.thisBlobSize == compiledDataLength);
 
 	XEMasterAssert(header.bindPointCount > 0);
@@ -579,12 +579,12 @@ PipelineLayoutHandle Device::createPipelineLayout(const void* compiledData, uint
 	pipelineLayout.bindPointsLUTKeyShift = bindPointsLUTKeyShift;
 	pipelineLayout.bindPointsLUTKeyAndMask = bindPointsLUTKeyAndMask;
 
-	const BinaryFormat::PipelineBindPointRecord* bindPoints =
-		(const BinaryFormat::PipelineBindPointRecord*)(compiledDataBytes + sizeof(BinaryFormat::PipelineLayoutHeader));
+	const ObjectFormat::PipelineBindPointRecord* bindPoints =
+		(const ObjectFormat::PipelineBindPointRecord*)(compiledDataBytes + sizeof(ObjectFormat::PipelineLayoutHeader));
 
 	for (uint8 i = 0; i < header.bindPointCount; i++)
 	{
-		const BinaryFormat::PipelineBindPointRecord& bindPoint = bindPoints[i];
+		const ObjectFormat::PipelineBindPointRecord& bindPoint = bindPoints[i];
 		XEMasterAssert(bindPoint.bindPointNameHash);
 		const uint8 lutIndex = (bindPoint.bindPointNameHash >> bindPointsLUTKeyShift) & bindPointsLUTKeyAndMask;
 
@@ -593,8 +593,8 @@ PipelineLayoutHandle Device::createPipelineLayout(const void* compiledData, uint
 	}
 
 	const uint32 headerAndBindPointsLength =
-		sizeof(BinaryFormat::PipelineLayoutHeader) +
-		sizeof(BinaryFormat::PipelineBindPointRecord) * header.bindPointCount;
+		sizeof(ObjectFormat::PipelineLayoutHeader) +
+		sizeof(ObjectFormat::PipelineBindPointRecord) * header.bindPointCount;
 	XEMasterAssert(compiledDataLength > headerAndBindPointsLength);
 
 	const void* d3dRootSignatureData = compiledDataBytes + headerAndBindPointsLength;
