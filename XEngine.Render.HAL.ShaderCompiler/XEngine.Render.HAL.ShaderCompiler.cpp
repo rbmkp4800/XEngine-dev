@@ -60,7 +60,8 @@ SharedDataBufferRef SharedDataBufferRef::createReference()
 
 void SharedDataBufferRef::release()
 {
-	// XEAssert(block);
+	if (!block)
+		return;
 
 	const uint32 newReferenceCount = block->referenceCount.decrement();
 	if (newReferenceCount == 0)

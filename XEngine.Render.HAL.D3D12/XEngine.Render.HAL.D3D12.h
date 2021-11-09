@@ -303,7 +303,7 @@ namespace XEngine::Render::HAL
 
 		void resourceStateTransition(ResourceHandle resourceHandle, ResourceState stateBefore, ResourceState stateAfter);
 
-		void copyFromBufferToBuffer();
+		void copyFromBufferToBuffer(ResourceHandle srcBufferHandle, uint64 srcOffset, ResourceHandle destinationBufferHandle, uint64 destinationOffset, uint64 size);
 		void copyFromBufferToTexture();
 		void copyFromTextureToTexture();
 		void copyFromTextureToBuffer();
@@ -399,7 +399,7 @@ namespace XEngine::Render::HAL
 		Device() = default;
 		~Device() = default;
 
-		ResourceHandle createBuffer(uint32 size, BufferMemoryType memoryType, BufferCreationFlags flags);
+		ResourceHandle createBuffer(uint64 size, BufferMemoryType memoryType, BufferCreationFlags flags);
 		void destroyBuffer(ResourceHandle handle);
 
 		ResourceHandle createTexture(const TextureDim& dim, TexelFormat format, TextureCreationFlags flags);

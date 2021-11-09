@@ -218,7 +218,6 @@ void CommandList::setPipelineLayout(PipelineLayoutHandle pipelineLayoutHandle)
 void CommandList::setPipeline(PipelineHandle pipelineHandle)
 {
 	XEAssert(state == State::Recording);
-	XEAssert(pipelineType == PipelineType::Graphics || pipelineType == PipelineType::Compute);
 
 	const Device::Pipeline& pipeline = device->pipelinesTable[device->resolvePipelineHandle(pipelineHandle)];
 	XEAssert(pipeline.type == currentPipelineType);
@@ -334,6 +333,19 @@ void CommandList::resourceStateTransition(ResourceHandle resourceHandle,
 	d3dCommandList->ResourceBarrier(1, &d3dBarrier);
 }
 
+void CommandList::copyFromBufferToBuffer(ResourceHandle srcBufferHandle, uint64 srcOffset,
+	ResourceHandle destBufferHandle, uint64 destOffset, uint64 size)
+{
+	XEAssert(state == State::Recording);
+
+	const Device::Resource& srcBuffer = device->resourcesTable[device->resolveResourceHandle(srcBufferHandle)];
+	const Device::Resource& destBuffer = device->resourcesTable[device->resolveResourceHandle(destBufferHandle)];
+	XEAssert(srcBuffer.type == ResourceType::Buffer && srcBuffer.d3dResource);
+	XEAssert(destBuffer.type == ResourceType::Buffer && destBuffer.d3dResource);
+
+	d3dCommandList->CopyBufferRegion(destBuffer.d3dResource, destOffset, srcBuffer.d3dResource, srcOffset, size);
+}
+
 // Device //////////////////////////////////////////////////////////////////////////////////////////
 
 struct Device::Resource
@@ -424,7 +436,7 @@ void Device::initialize(IDXGIAdapter4* dxgiAdapter)
 	srvDescriptorSize = uint16(d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
 }
 
-ResourceHandle Device::createBuffer(uint32 size, BufferMemoryType memoryType, BufferCreationFlags flags)
+ResourceHandle Device::createBuffer(uint64 size, BufferMemoryType memoryType, BufferCreationFlags flags)
 {
 	const sint32 resourceIndex = resourcesTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(resourceIndex >= 0);

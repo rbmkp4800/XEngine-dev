@@ -107,6 +107,11 @@ namespace XEngine::Render::HAL::ShaderCompiler
 			SharedDataBufferRef() = default;
 			inline ~SharedDataBufferRef() { release(); }
 
+			inline SharedDataBufferRef(SharedDataBufferRef&& that) { moveFrom(that); }
+			inline void operator = (SharedDataBufferRef&& that) { moveFrom(that); }
+
+			inline void moveFrom(SharedDataBufferRef& that) { release(); block = that.block; that.block = nullptr; }
+
 			SharedDataBufferRef createReference();
 			void release();
 
