@@ -4,10 +4,12 @@ using uint8 = unsigned char;
 using uint16 = unsigned short int;
 using uint32 = unsigned long int;
 using uint64 = unsigned long long int;
+
 using sint8 = signed char;
 using sint16 = signed short int;
 using sint32 = signed long int;
 using sint64 = signed long long int;
+
 using float32 = float;
 using float64 = double;
 

@@ -37,6 +37,8 @@ namespace XEngine::Render::HAL
 	enum class FenceHandle : uint32;
 	enum class SwapChainHandle : uint32;
 
+	enum class PipelineBindPointId : uint32;
+
 	using DescriptorAddress = uint32;
 
 	static constexpr ResourceHandle ZeroResourceHandle = ResourceHandle(0);
@@ -239,14 +241,17 @@ namespace XEngine::Render::HAL
 		uint64 value;
 	};
 
+	namespace Internal
+	{
+		struct PipelineBindPointsLUTEntry;
+	}
+
 	class CommandList : public XLib::NonCopyable
 	{
 		friend Device;
 
 	private:
 		enum class State : uint8;
-
-		struct BindPointDesc;
 
 	private:
 		Device* device = nullptr;
@@ -257,12 +262,10 @@ namespace XEngine::Render::HAL
 		State state = State(0);
 		PipelineType currentPipelineType = PipelineType::Undefined;
 		PipelineLayoutHandle currentPipelineLayoutHandle = ZeroPipelineLayoutHandle;
-		uint8 bindPointsLUTKeyShift = 0;
-		uint8 bindPointsLUTKeyAndMask = 0;
-		const BindPointDesc* bindPointsLUT = nullptr;
+		Internal::PipelineBindPointsLUTEntry* pipelineBindPointsLUTShortcut = nullptr;
 
 	private:
-		BindPointDesc lookupBindPointsLUT(uint32 bindPointNameHash) const;
+		inline Internal::PipelineBindPointsLUTEntry lookupBindPointsLUT(uint32 bindPointNameCRC) const;
 
 	public:
 		CommandList() = default;
@@ -279,8 +282,13 @@ namespace XEngine::Render::HAL
 
 		inline void setRenderTarget(RenderTargetViewHandle rtv, DepthStencilViewHandle dsv = ZeroDepthStencilViewHandle) { setRenderTargets(1, &rtv, dsv); }
 
-		void setPipeline(PipelineType pipelineType, PipelineHandle pipelineHandle);
+		void setPipelineType(PipelineType pipelineType);
+		void setPipelineLayout(PipelineLayoutHandle pipelineLayoutHandle);
+		void setPipeline(PipelineHandle pipelineHandle);
 
+		void bindConstants(PipelineBindPointId bindPointId, const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0);
+
+		void bindConstants(uint32 bindPointNameCRC, const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0);
 		void bindConstants(uint32 bindPointNameCRC, const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0);
 		void bindBuffer(BufferBindType bindType, uint32 bindPointNameCRC, ResourceHandle bufferHandle, uint32 offset = 0);
 		void bindDescriptor(uint32 bindPointNameCRC, DescriptorAddress address);
@@ -436,6 +444,8 @@ namespace XEngine::Render::HAL
 
 		void writeDescriptor(DescriptorAddress descriptorAddress, ShaderResourceViewHandle srvHandle);
 		void writeBundleDescriptor(DescriptorBundleHandle bundle, uint32 bindPointNameCRC, ShaderResourceViewHandle srvHandle);
+
+		PipelineBindPointId getPipelineBindPointId(PipelineLayoutHandle pipelineLayoutHandle, uint64 bindPointNameCRC) const;
 
 		void submitGraphics(CommandList& commandList, const FenceSignalDesc* fenceSignals = nullptr, uint32 fenceSignalCount = 0);
 		void submitAsyncCompute(CommandList& commandList, const FenceSignalDesc* fenceSignals = nullptr, uint32 fenceSignalCount = 0);

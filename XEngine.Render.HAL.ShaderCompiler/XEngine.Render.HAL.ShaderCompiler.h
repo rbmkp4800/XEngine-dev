@@ -32,28 +32,6 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		Pixel,
 	};
 
-	enum class PipelineBindPointType : uint8
-	{
-		Undefined = 0,
-		Constants,
-		ConstantBuffer,
-		ReadOnlyBuffer,
-		ReadWriteBuffer,
-		//Descriptor,
-		//DescriptorBundle,
-		//DescriptorArray,
-	};
-
-	enum class DescriptorBindPointType : uint8
-	{
-		Undefined = 0,
-		ReadOnlyBuffer,
-		ReadWriteBuffer,
-		ReadOnlyTexture2D,
-		ReadWriteTexture2D,
-		RaytracingAccelerationStructure,
-	};
-
 	enum class PipelineBindPointShaderVisibility : uint8
 	{
 		All = 0,
@@ -65,6 +43,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 
 	struct PipelineBindPointDesc
 	{
+		const char* name;
 		PipelineBindPointType type;
 		PipelineBindPointShaderVisibility shaderVisibility;
 		union
@@ -76,7 +55,8 @@ namespace XEngine::Render::HAL::ShaderCompiler
 
 	struct DescriptorBindPointDesc
 	{
-		DescriptorBindPointType type;
+		const char* name;
+		DescriptorType descriptorType;
 	};
 
 	struct PipelineLayoutDesc
@@ -118,27 +98,25 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		class SharedDataBufferRef : public XLib::NonCopyable
 		{
 		private:
-			struct Header
-			{
-				uint32 referenceCount;
-				uint32 dataSize;
-			};
+			struct BlockHeader;
 
 		private:
-			Header* block = nullptr;
+			BlockHeader* block = nullptr;
 
 		public:
 			SharedDataBufferRef() = default;
 			inline ~SharedDataBufferRef() { release(); }
 
-			void allocate(uint32 size);
+			SharedDataBufferRef createReference();
+			void release();
 
 			void* getMutablePointer();
 
-			SharedDataBufferRef addReference();
-			void release();
-
+			DataView getData() const;
 			inline bool isValid() const { return block != nullptr; }
+
+		public:
+			static SharedDataBufferRef AllocateBuffer(uint32 size);
 		};
 	}
 
@@ -153,8 +131,8 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		CompiledDescriptorBundleLayout() = default;
 		~CompiledDescriptorBundleLayout() = default;
 
-		inline bool isInitialized() const;
-		inline DataView getObjectData() const;
+		inline bool isInitialized() const { return objectData.isValid(); }
+		inline DataView getObjectData() const { return objectData.getData(); }
 	};
 
 	class CompiledPipelineLayout : public XLib::NonCopyable
@@ -168,10 +146,8 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		CompiledPipelineLayout() = default;
 		~CompiledPipelineLayout() = default;
 
-		inline bool isInitialized() const;
+		inline bool isInitialized() const { return objectData.isValid(); }
 		inline DataView getObjectData() const;
-
-		inline BindPointId getBindPointId(uint8 bindPointIndex) const;
 	};
 
 	class CompiledShader : public XLib::NonCopyable
@@ -185,8 +161,8 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		CompiledShader() = default;
 		~CompiledShader() = default;
 
-		inline bool isInitialized() const;
-		inline DataView getObjectData() const;
+		inline bool isInitialized() const { return objectData.isValid(); }
+		inline DataView getObjectData() const { return objectData.getData(); }
 	};
 
 	class CompiledPipeline : public XLib::NonCopyable
@@ -201,8 +177,8 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		CompiledPipeline() = default;
 		~CompiledPipeline() = default;
 
-		inline bool isInitialized() const;
-		inline DataView getBaseObjectData() const;
+		inline bool isInitialized() const { return baseObjectData.isValid(); }
+		inline DataView getBaseObjectData() const { return baseObjectData.getData(); }
 		inline DataView getBytecodeObjectData(uint8 bytecodeObjectIndex) const;
 		inline uint8 getBytecodeObjectCount() const;
 	};

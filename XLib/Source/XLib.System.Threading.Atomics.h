@@ -140,4 +140,12 @@ namespace XLib
 
 		inline void busyWait(Type waitValue) { while (value != waitValue) {} }
 	};
+
+	using AtomicU16 = Atomic<uint16>;
+	using AtomicU32 = Atomic<uint32>;
+	using AtomicU64 = Atomic<uint64>;
+
+	using AtomicS16 = Atomic<sint16>;
+	using AtomicS32 = Atomic<sint32>;
+	using AtomicS64 = Atomic<sint64>;
 }

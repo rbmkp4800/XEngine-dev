@@ -98,7 +98,7 @@ namespace XLib
 	template <typename CharType>
 	inline sint32 CompareStrings();
 
-	template <typename CharType>
+	template <typename CharType = char>
 	inline uintptr ComputeCStrLength(const CharType* cstr);
 
 	/*class Strings abstract final

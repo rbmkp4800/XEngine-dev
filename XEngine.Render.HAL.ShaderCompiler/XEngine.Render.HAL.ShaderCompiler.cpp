@@ -3,7 +3,11 @@
 #include <dxcapi.h>
 
 #include <XLib.Containers.ArrayList.h>
+#include <XLib.CRC.h>
 #include <XLib.Platform.COMPtr.h>
+#include <XLib.String.h>
+#include <XLib.SystemHeapAllocator.h>
+#include <XLib.System.Threading.Atomics.h>
 
 #include <XEngine.Render.HAL.ObjectFormat.h>
 
@@ -13,6 +17,7 @@ using namespace XLib;
 using namespace XLib::Platform;
 using namespace XEngine::Render::HAL;
 using namespace XEngine::Render::HAL::ShaderCompiler;
+using namespace XEngine::Render::HAL::ShaderCompiler::Internal;
 
 namespace
 {
@@ -31,44 +36,100 @@ HRESULT __stdcall ::DXCIncludeHandler::LoadSource(LPCWSTR pFilename, IDxcBlob** 
 	return S_FALSE;
 }
 
+struct SharedDataBufferRef::BlockHeader
+{
+	AtomicU32 referenceCount;
+	uint32 dataSize;
+	uint64 _padding;
+};
+
+void* SharedDataBufferRef::getMutablePointer()
+{
+	// XEAssert(!block);
+	return block + 1;
+}
+
+SharedDataBufferRef SharedDataBufferRef::createReference()
+{
+	// XEAssert(block);
+	block->referenceCount.increment();
+	SharedDataBufferRef newReference;
+	newReference.block = block;
+	return newReference;
+}
+
+void SharedDataBufferRef::release()
+{
+	// XEAssert(block);
+
+	const uint32 newReferenceCount = block->referenceCount.decrement();
+	if (newReferenceCount == 0)
+		SystemHeapAllocator::Release(block);
+	block = nullptr;
+}
+
+SharedDataBufferRef SharedDataBufferRef::AllocateBuffer(uint32 size)
+{
+	// XEAssert(size);
+	SharedDataBufferRef reference;
+	reference.block = (BlockHeader*)SystemHeapAllocator::Allocate(sizeof(BlockHeader) + size);
+	reference.block->referenceCount = 1;
+	reference.block->dataSize = size;
+	reference.block->_padding = 0;
+	return reference;
+}
+
 bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& desc, CompiledPipelineLayout& result)
 {
 	if (desc.bindPointCount >= MaxPipelineBindPointCount)
 		return false;
 
 	D3D12_ROOT_PARAMETER1 d3dRootParams[MaxPipelineBindPointCount] = {};
-	BindPointId bindPointIds[MaxPipelineBindPointCount] = {};
+	ObjectFormat::PipelineBindPointRecord bindPointRecords[MaxPipelineBindPointCount] = {};
 
 	uint8 cbvRegisterCount = 0;
 	uint8 srvRegisterCount = 0;
 	uint8 uavRegisterCount = 0;
 
+	uint8 rootParameterCount = 0;
 	for (uint32 i = 0; i < desc.bindPointCount; i++)
 	{
-		const PipelineBindPointDesc& bindPoint = desc.bindPoints[i];
+		const PipelineBindPointDesc& bindPointDesc = desc.bindPoints[i];
+		ObjectFormat::PipelineBindPointRecord& objectBindPointRecord = bindPointRecords[i];
 
-		D3D12_ROOT_PARAMETER1& d3dRootParam = d3dRootParams[i];
+		const uint8 rootParameterIndex = rootParameterCount;
+		rootParameterCount++;
 
-		if  (bindPoint.type == PipelineBindPointType::Constants)
+		// XEAssert(objectBindPointRecord.nameCRC);
+		const uintptr bindPointNameLength = ComputeCStrLength(bindPointDesc.name);
+		const uint32 bindPointNameCRC = CRC32::Compute(bindPointDesc.name, bindPointNameLength);
+
+		objectBindPointRecord.nameCRC = bindPointNameCRC;
+		objectBindPointRecord.type = bindPointDesc.type;
+		objectBindPointRecord.rootParameterIndex = rootParameterIndex;
+		if (bindPointDesc.type == PipelineBindPointType::Constants)
+			objectBindPointRecord.constantsSize32bitValues = bindPointDesc.constantsSize32bitValues;
+
+		D3D12_ROOT_PARAMETER1& d3dRootParam = d3dRootParams[rootParameterIndex];
+
+		if (bindPointDesc.type == PipelineBindPointType::Constants)
 		{
 			d3dRootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
 			d3dRootParam.Constants.ShaderRegister = cbvRegisterCount;
 			d3dRootParam.Constants.RegisterSpace = 0;
-			d3dRootParam.Constants.Num32BitValues = bindPoint.constantsSize32bitValues;
-
+			d3dRootParam.Constants.Num32BitValues = bindPointDesc.constantsSize32bitValues;
 			cbvRegisterCount++;
 		}
-		else if (bindPoint.type == PipelineBindPointType::ConstantBuffer)
+		else if (bindPointDesc.type == PipelineBindPointType::ConstantBuffer)
 		{
 			d3dRootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 			d3dRootParam.Descriptor.ShaderRegister = cbvRegisterCount;
 			d3dRootParam.Descriptor.RegisterSpace = 0;
 			d3dRootParam.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE; // TODO: Data volatility
-
 			cbvRegisterCount++;
 		}
 		else
-			return false;
+			; // XEAssertUnreachableCode();
 
 		d3dRootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL; // TODO: ...
 	}
@@ -76,7 +137,7 @@ bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& de
 	D3D12_VERSIONED_ROOT_SIGNATURE_DESC d3dRootSignatureDesc = {};
 	d3dRootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
 	d3dRootSignatureDesc.Desc_1_1.pParameters = d3dRootParams;
-	d3dRootSignatureDesc.Desc_1_1.NumParameters = desc.bindPointCount;
+	d3dRootSignatureDesc.Desc_1_1.NumParameters = rootParameterCount;
 	d3dRootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
 	// TODO: D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED;
 	// TODO: D3D12_ROOT_SIGNATURE_FLAG_DENY_*_SHADER_ROOT_ACCESS
@@ -85,25 +146,25 @@ bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& de
 	D3D12SerializeVersionedRootSignature(&d3dRootSignatureDesc, d3dRootSignature.initRef(), d3dError.initRef());
 
 	const uint32 headerOffset = 0;
-	const uint32 bindPointIdsOffset = headerOffset + sizeof(ObjectFormat::PipelineLayoutObjectHeader);
-	const uint32 rootSignatureOffset = bindPointIdsOffset + sizeof(BindPointId) * desc.bindPointCount;
+	const uint32 bindPointRecordsOffset = headerOffset + sizeof(ObjectFormat::PipelineLayoutObjectHeader);
+	const uint32 rootSignatureOffset = bindPointRecordsOffset + sizeof(ObjectFormat::PipelineBindPointRecord) * desc.bindPointCount;
 
 	const uint32 objectSize = rootSignatureOffset + d3dRootSignature->GetBufferSize();
 
-	result.objectData.release();
-	result.objectData.allocate(objectSize);
+	result.objectData = SharedDataBufferRef::AllocateBuffer(objectSize);
 	byte* objectDataBytes = (byte*)result.objectData.getMutablePointer();
 
 	ObjectFormat::PipelineLayoutObjectHeader header = {};
 	header.signature = ObjectFormat::PipelineLayoutObjectSignature;
 	header.version = ObjectFormat::PipelineLayoutObjectCurrentVerstion;
 	header.objectSize = objectSize;
-	header.objectHash = 0; // TODO: ...
+	header.objectCRC = 0; // TODO: ...
+
 	header.sourceHash = 0; // TODO: ...
 	header.bindPointCount = desc.bindPointCount;
 
 	Memory::Copy(objectDataBytes + headerOffset, &header, sizeof(ObjectFormat::PipelineLayoutObjectHeader));
-	Memory::Copy(objectDataBytes + bindPointIdsOffset, bindPointIds, sizeof(BindPointId) * desc.bindPointCount);
+	Memory::Copy(objectDataBytes + bindPointRecordsOffset, bindPointRecords, sizeof(ObjectFormat::PipelineBindPointRecord) * desc.bindPointCount);
 	Memory::Copy(objectDataBytes + rootSignatureOffset, d3dRootSignature->GetBufferPointer(), d3dRootSignature->GetBufferSize());
 
 	return true;

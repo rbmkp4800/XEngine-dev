@@ -2,6 +2,8 @@
 
 #include <XLib.h>
 
+#include "XEngine.Render.HAL.Common.h"
+
 namespace XEngine::Render::HAL::ObjectFormat
 {
 	static constexpr uint32 PipelineLayoutObjectSignature = 0;
@@ -18,7 +20,7 @@ namespace XEngine::Render::HAL::ObjectFormat
 		uint32 signature;
 		uint32 version;
 		uint32 objectSize;
-		uint32 objectHash;
+		uint32 objectCRC;
 
 		uint32 sourceHash;
 		uint8 bindPointCount;
@@ -26,12 +28,20 @@ namespace XEngine::Render::HAL::ObjectFormat
 		uint16 _padding1;
 	};
 
+	struct PipelineBindPointRecord
+	{
+		uint32 nameCRC;
+		PipelineBindPointType type;
+		uint8 rootParameterIndex;
+		uint8 constantsSize32bitValues;
+	};
+
 	struct PipelineBaseObjectHeader
 	{
 		uint32 signature;
 		uint32 version;
 		uint32 objectSize;
-		uint32 objectHash;
+		uint32 objectCRC;
 
 	};
 
@@ -40,6 +50,6 @@ namespace XEngine::Render::HAL::ObjectFormat
 		uint32 signature;
 		uint32 version;
 		uint32 objectSize;
-		uint32 objectHash;
+		uint32 objectCRC;
 	};
 }
