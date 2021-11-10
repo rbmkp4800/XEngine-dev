@@ -34,8 +34,8 @@ namespace XEngine::Render::Shaders::PackFile
 		uint64 nameCRC;
 		uint16 pipelineLayoutIndex;
 		PipelineType type;
-		uint8 binaryBlobCount;
-		uint32 binaryBlobsMapOffset;
+		uint8 bytecodeObjectCount;
+		uint32 bytecodeObjectsMapOffset;
 	};
 
 	struct BinaryBlobDesc

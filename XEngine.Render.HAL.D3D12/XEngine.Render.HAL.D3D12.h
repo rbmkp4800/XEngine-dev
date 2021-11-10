@@ -310,7 +310,7 @@ namespace XEngine::Render::HAL
 
 		void resourceStateTransition(ResourceHandle resourceHandle, ResourceState stateBefore, ResourceState stateAfter);
 
-		void copyFromBufferToBuffer(ResourceHandle srcBufferHandle, uint64 srcOffset, ResourceHandle destinationBufferHandle, uint64 destinationOffset, uint64 size);
+		void copyFromBufferToBuffer(ResourceHandle srcBufferHandle, uint64 srcOffset, ResourceHandle destBufferHandle, uint64 destOffset, uint64 size);
 		void copyFromBufferToTexture();
 		void copyFromTextureToTexture();
 		void copyFromTextureToBuffer();
@@ -436,8 +436,7 @@ namespace XEngine::Render::HAL
 		PipelineHandle createGraphicsPipeline(PipelineLayoutHandle pipelineLayoutHandle,
 			ObjectDataView baseObjectData, const ObjectDataView* bytecodeObjectsData, uint8 bytecodeObjectCount,
 			const RasterizerDesc& rasterizerDesc, const DepthStencilDesc& depthStencilDesc, const BlendDesc& blendDesc);
-		PipelineHandle createComputePipeline(PipelineLayoutHandle pipelineLayoutHandle,
-			ObjectDataView baseObjectData, ObjectDataView bytecodeObjectData);
+		PipelineHandle createComputePipeline(PipelineLayoutHandle pipelineLayoutHandle, ObjectDataView bytecodeObjectData);
 		void destroyPipeline(PipelineHandle handle);
 
 		FenceHandle createFence(uint64 initialValue);

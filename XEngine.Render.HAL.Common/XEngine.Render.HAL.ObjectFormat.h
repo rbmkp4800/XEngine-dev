@@ -12,11 +12,13 @@ namespace XEngine::Render::HAL::ObjectFormat
 	static constexpr uint64 GraphicsPipelineBaseObjectSignature = 0;
 	static constexpr uint16 GraphicsPipelineBaseObjectCurrentVerstion = 0;
 
-	static constexpr uint64 ComputePipelineBaseObjectSignature = 0;
-	static constexpr uint16 ComputePipelineBaseObjectCurrentVerstion = 0;
+	static constexpr uint64 GraphicsPipelineBytecodeObjectSignature = 0;
+	static constexpr uint16 GraphicsPipelineBytecodeObjectCurrentVerstion = 0;
 
-	static constexpr uint64 PipelineBytecodeObjectSignature = 0;
-	static constexpr uint16 PipelineBytecodeObjectCurrentVerstion = 0;
+	static constexpr uint64 CopmputePipelineBytecodeObjectSignature = 0;
+	static constexpr uint16 CopmputePipelineBytecodeObjectCurrentVerstion = 0;
+
+	static constexpr uint8 MaxGraphicsPipelineBytecodeObjectCount = 3;
 
 	struct GenericObjectHeader
 	{
@@ -52,22 +54,40 @@ namespace XEngine::Render::HAL::ObjectFormat
 		uint _padding : 4;
 	};
 
-	struct GraphicsPipelineBaseObjectHeader
+	struct GraphicsPipelineBaseObject
 	{
 		GenericObjectHeader generic;
+
+		uint32 pipelineLayoutSourceHash;
+		uint32 bytecodeObjectsCRCs[MaxGraphicsPipelineBytecodeObjectCount];
 
 		TexelFormat renderTargetFormats[4];
 		TexelFormat depthStencilFormat;
 		GraphicsPipelineEnabledShaderStages enabledShaderStages;
+		uint8 _padding0;
+		uint8 _padding1;
 	};
 
-	struct ComputePipelineBaseObjectHeader
+	enum class GraphicsPipelineBytecodeObjectType : uint8
 	{
-		GenericObjectHeader generic;
+		Undefined = 0,
+		VertexShader,
+		AmplificationShader,
+		MeshShader,
+		PixelShader,
 	};
 
-	struct PipelineBytecodeObjectHeader
+	struct GraphicsPipelineBytecodeObjectHeader
 	{
 		GenericObjectHeader generic;
+
+		uint32 baseObjectCRC;
+		GraphicsPipelineBytecodeObjectType objectType;
+	};
+
+	struct ComputePipelineBytecodeObjectHeader
+	{
+		GenericObjectHeader generic;
+		uint32 pipelineLayoutSourceHash;
 	};
 }

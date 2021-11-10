@@ -207,7 +207,7 @@ void Builder::storePackage(const char* packagePath)
 {
 	// NOTE: Binary blobs in package should have deterministic order
 
-	struct PipelineBlobsDeduplicationListItem
+	struct PipelineBytecodeObjectsDeduplicationListItem
 	{
 		BinaryBlob* blob;
 		uint32 blobsMapEntryIndex;
@@ -221,12 +221,12 @@ void Builder::storePackage(const char* packagePath)
 	uint32 pipelineBlobsMapEntryIndexAccum = 0;
 	for (const Pipeline& pipeline : pipelinesList)
 	{
-		const ArrayView<HAL::ShaderCompiler::BinaryBlob*>& pipelineBlobs = pipeline.getCompiledBinaryBlobs();
+		const CompiledPipeline& compiledPipeline = pipeline.getCompiled();
 
 		PackFile::PipelineDesc& serializedPipelineDesc = serializedPipelines.emplaceBack();
 		serializedPipelineDesc.nameCRC = pipeline.getNameCRC();
 		serializedPipelineDesc.pipelineLayoutIndex = ...;
-		serializedPipelineDesc.type = ...;
+		serializedPipelineDesc.type = pipeline.getType();
 		serializedPipelineDesc.binaryBlobCount = pipelineBlobs.getSize();
 		serializedPipelineDesc.binaryBlobsMapOffset = pipelineBlobsMapEntryIndexAccum;
 
