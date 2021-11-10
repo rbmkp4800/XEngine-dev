@@ -6,21 +6,28 @@
 
 namespace XEngine::Render::HAL::ObjectFormat
 {
-	static constexpr uint32 PipelineLayoutObjectSignature = 0;
-	static constexpr uint32 PipelineLayoutObjectCurrentVerstion = 0;
+	static constexpr uint64 PipelineLayoutObjectSignature = 0;
+	static constexpr uint16 PipelineLayoutObjectCurrentVerstion = 0;
 
-	static constexpr uint32 PipelineBaseObjectSignature = 0;
-	static constexpr uint32 PipelineBaseObjectCurrentVerstion = 0;
+	static constexpr uint64 GraphicsPipelineBaseObjectSignature = 0;
+	static constexpr uint16 GraphicsPipelineBaseObjectCurrentVerstion = 0;
 
-	static constexpr uint32 PipelineBytecodeObjectSignature = 0;
-	static constexpr uint32 PipelineBytecodeObjectCurrentVerstion = 0;
+	static constexpr uint64 ComputePipelineBaseObjectSignature = 0;
+	static constexpr uint16 ComputePipelineBaseObjectCurrentVerstion = 0;
+
+	static constexpr uint64 PipelineBytecodeObjectSignature = 0;
+	static constexpr uint16 PipelineBytecodeObjectCurrentVerstion = 0;
+
+	struct GenericObjectHeader
+	{
+		uint64 signature;
+		uint32 objectSize;
+		uint32 objectCRC;
+	};
 
 	struct PipelineLayoutObjectHeader
 	{
-		uint32 signature;
-		uint32 version;
-		uint32 objectSize;
-		uint32 objectCRC;
+		GenericObjectHeader generic;
 
 		uint32 sourceHash;
 		uint8 bindPointCount;
@@ -36,20 +43,31 @@ namespace XEngine::Render::HAL::ObjectFormat
 		uint8 constantsSize32bitValues;
 	};
 
-	struct PipelineBaseObjectHeader
+	struct GraphicsPipelineEnabledShaderStages
 	{
-		uint32 signature;
-		uint32 version;
-		uint32 objectSize;
-		uint32 objectCRC;
+		bool vertex : 1;
+		bool amplification : 1;
+		bool mesh : 1;
+		bool pixel : 1;
+		uint _padding : 4;
+	};
 
+	struct GraphicsPipelineBaseObjectHeader
+	{
+		GenericObjectHeader generic;
+
+		TexelFormat renderTargetFormats[4];
+		TexelFormat depthStencilFormat;
+		GraphicsPipelineEnabledShaderStages enabledShaderStages;
+	};
+
+	struct ComputePipelineBaseObjectHeader
+	{
+		GenericObjectHeader generic;
 	};
 
 	struct PipelineBytecodeObjectHeader
 	{
-		uint32 signature;
-		uint32 version;
-		uint32 objectSize;
-		uint32 objectCRC;
+		GenericObjectHeader generic;
 	};
 }

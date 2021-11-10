@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\XLib.AllocatorAdapterBase.h" />
+    <ClInclude Include="Source\XLib.ByteStream.h" />
     <ClInclude Include="Source\XLib.Color.h" />
     <ClInclude Include="Source\XLib.Containers.BitSet.h" />
     <ClInclude Include="Source\XLib.Containers.FlatHashMap.h" />
@@ -43,7 +44,6 @@
     <ClInclude Include="Source\XLib.PoolAllocator.h" />
     <ClInclude Include="Source\XLib.Program.h" />
     <ClInclude Include="Source\XLib.Containers.Set.h" />
-    <ClInclude Include="Source\XLib.Float.Consts.h" />
     <ClInclude Include="Source\XLib.Float.Conversion.h" />
     <ClInclude Include="Source\XLib.SystemHeapAllocator.h" />
     <ClInclude Include="Source\XLib.Containers.ArrayList.h" />

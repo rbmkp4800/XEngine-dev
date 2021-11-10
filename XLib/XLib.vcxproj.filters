@@ -26,7 +26,6 @@
       <Filter>System\Threading</Filter>
     </ClInclude>
     <ClInclude Include="Source\XLib.Float.Conversion.h" />
-    <ClInclude Include="Source\XLib.Float.Consts.h" />
     <ClInclude Include="Source\XLib.System.AsyncIO.h">
       <Filter>System</Filter>
     </ClInclude>
@@ -129,6 +128,7 @@
     </ClInclude>
     <ClInclude Include="Source\XLib.JSON.h" />
     <ClInclude Include="Source\XLib.Containers.BitSet.h" />
+    <ClInclude Include="Source\XLib.ByteStream.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\XLib.Random.cpp" />

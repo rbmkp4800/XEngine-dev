@@ -220,6 +220,13 @@ namespace XEngine::Render::HAL
 
 	};
 
+	struct DepthStencilDesc
+	{
+		bool enableDepthRead;
+		bool enableDepthWrite;
+		// depthComparisonFunc;
+	};
+
 	struct BlendDesc
 	{
 
@@ -428,7 +435,7 @@ namespace XEngine::Render::HAL
 
 		PipelineHandle createGraphicsPipeline(PipelineLayoutHandle pipelineLayoutHandle,
 			ObjectDataView baseObjectData, const ObjectDataView* bytecodeObjectsData, uint8 bytecodeObjectCount,
-			const RasterizerDesc& rasterizerDesc, const BlendDesc& blendDesc);
+			const RasterizerDesc& rasterizerDesc, const DepthStencilDesc& depthStencilDesc, const BlendDesc& blendDesc);
 		PipelineHandle createComputePipeline(PipelineLayoutHandle pipelineLayoutHandle,
 			ObjectDataView baseObjectData, ObjectDataView bytecodeObjectData);
 		void destroyPipeline(PipelineHandle handle);
