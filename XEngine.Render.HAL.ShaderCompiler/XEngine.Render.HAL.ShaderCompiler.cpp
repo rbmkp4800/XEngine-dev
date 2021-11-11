@@ -1,40 +1,25 @@
 #include <d3d12.h>
 //#include <d3d12shader.h>
 #include <dxcapi.h>
+#include <wrl/client.h>
 
 #include <XLib.Containers.ArrayList.h>
 #include <XLib.CRC.h>
-#include <XLib.Platform.COMPtr.h>
 #include <XLib.String.h>
 #include <XLib.SystemHeapAllocator.h>
 #include <XLib.System.Threading.Atomics.h>
+#include <XLib.Text.h>
 
 #include <XEngine.Render.HAL.ObjectFormat.h>
 
 #include "XEngine.Render.HAL.ShaderCompiler.h"
 
+using namespace Microsoft::WRL;
 using namespace XLib;
-using namespace XLib::Platform;
 using namespace XEngine::Render::HAL;
+using namespace XEngine::Render::HAL::ObjectFormat;
 using namespace XEngine::Render::HAL::ShaderCompiler;
 using namespace XEngine::Render::HAL::ShaderCompiler::Internal;
-
-namespace
-{
-	struct DXCIncludeHandler : public IDxcIncludeHandler
-	{
-		virtual HRESULT __stdcall LoadSource(LPCWSTR pFilename, IDxcBlob** ppIncludeSource) override;
-
-		virtual HRESULT __stdcall QueryInterface(REFIID riid, void** ppvObject) override { return E_NOINTERFACE; }
-		virtual ULONG __stdcall AddRef() override { return 1; }
-		virtual ULONG __stdcall Release() override { return 1; }
-	};
-}
-
-HRESULT __stdcall ::DXCIncludeHandler::LoadSource(LPCWSTR pFilename, IDxcBlob** ppIncludeSource)
-{
-	return S_FALSE;
-}
 
 struct SharedDataBufferRef::BlockHeader
 {
@@ -86,7 +71,7 @@ bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& de
 		return false;
 
 	D3D12_ROOT_PARAMETER1 d3dRootParams[MaxPipelineBindPointCount] = {};
-	ObjectFormat::PipelineBindPointRecord bindPointRecords[MaxPipelineBindPointCount] = {};
+	PipelineBindPointRecord bindPointRecords[MaxPipelineBindPointCount] = {};
 
 	uint8 cbvRegisterCount = 0;
 	uint8 srvRegisterCount = 0;
@@ -96,7 +81,7 @@ bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& de
 	for (uint32 i = 0; i < desc.bindPointCount; i++)
 	{
 		const PipelineBindPointDesc& bindPointDesc = desc.bindPoints[i];
-		ObjectFormat::PipelineBindPointRecord& objectBindPointRecord = bindPointRecords[i];
+		PipelineBindPointRecord& objectBindPointRecord = bindPointRecords[i];
 
 		const uint8 rootParameterIndex = rootParameterCount;
 		rootParameterCount++;
@@ -143,30 +128,33 @@ bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& de
 	// TODO: D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED;
 	// TODO: D3D12_ROOT_SIGNATURE_FLAG_DENY_*_SHADER_ROOT_ACCESS
 
-	COMPtr<ID3DBlob> d3dRootSignature, d3dError;
-	D3D12SerializeVersionedRootSignature(&d3dRootSignatureDesc, d3dRootSignature.initRef(), d3dError.initRef());
+	ComPtr<ID3DBlob> d3dRootSignature;
+	ComPtr<ID3DBlob> d3dError;
+	D3D12SerializeVersionedRootSignature(&d3dRootSignatureDesc, &d3dRootSignature, &d3dError);
+
+	// Compose compiled object
 
 	const uint32 headerOffset = 0;
-	const uint32 bindPointRecordsOffset = headerOffset + sizeof(ObjectFormat::PipelineLayoutObjectHeader);
-	const uint32 rootSignatureOffset = bindPointRecordsOffset + sizeof(ObjectFormat::PipelineBindPointRecord) * desc.bindPointCount;
-
+	const uint32 bindPointRecordsOffset = headerOffset + sizeof(PipelineLayoutObjectHeader);
+	const uint32 rootSignatureOffset = bindPointRecordsOffset + sizeof(PipelineBindPointRecord) * desc.bindPointCount;
 	const uint32 objectSize = rootSignatureOffset + d3dRootSignature->GetBufferSize();
 
 	result.objectData = SharedDataBufferRef::AllocateBuffer(objectSize);
-	byte* objectDataBytes = (byte*)result.objectData.getMutablePointer();
 
-	ObjectFormat::PipelineLayoutObjectHeader header = {};
-	header.signature = ObjectFormat::PipelineLayoutObjectSignature;
-	header.version = ObjectFormat::PipelineLayoutObjectCurrentVerstion;
-	header.objectSize = objectSize;
-	header.objectCRC = 0; // TODO: ...
-
+	PipelineLayoutObjectHeader header = {};
+	header.generic.signature = PipelineLayoutObjectSignature;
+	header.generic.objectSize = objectSize;
+	header.generic.objectCRC = 0; // Will be filled later
 	header.sourceHash = 0; // TODO: ...
 	header.bindPointCount = desc.bindPointCount;
 
-	Memory::Copy(objectDataBytes + headerOffset, &header, sizeof(ObjectFormat::PipelineLayoutObjectHeader));
-	Memory::Copy(objectDataBytes + bindPointRecordsOffset, bindPointRecords, sizeof(ObjectFormat::PipelineBindPointRecord) * desc.bindPointCount);
+	byte* objectDataBytes = (byte*)result.objectData.getMutablePointer();
+	Memory::Copy(objectDataBytes + headerOffset, &header, sizeof(PipelineLayoutObjectHeader));
+	Memory::Copy(objectDataBytes + bindPointRecordsOffset, bindPointRecords, sizeof(PipelineBindPointRecord) * desc.bindPointCount);
 	Memory::Copy(objectDataBytes + rootSignatureOffset, d3dRootSignature->GetBufferPointer(), d3dRootSignature->GetBufferSize());
+
+	const uint32 objectCRC = CRC32::Compute(objectDataBytes, objectSize);
+	header.generic.objectCRC = objectCRC;
 
 	return true;
 }
@@ -174,12 +162,45 @@ bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& de
 bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& compiledPipelineLayout,
 	ShaderType shaderType, const char* source, uint32 sourceLength, CompiledShader& result)
 {
-	COMPtr<IDxcCompiler3> dxcCompiler;
-	DxcCreateInstance(CLSID_DxcCompiler, dxcCompiler.uuid(), dxcCompiler.voidInitRef());
+	// Patch source code substituting bindings
+	String patchedSourceString;
+	{
+		patchedSourceString.reserve(sourceLength);
+
+		TextStreamReader sourceReader(source, sourceLength);
+		StringTextStreamWriter patchedSourceWriter(patchedSourceString);
+
+		for (;;)
+		{
+			const bool bindingFound = TextStreamForwardToFirstOccurrence(sourceReader, "@binding", patchedSourceWriter);
+			if (!bindingFound)
+				break;
+
+			InplaceString<64> bindPointName;
+			TextStreamSkipWritespaces(sourceReader);
+			if (TextStreamReadCIdentifier(sourceReader, bindPointName) != TextStreamReadFormatStringResult::Success)
+				return false;
+			TextStreamSkipWritespaces(sourceReader);
+			if (sourceReader.get() != ')')
+				return false;
+
+			const uint32 bindPointNameCRC = CRC32::Compute(bindPointName.getData(), bindPointName.getLength());
+
+			const uint8 registerIndex = ...;
+			const char registerType = ...;
+
+			TextStreamWriteFmt(patchedSourceWriter, ": register(", registerType, WFmtUDec(registerIndex), ')');
+		}
+
+		patchedSourceString.compact();
+	}
+
+	ComPtr<IDxcCompiler3> dxcCompiler;
+	DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxcCompiler));
 
 	DxcBuffer dxcSourceBuffer = {};
-	dxcSourceBuffer.Ptr = source;
-	dxcSourceBuffer.Size = sourceLength;
+	dxcSourceBuffer.Ptr = patchedSourceString.getData();
+	dxcSourceBuffer.Size = patchedSourceString.getLength();
 	dxcSourceBuffer.Encoding = CP_UTF8;
 
 	using DXCArgsList = ExpandableInplaceArrayList<LPCWSTR, 32, uint16, false>;
@@ -198,16 +219,56 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& compil
 			case ShaderType::Mesh:			dxcProfile = L"-Tms_6_6"; break;
 			case ShaderType::Pixel:			dxcProfile = L"-Tps_6_6"; break;
 		}
-		// ASSERT(dxcTargetProfile);
+		// XEAssert(dxcTargetProfile);
 		dxcArgsList.pushBack(dxcProfile);
 	}
 
-	DXCIncludeHandler dxcIncludeHandler;
+	ComPtr<IDxcResult> dxcResult;
+	const HRESULT hCompileResult = dxcCompiler->Compile(&dxcSourceBuffer,
+		dxcArgsList.getData(), dxcArgsList.getSize(), nullptr, IID_PPV_ARGS(&dxcResult));
+	if (FAILED(hCompileResult))
+		return false;
 
-	COMPtr<IDxcResult> dxcResult;
+	ComPtr<IDxcBlobUtf8> dxcErrorsBlob;
+	dxcResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&dxcErrorsBlob), nullptr);
 
-	dxcCompiler->Compile(&dxcSourceBuffer, dxcArgsList.getData(), dxcArgsList.getSize(),
-		&dxcIncludeHandler, dxcResult.uuid(), dxcResult.voidInitRef());
+	if (dxcErrorsBlob != nullptr && dxcErrorsBlob->GetStringLength() > 0)
+	{
+
+	}
+
+	HRESULT hCompileStatus = E_FAIL;
+	dxcResult->GetStatus(&hCompileStatus);
+
+	if (FAILED(hCompileStatus))
+		return false;
+
+	ComPtr<IDxcBlob> dxcBytecodeBlob = nullptr;
+	dxcResult->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&dxcBytecodeBlob), nullptr);
+	// XEAssert(dxcBytecodeBlob != nullptr && dxcBytecodeBlob->GetBufferSize() > 0);
+
+	// Compose compiled object
+
+	const uint32 headerOffset = 0;
+	const uint32 bytecodeOffset = headerOffset + sizeof(GraphicsPipelineBytecodeObjectHeader);
+	const uint32 objectSize = bytecodeOffset + dxcBytecodeBlob->GetBufferSize();
+
+	result.objectData = SharedDataBufferRef::AllocateBuffer(objectSize);
+
+	GraphicsPipelineBytecodeObjectHeader header = {};
+	header.generic.signature = GraphicsPipelineBytecodeObjectSignature;
+	header.generic.objectSize = objectSize;
+	header.generic.objectCRC = 0; // Will be filled later
+	header.objectType = ...;
+
+	byte* objectDataBytes = (byte*)result.objectData.getMutablePointer();
+	Memory::Copy(objectDataBytes + headerOffset, &header, sizeof(GraphicsPipelineBytecodeObjectHeader));
+	Memory::Copy(objectDataBytes + bytecodeOffset, dxcBytecodeBlob->GetBufferPointer(), dxcBytecodeBlob->GetBufferSize());
+
+	const uint32 objectCRC = CRC32::Compute(objectDataBytes, objectSize);
+	header.generic.objectCRC = objectCRC;
+
+	return true;
 }
 
 bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayout& compiledPipelineLayout,

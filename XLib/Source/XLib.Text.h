@@ -10,12 +10,13 @@ namespace XLib
 	{
 	private:
 		const char* current = nullptr;
+		const char* limit = 0;
 
 	public:
 		TextStreamReader() = default;
 		~TextStreamReader() = default;
 
-		inline TextStreamReader(const char* text);
+		inline TextStreamReader(const char* data, uintptr length);
 
 		inline char get();
 		inline char peek();
@@ -53,84 +54,69 @@ namespace XLib
 	
 	};
 
-	template <typename BaseStreamType>
-	class FormatReader
+	template <typename StringType>
+	class StringTextStreamWriter
 	{
 	private:
-		BaseStreamType& baseStream;
+		StringType& string;
 
 	public:
-		FormatReader(BaseStreamType& baseStream) : baseStream(baseStream) {}
-		~FormatReader() = default;
-
-		inline char get() { return baseStream.get(); }
-		inline char peek() { return baseStream.peek(); }
-		inline bool endOfStream() { return baseStream.endOfStream(); }
-
-		bool skipWhitespaces(); // returns true if at least one char consumed
-		bool skipToNewLine(); // returns true if at least one line consumed (not reached end of stream)
-		bool skipToChar(char c); // stops at next char. returns true if at least one char consumed
-
-		template <typename T> bool readBinInt(T& result);
-		template <typename T> bool readOctInt(T& result);
-		template <typename T> bool readDecInt(T& result);
-		template <typename T> bool readHexInt(T& result);
-
-		bool readF32(float32& result);
-		bool readF64(float32& result);
+		inline StringTextStreamWriter(StringType& string) : string(string) {}
+		~StringTextStreamWriter() = default;
 	};
 
-#if 0
-	class TextFileStreamReader : public BufferedTextStreamReader<File>
+	////////////////////////////////////////////////////////////////////////////////////////////////
+
+	enum class TextStreamReadFormatStringResult : uint8
 	{
-	public:
-		bool open(const char* filename);
+		Success = 0,
+		CanNotConsume,
+		CanNotAppend,
 	};
+
+	// "skip whitespaces" returns true if at least one char consumed
+	// "skip to new line" returns true if at least one line consumed (not reached end of stream)
+	// "skip/forward to first occurrence" stops at next char
+
+	template <typename StreamType> inline bool TextStreamSkipWritespaces(StreamType& stream);
+	template <typename StreamType> inline bool TextStreamSkipToNewLine(StreamType& stream);
+	template <typename StreamType> inline bool TextStreamSkipToFirstOccurrence(StreamType& stream, char c); // 
+	template <typename StreamType> inline bool TextStreamSkipToFirstOccurrence(StreamType& stream, const char* cstr);
+
+	// TODO: Use logic same to `TextStreamReadFormatStringResult` for all return types
+
+	template <typename InStreamType, typename OutStreamType>
+	inline bool TextStreamForwardToFirstOccurrence(InStreamType& stream, char c, OutStreamType& streamForwardTo);
+
+	template <typename InStreamType, typename OutStreamType>
+	inline bool TextStreamForwardToFirstOccurrence(InStreamType& stream, StringView str, OutStreamType& streamForwardTo);
+
+	template <typename InStreamType, typename OutStreamType>
+	inline bool TextStreamForwardToFirstOccurrence(InStreamType& stream, const char* c, OutStreamType& streamForwardTo);
+
+	template <typename StreamType, typename StringType>
+	inline TextStreamReadFormatStringResult TextStreamReadCIdentifier(StreamType& stream, StringType& resultString);
+
+	template <typename StreamType, typename ResultType>
+	inline bool TextStreamReadIntDec(StreamType& stream, ResultType& result);
+
+	template <typename StreamType, typename ValueType>
+	inline bool TextStreamWriteSIntDec(StreamType& stream, ValueType& result);
 
 	template <typename StreamReaderT, typename ... FmtArgsT>
-	inline void TextFormatRead(StreamReaderT& reader, FmtArgsT ... fmtArgs);
+	inline bool TextStreamReadFmt(StreamReaderT& reader, FmtArgsT ... fmtArgs);
 
 	template <typename StreamWriterT, typename ... FmtArgsT>
-	inline void TextFormatWrite(StreamWriterT& writer, FmtArgsT ... fmtArgs);
+	inline bool TextStreamWriteFmt(StreamWriterT& writer, FmtArgsT ... fmtArgs);
 
-	namespace Fmt
+	//struct RFmtSkipWS {};
+	//struct RFmtSkip2NL {};
+	//struct RFmtDec {};
+
+	struct WFmtUDec
 	{
-		class RdToNL
-		{
-
-		};
-
-		class RdWS
-		{
-		public:
-			RdWS(bool atLeastOne = false);
-			~RdWS() = default;
-		};
-
-		class RdS32
-		{
-		private:
-			sint32& result;
-
-		public:
-			RdS32(sint32& result);
-			~RdS32() = default;
-
-			template <typename Reader>
-			static bool Read(Reader& reader, RdS32& result);
-		};
-
-		template <typename ResultStringWriter>
-		class RdStr
-		{
-		private:
-			ResultStringWriter& resultWriter;
-
-		public:
-			RdStr(ResultStringWriter& resultWriter);
-			~RdStr() = default;
-		};
-	}
-#endif
-
+		uint64 value;
+		inline WFmtUDec(uint64 value) : value(value) {}
+		template <typename StreamType> inline bool write(StreamType& stream) const { return TextStreamWriteSIntDec(value); }
+	};
 }

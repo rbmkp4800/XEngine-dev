@@ -18,11 +18,10 @@ namespace XLib
 		~BaseStringView() = default;
 
 		inline BaseStringView(const CharType* data, CounterType length) : data(data), length(length) {}
+		inline BaseStringView(const CharType* cstr);
 
 		inline const CharType& operator [] (CounterType index) const { return data[index]; }
-
 		inline const CharType* getData() const { return data; }
-
 		inline CounterType getLength() const { return length; }
 		inline bool isEmpty() const { return length == 0; }
 	};
@@ -44,10 +43,13 @@ namespace XLib
 		inline void append();
 
 		inline void clear();
+		inline void compact();
+		inline void reserve(CounterType newCapacity);
+
 		inline void truncate(CounterType newLength);
 
 		inline const CharType* getCStr() const { return buffer; }
-
+		inline const CharType* getData() const { return buffer; }
 		inline CounterType getLength() const { return length; }
 		inline bool isEmpty() const { return length == 0; }
 	};
@@ -76,10 +78,11 @@ namespace XLib
 		inline void truncate(CounterType newLength);
 		//inline bool recalculateLength();
 
-		inline const CharType* getCStr() const { return &storage; }
-		inline StringView getView() const { return StringView(&storage, length); }
 		inline CharType* getMutableStorage() { return &storage; }
 
+		inline StringView getView() const { return StringView(&storage, length); }
+		inline const CharType* getCStr() const { return &storage; }
+		inline const CharType* getData() const { return buffer; }
 		inline CounterType getLength() const { return length; }
 		inline bool isEmpty() const { return length == 0; }
 		inline bool isFull() const { return length + 1 == Capacity; }

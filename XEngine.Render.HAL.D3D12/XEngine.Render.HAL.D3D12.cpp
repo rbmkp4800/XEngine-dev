@@ -709,10 +709,9 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 			GraphicsPipelineBytecodeObjectSignature, bytecodeObjectData.size));
 
 		XEMasterAssert(baseObject.bytecodeObjectsCRCs[i] == bytecodeObjectHeader.generic.objectCRC);
-		XEMasterAssert(baseObject.generic.objectCRC == bytecodeObjectHeader.baseObjectCRC);
 		XEMasterAssert(expectedBytecodeObjectTypes[i] == bytecodeObjectHeader.objectType);
 
-		D3D12_SHADER_BYTECODE *d3dBytecodeStorePtr = nullptr;
+		D3D12_SHADER_BYTECODE* d3dBytecodeStorePtr = nullptr;
 		switch (bytecodeObjectHeader.objectType)
 		{
 			case GraphicsPipelineBytecodeObjectType::VertexShader:			d3dBytecodeStorePtr = &d3dVS; break;

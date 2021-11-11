@@ -81,13 +81,15 @@ namespace XEngine::Render::HAL::ObjectFormat
 	{
 		GenericObjectHeader generic;
 
-		uint32 baseObjectCRC;
 		GraphicsPipelineBytecodeObjectType objectType;
+		uint8 _padding0;
+		uint16 _padding1;
 	};
 
 	struct ComputePipelineBytecodeObjectHeader
 	{
 		GenericObjectHeader generic;
+
 		uint32 pipelineLayoutSourceHash;
 	};
 }
