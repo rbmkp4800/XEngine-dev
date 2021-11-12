@@ -91,5 +91,12 @@ namespace XEngine::Render::HAL::ObjectFormat
 		GenericObjectHeader generic;
 
 		uint32 pipelineLayoutSourceHash;
+
+		//struct
+		//{
+		//	uint groupSizeX : 10;
+		//	uint groupSizeY : 10;
+		//	uint groupSizeZ : 10;
+		//};
 	};
 }

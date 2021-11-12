@@ -5,6 +5,8 @@
 
 #include <XEngine.Render.HAL.Common.h>
 
+namespace XEngine::Render::HAL::ObjectFormat { struct PipelineBindPointRecord; }
+
 namespace XEngine::Render::HAL::ShaderCompiler
 {
 	class CompiledDescriptorBundleLayout;
@@ -145,7 +147,18 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		friend Host;
 
 	private:
+		struct BindPointMetadata
+		{
+			uint8 registerIndex;
+			char registerType; // b/t/u
+		};
+
+	private:
 		Internal::SharedDataBufferRef objectData;
+		BindPointMetadata bindPointsMetadata[MaxPipelineBindPointCount] = {};
+
+	private:
+		bool findBindPointMetadata(uint32 bindPointNameCRC, BindPointMetadata& result) const;
 
 	public:
 		CompiledPipelineLayout() = default;
@@ -197,13 +210,13 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		static bool CompilePipelineLayout(Platform platform,
 			const PipelineLayoutDesc& desc, CompiledPipelineLayout& result);
 
-		static bool CompileShader(Platform platform, const CompiledPipelineLayout& compiledPipelineLayout,
+		static bool CompileShader(Platform platform, const CompiledPipelineLayout& pipelineLayout,
 			ShaderType shaderType, const char* source, uint32 sourceLength, CompiledShader& result);
 
-		static bool CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayout& compiledPipelineLayout,
+		static bool CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayout& pipelineLayout,
 			const GraphicsPipelineDesc& pipelineDesc, CompiledPipeline& result);
 
-		static bool CompileComputePipeline(Platform platform, const CompiledPipelineLayout& compiledPipelineLayout,
+		static bool CompileComputePipeline(Platform platform, const CompiledPipelineLayout& pipelineLayout,
 			const ComputePipelineDesc& pipelineDesc, CompiledPipeline& result);
 	};
 }

@@ -65,6 +65,22 @@ SharedDataBufferRef SharedDataBufferRef::AllocateBuffer(uint32 size)
 	return reference;
 }
 
+bool CompiledPipelineLayout::findBindPointMetadata(uint32 bindPointNameCRC, BindPointMetadata& result) const
+{
+	const uint8 bindPointCount = ...;
+	const ObjectFormat::PipelineBindPointRecord* bindPointRecords = ...;
+
+	for (uint8 i = 0; i < bindPointCount; i++)
+	{
+		if (bindPointRecords[i].nameCRC == bindPointNameCRC)
+		{
+			result = bindPointsMetadata[i];
+			return true;
+		}
+	}
+	return false;
+}
+
 bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& desc, CompiledPipelineLayout& result)
 {
 	if (desc.bindPointCount >= MaxPipelineBindPointCount)
@@ -72,6 +88,7 @@ bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& de
 
 	D3D12_ROOT_PARAMETER1 d3dRootParams[MaxPipelineBindPointCount] = {};
 	PipelineBindPointRecord bindPointRecords[MaxPipelineBindPointCount] = {};
+	CompiledPipelineLayout::BindPointMetadata bindPointsMetadata[MaxPipelineBindPointCount] = {};
 
 	uint8 cbvRegisterCount = 0;
 	uint8 srvRegisterCount = 0;
@@ -82,6 +99,7 @@ bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& de
 	{
 		const PipelineBindPointDesc& bindPointDesc = desc.bindPoints[i];
 		PipelineBindPointRecord& objectBindPointRecord = bindPointRecords[i];
+		CompiledPipelineLayout::BindPointMetadata& bindPointMetadata = bindPointsMetadata[i];
 
 		const uint8 rootParameterIndex = rootParameterCount;
 		rootParameterCount++;
@@ -104,6 +122,10 @@ bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& de
 			d3dRootParam.Constants.ShaderRegister = cbvRegisterCount;
 			d3dRootParam.Constants.RegisterSpace = 0;
 			d3dRootParam.Constants.Num32BitValues = bindPointDesc.constantsSize32bitValues;
+
+			bindPointMetadata.registerIndex = cbvRegisterCount;
+			bindPointMetadata.registerType = 'b';
+
 			cbvRegisterCount++;
 		}
 		else if (bindPointDesc.type == PipelineBindPointType::ConstantBuffer)
@@ -111,8 +133,36 @@ bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& de
 			d3dRootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 			d3dRootParam.Descriptor.ShaderRegister = cbvRegisterCount;
 			d3dRootParam.Descriptor.RegisterSpace = 0;
-			d3dRootParam.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE; // TODO: Data volatility
+			d3dRootParam.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE;
+
+			bindPointMetadata.registerIndex = cbvRegisterCount;
+			bindPointMetadata.registerType = 'b';
+
 			cbvRegisterCount++;
+		}
+		else if (bindPointDesc.type == PipelineBindPointType::ReadOnlyBuffer)
+		{
+			d3dRootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+			d3dRootParam.Descriptor.ShaderRegister = srvRegisterCount;
+			d3dRootParam.Descriptor.RegisterSpace = 0;
+			d3dRootParam.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE;
+
+			bindPointMetadata.registerIndex = srvRegisterCount;
+			bindPointMetadata.registerType = 't';
+
+			srvRegisterCount++;
+		}
+		else if (bindPointDesc.type == PipelineBindPointType::ReadWriteBuffer)
+		{
+			d3dRootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_UAV;
+			d3dRootParam.Descriptor.ShaderRegister = uavRegisterCount;
+			d3dRootParam.Descriptor.RegisterSpace = 0;
+			d3dRootParam.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE;
+
+			bindPointMetadata.registerIndex = uavRegisterCount;
+			bindPointMetadata.registerType = 'u';
+
+			uavRegisterCount++;
 		}
 		else
 			; // XEAssertUnreachableCode();
@@ -156,12 +206,18 @@ bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& de
 	const uint32 objectCRC = CRC32::Compute(objectDataBytes, objectSize);
 	header.generic.objectCRC = objectCRC;
 
+	// Fill compiled object metadata
+	Memory::Copy(result.bindPointsMetadata, bindPointsMetadata,
+		sizeof(CompiledPipelineLayout::BindPointMetadata) * desc.bindPointCount);
+
 	return true;
 }
 
-bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& compiledPipelineLayout,
+bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipelineLayout,
 	ShaderType shaderType, const char* source, uint32 sourceLength, CompiledShader& result)
 {
+	//XEAssert(pipelineLayout.isInitialized());
+
 	// Patch source code substituting bindings
 	String patchedSourceString;
 	{
@@ -185,11 +241,12 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& compil
 				return false;
 
 			const uint32 bindPointNameCRC = CRC32::Compute(bindPointName.getData(), bindPointName.getLength());
+			CompiledPipelineLayout::BindPointMetadata bindPointMetadata = {};
+			if (!pipelineLayout.findBindPointMetadata(bindPointNameCRC, bindPointMetadata))
+				return false;
 
-			const uint8 registerIndex = ...;
-			const char registerType = ...;
-
-			TextStreamWriteFmt(patchedSourceWriter, ": register(", registerType, WFmtUDec(registerIndex), ')');
+			TextStreamWriteFmt(patchedSourceWriter, ": register(",
+				bindPointMetadata.registerType, WFmtUDec(bindPointMetadata.registerIndex), ')');
 		}
 
 		patchedSourceString.compact();
@@ -271,7 +328,7 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& compil
 	return true;
 }
 
-bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayout& compiledPipelineLayout,
+bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayout& pipelineLayout,
 	const GraphicsPipelineDesc& pipelineDesc, CompiledPipeline& result)
 {
 
