@@ -665,7 +665,6 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 	const GraphicsPipelineBaseObject& baseObject = *(const GraphicsPipelineBaseObject*)baseObjectData.data;
 
 	XEMasterAssert(ValidateGenericObjectHeader(&baseObject.generic, GraphicsPipelineBaseObjectSignature, baseObjectData.size));
-
 	XEMasterAssert(baseObject.pipelineLayoutSourceHash == pipelineLayout.sourceHash);
 
 	// Validate enabled shader stages combination
@@ -674,17 +673,17 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 
 	// Calculate expected bytecode objects number and their types
 
-	GraphicsPipelineBytecodeObjectType expectedBytecodeObjectTypes[MaxGraphicsPipelineBytecodeObjectCount] = {};
+	PipelineBytecodeObjectType expectedBytecodeObjectTypes[MaxGraphicsPipelineBytecodeObjectCount] = {};
 	uint8 expectedBytecodeObjectCount = 0;
 
 	if (baseObject.enabledShaderStages.vertex)
-		expectedBytecodeObjectTypes[expectedBytecodeObjectCount++] = GraphicsPipelineBytecodeObjectType::VertexShader;
+		expectedBytecodeObjectTypes[expectedBytecodeObjectCount++] = PipelineBytecodeObjectType::VertexShader;
 	if (baseObject.enabledShaderStages.amplification)
-		expectedBytecodeObjectTypes[expectedBytecodeObjectCount++] = GraphicsPipelineBytecodeObjectType::AmplificationShader;
+		expectedBytecodeObjectTypes[expectedBytecodeObjectCount++] = PipelineBytecodeObjectType::AmplificationShader;
 	if (baseObject.enabledShaderStages.mesh)
-		expectedBytecodeObjectTypes[expectedBytecodeObjectCount++] = GraphicsPipelineBytecodeObjectType::MeshShader;
+		expectedBytecodeObjectTypes[expectedBytecodeObjectCount++] = PipelineBytecodeObjectType::MeshShader;
 	if (baseObject.enabledShaderStages.pixel)
-		expectedBytecodeObjectTypes[expectedBytecodeObjectCount++] = GraphicsPipelineBytecodeObjectType::PixelShader;
+		expectedBytecodeObjectTypes[expectedBytecodeObjectCount++] = PipelineBytecodeObjectType::PixelShader;
 
 	XEAssert(expectedBytecodeObjectCount <= MaxGraphicsPipelineBytecodeObjectCount); // TODO: UB here :(
 	XEMasterAssert(expectedBytecodeObjectCount == bytecodeObjectCount);
@@ -701,29 +700,28 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 		const ObjectDataView& bytecodeObjectData = bytecodeObjectsData[i];
 		const byte* bytecodeObjectDataBytes = (const byte*)bytecodeObjectData.data;
 
-		XEAssert(bytecodeObjectData.size > sizeof(GraphicsPipelineBytecodeObjectHeader));
-		const GraphicsPipelineBytecodeObjectHeader& bytecodeObjectHeader =
-			*(const GraphicsPipelineBytecodeObjectHeader*)bytecodeObjectDataBytes;
+		XEMasterAssert(bytecodeObjectData.size > sizeof(PipelineBytecodeObjectHeader));
+		const PipelineBytecodeObjectHeader& bytecodeObjectHeader = *(PipelineBytecodeObjectHeader*)bytecodeObjectDataBytes;
 
 		XEMasterAssert(ValidateGenericObjectHeader(&bytecodeObjectHeader.generic,
-			GraphicsPipelineBytecodeObjectSignature, bytecodeObjectData.size));
-
+			PipelineBytecodeObjectSignature, bytecodeObjectData.size));
 		XEMasterAssert(baseObject.bytecodeObjectsCRCs[i] == bytecodeObjectHeader.generic.objectCRC);
 		XEMasterAssert(expectedBytecodeObjectTypes[i] == bytecodeObjectHeader.objectType);
+		XEMasterAssert(baseObject.pipelineLayoutSourceHash == bytecodeObjectHeader.pipelineLayoutSourceHash);
 
 		D3D12_SHADER_BYTECODE* d3dBytecodeStorePtr = nullptr;
 		switch (bytecodeObjectHeader.objectType)
 		{
-			case GraphicsPipelineBytecodeObjectType::VertexShader:			d3dBytecodeStorePtr = &d3dVS; break;
-			case GraphicsPipelineBytecodeObjectType::AmplificationShader:	d3dBytecodeStorePtr = &d3dAS; break;
-			case GraphicsPipelineBytecodeObjectType::MeshShader:			d3dBytecodeStorePtr = &d3dMS; break;
-			case GraphicsPipelineBytecodeObjectType::PixelShader:			d3dBytecodeStorePtr = &d3dPS; break;
+			case PipelineBytecodeObjectType::VertexShader:			d3dBytecodeStorePtr = &d3dVS; break;
+			case PipelineBytecodeObjectType::AmplificationShader:	d3dBytecodeStorePtr = &d3dAS; break;
+			case PipelineBytecodeObjectType::MeshShader:			d3dBytecodeStorePtr = &d3dMS; break;
+			case PipelineBytecodeObjectType::PixelShader:			d3dBytecodeStorePtr = &d3dPS; break;
 		}
 		XEAssert(d3dBytecodeStorePtr);
 
 		XEMasterAssert(!d3dBytecodeStorePtr->pShaderBytecode);
-		d3dBytecodeStorePtr->pShaderBytecode = bytecodeObjectDataBytes + sizeof(GraphicsPipelineBytecodeObjectHeader);
-		d3dBytecodeStorePtr->BytecodeLength = bytecodeObjectData.size - sizeof(GraphicsPipelineBytecodeObjectHeader);
+		d3dBytecodeStorePtr->pShaderBytecode = bytecodeObjectDataBytes + sizeof(PipelineBytecodeObjectHeader);
+		d3dBytecodeStorePtr->BytecodeLength = bytecodeObjectData.size - sizeof(PipelineBytecodeObjectHeader);
 	}
 
 	// Count render targets in base object
@@ -835,15 +833,14 @@ PipelineHandle Device::createComputePipeline(PipelineLayoutHandle pipelineLayout
 	const byte* objectDataBytes = (const byte*)bytecodeObjectData.data;
 
 	XEMasterAssert(bytecodeObjectData.size > sizeof(ComputePipelineBytecodeObjectHeader));
-	const ComputePipelineBytecodeObjectHeader& header = *(const ComputePipelineBytecodeObjectHeader*)objectDataBytes;
+	const PipelineBytecodeObjectHeader& header = *(const PipelineBytecodeObjectHeader*)objectDataBytes;
 
-	XEMasterAssert(ValidateGenericObjectHeader(&header.generic, ComputePipelineBaseObjectSignature, baseObjectData.size));
-
+	XEMasterAssert(ValidateGenericObjectHeader(&header.generic, PipelineBytecodeObjectSignature, baseObjectData.size));
 	XEMasterAssert(header.pipelineLayoutSourceHash == pipelineLayout.sourceHash);
 
 	D3D12_SHADER_BYTECODE d3dCS = {};
-	d3dCS.pShaderBytecode = objectDataBytes + sizeof(ComputePipelineBytecodeObjectHeader);
-	d3dCS.BytecodeLength = bytecodeObjectData.size - sizeof(ComputePipelineBytecodeObjectHeader);
+	d3dCS.pShaderBytecode = objectDataBytes + sizeof(PipelineBytecodeObjectHeader);
+	d3dCS.BytecodeLength = bytecodeObjectData.size - sizeof(PipelineBytecodeObjectHeader);
 
 	// Compose D3D12 Pipeline State stream
 

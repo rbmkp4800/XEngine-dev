@@ -4,8 +4,9 @@
 
 namespace XEngine::Render::HAL
 {
-	static constexpr uint32 MaxPipelineBindPointCountLog2 = 4;
-	static constexpr uint32 MaxPipelineBindPointCount = 1 << MaxPipelineBindPointCountLog2;
+	static constexpr uint8 MaxPipelineBindPointCountLog2 = 4;
+	static constexpr uint8 MaxPipelineBindPointCount = 1 << MaxPipelineBindPointCountLog2;
+	static constexpr uint8 MaxRenderTargetCount = 4;
 
 	enum class TexelFormat : uint8
 	{
@@ -34,4 +35,6 @@ namespace XEngine::Render::HAL
 		ReadWriteTexture2D,
 		RaytracingAccelerationStructure,
 	};
+
+	bool ValidateTexelFormatValue(TexelFormat format);
 }

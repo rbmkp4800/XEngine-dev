@@ -80,7 +80,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		CompiledShader* amplificationShader;
 		CompiledShader* meshShader;
 		CompiledShader* pixelShader;
-		TexelFormat renderTargetsFormats[4];
+		TexelFormat renderTargetsFormats[MaxRenderTargetCount];
 		TexelFormat depthStencilFormat;
 	};
 	
@@ -138,6 +138,8 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		CompiledDescriptorBundleLayout() = default;
 		~CompiledDescriptorBundleLayout() = default;
 
+		void destroy();
+
 		inline bool isInitialized() const { return objectData.isValid(); }
 		inline DataView getObjectData() const { return objectData.getData(); }
 	};
@@ -159,10 +161,13 @@ namespace XEngine::Render::HAL::ShaderCompiler
 
 	private:
 		bool findBindPointMetadata(uint32 bindPointNameCRC, BindPointMetadata& result) const;
+		uint32 getSourceHash() const;
 
 	public:
 		CompiledPipelineLayout() = default;
 		~CompiledPipelineLayout() = default;
+
+		void destroy();
 
 		inline bool isInitialized() const { return objectData.isValid(); }
 		inline DataView getObjectData() const;
@@ -175,9 +180,16 @@ namespace XEngine::Render::HAL::ShaderCompiler
 	private:
 		Internal::SharedDataBufferRef objectData;
 
+	private:
+		uint32 getObjectCRC() const;
+
 	public:
 		CompiledShader() = default;
 		~CompiledShader() = default;
+
+		void destroy();
+
+		ShaderType getShaderType() const;
 
 		inline bool isInitialized() const { return objectData.isValid(); }
 		inline DataView getObjectData() const { return objectData.getData(); }
@@ -189,16 +201,19 @@ namespace XEngine::Render::HAL::ShaderCompiler
 
 	private:
 		Internal::SharedDataBufferRef baseObjectData;
-		Internal::SharedDataBufferRef bytecodeObjectsData[4];
+		Internal::SharedDataBufferRef bytecodeObjectsData[MaxGraphicsPipelineBytecodeObjectCount];
+		uint8 bytecodeObjectCount = 0;
 
 	public:
 		CompiledPipeline() = default;
 		~CompiledPipeline() = default;
 
+		void destroy();
+
 		inline bool isInitialized() const { return baseObjectData.isValid(); }
 		inline DataView getBaseObjectData() const { return baseObjectData.getData(); }
 		inline DataView getBytecodeObjectData(uint8 bytecodeObjectIndex) const;
-		inline uint8 getBytecodeObjectCount() const;
+		inline uint8 getBytecodeObjectCount() const { return bytecodeObjectCount; }
 	};
 
 	class Host abstract final
