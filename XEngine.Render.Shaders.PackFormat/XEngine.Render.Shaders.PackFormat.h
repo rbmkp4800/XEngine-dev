@@ -2,15 +2,10 @@
 
 #include <XLib.h>
 
-namespace XEngine::Render::Shaders::PackFile
+namespace XEngine::Render::Shaders::PackFormat
 {
 	static constexpr uint32 Signature = 0;
 	static constexpr uint16 CurrentVersion = 1;
-
-	enum class Patform : uint8
-	{
-		D3D12,
-	};
 
 	enum class PipelineType : uint8
 	{
@@ -38,7 +33,7 @@ namespace XEngine::Render::Shaders::PackFile
 		uint32 bytecodeObjectsMapOffset;
 	};
 
-	struct BinaryBlobDesc
+	struct ObjectDesc
 	{
 		uint32 offset;
 		uint32 size;

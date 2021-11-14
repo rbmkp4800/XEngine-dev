@@ -23,8 +23,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.GeometryCompiler", 
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.GeometryImporter", "XEngine.GeometryImporter\XEngine.GeometryImporter.vcxproj", "{04B988B1-C7EA-4261-87E1-0A95B6630F95}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.Shaders.PackFile", "XEngine.Render.Shaders.PackFile\XEngine.Render.Shaders.PackFile.vcxproj", "{E41C3648-B10A-4C33-A052-D98F8ED51AB0}"
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.HAL.D3D12", "XEngine.Render.HAL.D3D12\XEngine.Render.HAL.D3D12.vcxproj", "{1ED495B0-B69B-4409-83FC-587F590EAB29}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XC.Compiler", "XC.Compiler\XC.Compiler.vcxproj", "{A0A7087D-4990-4DE2-9E57-A47928A38608}"
@@ -32,6 +30,8 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.HAL.Common", "XEngine.Render.HAL.Common\XEngine.Render.HAL.Common.vcxproj", "{102D6F8C-FAAD-4FD3-9B3A-16923042465E}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.HAL.ShaderCompiler", "XEngine.Render.HAL.ShaderCompiler\XEngine.Render.HAL.ShaderCompiler.vcxproj", "{0E31D4F6-C1D4-4A6F-8C42-A0F7B2E4D9D9}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.Shaders.PackFormat", "XEngine.Render.Shaders.PackFormat\XEngine.Render.Shaders.PackFormat.vcxproj", "{E41C3648-B10A-4C33-A052-D98F8ED51AB0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -79,10 +79,6 @@ Global
 		{04B988B1-C7EA-4261-87E1-0A95B6630F95}.Debug|x64.Build.0 = Debug|x64
 		{04B988B1-C7EA-4261-87E1-0A95B6630F95}.Release|x64.ActiveCfg = Release|x64
 		{04B988B1-C7EA-4261-87E1-0A95B6630F95}.Release|x64.Build.0 = Release|x64
-		{E41C3648-B10A-4C33-A052-D98F8ED51AB0}.Debug|x64.ActiveCfg = Debug|x64
-		{E41C3648-B10A-4C33-A052-D98F8ED51AB0}.Debug|x64.Build.0 = Debug|x64
-		{E41C3648-B10A-4C33-A052-D98F8ED51AB0}.Release|x64.ActiveCfg = Release|x64
-		{E41C3648-B10A-4C33-A052-D98F8ED51AB0}.Release|x64.Build.0 = Release|x64
 		{1ED495B0-B69B-4409-83FC-587F590EAB29}.Debug|x64.ActiveCfg = Debug|x64
 		{1ED495B0-B69B-4409-83FC-587F590EAB29}.Debug|x64.Build.0 = Debug|x64
 		{1ED495B0-B69B-4409-83FC-587F590EAB29}.Release|x64.ActiveCfg = Release|x64
@@ -99,6 +95,10 @@ Global
 		{0E31D4F6-C1D4-4A6F-8C42-A0F7B2E4D9D9}.Debug|x64.Build.0 = Debug|x64
 		{0E31D4F6-C1D4-4A6F-8C42-A0F7B2E4D9D9}.Release|x64.ActiveCfg = Release|x64
 		{0E31D4F6-C1D4-4A6F-8C42-A0F7B2E4D9D9}.Release|x64.Build.0 = Release|x64
+		{E41C3648-B10A-4C33-A052-D98F8ED51AB0}.Debug|x64.ActiveCfg = Debug|x64
+		{E41C3648-B10A-4C33-A052-D98F8ED51AB0}.Debug|x64.Build.0 = Debug|x64
+		{E41C3648-B10A-4C33-A052-D98F8ED51AB0}.Release|x64.ActiveCfg = Release|x64
+		{E41C3648-B10A-4C33-A052-D98F8ED51AB0}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

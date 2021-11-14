@@ -6,6 +6,8 @@
 #include <XLib.NonCopyable.h>
 #include <XLib.String.h>
 
+#include <XEngine.Render.HAL.Common.h>
+
 #include "XEngine.Render.Shaders.Builder.PipelineLayoutsList.h"
 #include "XEngine.Render.Shaders.Builder.ShadersList.h"
 
@@ -13,11 +15,14 @@ namespace XEngine::Render::Shaders::Builder_
 {
 	class PipelinesList;
 
-	enum class PipelineConfig : uint8
+	struct GraphicsPipelineDesc
 	{
-		None = 0,
-		Compute,
-		GraphicsMesh,
+		ShaderRef vertexShader;
+		ShaderRef amplificationShader;
+		ShaderRef meshShader;
+		ShaderRef pixelShader;
+		HAL::TexelFormat renderTargetsFormats[HAL::MaxRenderTargetCount];
+		HAL::TexelFormat depthStencilFormat;
 	};
 
 	class Pipeline : public XLib::NonCopyable
@@ -29,12 +34,28 @@ namespace XEngine::Render::Shaders::Builder_
 
 		XLib::InplaceString<63, uint8> name;
 		uint64 nameCRC = 0;
-		PipelineLayoutRef PipelineLayout = ZeroPipelineLayoutRef;
 
-		PipelineConfig type = PipelineConfig::None;
-		ShaderRef cs;
-		ShaderRef vs;
-		ShaderRef ps;
+		struct
+		{
+			PipelineLayoutRef pipelineLayout = ZeroPipelineLayoutRef;
+			union
+			{
+				struct
+				{
+					ShaderRef computeShader;
+				};
+				struct
+				{
+					ShaderRef vertexShader;
+					ShaderRef amplificationShader;
+					ShaderRef meshShader;
+					ShaderRef pixelShader;
+					HAL::TexelFormat renderTargetsFormats[HAL::MaxRenderTargetCount];
+					HAL::TexelFormat depthStencilFormat;
+				};
+			};
+		} src = {};
+		HAL::PipelineType type = HAL::PipelineType::Undefined;
 
 		HAL::ShaderCompiler::CompiledPipeline compiledPipeline;
 
@@ -43,7 +64,9 @@ namespace XEngine::Render::Shaders::Builder_
 		~Pipeline() = default;
 
 	public:
-		inline uint64 getNameCRC() const;
+		bool compile();
+
+		inline uint64 getNameCRC() const { return nameCRC; }
 		inline const HAL::ShaderCompiler::CompiledPipeline& getCompiled() const { return compiledPipeline; }
 	};
 
@@ -60,6 +83,9 @@ namespace XEngine::Render::Shaders::Builder_
 	public:
 		PipelinesList() = default;
 		~PipelinesList() = default;
+
+		Pipeline* createGraphicsPipeline(const char* name, PipelineLayoutRef pipelineLayout, const GraphicsPipelineDesc& pipelineDesc);
+		Pipeline* createComputePipeline(const char* name, PipelineLayoutRef pipelineLayout, ShaderRef computeShader);
 
 		inline uint32 getSize() const;
 	};

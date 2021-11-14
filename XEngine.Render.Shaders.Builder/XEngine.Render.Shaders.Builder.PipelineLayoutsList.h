@@ -12,7 +12,7 @@ namespace XEngine::Render::Shaders::Builder_
 {
 	class PipelineLayoutsList;
 
-	using PipelineLayoutRef = uint16;
+	enum class PipelineLayoutRef : uint16;
 	static constexpr PipelineLayoutRef ZeroPipelineLayoutRef = PipelineLayoutRef(0);
 
 	class PipelineLayout : public XLib::NonCopyable
@@ -47,7 +47,7 @@ namespace XEngine::Render::Shaders::Builder_
 		PipelineLayoutsList() = default;
 		~PipelineLayoutsList() = default;
 
-		PipelineLayoutRef createAndCompileEntry(const char* name, const HAL::ShaderCompiler::PipelineLayoutDesc& desc);
+		PipelineLayoutRef createEntry(const char* name, const HAL::ShaderCompiler::PipelineLayoutDesc& desc);
 
 		PipelineLayoutRef findEntry(const char* name) const;
 		const PipelineLayout& getEntry(PipelineLayoutRef ref) const;

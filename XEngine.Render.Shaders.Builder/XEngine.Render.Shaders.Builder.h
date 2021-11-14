@@ -26,6 +26,6 @@ namespace XEngine::Render::Shaders
 
 		void build();
 
-		void storePackage(const char* packagePath);
+		void storePack(const char* packagePath);
 	};
 }

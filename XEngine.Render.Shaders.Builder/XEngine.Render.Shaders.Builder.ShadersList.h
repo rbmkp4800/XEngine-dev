@@ -15,7 +15,8 @@ namespace XEngine::Render::Shaders::Builder_
 {
 	class ShadersList;
 
-	using ShaderRef = uint16;
+	enum class ShaderRef : uint16;
+	static constexpr ShaderRef ZeroShaderRef = ShaderRef(0);
 
 	class Shader : public XLib::NonCopyable
 	{
@@ -79,7 +80,7 @@ namespace XEngine::Render::Shaders::Builder_
 		~ShadersList() = default;
 
 		// returns null if entry with this name already exists
-		Shader* createEntry(HAL::ShaderCompiler::ShaderType type, SourcesCacheEntryId mainSourceId);
+		ShaderRef findOrCreateEntry(HAL::ShaderCompiler::ShaderType type, SourcesCacheEntryId mainSourceId);
 
 		inline bool isEmpty() const { return entriesStorageList.isEmpty(); }
 		inline uint32 getSize() const { return entriesStorageList.getSize(); }

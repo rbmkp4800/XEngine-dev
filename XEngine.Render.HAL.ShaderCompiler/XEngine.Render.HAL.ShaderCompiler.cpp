@@ -85,10 +85,10 @@ SharedDataBufferRef SharedDataBufferRef::AllocateBuffer(uint32 size)
 
 bool CompiledPipelineLayout::findBindPointMetadata(uint32 bindPointNameCRC, BindPointMetadata& result) const
 {
-	const uint8 bindPointCount = ...;
-	const ObjectFormat::PipelineBindPointRecord* bindPointRecords = ...;
+	const PipelineLayoutObjectHeader& header = *(PipelineLayoutObjectHeader*)objectData.getData().data;
+	const PipelineBindPointRecord* bindPointRecords = (PipelineBindPointRecord*)(&header + 1);
 
-	for (uint8 i = 0; i < bindPointCount; i++)
+	for (uint8 i = 0; i < header.bindPointCount; i++)
 	{
 		if (bindPointRecords[i].nameCRC == bindPointNameCRC)
 		{
@@ -99,6 +99,25 @@ bool CompiledPipelineLayout::findBindPointMetadata(uint32 bindPointNameCRC, Bind
 	return false;
 }
 
+uint32 CompiledPipelineLayout::getSourceHash() const
+{
+	return (*(PipelineLayoutObjectHeader*)objectData.getData().data).sourceHash;
+}
+
+ShaderType CompiledShader::getShaderType() const
+{
+	const PipelineBytecodeObjectHeader& header = *(PipelineBytecodeObjectHeader*)objectData.getData().data;
+	switch (header.objectType)
+	{
+		case PipelineBytecodeObjectType::ComputeShader:			return ShaderType::Compute;
+		case PipelineBytecodeObjectType::VertexShader:			return ShaderType::Vertex;
+		case PipelineBytecodeObjectType::AmplificationShader:	return ShaderType::Amplification;
+		case PipelineBytecodeObjectType::MeshShader:			return ShaderType::Mesh;
+		case PipelineBytecodeObjectType::PixelShader:			return ShaderType::Pixel;
+	}
+	XEAssertUnreachableCode();
+}
+
 bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& desc, CompiledPipelineLayout& result)
 {
 	result.destroy();
@@ -106,15 +125,16 @@ bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& de
 	if (desc.bindPointCount >= MaxPipelineBindPointCount)
 		return false;
 
+	// TODO: Check for non-unique bind point names
+
 	D3D12_ROOT_PARAMETER1 d3dRootParams[MaxPipelineBindPointCount] = {};
 	PipelineBindPointRecord bindPointRecords[MaxPipelineBindPointCount] = {};
 	CompiledPipelineLayout::BindPointMetadata bindPointsMetadata[MaxPipelineBindPointCount] = {};
 
+	uint8 rootParameterCount = 0;
 	uint8 cbvRegisterCount = 0;
 	uint8 srvRegisterCount = 0;
 	uint8 uavRegisterCount = 0;
-
-	uint8 rootParameterCount = 0;
 	for (uint32 i = 0; i < desc.bindPointCount; i++)
 	{
 		const PipelineBindPointDesc& bindPointDesc = desc.bindPoints[i];
@@ -223,8 +243,7 @@ bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& de
 	Memory::Copy(objectDataBytes + bindPointRecordsOffset, bindPointRecords, sizeof(PipelineBindPointRecord) * desc.bindPointCount);
 	Memory::Copy(objectDataBytes + rootSignatureOffset, d3dRootSignature->GetBufferPointer(), d3dRootSignature->GetBufferSize());
 
-	const uint32 objectCRC = CRC32::Compute(objectDataBytes, objectSize);
-	header.generic.objectCRC = objectCRC;
+	header.generic.objectCRC = CRC32::Compute(objectDataBytes, objectSize);
 
 	// Fill compiled object metadata
 	Memory::Copy(result.bindPointsMetadata, bindPointsMetadata,
@@ -345,35 +364,34 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipeli
 
 	Memory::Copy(objectDataBytes + bytecodeOffset, dxcBytecodeBlob->GetBufferPointer(), dxcBytecodeBlob->GetBufferSize());
 
-	const uint32 objectCRC = CRC32::Compute(objectDataBytes, objectSize);
-	header.generic.objectCRC = objectCRC;
+	header.generic.objectCRC = CRC32::Compute(objectDataBytes, objectSize);
 
 	return true;
 }
 
 bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayout& pipelineLayout,
-	const GraphicsPipelineDesc& pipelineDesc, CompiledPipeline& result)
+	const GraphicsPipelineDesc& desc, CompiledPipeline& result)
 {
 	result.destroy();
 
-	XEAssertImply(pipelineDesc.vertexShader,		pipelineDesc.vertexShader->isInitialized());
-	XEAssertImply(pipelineDesc.amplificationShader,	pipelineDesc.amplificationShader->isInitialized());
-	XEAssertImply(pipelineDesc.meshShader,			pipelineDesc.meshShader->isInitialized());
-	XEAssertImply(pipelineDesc.pixelShader,			pipelineDesc.vertexShader->isInitialized());
+	XEAssertImply(desc.vertexShader,		desc.vertexShader->isInitialized());
+	XEAssertImply(desc.amplificationShader,	desc.amplificationShader->isInitialized());
+	XEAssertImply(desc.meshShader,			desc.meshShader->isInitialized());
+	XEAssertImply(desc.pixelShader,			desc.vertexShader->isInitialized());
 
-	XEAssertImply(pipelineDesc.vertexShader,		pipelineDesc.vertexShader->getShaderType() == ShaderType::Vertex);
-	XEAssertImply(pipelineDesc.amplificationShader,	pipelineDesc.amplificationShader->getShaderType() == ShaderType::Amplification);
-	XEAssertImply(pipelineDesc.meshShader,			pipelineDesc.meshShader->getShaderType() == ShaderType::Mesh);
-	XEAssertImply(pipelineDesc.pixelShader,			pipelineDesc.vertexShader->getShaderType() == ShaderType::Pixel);
+	XEAssertImply(desc.vertexShader,		desc.vertexShader->getShaderType() == ShaderType::Vertex);
+	XEAssertImply(desc.amplificationShader,	desc.amplificationShader->getShaderType() == ShaderType::Amplification);
+	XEAssertImply(desc.meshShader,			desc.meshShader->getShaderType() == ShaderType::Mesh);
+	XEAssertImply(desc.pixelShader,			desc.vertexShader->getShaderType() == ShaderType::Pixel);
 
 	// Validate enabled shader stages combination
-	XEAssert((pipelineDesc.vertexShader != nullptr) ^ (baseObject.enabledShaderStages.mesh != nullptr));
-	XEAssert(baseObject.enabledShaderStages.vertex, !baseObject.enabledShaderStages.amplification);
+	XEAssert((desc.vertexShader != nullptr) ^ (desc.meshShader != nullptr));
+	XEAssert(desc.vertexShader, !desc.amplificationShader);
 
 	// Validate render targets
 	{
 		bool undefinedRenderTargetFound = false;
-		for (TexelFormat renderTargetFormat : pipelineDesc.renderTargetsFormats)
+		for (TexelFormat renderTargetFormat : desc.renderTargetsFormats)
 		{
 			if (undefinedRenderTargetFound)
 				XEAssert(renderTargetFormat == TexelFormat::Undefined);
@@ -384,7 +402,7 @@ bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayo
 		}
 	}
 
-	XEAssert(ValidateTexelFormatValue(pipelineDesc.depthStencilFormat));
+	XEAssert(ValidateTexelFormatValue(desc.depthStencilFormat));
 
 	SharedDataBufferRef bytecodeObjects[MaxGraphicsPipelineBytecodeObjectCount];
 	uint32 bytecodeObjectsCRCs[MaxGraphicsPipelineBytecodeObjectCount] = {};
@@ -401,15 +419,16 @@ bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayo
 			XEAssert(bytecodeObjectCount <= MaxGraphicsPipelineBytecodeObjectCount);
 		};
 
-		pushBytecodeObject(pipelineDesc.vertexShader);
-		pushBytecodeObject(pipelineDesc.amplificationShader);
-		pushBytecodeObject(pipelineDesc.meshShader);
-		pushBytecodeObject(pipelineDesc.pixelShader);
+		pushBytecodeObject(desc.vertexShader);
+		pushBytecodeObject(desc.amplificationShader);
+		pushBytecodeObject(desc.meshShader);
+		pushBytecodeObject(desc.pixelShader);
 	}
 
-	result.baseObjectData = SharedDataBufferRef::AllocateBuffer(sizeof(GraphicsPipelineBaseObject));
+	result.graphicsBaseObjectData = SharedDataBufferRef::AllocateBuffer(sizeof(GraphicsPipelineBaseObject));
 	{
-		GraphicsPipelineBaseObject& baseObject = *(GraphicsPipelineBaseObject*)result.baseObjectData.getMutablePointer();
+		GraphicsPipelineBaseObject& baseObject =
+			*(GraphicsPipelineBaseObject*)result.graphicsBaseObjectData.getMutablePointer();
 		baseObject = {};
 		baseObject.generic.signature = GraphicsPipelineBaseObjectSignature;
 		baseObject.generic.objectSize = sizeof(GraphicsPipelineBaseObject);
@@ -418,20 +437,19 @@ bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayo
 		baseObject.pipelineLayoutSourceHash = pipelineLayout.getSourceHash();
 		Memory::Copy(baseObject.bytecodeObjectsCRCs, bytecodeObjectsCRCs, sizeof(uint32) * bytecodeObjectCount);
 
-		Memory::Copy(baseObject.renderTargetFormats, pipelineDesc.renderTargetsFormats, sizeof(TexelFormat) * MaxRenderTargetCount);
-		baseObject.depthStencilFormat = pipelineDesc.depthStencilFormat;
+		Memory::Copy(baseObject.renderTargetFormats, desc.renderTargetsFormats, sizeof(TexelFormat) * MaxRenderTargetCount);
+		baseObject.depthStencilFormat = desc.depthStencilFormat;
 
-		baseObject.enabledShaderStages.vertex			= pipelineDesc.vertexShader			!= nullptr;
-		baseObject.enabledShaderStages.amplification	= pipelineDesc.amplificationShader	!= nullptr;
-		baseObject.enabledShaderStages.mesh				= pipelineDesc.meshShader			!= nullptr;
-		baseObject.enabledShaderStages.pixel			= pipelineDesc.pixelShader			!= nullptr;
+		baseObject.enabledShaderStages.vertex			= desc.vertexShader			!= nullptr;
+		baseObject.enabledShaderStages.amplification	= desc.amplificationShader	!= nullptr;
+		baseObject.enabledShaderStages.mesh				= desc.meshShader			!= nullptr;
+		baseObject.enabledShaderStages.pixel			= desc.pixelShader			!= nullptr;
 
-		const uint32 baseObjectCRC = CRC32::Compute(baseObject);
-		baseObject.generic.objectCRC = baseObjectCRC;
+		baseObject.generic.objectCRC = CRC32::Compute(baseObject);
 	}
 
 	for (uint8 i = 0; i < bytecodeObjectCount; i++)
-		result.bytecodeObjectsData = asRValue(bytecodeObjects);
+		result.bytecodeObjectsData[i] = asRValue(bytecodeObjects[i]);
 	result.bytecodeObjectCount = bytecodeObjectCount;
 
 	return true;

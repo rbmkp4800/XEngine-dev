@@ -36,5 +36,12 @@ namespace XEngine::Render::HAL
 		RaytracingAccelerationStructure,
 	};
 
+	enum class PipelineType : uint8
+	{
+		Undefined = 0,
+		Graphics,
+		Compute,
+	};
+
 	bool ValidateTexelFormatValue(TexelFormat format);
 }

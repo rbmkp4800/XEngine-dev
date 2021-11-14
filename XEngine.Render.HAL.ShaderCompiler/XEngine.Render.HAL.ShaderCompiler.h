@@ -76,17 +76,12 @@ namespace XEngine::Render::HAL::ShaderCompiler
 	struct GraphicsPipelineDesc
 	{
 		// TODO: Input assempler?
-		CompiledShader* vertexShader;
-		CompiledShader* amplificationShader;
-		CompiledShader* meshShader;
-		CompiledShader* pixelShader;
+		const CompiledShader* vertexShader;
+		const CompiledShader* amplificationShader;
+		const CompiledShader* meshShader;
+		const CompiledShader* pixelShader;
 		TexelFormat renderTargetsFormats[MaxRenderTargetCount];
 		TexelFormat depthStencilFormat;
-	};
-	
-	struct ComputePipelineDesc
-	{
-		CompiledShader* computeShader;
 	};
 
 	struct DataView
@@ -138,7 +133,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		CompiledDescriptorBundleLayout() = default;
 		~CompiledDescriptorBundleLayout() = default;
 
-		void destroy();
+		inline void destroy() { this->~CompiledDescriptorBundleLayout(); }
 
 		inline bool isInitialized() const { return objectData.isValid(); }
 		inline DataView getObjectData() const { return objectData.getData(); }
@@ -167,7 +162,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		CompiledPipelineLayout() = default;
 		~CompiledPipelineLayout() = default;
 
-		void destroy();
+		inline void destroy() { this->~CompiledPipelineLayout(); }
 
 		inline bool isInitialized() const { return objectData.isValid(); }
 		inline DataView getObjectData() const;
@@ -187,7 +182,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		CompiledShader() = default;
 		~CompiledShader() = default;
 
-		void destroy();
+		inline void destroy() { this->~CompiledShader(); }
 
 		ShaderType getShaderType() const;
 
@@ -200,7 +195,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		friend Host;
 
 	private:
-		Internal::SharedDataBufferRef baseObjectData;
+		Internal::SharedDataBufferRef graphicsBaseObjectData;
 		Internal::SharedDataBufferRef bytecodeObjectsData[MaxGraphicsPipelineBytecodeObjectCount];
 		uint8 bytecodeObjectCount = 0;
 
@@ -208,11 +203,11 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		CompiledPipeline() = default;
 		~CompiledPipeline() = default;
 
-		void destroy();
+		inline void destroy() { this->~CompiledPipeline(); }
 
-		inline bool isInitialized() const { return baseObjectData.isValid(); }
-		inline DataView getBaseObjectData() const { return baseObjectData.getData(); }
-		inline DataView getBytecodeObjectData(uint8 bytecodeObjectIndex) const;
+		inline bool isInitialized() const { return bytecodeObjectCount > 0; }
+		inline DataView getGraphicsBaseObjectData() const { return graphicsBaseObjectData.getData(); }
+		inline DataView getBytecodeObjectData(uint8 bytecodeObjectIndex) const { return bytecodeObjectsData[bytecodeObjectIndex].getData(); }
 		inline uint8 getBytecodeObjectCount() const { return bytecodeObjectCount; }
 	};
 
@@ -229,9 +224,9 @@ namespace XEngine::Render::HAL::ShaderCompiler
 			ShaderType shaderType, const char* source, uint32 sourceLength, CompiledShader& result);
 
 		static bool CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayout& pipelineLayout,
-			const GraphicsPipelineDesc& pipelineDesc, CompiledPipeline& result);
+			const GraphicsPipelineDesc& desc, CompiledPipeline& result);
 
 		static bool CompileComputePipeline(Platform platform, const CompiledPipelineLayout& pipelineLayout,
-			const ComputePipelineDesc& pipelineDesc, CompiledPipeline& result);
+			const CompiledShader* computeShader, CompiledPipeline& result);
 	};
 }

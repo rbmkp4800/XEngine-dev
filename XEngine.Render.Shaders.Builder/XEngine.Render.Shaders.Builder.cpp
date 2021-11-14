@@ -4,7 +4,7 @@
 #include <XLib.SystemHeapAllocator.h>
 
 #include <XEngine.Render.HAL.ShaderCompiler.h>
-#include <XEngine.Render.Shaders.PackFile.h>
+#include <XEngine.Render.Shaders.PackFormat.h>
 
 #include "XEngine.Render.Shaders.Builder.h"
 
@@ -12,6 +12,22 @@ using namespace XLib;
 using namespace XEngine::Render::HAL::ShaderCompiler;
 using namespace XEngine::Render::Shaders;
 using namespace XEngine::Render::Shaders::Builder_;
+
+bool Builder::loadIndex(const char* indexPath)
+{
+	pipelineLayoutsList.createEntry("TestPipelineLayout", ...);
+	pipelinesList.createGraphicsPipeline(
+		"TestGfxPipeline",
+		pipelineLayoutsList.findEntry("TestPipelineLayout"),
+		Builder_::GraphicsPipelineDesc {
+			.vertexShader = shadersList.findOrCreateEntry(
+				ShaderType::Vertex,
+				sourcesCache.findOrCreateEntry("test.hlsl")),
+			.renderTargetsFormats = { HAL::TexelFormat::R8G8B8A8_UNORM },
+		});
+}
+
+#if 0
 
 static inline ShaderType ShaderTypeFromString(const StringView& str)
 {
@@ -28,8 +44,6 @@ static inline ShaderType ShaderTypeFromString(const StringView& str)
 	}
 	return ShaderType::Undefined;
 }
-
-#if 0
 
 static void CheckShaderDependenciesTimestampsAndUpdateCompilationFlag(Shader& shader,
 	SourcesCache& sourcesCache, const char* rootPath, TimePoint& upToDateObjectWriteTime)
@@ -77,91 +91,8 @@ static void CheckShaderDependenciesTimestampsAndUpdateCompilationFlag(Shader& sh
 	upToDateObjectWriteTime = objectWriteTime;
 }
 
-#endif
-
-bool Builder::loadIndex(const char* shadersListFilePath)
-{
-	File file;
-	file.open(shadersListFilePath, FileAccessMode::Read);
-
-	const uint64 fileSize = file.getSize();
-
-	// TODO: This should be some kind of safe ptr, so we can release on return
-	char* fileContent = (char*)SystemHeapAllocator::Allocate(fileSize);
-
-	uint32 readSize = 0;
-	const bool readResult = file.read(fileContent, fileSize, readSize);
-
-	file.close();
-
-	if (!readResult || readSize != fileSize)
-		return false;
-
-	using JSONNodeId = JSONDocumentTree::NodeId;
-	static constexpr JSONNodeId JSONRootNodeId = JSONDocumentTree::RootNodeId;
-	static constexpr JSONNodeId JSONInvalidNodeId = JSONDocumentTree::InvalidNodeId;
-
-	JSONDocumentTree jsonTree;
-	if (!jsonTree.parse(fileContent))
-		return false;
-
-	if (jsonTree.isEmpty() || !jsonTree.isArray(JSONRootNodeId))
-		return false;
-
-	for (JSONNodeId jsonRootArrayIt = jsonTree.getArrayBegin(JSONRootNodeId);
-		jsonRootArrayIt != JSONInvalidNodeId;
-		jsonRootArrayIt = jsonTree.getArrayNext(jsonRootArrayIt))
-	{
-		if (!jsonTree.isObject(jsonRootArrayIt))
-			return false;
-
-		StringView shaderName = {};
-		StringView shaderTypeStr = {};
-		StringView shaderSourcePath = {};
-		StringView shaderEntryPoint = {};
-
-		if (!jsonTree.getStringProperty(jsonRootArrayIt, "name", shaderName))
-			return false;
-		if (!jsonTree.getStringProperty(jsonRootArrayIt, "type", shaderTypeStr))
-			return false;
-		if (!jsonTree.getStringProperty(jsonRootArrayIt, "src", shaderSourcePath))
-			return false;
-
-		if (shaderName.getLength() > Shader::NameLengthLimit)
-			return false;
-		if (shaderEntryPoint.getLength() > Shader::EntryPointNameLengthLimit)
-			return false;
-		if (shaderSourcePath.getLength() > SourcesCacheEntry::LocalPathLengthLimit)
-			return false;
-
-		const ShaderType shaderType = ShaderTypeFromString(shaderTypeStr);
-		if (shaderType == ShaderType::None)
-			return false;
-
-		const JSONNodeId entryPointNameNodeId = jsonTree.getProperty(jsonRootArrayIt, "entryPoint");
-		if (entryPointNameNodeId != JSONInvalidNodeId)
-		{
-			if (!jsonTree.isString(entryPointNameNodeId))
-				return false;
-			shaderEntryPoint = jsonTree.asString(entryPointNameNodeId);
-		}
-
-		const SourcesCacheEntryId mainSourceId = sourcesCache.findOrCreateEntry(shaderSourcePath);
-
-		Shader* shader = shadersList.createEntry(shaderName, shaderType, mainSourceId);
-		if (!shader)
-		{
-			// Duplicate shader
-			return false;
-		}
-	}
-
-	SystemHeapAllocator::Release(fileContent);
-}
-
 void Builder::build()
 {
-#if 0
 	const bool rebuildAll = !metadataLoadResult;
 	if (rebuildAll)
 	{
@@ -194,7 +125,6 @@ void Builder::build()
 	}
 
 	relinkPack |= !shadersToCompile.isEmpty();
-#endif
 
 	for (Shader& shader : shadersList)
 	{
@@ -203,9 +133,9 @@ void Builder::build()
 	}
 }
 
-void Builder::storePackage(const char* packagePath)
+void Builder::storePack(const char* packagePath)
 {
-	// NOTE: Binary blobs in package should have deterministic order
+	using namespace PackFormat;
 
 	struct PipelineBytecodeObjectsDeduplicationListItem
 	{
@@ -213,7 +143,7 @@ void Builder::storePackage(const char* packagePath)
 		uint32 blobsMapEntryIndex;
 	};
 
-	ArrayList<PackFile::PipelineDesc, uint32, false> serializedPipelines;
+	ArrayList<PipelineDesc, uint32, false> serializedPipelines;
 	serializedPipelines.reserve(pipelinesList.getSize());
 
 	ArrayList<PipelineBlobsDeduplicationListItem, uint32, false> pipelineBlobsDeduplicationList;
@@ -223,7 +153,7 @@ void Builder::storePackage(const char* packagePath)
 	{
 		const CompiledPipeline& compiledPipeline = pipeline.getCompiled();
 
-		PackFile::PipelineDesc& serializedPipelineDesc = serializedPipelines.emplaceBack();
+		PipelineDesc& serializedPipelineDesc = serializedPipelines.emplaceBack();
 		serializedPipelineDesc.nameCRC = pipeline.getNameCRC();
 		serializedPipelineDesc.pipelineLayoutIndex = ...;
 		serializedPipelineDesc.type = pipeline.getType();
@@ -263,7 +193,7 @@ void Builder::storePackage(const char* packagePath)
 		}
 	}
 
-	ArrayList<PackFile::BinaryBlobDesc> serializedBinaryBlobs;
+	ArrayList<BinaryBlobDesc> serializedBinaryBlobs;
 
 	uint32 blobsTotalSizeAccumulator = 0;
 
@@ -271,7 +201,7 @@ void Builder::storePackage(const char* packagePath)
 	{
 		const CompiledPipelineLayout& compiledLayout = PipelineLayout.getCompiled();
 
-		PackFile::BinaryBlobDesc desc = {};
+		BinaryBlobDesc desc = {};
 		desc.offset = blobsTotalSizeAccumulator;
 		desc.size = compiledLayout.getBinaryBlobSize();
 		serializedBinaryBlobs.pushBack(desc);
@@ -282,9 +212,9 @@ void Builder::storePackage(const char* packagePath)
 	File file;
 	file.open(packagePath, FileAccessMode::Write, FileOpenMode::Override);
 
-	PackFile::Header header = {};
-	header.signature = PackFile::Signature;
-	header.version = PackFile::CurrentVersion;
+	Header header = {};
+	header.signature = Signature;
+	header.version = CurrentVersion;
 	header.platformFlags = 0;
 	header.pipelineLayoutCount = 0;
 	header.pipelineCount = 0;
@@ -293,3 +223,5 @@ void Builder::storePackage(const char* packagePath)
 
 	file.close();
 }
+
+#endif
