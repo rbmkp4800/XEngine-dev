@@ -52,7 +52,7 @@ void* SharedDataBufferRef::getMutablePointer()
 	return block + 1;
 }
 
-SharedDataBufferRef SharedDataBufferRef::createReference()
+SharedDataBufferRef SharedDataBufferRef::createReference() const
 {
 	XEAssert(block);
 	block->referenceCount.increment();
@@ -409,7 +409,7 @@ bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayo
 	uint8 bytecodeObjectCount = 0;
 	{
 		auto pushBytecodeObject =
-			[&bytecodeObjects, &bytecodeObjectsCRCs, &bytecodeObjectCount](CompiledShader* shader) -> void
+			[&bytecodeObjects, &bytecodeObjectsCRCs, &bytecodeObjectCount](const CompiledShader* shader) -> void
 		{
 			if (!shader)
 				return;

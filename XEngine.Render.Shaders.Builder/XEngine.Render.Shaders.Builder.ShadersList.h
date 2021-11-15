@@ -45,6 +45,8 @@ namespace XEngine::Render::Shaders::Builder_
 		~Shader() = default;
 
 	public:
+		void compile();
+
 		inline SourcesCacheEntryId getSourceMain() const { return sourceMain; }
 		inline PipelineLayoutRef getPipelineLayout() const { return pipelineLayout; }
 		inline HAL::ShaderCompiler::ShaderType getType() const { return type; }

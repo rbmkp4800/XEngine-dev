@@ -23,6 +23,7 @@ namespace XEngine::Render::Shaders::Builder_
 		XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
 
 		XLib::InplaceString<63, uint8> name;
+
 		HAL::ShaderCompiler::CompiledPipelineLayout compiledPipelineLayout;
 
 	private:
@@ -30,6 +31,8 @@ namespace XEngine::Render::Shaders::Builder_
 		~PipelineLayout() = default;
 
 	public:
+		bool compile();
+
 		inline const HAL::ShaderCompiler::CompiledPipelineLayout& getCompiled() const { return compiledPipelineLayout; }
 	};
 
@@ -44,6 +47,9 @@ namespace XEngine::Render::Shaders::Builder_
 		EntriesStorageList entriesStorageList;
 
 	public:
+		using Iterator = EntriesSearchTree::Iterator;
+
+	public:
 		PipelineLayoutsList() = default;
 		~PipelineLayoutsList() = default;
 
@@ -51,5 +57,8 @@ namespace XEngine::Render::Shaders::Builder_
 
 		PipelineLayoutRef findEntry(const char* name) const;
 		const PipelineLayout& getEntry(PipelineLayoutRef ref) const;
+
+		inline Iterator begin() { return entriesSearchTree.begin(); }
+		inline Iterator end() { return entriesSearchTree.end(); }
 	};
 }

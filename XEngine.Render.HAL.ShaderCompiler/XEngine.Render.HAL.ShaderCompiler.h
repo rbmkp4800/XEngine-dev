@@ -109,7 +109,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 
 			inline void moveFrom(SharedDataBufferRef& that) { release(); block = that.block; that.block = nullptr; }
 
-			SharedDataBufferRef createReference();
+			SharedDataBufferRef createReference() const;
 			void release();
 
 			void* getMutablePointer();
