@@ -57,7 +57,8 @@ namespace XEngine::Render::Shaders::Builder_
 		} src = {};
 		HAL::PipelineType type = HAL::PipelineType::Undefined;
 
-		HAL::ShaderCompiler::CompiledPipeline compiledPipeline;
+		HAL::ShaderCompiler::CompiledGraphicsPipeline compiledGraphicsPipeline;
+		HAL::ShaderCompiler::CompiledShader compiledComputeShader;
 
 	private:
 		Pipeline() = default;
@@ -67,7 +68,8 @@ namespace XEngine::Render::Shaders::Builder_
 		bool compile();
 
 		inline uint64 getNameCRC() const { return nameCRC; }
-		inline const HAL::ShaderCompiler::CompiledPipeline& getCompiled() const { return compiledPipeline; }
+		inline const HAL::ShaderCompiler::CompiledGraphicsPipeline& getCompiledGraphics() const { return compiledGraphicsPipeline; }
+		inline const HAL::ShaderCompiler::CompiledShader& getCompiledCompute() const { return compiledComputeShader; }
 	};
 
 	class PipelinesList : public XLib::NonCopyable

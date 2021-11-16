@@ -816,7 +816,7 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 	return composePipelineHandle(pipelineIndex);
 }
 
-PipelineHandle Device::createComputePipeline(PipelineLayoutHandle pipelineLayoutHandle, ObjectDataView bytecodeObjectData)
+PipelineHandle Device::createComputePipeline(PipelineLayoutHandle pipelineLayoutHandle, ObjectDataView computeShaderObjectData)
 {
 	using namespace ObjectFormat;
 
@@ -830,7 +830,7 @@ PipelineHandle Device::createComputePipeline(PipelineLayoutHandle pipelineLayout
 	pipeline.pipelineLayoutHandle = pipelineLayoutHandle;
 	pipeline.type = PipelineType::Compute;
 
-	const byte* objectDataBytes = (const byte*)bytecodeObjectData.data;
+	const byte* objectDataBytes = (const byte*)computeShaderObjectData.data;
 
 	XEMasterAssert(bytecodeObjectData.size > sizeof(ComputePipelineBytecodeObjectHeader));
 	const PipelineBytecodeObjectHeader& header = *(const PipelineBytecodeObjectHeader*)objectDataBytes;
@@ -840,7 +840,7 @@ PipelineHandle Device::createComputePipeline(PipelineLayoutHandle pipelineLayout
 
 	D3D12_SHADER_BYTECODE d3dCS = {};
 	d3dCS.pShaderBytecode = objectDataBytes + sizeof(PipelineBytecodeObjectHeader);
-	d3dCS.BytecodeLength = bytecodeObjectData.size - sizeof(PipelineBytecodeObjectHeader);
+	d3dCS.BytecodeLength = computeShaderObjectData.size - sizeof(PipelineBytecodeObjectHeader);
 
 	// Compose D3D12 Pipeline State stream
 

@@ -370,7 +370,7 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipeli
 }
 
 bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayout& pipelineLayout,
-	const GraphicsPipelineDesc& desc, CompiledPipeline& result)
+	const GraphicsPipelineDesc& desc, CompiledGraphicsPipeline& result)
 {
 	result.destroy();
 
@@ -425,10 +425,10 @@ bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayo
 		pushBytecodeObject(desc.pixelShader);
 	}
 
-	result.graphicsBaseObjectData = SharedDataBufferRef::AllocateBuffer(sizeof(GraphicsPipelineBaseObject));
+	result.baseObjectData = SharedDataBufferRef::AllocateBuffer(sizeof(GraphicsPipelineBaseObject));
 	{
 		GraphicsPipelineBaseObject& baseObject =
-			*(GraphicsPipelineBaseObject*)result.graphicsBaseObjectData.getMutablePointer();
+			*(GraphicsPipelineBaseObject*)result.baseObjectData.getMutablePointer();
 		baseObject = {};
 		baseObject.generic.signature = GraphicsPipelineBaseObjectSignature;
 		baseObject.generic.objectSize = sizeof(GraphicsPipelineBaseObject);

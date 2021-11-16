@@ -12,7 +12,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 	class CompiledDescriptorBundleLayout;
 	class CompiledPipelineLayout;
 	class CompiledShader;
-	class CompiledPipeline;
+	class CompiledGraphicsPipeline;
 	class Host;
 
 	enum class Platform : uint8
@@ -190,23 +190,23 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		inline DataView getObjectData() const { return objectData.getData(); }
 	};
 
-	class CompiledPipeline : public XLib::NonCopyable
+	class CompiledGraphicsPipeline : public XLib::NonCopyable
 	{
 		friend Host;
 
 	private:
-		Internal::SharedDataBufferRef graphicsBaseObjectData;
+		Internal::SharedDataBufferRef baseObjectData;
 		Internal::SharedDataBufferRef bytecodeObjectsData[MaxGraphicsPipelineBytecodeObjectCount];
 		uint8 bytecodeObjectCount = 0;
 
 	public:
-		CompiledPipeline() = default;
-		~CompiledPipeline() = default;
+		CompiledGraphicsPipeline() = default;
+		~CompiledGraphicsPipeline() = default;
 
-		inline void destroy() { this->~CompiledPipeline(); }
+		inline void destroy() { this->~CompiledGraphicsPipeline(); }
 
 		inline bool isInitialized() const { return bytecodeObjectCount > 0; }
-		inline DataView getGraphicsBaseObjectData() const { return graphicsBaseObjectData.getData(); }
+		inline DataView getBaseObjectData() const { return baseObjectData.getData(); }
 		inline DataView getBytecodeObjectData(uint8 bytecodeObjectIndex) const { return bytecodeObjectsData[bytecodeObjectIndex].getData(); }
 		inline uint8 getBytecodeObjectCount() const { return bytecodeObjectCount; }
 	};
@@ -224,9 +224,6 @@ namespace XEngine::Render::HAL::ShaderCompiler
 			ShaderType shaderType, const char* source, uint32 sourceLength, CompiledShader& result);
 
 		static bool CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayout& pipelineLayout,
-			const GraphicsPipelineDesc& desc, CompiledPipeline& result);
-
-		static bool CompileComputePipeline(Platform platform, const CompiledPipelineLayout& pipelineLayout,
-			const CompiledShader* computeShader, CompiledPipeline& result);
+			const GraphicsPipelineDesc& desc, CompiledGraphicsPipeline& result);
 	};
 }

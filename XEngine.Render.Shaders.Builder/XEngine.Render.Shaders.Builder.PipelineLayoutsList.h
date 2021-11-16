@@ -20,9 +20,19 @@ namespace XEngine::Render::Shaders::Builder_
 		friend PipelineLayoutsList;
 
 	private:
+		struct BindPoint
+		{
+			XLib::InplaceString<31, uint8> name;
+			HAL::PipelineBindPointType type;
+			HAL::ShaderCompiler::PipelineBindPointShaderVisibility shaderVisibility;
+			uint8 constantsSize32bitValues;
+		};
+
+	private:
 		XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
 
 		XLib::InplaceString<63, uint8> name;
+		XLib::ArrayList<BindPoint, uint8> bindPoints;
 
 		HAL::ShaderCompiler::CompiledPipelineLayout compiledPipelineLayout;
 

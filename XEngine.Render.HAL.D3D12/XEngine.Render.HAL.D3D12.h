@@ -429,7 +429,7 @@ namespace XEngine::Render::HAL
 		PipelineHandle createGraphicsPipeline(PipelineLayoutHandle pipelineLayoutHandle,
 			ObjectDataView baseObjectData, const ObjectDataView* bytecodeObjectsData, uint8 bytecodeObjectCount,
 			const RasterizerDesc& rasterizerDesc, const DepthStencilDesc& depthStencilDesc, const BlendDesc& blendDesc);
-		PipelineHandle createComputePipeline(PipelineLayoutHandle pipelineLayoutHandle, ObjectDataView bytecodeObjectData);
+		PipelineHandle createComputePipeline(PipelineLayoutHandle pipelineLayoutHandle, ObjectDataView computeShaderObjectData);
 		void destroyPipeline(PipelineHandle handle);
 
 		FenceHandle createFence(uint64 initialValue);
