@@ -33,6 +33,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.HAL.ShaderCo
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.Shaders.PackFormat", "XEngine.Render.Shaders.PackFormat\XEngine.Render.Shaders.PackFormat.vcxproj", "{E41C3648-B10A-4C33-A052-D98F8ED51AB0}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XUI", "XUI\XUI.vcxproj", "{41B7A650-F2DA-4859-94E6-008619E2D88B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -99,6 +101,10 @@ Global
 		{E41C3648-B10A-4C33-A052-D98F8ED51AB0}.Debug|x64.Build.0 = Debug|x64
 		{E41C3648-B10A-4C33-A052-D98F8ED51AB0}.Release|x64.ActiveCfg = Release|x64
 		{E41C3648-B10A-4C33-A052-D98F8ED51AB0}.Release|x64.Build.0 = Release|x64
+		{41B7A650-F2DA-4859-94E6-008619E2D88B}.Debug|x64.ActiveCfg = Debug|x64
+		{41B7A650-F2DA-4859-94E6-008619E2D88B}.Debug|x64.Build.0 = Debug|x64
+		{41B7A650-F2DA-4859-94E6-008619E2D88B}.Release|x64.ActiveCfg = Release|x64
+		{41B7A650-F2DA-4859-94E6-008619E2D88B}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
