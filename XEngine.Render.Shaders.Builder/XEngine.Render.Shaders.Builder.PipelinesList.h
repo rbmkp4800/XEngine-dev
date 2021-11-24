@@ -68,6 +68,7 @@ namespace XEngine::Render::Shaders::Builder_
 		bool compile();
 
 		inline uint64 getNameCRC() const { return nameCRC; }
+		inline PipelineLayoutRef getPipelineLayout() const { return src.pipelineLayout; }
 		inline const HAL::ShaderCompiler::CompiledGraphicsPipeline& getCompiledGraphics() const { return compiledGraphicsPipeline; }
 		inline const HAL::ShaderCompiler::CompiledShader& getCompiledCompute() const { return compiledComputeShader; }
 	};

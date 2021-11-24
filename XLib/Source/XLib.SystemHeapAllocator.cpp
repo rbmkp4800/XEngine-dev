@@ -31,7 +31,7 @@ void* SystemHeapAllocator::Reallocate(void* ptr, uintptr size)
 	if (ptr)
 		return HeapReAlloc(GetProcessHeap(), 0, ptr, size);
 	else
-		return HeapAlloc(GetProcessHeap(), 0, size);;
+		return HeapAlloc(GetProcessHeap(), 0, size);
 }
 
 bool SystemHeapAllocator::ReallocateInplace(void* ptr, uintptr size)

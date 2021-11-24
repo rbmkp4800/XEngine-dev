@@ -43,6 +43,7 @@ namespace XEngine::Render::Shaders::Builder_
 	public:
 		bool compile();
 
+		inline uint64 getNameCRC() const;
 		inline const HAL::ShaderCompiler::CompiledPipelineLayout& getCompiled() const { return compiledPipelineLayout; }
 	};
 
@@ -67,6 +68,8 @@ namespace XEngine::Render::Shaders::Builder_
 
 		PipelineLayoutRef findEntry(const char* name) const;
 		const PipelineLayout& getEntry(PipelineLayoutRef ref) const;
+
+		inline uint16 getSize() const;
 
 		inline Iterator begin() { return entriesSearchTree.begin(); }
 		inline Iterator end() { return entriesSearchTree.end(); }

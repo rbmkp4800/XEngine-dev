@@ -82,7 +82,7 @@ namespace XLib
 
 		inline StringView getView() const { return StringView(&storage, length); }
 		inline const CharType* getCStr() const { return &storage; }
-		inline const CharType* getData() const { return buffer; }
+		inline const CharType* getData() const { return &storage; }
 		inline CounterType getLength() const { return length; }
 		inline bool isEmpty() const { return length == 0; }
 		inline bool isFull() const { return length + 1 == Capacity; }

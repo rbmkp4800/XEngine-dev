@@ -59,4 +59,22 @@ namespace XLib
 		template <typename Type>
 		static inline uint32 Compute(const Type& data) { return Compute(&data, sizeof(data)); }
 	};
+
+	class CRC64
+	{
+	private:
+		uint64 value = 0;
+
+	public:
+		static uint64 Compute(const void* data, uintptr size, uint64 seed = 0);
+
+		inline void process(const void* data, uintptr size) { value = Compute(data, size, value); }
+		inline uint64 getValue() { return value; }
+		inline void reset() { value = 0; }
+
+		template <typename Type>
+		inline void process(const Type& data) { process(&data, sizeof(data)); }
+		template <typename Type>
+		static inline uint64 Compute(const Type& data) { return Compute(&data, sizeof(data)); }
+	};
 }

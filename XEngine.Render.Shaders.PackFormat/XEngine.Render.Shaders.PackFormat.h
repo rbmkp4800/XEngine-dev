@@ -4,38 +4,48 @@
 
 namespace XEngine::Render::Shaders::PackFormat
 {
-	static constexpr uint32 Signature = 0;
-	static constexpr uint16 CurrentVersion = 1;
+	static constexpr uint32 PackSignature = 0;
+	static constexpr uint16 PackCurrentVersion = 1;
 
-	enum class PipelineType : uint8
-	{
-		Graphics,
-		Compute,
-	};
-
-	struct Header
+	struct PackHeader
 	{
 		uint32 signature;
 		uint16 version;
-		uint16 platformFlags;
 		uint16 pipelineLayoutCount;
 		uint16 pipelineCount;
-		uint32 pipelineBytecodeObjectsMapSize;
-		uint32 objectCount;
+		uint16 bytecodeObjectCount;
+		uint32 objectsBaseOffset;
 	};
 
-	struct PipelineDesc
-	{
-		uint64 nameCRC;
-		uint16 pipelineLayoutIndex;
-		PipelineType type;
-		uint8 bytecodeObjectCount;
-		uint32 bytecodeObjectsMapOffset;
-	};
-
-	struct ObjectDesc
+	struct ObjectRecord // 12 bytes
 	{
 		uint32 offset;
 		uint32 size;
+		uint32 crc;
+	};
+
+	struct PipelineLayoutRecord // 20 bytes
+	{
+		uint64 nameCRC;
+		ObjectRecord object;
+	};
+
+	struct PipelineRecord // 32 bytes
+	{
+		// 0..7
+		uint64 nameCRC;
+
+		// 8..9
+		struct
+		{
+			uint pipelineLayoutIndex : 15;
+			bool isGraphics : 1;
+		};
+
+		// 10..19
+		uint16 bytecodeObjectsIndices[5];
+
+		// 20..31
+		ObjectRecord graphicsBaseObject;
 	};
 }

@@ -84,50 +84,65 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		TexelFormat depthStencilFormat;
 	};
 
-	struct DataView
+	struct ObjectHash
 	{
-		const void* data;
-		uint32 size;
+		uint64 a;
+		uint64 b;
 	};
 
-	namespace Internal
+	class Object : public XLib::NonCopyable
 	{
-		class SharedDataBufferRef : public XLib::NonCopyable
+		friend Host;
+
+	private:
+		struct alignas(32) BlockHeader
 		{
-		private:
-			struct BlockHeader;
-
-		private:
-			BlockHeader* block = nullptr;
-
-		public:
-			SharedDataBufferRef() = default;
-			inline ~SharedDataBufferRef() { release(); }
-
-			inline SharedDataBufferRef(SharedDataBufferRef&& that) { moveFrom(that); }
-			inline void operator = (SharedDataBufferRef&& that) { moveFrom(that); }
-
-			inline void moveFrom(SharedDataBufferRef& that) { release(); block = that.block; that.block = nullptr; }
-
-			SharedDataBufferRef createReference() const;
-			void release();
-
-			void* getMutablePointer();
-
-			DataView getData() const;
-			inline bool isValid() const { return block != nullptr; }
-
-		public:
-			static SharedDataBufferRef AllocateBuffer(uint32 size);
+			volatile uint32 referenceCount;
+			uint32 dataSize;
+			ObjectHash hash;
+			bool finalized;
 		};
-	}
+
+	private:
+		BlockHeader* block = nullptr;
+
+	private:
+		void fillGenericHeaderAndFinalize(uint64 signature);
+
+	public:
+		Object() = default;
+		~Object();
+
+		inline Object(Object&& that) { moveFrom(that); }
+		inline void operator = (Object&& that) { moveFrom(that); }
+
+		inline void release() { this->~Object(); }
+		inline void moveFrom(Object& that) { release(); block = that.block; that.block = nullptr; }
+
+		void finalize();
+		Object clone() const;
+
+		inline void* getMutableData() { XEAssert(block && !block->finalized); return block + 1; }
+		inline const void* getData() const { XEAssert(block && block->finalized); return block + 1; }
+		inline uint32 getSize() const { XEAssert(block); return block->dataSize; }
+
+		inline ObjectHash getHash() const { XEAssert(block && block->finalized); return block->hash; }
+
+		inline uint32 getCRC() const;
+
+		inline bool isInitialized() const { return block != nullptr; }
+		inline bool isValid() const { return block ? block->finalized : false; }
+
+	public:
+		static Object Create(uint32 size);
+	};
 
 	class CompiledDescriptorBundleLayout : public XLib::NonCopyable
 	{
 		friend Host;
 
 	private:
-		Internal::SharedDataBufferRef objectData;
+		Object object;
 
 	public:
 		CompiledDescriptorBundleLayout() = default;
@@ -135,8 +150,8 @@ namespace XEngine::Render::HAL::ShaderCompiler
 
 		inline void destroy() { this->~CompiledDescriptorBundleLayout(); }
 
-		inline bool isInitialized() const { return objectData.isValid(); }
-		inline DataView getObjectData() const { return objectData.getData(); }
+		inline bool isInitialized() const { return object.isValid(); }
+		inline const Object& getObject() const { return object; }
 	};
 
 	class CompiledPipelineLayout : public XLib::NonCopyable
@@ -151,7 +166,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		};
 
 	private:
-		Internal::SharedDataBufferRef objectData;
+		Object object;
 		BindPointMetadata bindPointsMetadata[MaxPipelineBindPointCount] = {};
 
 	private:
@@ -164,8 +179,8 @@ namespace XEngine::Render::HAL::ShaderCompiler
 
 		inline void destroy() { this->~CompiledPipelineLayout(); }
 
-		inline bool isInitialized() const { return objectData.isValid(); }
-		inline DataView getObjectData() const;
+		inline bool isInitialized() const { return object.isValid(); }
+		inline const Object& getObject() const { return object; }
 	};
 
 	class CompiledShader : public XLib::NonCopyable
@@ -173,10 +188,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		friend Host;
 
 	private:
-		Internal::SharedDataBufferRef objectData;
-
-	private:
-		uint32 getObjectCRC() const;
+		Object object;
 
 	public:
 		CompiledShader() = default;
@@ -186,8 +198,8 @@ namespace XEngine::Render::HAL::ShaderCompiler
 
 		ShaderType getShaderType() const;
 
-		inline bool isInitialized() const { return objectData.isValid(); }
-		inline DataView getObjectData() const { return objectData.getData(); }
+		inline bool isInitialized() const { return object.isValid(); }
+		inline const Object& getObject() const { return object; }
 	};
 
 	class CompiledGraphicsPipeline : public XLib::NonCopyable
@@ -195,8 +207,8 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		friend Host;
 
 	private:
-		Internal::SharedDataBufferRef baseObjectData;
-		Internal::SharedDataBufferRef bytecodeObjectsData[MaxGraphicsPipelineBytecodeObjectCount];
+		Object baseObject;
+		Object bytecodeObjects[MaxGraphicsPipelineBytecodeObjectCount];
 		uint8 bytecodeObjectCount = 0;
 
 	public:
@@ -206,8 +218,8 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		inline void destroy() { this->~CompiledGraphicsPipeline(); }
 
 		inline bool isInitialized() const { return bytecodeObjectCount > 0; }
-		inline DataView getBaseObjectData() const { return baseObjectData.getData(); }
-		inline DataView getBytecodeObjectData(uint8 bytecodeObjectIndex) const { return bytecodeObjectsData[bytecodeObjectIndex].getData(); }
+		inline const Object& getBaseObject() const { return baseObject; }
+		inline const Object& getBytecodeObject(uint8 bytecodeObjectIndex) const { return bytecodeObjects[bytecodeObjectIndex]; }
 		inline uint8 getBytecodeObjectCount() const { return bytecodeObjectCount; }
 	};
 

@@ -1,5 +1,5 @@
 #include <XLib.h>
-#include <XLib.JSON.h>
+#include <XLib.Containers.FlatHashMap.h>
 #include <XLib.System.File.h>
 #include <XLib.SystemHeapAllocator.h>
 
@@ -32,6 +32,107 @@ void Builder::build()
 
 	for (Shader& shader : shadersList)
 		shader.compile();
+}
+
+void Builder::composePack(const char* packPath)
+{
+	using namespace PackFormat;
+
+	ArrayList<Object> genericObjects;
+	uint32 genericObjectsOffsetAccum = 0;
+
+	ArrayList<PipelineLayoutRecord> pipelineLayoutRecords;
+	FlatHashMap<uint64, uint16> pipelineLayoutNameCRCToGenericObjectIdxMap;
+
+	pipelineLayoutRecords.reserve(pipelineLayoutsList.getSize());
+	for (PipelineLayout& pipelineLayout : pipelineLayoutsList)
+	{
+		const Object& object = pipelineLayout.getCompiled().getObject();
+
+		PipelineLayoutRecord& record = pipelineLayoutRecords.pushBack(PipelineLayoutRecord{});
+		record.nameCRC = pipelineLayout.getNameCRC();
+
+		record.object.offset = genericObjectsOffsetAccum;
+		record.object.size = object.getSize();
+		record.object.crc = object.getCRC();
+		genericObjectsOffsetAccum += object.getSize();
+
+		const uint32 objectIndexU32 = genericObjects.getSize();
+		genericObjects.emplaceBack(object.clone());
+
+		XEAssert(objectIndexU32 < uint16(-1));
+		const uint16 objectIndex = uint16(objectIndexU32);
+
+		pipelineLayoutNameCRCToGenericObjectIdxMap.insert(pipelineLayout.getNameCRC(), uint16(objectIndex));
+	}
+
+	ArrayList<Object> bytecodeObjects;
+	FlatHashMap<ObjectHash, uint16> bytecodeObjectHashToIdxMap;
+
+	ArrayList<PipelineRecord> pipelineRecords;
+	pipelineRecords.reserve(pipelinesList.getSize());
+	for (Pipeline& pipeline : pipelinesList)
+	{
+		const PipelineLayout& pipelineLayout = pipelineLayoutsList.getEntry(pipeline.getPipelineLayout());
+		// TODO: Check if element does not exist
+		const uint16 pipelineLayoutIndex = *pipelineLayoutNameCRCToGenericObjectIdxMap.find(pipelineLayout.getNameCRC());
+
+		const bool isGraphics = pipeline. ...;
+
+		PipelineRecord& record = pipelineRecords.pushBack(PipelineRecord{});
+		record.nameCRC = pipeline.getNameCRC();
+		record.pipelineLayoutIndex = pipelineLayoutIndex;
+		record.isGraphics = isGraphics;
+
+		if (isGraphics)
+		{
+			const CompiledGraphicsPipeline& compiled = pipeline.getCompiledGraphics();
+			const Object& baseObject = compiled.getBaseObject();
+
+			record.graphicsBaseObject.offset = genericObjectsOffsetAccum;
+			record.graphicsBaseObject.size = baseObject.getSize();
+			record.graphicsBaseObject.crc = baseObject.getCRC();
+			genericObjectsOffsetAccum += baseObject.getSize();
+
+			genericObjects.emplaceBack(baseObject.clone());
+		}
+		else
+		{
+			const CompiledShader& compiled =  pipeline.getCompiledCompute();
+			record.bytecodeObjectsIndices[0] = ...;
+		}
+	}
+
+	uint32 bytecodeObjectOffsetAccum = 0;
+	bytecodeObjectOffsetAccum += genericObjectsOffsetAccum; // Bytecode objects go after generic objects
+
+	ArrayList<ObjectRecord> bytecodeObjectRecords;
+	bytecodeObjectRecords.reserve(bytecodeObjects.getSize());
+	for (const Object& object : bytecodeObjects)
+	{
+		ObjectRecord& record = bytecodeObjectRecords.pushBack(ObjectRecord{});
+		record.offset = bytecodeObjectOffsetAccum;
+		record.size = object.getSize();
+		record.crc = object.getCRC();
+		bytecodeObjectOffsetAccum += object.getSize();
+	}
+
+	File file;
+	file.open(packPath, FileAccessMode::Write, FileOpenMode::Override);
+
+	PackHeader header = {};
+	header.signature = PackSignature;
+	header.version = PackCurrentVersion;
+	header.pipelineLayoutCount = pipelineLayoutRecords.getSize();
+	header.pipelineCount = pipelineRecords.getSize();
+	header.bytecodeObjectCount = bytecodeObjectRecords.getSize();
+	file.write(header);
+
+	file.write(pipelineLayoutRecords.getData(), pipelineLayoutRecords.getSize() * sizeof(PipelineLayoutRecord));
+	file.write(pipelineRecords.getData(), pipelineRecords.getSize() * sizeof(PipelineRecord));
+	file.write(bytecodeObjectRecords.getData(), bytecodeObjectRecords.getSize() * sizeof(ObjectRecord));
+
+	file.close();
 }
 
 #if 0
@@ -138,97 +239,6 @@ void Builder::build()
 		const PipelineLayout& pipelineLayout = pipelineLayoutsList.getEntry(shader.getPipelineLayout());
 		Host::CompileShader(Platform::D3D12, pipelineLayout.getCompiled(), shader.getType(), ...);
 	}
-}
-
-void Builder::storePack(const char* packagePath)
-{
-	using namespace PackFormat;
-
-	struct PipelineBytecodeObjectsDeduplicationListItem
-	{
-		BinaryBlob* blob;
-		uint32 blobsMapEntryIndex;
-	};
-
-	ArrayList<PipelineDesc, uint32, false> serializedPipelines;
-	serializedPipelines.reserve(pipelinesList.getSize());
-
-	ArrayList<PipelineBlobsDeduplicationListItem, uint32, false> pipelineBlobsDeduplicationList;
-
-	uint32 pipelineBlobsMapEntryIndexAccum = 0;
-	for (const Pipeline& pipeline : pipelinesList)
-	{
-		const CompiledPipeline& compiledPipeline = pipeline.getCompiled();
-
-		PipelineDesc& serializedPipelineDesc = serializedPipelines.emplaceBack();
-		serializedPipelineDesc.nameCRC = pipeline.getNameCRC();
-		serializedPipelineDesc.pipelineLayoutIndex = ...;
-		serializedPipelineDesc.type = pipeline.getType();
-		serializedPipelineDesc.binaryBlobCount = pipelineBlobs.getSize();
-		serializedPipelineDesc.binaryBlobsMapOffset = pipelineBlobsMapEntryIndexAccum;
-
-		for (BinaryBlob* blob : pipelineBlobs)
-		{
-			PipelineBlobsDeduplicationListItem& item = pipelineBlobsDeduplicationList.emplaceBack();
-			item.blob = blob;
-			item.blobsMapEntryIndex = pipelineBlobsMapEntryIndexAccum;
-			pipelineBlobsMapEntryIndexAccum++;
-		}
-	}
-	pipelineBlobsDeduplicationList.compact();
-
-	const uint32 pipelineBlobsMapSize = pipelineBlobsMapEntryIndexAccum;
-
-	Sort(pipelineBlobsDeduplicationList, ...);
-
-	ArrayList<uint32, uint32, false> pipelineBlobsMap;
-	pipelineBlobsMap.resize(pipelineBlobsMapSize);
-
-	{
-		BinaryBlob* prevDeduplicatedBlob = nullptr;
-		uint32 prevDeduplicatedBlobsMapEntryIndex = 0;
-		for (PipelineBlobsDeduplicationListItem& item : pipelineBlobsDeduplicationList)
-		{
-			if (prevDeduplicatedBlob != item.blob)
-			{
-				prevDeduplicatedBlob = item.blob;
-				prevDeduplicatedBlobsMapEntryIndex = item.blobsMapEntryIndex;
-			}
-
-			ASSERT(item.blobsMapEntryIndex < pipelineBlobsMapSize);
-			pipelineBlobsMap[item.blobsMapEntryIndex] = prevDeduplicatedBlobsMapEntryIndex;
-		}
-	}
-
-	ArrayList<BinaryBlobDesc> serializedBinaryBlobs;
-
-	uint32 blobsTotalSizeAccumulator = 0;
-
-	for (const PipelineLayout& PipelineLayout : pipelineLayoutsList)
-	{
-		const CompiledPipelineLayout& compiledLayout = PipelineLayout.getCompiled();
-
-		BinaryBlobDesc desc = {};
-		desc.offset = blobsTotalSizeAccumulator;
-		desc.size = compiledLayout.getBinaryBlobSize();
-		serializedBinaryBlobs.pushBack(desc);
-
-		blobsTotalSizeAccumulator += compiledLayout.getBinaryBlobSize();
-	}
-
-	File file;
-	file.open(packagePath, FileAccessMode::Write, FileOpenMode::Override);
-
-	Header header = {};
-	header.signature = Signature;
-	header.version = CurrentVersion;
-	header.platformFlags = 0;
-	header.pipelineLayoutCount = 0;
-	header.pipelineCount = 0;
-	header.binaryBlobCount = 0;
-	file.write(header);
-
-	file.close();
 }
 
 #endif
