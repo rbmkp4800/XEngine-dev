@@ -100,6 +100,13 @@ namespace XEngine::Render::HAL
 		RaytracingAccelerationStructure,
 	};
 
+	enum class PipelineType : uint8
+	{
+		Undefined = 0,
+		Graphics,
+		Compute,
+	};
+
 	enum class CommandListType : uint8
 	{
 		Undefined = 0,
@@ -288,7 +295,6 @@ namespace XEngine::Render::HAL
 
 		void bindConstants(PipelineBindPointId bindPointId, const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0);
 
-		void bindConstants(uint32 bindPointNameCRC, const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0);
 		void bindConstants(uint32 bindPointNameCRC, const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0);
 		void bindBuffer(BufferBindType bindType, uint32 bindPointNameCRC, ResourceHandle bufferHandle, uint32 offset = 0);
 		void bindDescriptor(uint32 bindPointNameCRC, DescriptorAddress address);

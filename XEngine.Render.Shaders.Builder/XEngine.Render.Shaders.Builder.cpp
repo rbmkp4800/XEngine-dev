@@ -1,4 +1,5 @@
 #include <XLib.h>
+#include <XLib.Containers.ArrayList.h>
 #include <XLib.Containers.FlatHashMap.h>
 #include <XLib.System.File.h>
 #include <XLib.SystemHeapAllocator.h>
@@ -38,14 +39,20 @@ void Builder::composePack(const char* packPath)
 {
 	using namespace PackFormat;
 
-	ArrayList<Object> genericObjects;
+	ArrayList<PipelineLayoutRecord> pipelineLayoutRecords;
+	ArrayList<PipelineRecord> pipelineRecords;
+	ArrayList<ObjectRecord> bytecodeObjectRecords;
+
+	ArrayList<Object, uint16> genericObjects;
+	ArrayList<Object, uint16> bytecodeObjects;
+
+	FlatHashMap<uint64, uint16> pipelineLayoutNameCRCToGenericObjectIdxMap;
+	FlatHashMap<ObjectHash, uint16> bytecodeObjectHashToIdxMap;
+
 	uint32 genericObjectsOffsetAccum = 0;
 
-	ArrayList<PipelineLayoutRecord> pipelineLayoutRecords;
-	FlatHashMap<uint64, uint16> pipelineLayoutNameCRCToGenericObjectIdxMap;
-
 	pipelineLayoutRecords.reserve(pipelineLayoutsList.getSize());
-	for (PipelineLayout& pipelineLayout : pipelineLayoutsList)
+	for (PipelineLayout& pipelineLayout : pipelineLayoutsList) // Pipeline layouts are iterated in order of name CRC increase
 	{
 		const Object& object = pipelineLayout.getCompiled().getObject();
 
@@ -57,65 +64,96 @@ void Builder::composePack(const char* packPath)
 		record.object.crc = object.getCRC();
 		genericObjectsOffsetAccum += object.getSize();
 
-		const uint32 objectIndexU32 = genericObjects.getSize();
+		const uint16 objectIndex = genericObjects.getSize();
 		genericObjects.emplaceBack(object.clone());
 
-		XEAssert(objectIndexU32 < uint16(-1));
-		const uint16 objectIndex = uint16(objectIndexU32);
-
-		pipelineLayoutNameCRCToGenericObjectIdxMap.insert(pipelineLayout.getNameCRC(), uint16(objectIndex));
+		pipelineLayoutNameCRCToGenericObjectIdxMap.insert(pipelineLayout.getNameCRC(), objectIndex);
 	}
 
-	ArrayList<Object> bytecodeObjects;
-	FlatHashMap<ObjectHash, uint16> bytecodeObjectHashToIdxMap;
-
-	ArrayList<PipelineRecord> pipelineRecords;
 	pipelineRecords.reserve(pipelinesList.getSize());
-	for (Pipeline& pipeline : pipelinesList)
+	for (Pipeline& pipeline : pipelinesList) // Pipelines are iterated in order of name CRC increase
 	{
 		const PipelineLayout& pipelineLayout = pipelineLayoutsList.getEntry(pipeline.getPipelineLayout());
 		// TODO: Check if element does not exist
 		const uint16 pipelineLayoutIndex = *pipelineLayoutNameCRCToGenericObjectIdxMap.find(pipelineLayout.getNameCRC());
 
-		const bool isGraphics = pipeline. ...;
+		const bool isGraphics = pipeline.isGraphics();
 
-		PipelineRecord& record = pipelineRecords.pushBack(PipelineRecord{});
-		record.nameCRC = pipeline.getNameCRC();
-		record.pipelineLayoutIndex = pipelineLayoutIndex;
-		record.isGraphics = isGraphics;
+		PipelineRecord& pipelineRecord = pipelineRecords.pushBack(PipelineRecord{});
+		pipelineRecord.nameCRC = pipeline.getNameCRC();
+		pipelineRecord.pipelineLayoutIndex = pipelineLayoutIndex;
+		pipelineRecord.isGraphics = isGraphics;
+
+		auto deduplicateBytecodeObject = [&bytecodeObjectHashToIdxMap, &bytecodeObjects](const Object& object) -> uint16
+		{
+			const uint16* existingObjectIndexIt = bytecodeObjectHashToIdxMap.find(object.getHash());
+			if (existingObjectIndexIt)
+				return *existingObjectIndexIt;
+			
+			const uint16 objectIndex = bytecodeObjects.getSize();
+			bytecodeObjects.emplaceBack(object.clone());
+			bytecodeObjectHashToIdxMap.insert(object.getHash(), objectIndex);
+			return objectIndex;
+		};
+
+		uint8 bytecodeObjectCount = 0;
 
 		if (isGraphics)
 		{
 			const CompiledGraphicsPipeline& compiled = pipeline.getCompiledGraphics();
-			const Object& baseObject = compiled.getBaseObject();
 
-			record.graphicsBaseObject.offset = genericObjectsOffsetAccum;
-			record.graphicsBaseObject.size = baseObject.getSize();
-			record.graphicsBaseObject.crc = baseObject.getCRC();
-			genericObjectsOffsetAccum += baseObject.getSize();
+			// Base object
+			{
+				const Object& baseObject = compiled.getBaseObject();
 
-			genericObjects.emplaceBack(baseObject.clone());
+				pipelineRecord.graphicsBaseObject.offset = genericObjectsOffsetAccum;
+				pipelineRecord.graphicsBaseObject.size = baseObject.getSize();
+				pipelineRecord.graphicsBaseObject.crc = baseObject.getCRC();
+				genericObjectsOffsetAccum += baseObject.getSize();
+
+				genericObjects.emplaceBack(baseObject.clone());
+			}
+
+			// Bytecode objects
+			XEAssert(compiled.getBytecodeObjectCount() < countof(pipelineRecord.bytecodeObjectsIndices));
+			for (uint8 i = 0; i < compiled.getBytecodeObjectCount(); i++)
+				pipelineRecord.bytecodeObjectsIndices[i] = deduplicateBytecodeObject(compiled.getBytecodeObject(i));
+			bytecodeObjectCount = compiled.getBytecodeObjectCount();
 		}
 		else
 		{
-			const CompiledShader& compiled =  pipeline.getCompiledCompute();
-			record.bytecodeObjectsIndices[0] = ...;
+			pipelineRecord.bytecodeObjectsIndices[0] = deduplicateBytecodeObject(pipeline.getCompiledCompute().getObject());
+			bytecodeObjectCount = 1;
 		}
+
+		for (uint8 i = bytecodeObjectCount; i < countof(pipelineRecord.bytecodeObjectsIndices); i++)
+			pipelineRecord.bytecodeObjectsIndices[i] = uint16(-1);
 	}
 
-	uint32 bytecodeObjectOffsetAccum = 0;
-	bytecodeObjectOffsetAccum += genericObjectsOffsetAccum; // Bytecode objects go after generic objects
+	const uint32 genericObjectsTotalSize = genericObjectsOffsetAccum;
 
-	ArrayList<ObjectRecord> bytecodeObjectRecords;
+	const uint32 bytecodeObjectsBaseOffset = genericObjectsTotalSize;
+	uint32 bytecodeObjectOffsetAccum = 0;
+
 	bytecodeObjectRecords.reserve(bytecodeObjects.getSize());
 	for (const Object& object : bytecodeObjects)
 	{
 		ObjectRecord& record = bytecodeObjectRecords.pushBack(ObjectRecord{});
-		record.offset = bytecodeObjectOffsetAccum;
+		record.offset = bytecodeObjectOffsetAccum + bytecodeObjectsBaseOffset;
 		record.size = object.getSize();
 		record.crc = object.getCRC();
 		bytecodeObjectOffsetAccum += object.getSize();
 	}
+
+	const uint32 bytecodeObjectsTotalSize = bytecodeObjectOffsetAccum;
+
+	const uint32 pipelineLayoutRecordsSizeBytes = pipelineLayoutRecords.getSize() * sizeof(PipelineLayoutRecord);
+	const uint32 pipelineRecordsSizeBytes = pipelineRecords.getSize() * sizeof(PipelineRecord);
+	const uint32 bytecodeObjectRecordsSizeBytes = bytecodeObjectRecords.getSize() * sizeof(ObjectRecord);
+	const uint32 objectsBaseOffset = sizeof(PackHeader) +
+		pipelineLayoutRecordsSizeBytes +
+		pipelineRecordsSizeBytes +
+		bytecodeObjectRecordsSizeBytes;
 
 	File file;
 	file.open(packPath, FileAccessMode::Write, FileOpenMode::Override);
@@ -126,11 +164,29 @@ void Builder::composePack(const char* packPath)
 	header.pipelineLayoutCount = pipelineLayoutRecords.getSize();
 	header.pipelineCount = pipelineRecords.getSize();
 	header.bytecodeObjectCount = bytecodeObjectRecords.getSize();
+	header.objectsBaseOffset = objectsBaseOffset;
 	file.write(header);
 
-	file.write(pipelineLayoutRecords.getData(), pipelineLayoutRecords.getSize() * sizeof(PipelineLayoutRecord));
-	file.write(pipelineRecords.getData(), pipelineRecords.getSize() * sizeof(PipelineRecord));
-	file.write(bytecodeObjectRecords.getData(), bytecodeObjectRecords.getSize() * sizeof(ObjectRecord));
+	file.write(pipelineLayoutRecords.getData(), pipelineLayoutRecordsSizeBytes);
+	file.write(pipelineRecords.getData(), pipelineRecordsSizeBytes);
+	file.write(bytecodeObjectRecords.getData(), bytecodeObjectRecordsSizeBytes);
+
+	uint32 genericObjectsTotalSizeCheck = 0;
+	for (const Object& object : genericObjects)
+	{
+		file.write(object.getData(), object.getSize());
+		genericObjectsTotalSizeCheck += object.getSize();
+	}
+
+	uint32 bytecodeObjectsTotalSizeCheck = 0;
+	for (const Object& object : bytecodeObjects)
+	{
+		file.write(object.getData(), object.getSize());
+		bytecodeObjectsTotalSizeCheck += object.getSize();
+	}
+
+	XEAssert(genericObjectsTotalSizeCheck == genericObjectsTotalSize);
+	XEAssert(bytecodeObjectsTotalSizeCheck == bytecodeObjectsTotalSize);
 
 	file.close();
 }

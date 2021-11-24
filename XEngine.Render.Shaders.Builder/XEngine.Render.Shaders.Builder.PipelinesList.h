@@ -34,31 +34,14 @@ namespace XEngine::Render::Shaders::Builder_
 
 		XLib::InplaceString<63, uint8> name;
 		uint64 nameCRC = 0;
+		PipelineLayoutRef pipelineLayout = ZeroPipelineLayoutRef;
 
-		struct
-		{
-			PipelineLayoutRef pipelineLayout = ZeroPipelineLayoutRef;
-			union
-			{
-				struct
-				{
-					ShaderRef computeShader;
-				};
-				struct
-				{
-					ShaderRef vertexShader;
-					ShaderRef amplificationShader;
-					ShaderRef meshShader;
-					ShaderRef pixelShader;
-					HAL::TexelFormat renderTargetsFormats[HAL::MaxRenderTargetCount];
-					HAL::TexelFormat depthStencilFormat;
-				};
-			};
-		} src = {};
-		HAL::PipelineType type = HAL::PipelineType::Undefined;
+		ShaderRef computeShader = ZeroShaderRef;
+		GraphicsPipelineDesc graphicsDesc = {};
+		bool isGraphics = false;
 
-		HAL::ShaderCompiler::CompiledGraphicsPipeline compiledGraphicsPipeline;
 		HAL::ShaderCompiler::CompiledShader compiledComputeShader;
+		HAL::ShaderCompiler::CompiledGraphicsPipeline compiledGraphicsPipeline;
 
 	private:
 		Pipeline() = default;
@@ -68,9 +51,10 @@ namespace XEngine::Render::Shaders::Builder_
 		bool compile();
 
 		inline uint64 getNameCRC() const { return nameCRC; }
-		inline PipelineLayoutRef getPipelineLayout() const { return src.pipelineLayout; }
-		inline const HAL::ShaderCompiler::CompiledGraphicsPipeline& getCompiledGraphics() const { return compiledGraphicsPipeline; }
+		inline PipelineLayoutRef getPipelineLayout() const { return pipelineLayout; }
+		inline bool isGraphics() const { return isGraphics; }
 		inline const HAL::ShaderCompiler::CompiledShader& getCompiledCompute() const { return compiledComputeShader; }
+		inline const HAL::ShaderCompiler::CompiledGraphicsPipeline& getCompiledGraphics() const { return compiledGraphicsPipeline; }
 	};
 
 	class PipelinesList : public XLib::NonCopyable

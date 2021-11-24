@@ -81,7 +81,6 @@ namespace XEngine::Render::Shaders::Builder_
 		ShadersList() = default;
 		~ShadersList() = default;
 
-		// returns null if entry with this name already exists
 		ShaderRef findOrCreateEntry(HAL::ShaderCompiler::ShaderType type, SourcesCacheEntryId mainSourceId);
 
 		inline bool isEmpty() const { return entriesStorageList.isEmpty(); }
