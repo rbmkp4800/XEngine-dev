@@ -17,6 +17,5 @@ bool PipelineLayout::compile()
 		dst.constantsSize32bitValues = src.constantsSize32bitValues;
 	}
 
-	return Host::CompilePipelineLayout(Platform::D3D12,
-		PipelineLayoutDesc{ bindPointDescs, bindPoints.getSize() }, compiledPipelineLayout);
+	return Host::CompilePipelineLayout(Platform::D3D12, bindPointDescs, bindPoints.getSize(), compiledPipelineLayout);
 }

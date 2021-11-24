@@ -38,6 +38,14 @@ static inline PipelineBytecodeObjectType TranslateShaderTypeToPipelineBytecodeOb
 	XEAssertUnreachableCode();
 }
 
+static inline ObjectHash CalculateObjectHash(const void* data, uint32 size)
+{
+	ObjectHash result = {};
+	result.a = CRC64::Compute(data, size, 0xD2D6'86F0'85FF'DA5Dull);
+	result.b = CRC64::Compute(data, size, 0x632F'54B8'E9F8'FC2Dull);
+	return result;
+}
+
 void Object::fillGenericHeaderAndFinalize(uint64 signature)
 {
 	XEAssert(block);
@@ -53,8 +61,7 @@ void Object::fillGenericHeaderAndFinalize(uint64 signature)
 	const uint32 crc = CRC32::Compute(data, block->dataSize);
 	header.objectCRC = crc;
 
-	block->hashA = CRC64::Compute(block + 1, block->dataSize);
-	block->hashB = 0; // TODO: ...
+	block->hash = CalculateObjectHash(block + 1, block->dataSize);
 	block->finalized = true;
 }
 
@@ -74,8 +81,7 @@ void Object::finalize()
 	XEAssert(block);
 	XEAssert(!block->finalized);
 
-	block->hashA = CRC64::Compute(block + 1, block->dataSize);
-	block->hashB = 0; // TODO: ...
+	block->hash = CalculateObjectHash(block + 1, block->dataSize);
 	block->finalized = true;
 
 	// TODO: Check object header itself
@@ -99,8 +105,7 @@ Object Object::Create(uint32 size)
 	object.block = (BlockHeader*)SystemHeapAllocator::Allocate(sizeof(BlockHeader) + size);
 	object.block->referenceCount = 1;
 	object.block->dataSize = size;
-	object.block->hashA = 0;
-	object.block->hashB = 0;
+	object.block->hash = {};
 	object.block->finalized = false;
 	return object;
 }
@@ -140,11 +145,12 @@ ShaderType CompiledShader::getShaderType() const
 	XEAssertUnreachableCode();
 }
 
-bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& desc, CompiledPipelineLayout& result)
+bool Host::CompilePipelineLayout(Platform platform,
+	const PipelineBindPointDesc* bindPoints, const uint8 bindPointCount, CompiledPipelineLayout& result)
 {
 	result.destroy();
 
-	if (desc.bindPointCount >= MaxPipelineBindPointCount)
+	if (bindPointCount >= MaxPipelineBindPointCount)
 		return false;
 
 	// TODO: Check for non-unique bind point names
@@ -157,9 +163,9 @@ bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& de
 	uint8 cbvRegisterCount = 0;
 	uint8 srvRegisterCount = 0;
 	uint8 uavRegisterCount = 0;
-	for (uint32 i = 0; i < desc.bindPointCount; i++)
+	for (uint32 i = 0; i < bindPointCount; i++)
 	{
-		const PipelineBindPointDesc& bindPointDesc = desc.bindPoints[i];
+		const PipelineBindPointDesc& bindPointDesc = bindPoints[i];
 		PipelineBindPointRecord& objectBindPointRecord = bindPointRecords[i];
 		CompiledPipelineLayout::BindPointMetadata& bindPointMetadata = bindPointsMetadata[i];
 
@@ -248,7 +254,7 @@ bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& de
 
 	const uint32 headerOffset = 0;
 	const uint32 bindPointRecordsOffset = headerOffset + sizeof(PipelineLayoutObjectHeader);
-	const uint32 rootSignatureOffset = bindPointRecordsOffset + sizeof(PipelineBindPointRecord) * desc.bindPointCount;
+	const uint32 rootSignatureOffset = bindPointRecordsOffset + sizeof(PipelineBindPointRecord) * bindPointCount;
 	const uint32 objectSize = rootSignatureOffset + d3dRootSignature->GetBufferSize();
 
 	result.object = Object::Create(objectSize);
@@ -259,16 +265,16 @@ bool Host::CompilePipelineLayout(Platform platform, const PipelineLayoutDesc& de
 		header = {};
 		header.generic = {}; // Will be filled later
 		header.sourceHash = 0; // TODO: ...
-		header.bindPointCount = desc.bindPointCount;
+		header.bindPointCount = bindPointCount;
 
-		Memory::Copy(objectDataBytes + bindPointRecordsOffset, bindPointRecords, sizeof(PipelineBindPointRecord) * desc.bindPointCount);
+		Memory::Copy(objectDataBytes + bindPointRecordsOffset, bindPointRecords, sizeof(PipelineBindPointRecord) * bindPointCount);
 		Memory::Copy(objectDataBytes + rootSignatureOffset, d3dRootSignature->GetBufferPointer(), d3dRootSignature->GetBufferSize());
 	}
 	result.object.fillGenericHeaderAndFinalize(PipelineLayoutObjectSignature);
 
 	// Fill compiled object metadata
 	Memory::Copy(result.bindPointsMetadata, bindPointsMetadata,
-		sizeof(CompiledPipelineLayout::BindPointMetadata) * desc.bindPointCount);
+		sizeof(CompiledPipelineLayout::BindPointMetadata) * bindPointCount);
 
 	return true;
 }

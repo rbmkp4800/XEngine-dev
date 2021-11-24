@@ -15,6 +15,15 @@ namespace XEngine::Render::Shaders::Builder_
 	enum class PipelineLayoutRef : uint16;
 	static constexpr PipelineLayoutRef ZeroPipelineLayoutRef = PipelineLayoutRef(0);
 
+	struct BindPointDesc
+	{
+		const char* name;
+		HAL::PipelineBindPointType type;
+		HAL::ShaderCompiler::PipelineBindPointShaderVisibility shaderVisibility;
+		uint8 constantsSize32bitValues;
+		// DescriptorTableRef
+	};
+
 	class PipelineLayout : public XLib::NonCopyable
 	{
 		friend PipelineLayoutsList;
@@ -64,7 +73,7 @@ namespace XEngine::Render::Shaders::Builder_
 		PipelineLayoutsList() = default;
 		~PipelineLayoutsList() = default;
 
-		PipelineLayoutRef createEntry(const char* name, const HAL::ShaderCompiler::PipelineLayoutDesc& desc);
+		PipelineLayoutRef createEntry(const char* name, const BindPointDesc* bindPoints, uint8 bindPointCount);
 
 		PipelineLayoutRef findEntry(const char* name) const;
 		const PipelineLayout& getEntry(PipelineLayoutRef ref) const;

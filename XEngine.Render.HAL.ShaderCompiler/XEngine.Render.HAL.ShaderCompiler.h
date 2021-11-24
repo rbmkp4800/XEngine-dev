@@ -61,18 +61,6 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		DescriptorType descriptorType;
 	};
 
-	struct PipelineLayoutDesc
-	{
-		const PipelineBindPointDesc* bindPoints;
-		uint8 bindPointCount;
-	};
-
-	struct DescriptorBundleLayoutDesc
-	{
-		const DescriptorBindPointDesc* bindPoints;
-		uint8 bindPointCount;
-	};
-
 	struct GraphicsPipelineDesc
 	{
 		// TODO: Input assempler?
@@ -227,10 +215,10 @@ namespace XEngine::Render::HAL::ShaderCompiler
 	{
 	public:
 		static bool CompileDescriptorBundleLayout(Platform platform,
-			DescriptorBundleLayoutDesc& desc, CompiledDescriptorBundleLayout& result);
+			const DescriptorBindPointDesc* bindPoints, uint8 bindPointCount, CompiledDescriptorBundleLayout& result);
 
 		static bool CompilePipelineLayout(Platform platform,
-			const PipelineLayoutDesc& desc, CompiledPipelineLayout& result);
+			const PipelineBindPointDesc* bindPoints, uint8 bindPointCount, CompiledPipelineLayout& result);
 
 		static bool CompileShader(Platform platform, const CompiledPipelineLayout& pipelineLayout,
 			ShaderType shaderType, const char* source, uint32 sourceLength, CompiledShader& result);

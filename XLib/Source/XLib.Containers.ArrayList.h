@@ -5,6 +5,9 @@
 // `ExpandableInplaceArrayList` - acts like `InplaceArrayList` up to its capacity, then switches to dynamic mode like `ArrayList`.
 // `StaticSegmentedArrayList` - multiple static storage chunks with fast indexing.
 
+// TODO: Introduce overflow checks for `StaticSegmentedArrayList`.
+// TODO: Introduce `CounterType` overflows checks.
+
 #include "XLib.h"
 #include "XLib.AllocatorAdapterBase.h"
 #include "XLib.NonCopyable.h"
