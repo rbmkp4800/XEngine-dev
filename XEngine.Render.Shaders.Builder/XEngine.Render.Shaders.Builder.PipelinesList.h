@@ -17,10 +17,10 @@ namespace XEngine::Render::Shaders::Builder_
 
 	struct GraphicsPipelineDesc
 	{
-		ShaderRef vertexShader;
-		ShaderRef amplificationShader;
-		ShaderRef meshShader;
-		ShaderRef pixelShader;
+		Shader* vertexShader;
+		Shader* amplificationShader;
+		Shader* meshShader;
+		Shader* pixelShader;
 		HAL::TexelFormat renderTargetsFormats[HAL::MaxRenderTargetCount];
 		HAL::TexelFormat depthStencilFormat;
 	};
@@ -31,12 +31,11 @@ namespace XEngine::Render::Shaders::Builder_
 
 	private:
 		XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
-
-		XLib::InplaceString<63, uint8> name;
+		const char* name = nullptr;
 		uint64 nameCRC = 0;
-		PipelineLayoutRef pipelineLayout = ZeroPipelineLayoutRef;
 
-		ShaderRef computeShader = ZeroShaderRef;
+		const PipelineLayout& pipelineLayout;
+		Shader* computeShader = nullptr;
 		GraphicsPipelineDesc graphicsDesc = {};
 		bool isGraphics = false;
 
@@ -50,8 +49,9 @@ namespace XEngine::Render::Shaders::Builder_
 	public:
 		bool compile();
 
+		inline const char* getName() const { return name; }
 		inline uint64 getNameCRC() const { return nameCRC; }
-		inline PipelineLayoutRef getPipelineLayout() const { return pipelineLayout; }
+		inline const PipelineLayout& getPipelineLayout() const { return pipelineLayout; }
 		inline bool isGraphics() const { return isGraphics; }
 		inline const HAL::ShaderCompiler::CompiledShader& getCompiledCompute() const { return compiledComputeShader; }
 		inline const HAL::ShaderCompiler::CompiledGraphicsPipeline& getCompiledGraphics() const { return compiledGraphicsPipeline; }
@@ -60,20 +60,26 @@ namespace XEngine::Render::Shaders::Builder_
 	class PipelinesList : public XLib::NonCopyable
 	{
 	private:
-		using EntriesSearchTree = XLib::IntrusiveBinaryTree<Pipeline, &Pipeline::searchTreeHook>;
+		using EntriesOrderedSearchTree = XLib::IntrusiveBinaryTree<Pipeline, &Pipeline::searchTreeHook>;
 		using EntriesStorageList = XLib::StaticSegmentedArrayList<Pipeline, 5, 16>;
 
 	private:
-		EntriesSearchTree entriesSearchTree;
+		EntriesOrderedSearchTree entriesOrderedSearchTree;
 		EntriesStorageList entriesStorageList;
+
+	public:
+		using Iterator = EntriesOrderedSearchTree::Iterator;
 
 	public:
 		PipelinesList() = default;
 		~PipelinesList() = default;
 
-		Pipeline* createGraphicsPipeline(const char* name, PipelineLayoutRef pipelineLayout, const GraphicsPipelineDesc& pipelineDesc);
-		Pipeline* createComputePipeline(const char* name, PipelineLayoutRef pipelineLayout, ShaderRef computeShader);
+		Pipeline* createGraphicsPipeline(const char* name, const PipelineLayout& pipelineLayout, const GraphicsPipelineDesc& pipelineDesc);
+		Pipeline* createComputePipeline(const char* name, const PipelineLayout& pipelineLayout, Shader& computeShader);
 
 		inline uint32 getSize() const;
+
+		inline Iterator begin() { return entriesOrderedSearchTree.begin(); }
+		inline Iterator end() { return entriesOrderedSearchTree.end(); }
 	};
 }

@@ -4,16 +4,12 @@
 #include <XLib.Containers.ArrayList.h>
 #include <XLib.Containers.IntrusiveBinaryTree.h>
 #include <XLib.NonCopyable.h>
-#include <XLib.String.h>
 
 #include <XEngine.Render.HAL.ShaderCompiler.h>
 
 namespace XEngine::Render::Shaders::Builder_
 {
 	class PipelineLayoutsList;
-
-	enum class PipelineLayoutRef : uint16;
-	static constexpr PipelineLayoutRef ZeroPipelineLayoutRef = PipelineLayoutRef(0);
 
 	struct BindPointDesc
 	{
@@ -29,58 +25,56 @@ namespace XEngine::Render::Shaders::Builder_
 		friend PipelineLayoutsList;
 
 	private:
-		struct BindPoint
-		{
-			XLib::InplaceString<31, uint8> name;
-			HAL::PipelineBindPointType type;
-			HAL::ShaderCompiler::PipelineBindPointShaderVisibility shaderVisibility;
-			uint8 constantsSize32bitValues;
-		};
-
-	private:
 		XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
+		const char* name = nullptr;
+		uint64 nameCRC = 0;
 
-		XLib::InplaceString<63, uint8> name;
-		XLib::ArrayList<BindPoint, uint8> bindPoints;
+		PipelineLayoutsList& parentList;
+		uint32 bindPointsOffsetInParentStorage = 0;
+		uint8 bindPointCount = 0;
 
 		HAL::ShaderCompiler::CompiledPipelineLayout compiledPipelineLayout;
 
 	private:
-		PipelineLayout() = default;
+		inline PipelineLayout(PipelineLayoutsList& parentList) : parentList(parentList) {}
 		~PipelineLayout() = default;
 
 	public:
 		bool compile();
 
-		inline uint64 getNameCRC() const;
+		inline const char* getName() const { return name; }
+		inline uint64 getNameCRC() const { return nameCRC; }
 		inline const HAL::ShaderCompiler::CompiledPipelineLayout& getCompiled() const { return compiledPipelineLayout; }
 	};
 
 	class PipelineLayoutsList : public XLib::NonCopyable
 	{
-	private:
-		using EntriesSearchTree = XLib::IntrusiveBinaryTree<PipelineLayout, &PipelineLayout::searchTreeHook>;
-		using EntriesStorageList = XLib::StaticSegmentedArrayList<PipelineLayout, 4, 10>;
+		friend PipelineLayout;
 
 	private:
-		EntriesSearchTree entriesSearchTree;
+		using EntriesOrderedSearchTree = XLib::IntrusiveBinaryTree<PipelineLayout, &PipelineLayout::searchTreeHook>;
+		using EntriesStorageList = XLib::StaticSegmentedArrayList<PipelineLayout, 4, 10>;
+		using BindPointsStorageList = XLib::StaticSegmentedArrayList<BindPointDesc, 6, 14>;
+
+	private:
+		EntriesOrderedSearchTree entriesOrderedSearchTree;
 		EntriesStorageList entriesStorageList;
+		BindPointsStorageList bindPointsStorageList;
 
 	public:
-		using Iterator = EntriesSearchTree::Iterator;
+		using Iterator = EntriesOrderedSearchTree::Iterator;
 
 	public:
 		PipelineLayoutsList() = default;
 		~PipelineLayoutsList() = default;
 
-		PipelineLayoutRef createEntry(const char* name, const BindPointDesc* bindPoints, uint8 bindPointCount);
+		// Returns null if entry with such name already exists.
+		PipelineLayout* createEntry(const char* name, const BindPointDesc* bindPoints, uint8 bindPointCount);
+		PipelineLayout* findEntry(const char* name) const;
 
-		PipelineLayoutRef findEntry(const char* name) const;
-		const PipelineLayout& getEntry(PipelineLayoutRef ref) const;
+		inline uint16 getSize() const { return entriesStorageList.getSize(); }
 
-		inline uint16 getSize() const;
-
-		inline Iterator begin() { return entriesSearchTree.begin(); }
-		inline Iterator end() { return entriesSearchTree.end(); }
+		inline Iterator begin() { return entriesOrderedSearchTree.begin(); }
+		inline Iterator end() { return entriesOrderedSearchTree.end(); }
 	};
 }

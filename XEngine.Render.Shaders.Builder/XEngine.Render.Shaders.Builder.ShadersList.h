@@ -15,53 +15,30 @@ namespace XEngine::Render::Shaders::Builder_
 {
 	class ShadersList;
 
-	enum class ShaderRef : uint16;
-	static constexpr ShaderRef ZeroShaderRef = ShaderRef(0);
-
 	class Shader : public XLib::NonCopyable
 	{
 		friend ShadersList;
 
 	private:
-		using EntryPointNameInplaceString = XLib::InplaceString<31, uint8>;
-		using SourceDependenciesList = XLib::ExpandableInplaceArrayList<SourcesCacheEntryId, 14, uint16, false>;
-
-	private:
 		XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
+		uint64 configurationHash = 0; // Hash of data like main source file name, pipeline layout name etc. Used as UID
 
-		EntryPointNameInplaceString entryPointName;
-		SourceDependenciesList sourceDependencies;
-
-		HAL::ShaderCompiler::CompiledShader compiledShader;
-
-		SourcesCacheEntryId sourceMain = ZeroSourcesCacheEntryId;
-		PipelineLayoutRef pipelineLayout = ZeroPipelineLayoutRef;
+		SourcesCacheEntry& mainSource;
+		PipelineLayout& pipelineLayout;
+		const char* entryPointName = nullptr;
 		HAL::ShaderCompiler::ShaderType type = HAL::ShaderCompiler::ShaderType::Undefined;
 
-		bool compilationRequired = false;
+		HAL::ShaderCompiler::CompiledShader compiledShader;
 
 	private:
 		Shader() = default;
 		~Shader() = default;
 
 	public:
-		void compile();
+		bool compile();
 
-		inline SourcesCacheEntryId getSourceMain() const { return sourceMain; }
-		inline PipelineLayoutRef getPipelineLayout() const { return pipelineLayout; }
 		inline HAL::ShaderCompiler::ShaderType getType() const { return type; }
-
-		inline void addSourceDependency(SourcesCacheEntryId id) { sourceDependencies.pushBack(id); }
-		inline void clearSourceDependencies() { sourceDependencies.clear(); }
-		inline uint16 getSourceDependencyCount() const { return sourceDependencies.getSize(); }
-		//inline SourcesCacheEntryId getSourceDependency(uint16 i) const { return sourceDependencies[i]; }
-
-		inline void setCompilationRequired() { compilationRequired = true; }
-		inline bool isCompilationRequired() const { return compilationRequired; }
-
 		inline const HAL::ShaderCompiler::CompiledShader& getCompiled() const { return compiledShader; }
-
-		static constexpr uintptr EntryPointNameLengthLimit = EntryPointNameInplaceString::GetMaxLength();
 	};
 
 	class ShadersList : public XLib::NonCopyable
@@ -81,7 +58,7 @@ namespace XEngine::Render::Shaders::Builder_
 		ShadersList() = default;
 		~ShadersList() = default;
 
-		ShaderRef findOrCreateEntry(HAL::ShaderCompiler::ShaderType type, SourcesCacheEntryId mainSourceId);
+		Shader* findOrCreateEntry(HAL::ShaderCompiler::ShaderType type, SourcesCacheEntry& mainSource);
 
 		inline bool isEmpty() const { return entriesStorageList.isEmpty(); }
 		inline uint32 getSize() const { return entriesStorageList.getSize(); }

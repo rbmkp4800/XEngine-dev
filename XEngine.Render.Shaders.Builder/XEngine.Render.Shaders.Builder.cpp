@@ -19,7 +19,7 @@ bool Builder::loadIndex(const char* indexPath)
 	pipelineLayoutsList.createEntry("TestPipelineLayout", ...);
 	pipelinesList.createGraphicsPipeline(
 		"TestGfxPipeline",
-		pipelineLayoutsList.findEntry("TestPipelineLayout"),
+		*pipelineLayoutsList.findEntry("TestPipelineLayout"),
 		Builder_::GraphicsPipelineDesc {
 			.vertexShader = shadersList.findOrCreateEntry(ShaderType::Vertex, sourcesCache.findOrCreateEntry("test.hlsl")),
 			.renderTargetsFormats = { HAL::TexelFormat::R8G8B8A8_UNORM },
@@ -33,6 +33,9 @@ void Builder::build()
 
 	for (Shader& shader : shadersList)
 		shader.compile();
+
+	for (Pipeline& pipeline : pipelinesList)
+		pipeline.compile();
 }
 
 void Builder::composePack(const char* packPath)
@@ -52,7 +55,7 @@ void Builder::composePack(const char* packPath)
 	uint32 genericObjectsOffsetAccum = 0;
 
 	pipelineLayoutRecords.reserve(pipelineLayoutsList.getSize());
-	for (PipelineLayout& pipelineLayout : pipelineLayoutsList) // Pipeline layouts are iterated in order of name CRC increase
+	for (PipelineLayout& pipelineLayout : pipelineLayoutsList) // Iterating in order of name CRC increase
 	{
 		const Object& object = pipelineLayout.getCompiled().getObject();
 
@@ -71,11 +74,11 @@ void Builder::composePack(const char* packPath)
 	}
 
 	pipelineRecords.reserve(pipelinesList.getSize());
-	for (Pipeline& pipeline : pipelinesList) // Pipelines are iterated in order of name CRC increase
+	for (Pipeline& pipeline : pipelinesList) // Iterating in order of name CRC increase
 	{
-		const PipelineLayout& pipelineLayout = pipelineLayoutsList.getEntry(pipeline.getPipelineLayout());
 		// TODO: Check if element does not exist
-		const uint16 pipelineLayoutIndex = *pipelineLayoutNameCRCToGenericObjectIdxMap.find(pipelineLayout.getNameCRC());
+		const uint16 pipelineLayoutIndex =
+			*pipelineLayoutNameCRCToGenericObjectIdxMap.find(pipeline.getPipelineLayout().getNameCRC());
 
 		const bool isGraphics = pipeline.isGraphics();
 
