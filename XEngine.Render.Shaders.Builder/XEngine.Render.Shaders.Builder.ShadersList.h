@@ -24,7 +24,7 @@ namespace XEngine::Render::Shaders::Builder_
 		uint64 configurationHash = 0; // Hash of data like main source file name, pipeline layout name etc. Used as UID
 
 		SourcesCacheEntry& mainSource;
-		PipelineLayout& pipelineLayout;
+		const PipelineLayout& pipelineLayout;
 		const char* entryPointName = nullptr;
 		HAL::ShaderCompiler::ShaderType type = HAL::ShaderCompiler::ShaderType::Undefined;
 
@@ -58,7 +58,8 @@ namespace XEngine::Render::Shaders::Builder_
 		ShadersList() = default;
 		~ShadersList() = default;
 
-		Shader* findOrCreateEntry(HAL::ShaderCompiler::ShaderType type, SourcesCacheEntry& mainSource);
+		Shader* findOrCreateEntry(HAL::ShaderCompiler::ShaderType type,
+			SourcesCacheEntry& mainSource, const PipelineLayout& pipelineLayout);
 
 		inline bool isEmpty() const { return entriesStorageList.isEmpty(); }
 		inline uint32 getSize() const { return entriesStorageList.getSize(); }

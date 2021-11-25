@@ -102,6 +102,7 @@
     <ClCompile Include="XEngine.Render.Shaders.Builder.EntryPoint.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.PipelineLayoutsList.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.PipelinesList.cpp" />
+    <ClCompile Include="XEngine.Render.Shaders.Builder.ShadersList.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.SourcesCache.cpp" />
   </ItemGroup>
   <ItemGroup>

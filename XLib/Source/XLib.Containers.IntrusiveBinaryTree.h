@@ -17,9 +17,20 @@ namespace XLib
 {
 	class IntrusiveBinaryTreeNodeHook
 	{
+		template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*)>
+		friend class IntrusiveBinaryTree;
+
+	private:
+		void* left = nullptr;
+		void* right = nullptr;
+		void* parent = nullptr;
+		uint8 height = 0;
+
 	public:
-		void *left, *right, *parent;
-		uint8 height;
+		IntrusiveBinaryTreeNodeHook() = default;
+		~IntrusiveBinaryTreeNodeHook() = default;
+
+		inline bool isHooked() const { return left != nullptr || right != nullptr || parent != nullptr; }
 	};
 
 	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook)>

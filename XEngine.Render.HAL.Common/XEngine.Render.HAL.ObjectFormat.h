@@ -15,8 +15,6 @@ namespace XEngine::Render::HAL::ObjectFormat
 	static constexpr uint64 PipelineBytecodeObjectSignature = 0;
 	static constexpr uint16 PipelineBytecodeObjectCurrentVerstion = 0;
 
-	static constexpr uint8 MaxGraphicsPipelineBytecodeObjectCount = 3;
-
 	struct GenericObjectHeader
 	{
 		uint64 signature;

@@ -25,11 +25,12 @@ namespace XEngine::Render::Shaders::Builder_
 		friend PipelineLayoutsList;
 
 	private:
+		PipelineLayoutsList& parentList;
+
 		XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
 		const char* name = nullptr;
 		uint64 nameCRC = 0;
 
-		PipelineLayoutsList& parentList;
 		uint32 bindPointsOffsetInParentStorage = 0;
 		uint8 bindPointCount = 0;
 
@@ -70,6 +71,7 @@ namespace XEngine::Render::Shaders::Builder_
 
 		// Returns null if entry with such name already exists.
 		PipelineLayout* createEntry(const char* name, const BindPointDesc* bindPoints, uint8 bindPointCount);
+
 		PipelineLayout* findEntry(const char* name) const;
 
 		inline uint16 getSize() const { return entriesStorageList.getSize(); }

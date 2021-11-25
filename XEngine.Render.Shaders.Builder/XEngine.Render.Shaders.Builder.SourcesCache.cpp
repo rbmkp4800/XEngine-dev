@@ -1,52 +1,94 @@
+#include <XLib.System.File.h>
 #include <XLib.FileSystem.h>
 #include <XLib.String.h>
 
 #include "XEngine.Render.Shaders.Builder.SourcesCache.h"
 
-// TODO:
-#define ASSERT(...)
-
 using namespace XLib;
 using namespace XEngine::Render::Shaders::Builder_;
 
-XLib::TimePoint SourcesCacheEntry::checkWriteTime(const char* rootPath)
+enum class SourcesCacheEntry::TextState : uint8
+{
+	Unknown = 0,
+	Loaded,
+	CanNotOpen,
+};
+
+TimePoint SourcesCacheEntry::checkWriteTime()
 {
 	if (writeTimeChecked)
 		return writeTime;
 
 	InplaceString1024 fullPath;
-	fullPath.copyFrom(rootPath);
-	fullPath.append(localPath.getView());
+	fullPath.append(parentCache.getSourcesRootPath());
+	fullPath.append(localPath);
 	// TODO: Assert total length
 
-	writeTime = XLib::FileSystem::GetFileLastWriteTime(fullPath.getCStr());
+	writeTime = FileSystem::GetFileLastWriteTime(fullPath.getCStr());
 	writeTimeChecked = true;
+
+	if (writeTime == InvalidTimePoint)
+		textState = TextState::CanNotOpen;
 
 	return writeTime;
 }
 
-SourcesCacheEntryId SourcesCache::findOrCreateEntry(StringView localPath)
+bool SourcesCacheEntry::retrieveText(StringView& resultText)
 {
-	EntriesSearchTree::Iterator it = entriesSearchTree.find(localPath);
-	if (it.isValid())
+	resultText = {};
+
+	if (textState == TextState::CanNotOpen)
+		return false;
+	if (textState == TextState::Loaded)
 	{
-		const SourcesCacheEntry& entry = it.get();
-		const uintptr index = entriesStorageList.calculateIndex(&entry);
-		ASSERT(index < entriesStorageList.getSize());
-		return SourcesCacheEntryId(index);
+		resultText = text.getView();
+		return true;
 	}
-	else
+
+	InplaceString1024 fullPath;
+	fullPath.append(parentCache.getSourcesRootPath());
+	fullPath.append(localPath);
+
+	XEAssert(text.isEmpty());
+
+	File file;
+	if (!file.open(fullPath.getCStr(), FileAccessMode::Read, FileOpenMode::OpenExisting))
 	{
-		const uintptr index = entriesStorageList.getSize();
-		SourcesCacheEntry& entry = entriesStorageList.emplaceBack();
-		entry.localPath.copyFrom(localPath); // TODO: `fillFrom` and check length
-		entriesSearchTree.insert(entry);
-		return SourcesCacheEntryId(index);
+		textState = TextState::CanNotOpen;
+		return false;
 	}
+
+	// TODO: Check for overflows
+	const uint32 fileSize = file.getSize();
+
+	text.resize(fileSize + 1); // To have zero terminator in any case.
+	const bool readResult = file.read(text.getMutableData(), fileSize);
+
+	file.close();
+
+	if (!readResult)
+	{
+		text.clear();
+		text.compact();
+		textState = TextState::CanNotOpen;
+		return false;
+	}
+
+	textState = TextState::Loaded;
+	resultText = text.getView();
+	return true;
 }
 
-SourcesCacheEntry& SourcesCache::getEntry(const SourcesCacheEntryId id)
+SourcesCacheEntry* SourcesCache::findOrCreateEntry(const char* localPath)
 {
-	ASSERT(id < entriesStorageList.getSize());
-	return entriesStorageList[id];
+	EntriesSearchTree::Iterator existingIt = entriesSearchTree.find(localPath);
+	if (existingIt.isValid())
+		return &existingIt.get();
+
+	SourcesCacheEntry& entry = entriesStorageList.emplaceBack(*this);
+	entry.localPath = localPath;
+
+	entriesSearchTree.insert(entry);
+
+	return &entry;
 }

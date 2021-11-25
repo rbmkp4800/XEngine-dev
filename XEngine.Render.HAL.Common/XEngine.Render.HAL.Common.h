@@ -7,6 +7,7 @@ namespace XEngine::Render::HAL
 	static constexpr uint8 MaxPipelineBindPointCountLog2 = 4;
 	static constexpr uint8 MaxPipelineBindPointCount = 1 << MaxPipelineBindPointCountLog2;
 	static constexpr uint8 MaxRenderTargetCount = 4;
+	static constexpr uint8 MaxGraphicsPipelineBytecodeObjectCount = 3;
 
 	enum class TexelFormat : uint8
 	{

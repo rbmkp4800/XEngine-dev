@@ -26,10 +26,11 @@ namespace XLib
 		inline bool isEmpty() const { return length == 0; }
 	};
 
-	using StringView = BaseStringView<char>;
+	using StringView = BaseStringView<>;
+
 
 	template <typename CharType = char, typename CounterType = uint32, typename AllocatorType = SystemHeapAllocator>
-	class String : private AllocatorAdapterBase<AllocatorType>
+	class BaseString : private AllocatorAdapterBase<AllocatorType>
 	{
 	private:
 		CharType* buffer = nullptr;
@@ -37,28 +38,35 @@ namespace XLib
 		CounterType length = 0;
 
 	public:
-		String() = default;
-		~String() = default;
+		BaseString() = default;
+		~BaseString() = default;
 
 		inline void append();
 
+		inline void resize(CounterType newLength);
 		inline void clear();
 		inline void compact();
 		inline void reserve(CounterType newCapacity);
 
 		inline void truncate(CounterType newLength);
 
+		inline CharType* getMutableData() { return buffer; }
+
+		inline StringView getView() const { return StringView(buffer, length); }
 		inline const CharType* getCStr() const { return buffer; }
 		inline const CharType* getData() const { return buffer; }
 		inline CounterType getLength() const { return length; }
 		inline bool isEmpty() const { return length == 0; }
 	};
 
+	using String = BaseString<>;
+
 
 	template <uintptr Capacity, typename CounterType = uint8, typename CharType = char>
 	class InplaceString
 	{
-		static_assert(Capacity > 1); // at least one character
+		static_assert(Capacity > 1); // At least one character.
+		// TODO: Check that capacity is less then counter max value.
 
 	private:
 		CounterType length = 0;
@@ -78,7 +86,7 @@ namespace XLib
 		inline void truncate(CounterType newLength);
 		//inline bool recalculateLength();
 
-		inline CharType* getMutableStorage() { return &storage; }
+		inline CharType* getMutableData() { return &storage; }
 
 		inline StringView getView() const { return StringView(&storage, length); }
 		inline const CharType* getCStr() const { return &storage; }

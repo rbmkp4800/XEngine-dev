@@ -6,6 +6,7 @@
     <ClCompile Include="XEngine.Render.Shaders.Builder.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.PipelinesList.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.PipelineLayoutsList.cpp" />
+    <ClCompile Include="XEngine.Render.Shaders.Builder.ShadersList.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="XEngine.Render.Shaders.Builder.SourcesCache.h" />

@@ -39,7 +39,6 @@ namespace XEngine::Render::Shaders::Builder_
 		GraphicsPipelineDesc graphicsDesc = {};
 		bool isGraphics = false;
 
-		HAL::ShaderCompiler::CompiledShader compiledComputeShader;
 		HAL::ShaderCompiler::CompiledGraphicsPipeline compiledGraphicsPipeline;
 
 	private:
@@ -53,7 +52,7 @@ namespace XEngine::Render::Shaders::Builder_
 		inline uint64 getNameCRC() const { return nameCRC; }
 		inline const PipelineLayout& getPipelineLayout() const { return pipelineLayout; }
 		inline bool isGraphics() const { return isGraphics; }
-		inline const HAL::ShaderCompiler::CompiledShader& getCompiledCompute() const { return compiledComputeShader; }
+		inline const HAL::ShaderCompiler::CompiledShader& getCompiledCompute() const { return computeShader->getCompiled(); }
 		inline const HAL::ShaderCompiler::CompiledGraphicsPipeline& getCompiledGraphics() const { return compiledGraphicsPipeline; }
 	};
 
@@ -75,7 +74,7 @@ namespace XEngine::Render::Shaders::Builder_
 		~PipelinesList() = default;
 
 		Pipeline* createGraphicsPipeline(const char* name, const PipelineLayout& pipelineLayout, const GraphicsPipelineDesc& pipelineDesc);
-		Pipeline* createComputePipeline(const char* name, const PipelineLayout& pipelineLayout, Shader& computeShader);
+		Pipeline* createComputePipeline(const char* name, const PipelineLayout& pipelineLayout, const Shader& computeShader);
 
 		inline uint32 getSize() const;
 

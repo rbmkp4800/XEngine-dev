@@ -11,6 +11,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 {
 	class CompiledDescriptorBundleLayout;
 	class CompiledPipelineLayout;
+	class CompiledShaderLibrary;
 	class CompiledShader;
 	class CompiledGraphicsPipeline;
 	class Host;
@@ -59,6 +60,12 @@ namespace XEngine::Render::HAL::ShaderCompiler
 	{
 		const char* name;
 		DescriptorType descriptorType;
+	};
+
+	struct Define
+	{
+		const char* name;
+		const char* value;
 	};
 
 	struct GraphicsPipelineDesc
@@ -171,6 +178,18 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		inline const Object& getObject() const { return object; }
 	};
 
+	class CompiledShaderLibrary : public XLib::NonCopyable
+	{
+		friend Host;
+
+	private:
+		Object object;
+
+	public:
+		CompiledShaderLibrary() = default;
+		~CompiledShaderLibrary() = default;
+	};
+
 	class CompiledShader : public XLib::NonCopyable
 	{
 		friend Host;
@@ -215,11 +234,21 @@ namespace XEngine::Render::HAL::ShaderCompiler
 	{
 	public:
 		static bool CompileDescriptorBundleLayout(Platform platform,
-			const DescriptorBindPointDesc* bindPoints, uint8 bindPointCount, CompiledDescriptorBundleLayout& result);
+			const DescriptorBindPointDesc* bindPoints, uint8 bindPointCount,
+			CompiledDescriptorBundleLayout& result);
 
 		static bool CompilePipelineLayout(Platform platform,
 			const PipelineBindPointDesc* bindPoints, uint8 bindPointCount, CompiledPipelineLayout& result);
 
+		static bool CompileCompiledShaderLibrary(Platform platform,
+			const CompiledPipelineLayout& pipelineLayout, const char* source, uint32 sourceLength,
+			const Define* defines, uint16 defineCount, CompiledShaderLibrary& result);
+
+		static bool CompileShader(Platform platform,
+			const CompiledPipelineLayout& pipelineLayout, const CompiledShaderLibrary& library,
+			ShaderType shaderType, const char* entryPointName, CompiledShader& result);
+
+		// Temporary
 		static bool CompileShader(Platform platform, const CompiledPipelineLayout& pipelineLayout,
 			ShaderType shaderType, const char* source, uint32 sourceLength, CompiledShader& result);
 

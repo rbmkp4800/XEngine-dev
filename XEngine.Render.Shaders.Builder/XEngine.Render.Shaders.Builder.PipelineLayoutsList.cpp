@@ -5,18 +5,7 @@
 
 using namespace XLib;
 using namespace XEngine::Render::HAL;
-using namespace XEngine::Render::HAL::ShaderCompiler;
 using namespace XEngine::Render::Shaders::Builder_;
-
-static inline PipelineLayoutRef composePipelineLayoutRef(uint16 index)
-{
-
-}
-
-static inline uint16 resourcePipelineLayoutRef(PipelineLayoutRef ref)
-{
-
-}
 
 bool PipelineLayout::compile()
 {
@@ -24,21 +13,22 @@ bool PipelineLayout::compile()
 	XEAssert(bindPointCount <= countof(compilerBindPointDescs));
 
 	PipelineLayoutsList::BindPointsStorageList::Iterator srcBindPointsIt =
-		parentList.bindPointsStorageList.getIteratorAt(bindPointsOffsetInGlobalStorage);
+		parentList.bindPointsStorageList.getIteratorAt(bindPointsOffsetInParentStorage);
 	for (uint8 i = 0; i < bindPointCount; i++)
 	{
 		XEAssert(srcBindPointsIt.isValid());
 		const BindPointDesc& src = *srcBindPointsIt;
 		srcBindPointsIt++;
 
-		PipelineBindPointDesc& dst = compilerBindPointDescs[i];
+		ShaderCompiler::PipelineBindPointDesc& dst = compilerBindPointDescs[i];
 		dst.name = src.name;
 		dst.type = src.type;
 		dst.shaderVisibility = src.shaderVisibility;
 		dst.constantsSize32bitValues = src.constantsSize32bitValues;
 	}
 
-	return Host::CompilePipelineLayout(Platform::D3D12, compilerBindPointDescs, bindPointCount, compiledPipelineLayout);
+	return ShaderCompiler::Host::CompilePipelineLayout(ShaderCompiler::Platform::D3D12,
+		compilerBindPointDescs, bindPointCount, compiledPipelineLayout);
 }
 
 PipelineLayout* PipelineLayoutsList::createEntry(const char* name, const BindPointDesc* bindPoints, uint8 bindPointCount)
@@ -55,7 +45,6 @@ PipelineLayout* PipelineLayoutsList::createEntry(const char* name, const BindPoi
 	for (uint8 i = 0; i < bindPointCount; i++)
 		bindPointsStorageList.pushBack(bindPoints[i]);
 
-	const uint16 entryIndex = entriesStorageList.getSize();
 	PipelineLayout& pipelineLayout = entriesStorageList.emplaceBack(*this);
 	pipelineLayout.name = name;
 	pipelineLayout.nameCRC = nameCRC;
@@ -64,5 +53,5 @@ PipelineLayout* PipelineLayoutsList::createEntry(const char* name, const BindPoi
 
 	entriesOrderedSearchTree.insert(pipelineLayout);
 
-	return composePipelineLayoutRef(entryIndex);
+	return &pipelineLayout;
 }

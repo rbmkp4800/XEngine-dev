@@ -16,25 +16,30 @@ namespace XEngine::Render::Shaders::Builder_
 		friend SourcesCache;
 
 	private:
-		using LocalPathInplaceString = XLib::InplaceString<95, uint8>;
+		enum class TextState : uint8;
 
 	private:
+		SourcesCache& parentCache;
+
 		XLib::IntrusiveBinaryTreeNodeHook entriesSearchTreeHook;
-		LocalPathInplaceString localPath;
+		const char* localPath = nullptr;
+
+		XLib::String text;
+		TextState textState = TextState(0);
+
 		XLib::TimePoint writeTime = 0;
-		const char* text = nullptr;
 		bool writeTimeChecked = false;
 
 	private:
-		SourcesCacheEntry() = default;
+		inline SourcesCacheEntry(SourcesCache& parentCache) : parentCache(parentCache) {}
 		~SourcesCacheEntry() = default;
 
 	public:
-		XLib::TimePoint checkWriteTime(const char* rootPath);
-		//const char* getLocalPath() const { return localPath.cstr(); }
-		XLib::StringView loadText();
+		// Returns `InvalidTimePoint` if can't open file.
+		XLib::TimePoint checkWriteTime();
 
-		static constexpr uintptr LocalPathLengthLimit = LocalPathInplaceString::GetMaxLength();
+		// Returns false if can't open file.
+		bool retrieveText(XLib::StringView& resultText);
 	};
 
 	class SourcesCache : public XLib::NonCopyable
@@ -46,12 +51,16 @@ namespace XEngine::Render::Shaders::Builder_
 	private:
 		EntriesSearchTree entriesSearchTree;
 		EntriesStorageList entriesStorageList;
+		const char* sourcesRootPath = nullptr;
 
 	public:
 		SourcesCache() = default;
 		~SourcesCache() = default;
 
-		SourcesCacheEntryId findOrCreateEntry(XLib::StringView localPath);
-		SourcesCacheEntry& getEntry(SourcesCacheEntryId id);
+		void initialize(const char* sourcesRootPath);
+
+		SourcesCacheEntry* findOrCreateEntry(const char* localPath);
+
+		inline const char* getSourcesRootPath() const { return sourcesRootPath; }
 	};
 }
