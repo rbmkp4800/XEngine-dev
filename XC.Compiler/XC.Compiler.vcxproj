@@ -87,6 +87,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="XC.Compiler.Main.cpp" />
+    <ClCompile Include="XC.Compiler.Tokenizer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="XC.Compiler.Tokenizer.h" />

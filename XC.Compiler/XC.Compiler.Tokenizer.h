@@ -18,14 +18,26 @@ namespace XC::Compiler
 		uint32 columnNumber;
 	};
 
-	class TokenizedSource : public XLib::NonCopyable
+	class TokenStream : public XLib::NonCopyable
 	{
 	private:
 
 	public:
-		TokenizedSource() = default;
-		~TokenizedSource() = default;
+		TokenStream() = default;
+		~TokenStream() = default;
 
 		void tokenize(const char* text, uint64 length = uint64(-1));
+	};
+
+	class TokenStreamReader
+	{
+	private:
+		TokenStream& stream;
+
+	public:
+		TokenStreamReader() = default;
+		~TokenStreamReader() = default;
+
+		Token getNextToken();
 	};
 }
