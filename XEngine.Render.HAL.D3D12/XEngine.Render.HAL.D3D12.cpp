@@ -8,71 +8,13 @@
 
 #include "XEngine.Render.HAL.D3D12.h"
 
+#include "XEngine.Render.HAL.D3D12.Translation.h"
+
 using namespace XLib::Platform;
 using namespace XEngine::Render::HAL;
 using namespace XEngine::Render::HAL::Internal;
 
 static COMPtr<IDXGIFactory7> dxgiFactory;
-
-static inline D3D12_HEAP_TYPE TranslateBufferMemoryTypeToD3D12HeapType(BufferMemoryType type)
-{
-	switch (type)
-	{
-		case BufferMemoryType::Local:		return D3D12_HEAP_TYPE_DEFAULT;
-		case BufferMemoryType::Upload:		return D3D12_HEAP_TYPE_UPLOAD;
-		case BufferMemoryType::Readback:	return D3D12_HEAP_TYPE_READBACK;
-	}
-
-	XEMasterAssertUnreachableCode();
-}
-
-static inline DXGI_FORMAT TranslateTexelFormatToDXGIFormat(TexelFormat format)
-{
-	switch (format)
-	{
-		case TexelFormat::Undefined:		return DXGI_FORMAT_UNKNOWN;
-		case TexelFormat::R8G8B8A8_UNORM:	return DXGI_FORMAT_R8G8B8A8_UNORM;
-	}
-
-	XEMasterAssertUnreachableCode();
-}
-
-static inline D3D12_RESOURCE_STATES TranslateResourceStateToD3D12ResourceState(ResourceState state)
-{
-	if (state.isMutable())
-	{
-		switch (state.getMutable())
-		{
-			case ResourceMutableState::RenderTarget:	return D3D12_RESOURCE_STATE_RENDER_TARGET;
-			case ResourceMutableState::DepthWrite:		return D3D12_RESOURCE_STATE_DEPTH_WRITE;
-			case ResourceMutableState::ShaderReadWrite:	return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-			case ResourceMutableState::CopyDestination:	return D3D12_RESOURCE_STATE_COPY_DEST;
-		}
-		return D3D12_RESOURCE_STATE_COMMON;
-	}
-	else
-	{
-		const ResourceImmutableState immutableState = state.getImmutable();
-		D3D12_RESOURCE_STATES d3dResultStates = D3D12_RESOURCE_STATES(0);
-		if (immutableState.vertexBuffer)
-			d3dResultStates |= D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-		if (immutableState.indexBuffer)
-			d3dResultStates |= D3D12_RESOURCE_STATE_INDEX_BUFFER;
-		if (immutableState.constantBuffer)
-			d3dResultStates |= D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-		if (immutableState.pixelShaderRead)
-			d3dResultStates |= D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-		if (immutableState.nonPixelShaderRead)
-			d3dResultStates |= D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-		if (immutableState.depthRead)
-			d3dResultStates |= D3D12_RESOURCE_STATE_DEPTH_READ;
-		if (immutableState.indirectArgument)
-			d3dResultStates |= D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
-		if (immutableState.copySource)
-			d3dResultStates |= D3D12_RESOURCE_STATE_COPY_SOURCE;
-		return d3dResultStates;
-	}
-}
 
 static inline bool ValidateGenericObjectHeader(const ObjectFormat::GenericObjectHeader* header,
 	uint64 signature, uint32 objectSize)
@@ -472,7 +414,7 @@ ResourceHandle Device::createBuffer(uint64 size, BufferMemoryType memoryType, Bu
 	return composeResourceHandle(resourceIndex);
 }
 
-ResourceHandle Device::createTexture(const TextureDim& dim, TexelFormat format, TextureCreationFlags flags)
+ResourceHandle Device::createTexture(const TextureDim& dim, TextureFormat format, TextureCreationFlags flags)
 {
 	const sint32 resourceIndex = resourcesTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(resourceIndex >= 0);
@@ -483,7 +425,7 @@ ResourceHandle Device::createTexture(const TextureDim& dim, TexelFormat format, 
 	resource.type = ResourceType::Texture;
 	resource.internalOwnership = false;
 
-	const DXGI_FORMAT dxgiFormat = TranslateTexelFormatToDXGIFormat(format);
+	const DXGI_FORMAT dxgiFormat = TranslateTextureFormatToDXGIFormat(format);
 	const D3D12_HEAP_PROPERTIES d3dHeapProps = D3D12Helpers::HeapProperties(D3D12_HEAP_TYPE_DEFAULT);
 
 	D3D12_RESOURCE_FLAGS d3dResourceFlags = D3D12_RESOURCE_FLAG_NONE;
@@ -726,14 +668,14 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 
 	// Count render targets in base object
 	uint8 renderTargetCount = 0;
-	for (TexelFormat renderTargetFormat : baseObject.renderTargetFormats)
+	for (TexelViewFormat renderTargetFormat : baseObject.renderTargetFormats)
 	{
-		if (renderTargetFormat == TexelFormat::Undefined)
+		if (renderTargetFormat == TexelViewFormat::Undefined)
 			break;
 		renderTargetCount++;
 	}
 	for (uint8 i = renderTargetCount; i < countof(baseObject.renderTargetFormats); i++)
-		XEMasterAssert(baseObject.renderTargetFormats[i] == TexelFormat::Undefined);
+		XEMasterAssert(baseObject.renderTargetFormats[i] == TexelViewFormat::Undefined);
 
 	// Compose D3D12 Pipeline State stream
 
@@ -793,17 +735,17 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 	{
 		D3D12_RT_FORMAT_ARRAY d3dRTFormatArray = {};
 		for (uint8 i = 0; i < renderTargetCount; i++)
-			d3dRTFormatArray.RTFormats[i] = TranslateTexelFormatToDXGIFormat(baseObject.renderTargetFormats[i]);
+			d3dRTFormatArray.RTFormats[i] = TranslateTexelViewFormatToDXGIFormat(baseObject.renderTargetFormats[i]);
 		d3dRTFormatArray.NumRenderTargets = renderTargetCount;
 
 		d3dPSOStreamWriter.writeAligned(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RENDER_TARGET_FORMATS, sizeof(void*));
 		d3dPSOStreamWriter.writeAligned(d3dRTFormatArray, sizeof(void*));
 	}
 
-	if (baseObject.depthStencilFormat != TexelFormat::Undefined)
+	if (baseObject.depthStencilFormat != DepthStencilFormat::Undefined)
 	{
 		d3dPSOStreamWriter.writeAligned(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL_FORMAT, sizeof(void*));
-		d3dPSOStreamWriter.writeAligned(TranslateTexelFormatToDXGIFormat(baseObject.depthStencilFormat), sizeof(void*));
+		d3dPSOStreamWriter.writeAligned(TranslateDepthStencilFormatToDXGIFormat(baseObject.depthStencilFormat), sizeof(void*));
 	}
 
 	D3D12_PIPELINE_STATE_STREAM_DESC d3dPSOStreamDesc = {};

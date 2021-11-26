@@ -75,8 +75,8 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		const CompiledShader* amplificationShader;
 		const CompiledShader* meshShader;
 		const CompiledShader* pixelShader;
-		TexelFormat renderTargetsFormats[MaxRenderTargetCount];
-		TexelFormat depthStencilFormat;
+		TexelViewFormat renderTargetsFormats[MaxRenderTargetCount];
+		DepthStencilFormat depthStencilFormat;
 	};
 
 	struct ObjectHash

@@ -165,6 +165,7 @@
   <ItemGroup>
     <ClInclude Include="D3D12Helpers.h" />
     <ClInclude Include="XEngine.Render.HAL.D3D12.h" />
+    <ClInclude Include="XEngine.Render.HAL.D3D12.Translation.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\XEngine.Render.HAL.Common\XEngine.Render.HAL.Common.vcxproj">

@@ -21,8 +21,8 @@ namespace XEngine::Render::Shaders::Builder_
 		Shader* amplificationShader;
 		Shader* meshShader;
 		Shader* pixelShader;
-		HAL::TexelFormat renderTargetsFormats[HAL::MaxRenderTargetCount];
-		HAL::TexelFormat depthStencilFormat;
+		HAL::TexelViewFormat renderTargetsFormats[HAL::MaxRenderTargetCount];
+		HAL::DepthStencilFormat depthStencilFormat;
 	};
 
 	class Pipeline : public XLib::NonCopyable

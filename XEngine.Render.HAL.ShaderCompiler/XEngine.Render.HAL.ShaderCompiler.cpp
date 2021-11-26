@@ -417,14 +417,14 @@ bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayo
 	// Validate render targets
 	{
 		bool undefinedRenderTargetFound = false;
-		for (TexelFormat renderTargetFormat : desc.renderTargetsFormats)
+		for (TexelViewFormat renderTargetFormat : desc.renderTargetsFormats)
 		{
 			if (undefinedRenderTargetFound)
-				XEAssert(renderTargetFormat == TexelFormat::Undefined);
-			else if (renderTargetFormat == TexelFormat::Undefined)
+				XEAssert(renderTargetFormat == TexelViewFormat::Undefined);
+			else if (renderTargetFormat == TexelViewFormat::Undefined)
 				undefinedRenderTargetFound = true;
 			else
-				ValidateTexelFormatValue(renderTargetFormat);
+				ValidateTexelViewFormatValue(renderTargetFormat);
 		}
 	}
 
@@ -464,7 +464,7 @@ bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayo
 
 		Memory::Copy(baseObject.bytecodeObjectsCRCs, bytecodeObjectsCRCs, sizeof(uint32) * bytecodeObjectCount);
 
-		Memory::Copy(baseObject.renderTargetFormats, desc.renderTargetsFormats, sizeof(TexelFormat) * MaxRenderTargetCount);
+		Memory::Copy(baseObject.renderTargetFormats, desc.renderTargetsFormats, sizeof(TexelViewFormat) * MaxRenderTargetCount);
 		baseObject.depthStencilFormat = desc.depthStencilFormat;
 
 		baseObject.enabledShaderStages.vertex			= desc.vertexShader			!= nullptr;

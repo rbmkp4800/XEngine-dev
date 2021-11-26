@@ -170,6 +170,7 @@
   <ItemGroup>
     <ClInclude Include="XEngine.Render.HAL.Common.h" />
     <ClInclude Include="XEngine.Render.HAL.ObjectFormat.h" />
+    <ClInclude Include="XEngine.Render.HAL.TextureFormat.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -56,8 +56,8 @@ namespace XEngine::Render::HAL::ObjectFormat
 		uint32 pipelineLayoutSourceHash;
 		uint32 bytecodeObjectsCRCs[MaxGraphicsPipelineBytecodeObjectCount];
 
-		TexelFormat renderTargetFormats[MaxRenderTargetCount];
-		TexelFormat depthStencilFormat;
+		TexelViewFormat renderTargetFormats[MaxRenderTargetCount];
+		DepthStencilFormat depthStencilFormat;
 		GraphicsPipelineEnabledShaderStages enabledShaderStages;
 		uint8 _padding0;
 		uint8 _padding1;

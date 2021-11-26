@@ -408,7 +408,7 @@ namespace XEngine::Render::HAL
 		ResourceHandle createBuffer(uint64 size, BufferMemoryType memoryType, BufferCreationFlags flags);
 		void destroyBuffer(ResourceHandle handle);
 
-		ResourceHandle createTexture(const TextureDim& dim, TexelFormat format, TextureCreationFlags flags);
+		ResourceHandle createTexture(const TextureDim& dim, TextureFormat format, TextureCreationFlags flags);
 		void destroyTexture(ResourceHandle handle);
 
 		ShaderResourceViewHandle createShaderResourceView(ResourceHandle resourceHandle, const ShaderResourceViewDesc& viewDesc);

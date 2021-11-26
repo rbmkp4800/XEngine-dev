@@ -2,6 +2,8 @@
 
 #include <XLib.h>
 
+#include "XEngine.Render.HAL.TextureFormat.h"
+
 namespace XEngine::Render::HAL
 {
 	static constexpr uint8 MaxPipelineBindPointCountLog2 = 4;
@@ -9,10 +11,13 @@ namespace XEngine::Render::HAL
 	static constexpr uint8 MaxRenderTargetCount = 4;
 	static constexpr uint8 MaxGraphicsPipelineBytecodeObjectCount = 3;
 
-	enum class TexelFormat : uint8
+	enum class DepthStencilFormat : uint8
 	{
 		Undefined = 0,
-		R8G8B8A8_UNORM,
+		D16,
+		D32,
+		D24S8,
+		D32S8,
 	};
 
 	enum class PipelineBindPointType : uint8
@@ -36,6 +41,4 @@ namespace XEngine::Render::HAL
 		ReadWriteTexture2D,
 		RaytracingAccelerationStructure,
 	};
-
-	bool ValidateTexelFormatValue(TexelFormat format);
 }

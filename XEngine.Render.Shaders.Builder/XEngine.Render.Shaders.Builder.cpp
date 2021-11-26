@@ -22,7 +22,7 @@ bool Builder::loadIndex(const char* indexPath)
 		*pipelineLayoutsList.findEntry("TestPipelineLayout"),
 		Builder_::GraphicsPipelineDesc {
 			.vertexShader = shadersList.findOrCreateEntry(ShaderType::Vertex, sourcesCache.findOrCreateEntry("test.hlsl")),
-			.renderTargetsFormats = { HAL::TexelFormat::R8G8B8A8_UNORM },
+			.renderTargetsFormats = { HAL::TexelViewFormat::R8G8B8A8_UNORM },
 		});
 }
 
