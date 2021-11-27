@@ -123,6 +123,20 @@ namespace XEngine::Render::HAL
 		ReadWrite,
 	};
 
+	enum class TextureAspect : uint8
+	{
+		Color = 0,
+		Depth,
+		Stencil,
+	};
+
+	struct TextureSubresourceIdx
+	{
+		uint8 mip;
+		TextureAspect aspect;
+		uint16 arraySlice;
+	};
+
 	struct ResourceImmutableState
 	{
 		bool vertexBuffer : 1;
@@ -171,6 +185,16 @@ namespace XEngine::Render::HAL
 		inline ResourceMutableState getMutable() const { XEAssert(isMutable()); return mutableState; }
 	};
 
+	struct TextureRegion
+	{
+		uint16 left;
+		uint16 top;
+		uint16 front;
+		uint16 right;
+		uint16 bottom;
+		uint16 back;
+	};
+
 	struct TextureDim
 	{
 		TextureType type;
@@ -196,6 +220,7 @@ namespace XEngine::Render::HAL
 
 			struct
 			{
+				TexelViewFormat format;
 				uint8 startMipIndex;
 				uint8 mipLevelCount;
 				uint8 plane;
@@ -203,6 +228,7 @@ namespace XEngine::Render::HAL
 
 			struct
 			{
+				TexelViewFormat format;
 				uint8 mipIndex;
 				uint8 plane;
 			} readWriteTexture2D;
@@ -307,11 +333,16 @@ namespace XEngine::Render::HAL
 
 		void dispatch(uint32 groupCountX, uint32 groupCountY = 1, uint32 groupCountZ = 1);
 
-		void resourceStateTransition(ResourceHandle resourceHandle, ResourceState stateBefore, ResourceState stateAfter);
+		void resourceBarrierStateTransition(ResourceHandle resourceHandle,
+			ResourceState stateBefore, ResourceState stateAfter,
+			const TextureSubresourceIdx* textureSubresource = nullptr);
+		void resourceBarrierReadWrite(ResourceHandle resourceHandle, const TextureSubresourceIdx* textureSubresource = nullptr);
 
 		void copyFromBufferToBuffer(ResourceHandle srcBufferHandle, uint64 srcOffset, ResourceHandle destBufferHandle, uint64 destOffset, uint64 size);
 		void copyFromBufferToTexture();
-		void copyFromTextureToTexture();
+		void copyFromTextureToTexture(ResourceHandle srcTextureHandle, const TextureSubresourceIdx& srcSubresource,
+			ResourceHandle destTextureHandle, const TextureSubresourceIdx& destSubresource,
+			uint16 destX, uint16 destY, uint16 destZ, const TextureRegion* srcRegion);
 		void copyFromTextureToBuffer();
 	};
 
@@ -330,7 +361,7 @@ namespace XEngine::Render::HAL
 		static constexpr uint32 MaxPipelineCount = 1024;
 		static constexpr uint32 MaxFenceCount = 64;
 		static constexpr uint32 MaxSwapChainCount = 4;
-		static constexpr uint32 SwapChainPlaneCount = 2;
+		static constexpr uint32 SwapChainTextureCount = 2;
 
 		struct Resource;
 		struct ShaderResourceView;
@@ -408,7 +439,7 @@ namespace XEngine::Render::HAL
 		ResourceHandle createBuffer(uint64 size, BufferMemoryType memoryType, BufferCreationFlags flags);
 		void destroyBuffer(ResourceHandle handle);
 
-		ResourceHandle createTexture(const TextureDim& dim, TextureFormat format, TextureCreationFlags flags);
+		ResourceHandle createTexture(const TextureDim& dim, TextureFormat format, TextureCreationFlags flags = {}, uint8 mipLevelCount = 0);
 		void destroyTexture(ResourceHandle handle);
 
 		ShaderResourceViewHandle createShaderResourceView(ResourceHandle resourceHandle, const ShaderResourceViewDesc& viewDesc);
@@ -464,7 +495,7 @@ namespace XEngine::Render::HAL
 		void* getUploadBufferCPUPtr(ResourceHandle uploadBufferHandle);
 		DescriptorAddress getDescriptorBundleStartAddress(DescriptorBundleHandle bundleHandle) const;
 		uint64 getFenceValue(FenceHandle fenceHandle) const;
-		ResourceHandle getSwapChainPlaneTexture(SwapChainHandle swapChainHandle, uint32 planeIndex) const;
+		ResourceHandle getSwapChainTexture(SwapChainHandle swapChainHandle, uint32 textureIndex) const;
 
 		const char* getName() const;
 	};

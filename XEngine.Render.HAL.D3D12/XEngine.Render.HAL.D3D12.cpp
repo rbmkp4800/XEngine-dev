@@ -268,8 +268,8 @@ void CommandList::dispatch(uint32 groupCountX, uint32 groupCountY, uint32 groupC
 	d3dCommandList->Dispatch(groupCountX, groupCountY, groupCountZ);
 }
 
-void CommandList::resourceStateTransition(ResourceHandle resourceHandle,
-	ResourceState stateBefore, ResourceState stateAfter)
+void CommandList::resourceBarrierStateTransition(ResourceHandle resourceHandle,
+	ResourceState stateBefore, ResourceState stateAfter, const TextureSubresourceIdx* textureSubresource)
 {
 	XEAssert(state == State::Recording);
 
@@ -304,7 +304,22 @@ struct Device::Resource
 	ID3D12Resource2* d3dResource;
 	ResourceType type;
 	uint8 handleGeneration;
-	bool internalOwnership; // For example swap chain. User can't release it
+	bool internalOwnership; // For example swap chain. User can't release it.
+
+	union
+	{
+		struct
+		{
+			uint8 mipLevelCount;
+			uint16 arraySize;
+			TextureFormat format;
+		} texture;
+
+		struct
+		{
+			uint32 size;
+		} buffer;
+	};
 };
 
 struct Device::ShaderResourceView
@@ -339,7 +354,7 @@ struct Device::Fence
 struct Device::SwapChain
 {
 	IDXGISwapChain4* dxgiSwapChain;
-	ResourceHandle planeTextures[SwapChainPlaneCount];
+	ResourceHandle textures[SwapChainTextureCount];
 };
 
 void Device::initialize(IDXGIAdapter4* dxgiAdapter)
@@ -414,7 +429,8 @@ ResourceHandle Device::createBuffer(uint64 size, BufferMemoryType memoryType, Bu
 	return composeResourceHandle(resourceIndex);
 }
 
-ResourceHandle Device::createTexture(const TextureDim& dim, TextureFormat format, TextureCreationFlags flags)
+ResourceHandle Device::createTexture(const TextureDim& dim, TextureFormat format,
+	TextureCreationFlags flags, uint8 mipLevelCount)
 {
 	const sint32 resourceIndex = resourcesTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(resourceIndex >= 0);
@@ -436,9 +452,9 @@ ResourceHandle Device::createTexture(const TextureDim& dim, TextureFormat format
 	if (flags.allowShaderWrite)
 		d3dResourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
-	// TODO: For now just Texture2D
+	// TODO: Check if `mipLevelCount` is not greater than max possible level count for this resource.
 	const D3D12_RESOURCE_DESC d3dResourceDesc =
-		D3D12Helpers::ResourceDescForTexture2D(dim.width, dim.height, 0, dxgiFormat, d3dResourceFlags);
+		D3D12Helpers::ResourceDescForTexture2D(dim.width, dim.height, mipLevelCount, dxgiFormat, d3dResourceFlags);
 
 	d3dDevice->CreateCommittedResource(&d3dHeapProps, D3D12_HEAP_FLAG_NONE,
 		&d3dResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
@@ -846,7 +862,7 @@ SwapChainHandle Device::createSwapChain(uint16 width, uint16 height, void* hWnd)
 	dxgiSwapChainDesc.SampleDesc.Count = 1;
 	dxgiSwapChainDesc.SampleDesc.Quality = 1;
 	dxgiSwapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	dxgiSwapChainDesc.BufferCount = SwapChainPlaneCount;
+	dxgiSwapChainDesc.BufferCount = SwapChainTextureCount;
 	dxgiSwapChainDesc.Scaling = DXGI_SCALING_STRETCH;
 	dxgiSwapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	dxgiSwapChainDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
@@ -858,8 +874,8 @@ SwapChainHandle Device::createSwapChain(uint16 width, uint16 height, void* hWnd)
 
 	dxgiSwapChain1->QueryInterface(IID_PPV_ARGS(&swapChain.dxgiSwapChain));
 
-	// Allocate resources for planes
-	for (uint32 i = 0; i < SwapChainPlaneCount; i++)
+	// Allocate resources for textures
+	for (uint32 i = 0; i < SwapChainTextureCount; i++)
 	{
 		const sint32 resourceIndex = resourcesTableAllocationMask.findFirstZeroAndSet();
 		XEMasterAssert(resourceIndex >= 0);
@@ -872,7 +888,7 @@ SwapChainHandle Device::createSwapChain(uint16 width, uint16 height, void* hWnd)
 
 		dxgiSwapChain1->GetBuffer(i, IID_PPV_ARGS(&resource.d3dResource));
 		
-		swapChain.planeTextures[i] = composeResourceHandle(resourceIndex);
+		swapChain.textures[i] = composeResourceHandle(resourceIndex);
 	}
 
 	return composeSwapChainHandle(swapChainIndex);
@@ -926,11 +942,11 @@ uint64 Device::getFenceValue(FenceHandle fenceHandle) const
 	return fence.d3dFence->GetCompletedValue();
 }
 
-ResourceHandle Device::getSwapChainPlaneTexture(SwapChainHandle swapChainHandle, uint32 planeIndex) const
+ResourceHandle Device::getSwapChainTexture(SwapChainHandle swapChainHandle, uint32 textureIndex) const
 {
 	const SwapChain& swapChain = swapChainsTable[resolveSwapChainHandle(swapChainHandle)];
-	XEAssert(planeIndex < countof(swapChain.planeTextures));
-	return swapChain.planeTextures[planeIndex];
+	XEAssert(textureIndex < countof(swapChain.textures));
+	return swapChain.textures[textureIndex];
 }
 
 // Host ////////////////////////////////////////////////////////////////////////////////////////////

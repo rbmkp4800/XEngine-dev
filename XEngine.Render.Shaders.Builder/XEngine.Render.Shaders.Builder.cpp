@@ -16,12 +16,13 @@ using namespace XEngine::Render::Shaders::Builder_;
 
 bool Builder::loadIndex(const char* indexPath)
 {
-	pipelineLayoutsList.createEntry("TestPipelineLayout", ...);
+	PipelineLayout& testLayout = *pipelineLayoutsList.createEntry("TestPipelineLayout", ...);
+
 	pipelinesList.createGraphicsPipeline(
 		"TestGfxPipeline",
-		*pipelineLayoutsList.findEntry("TestPipelineLayout"),
+		testLayout,
 		Builder_::GraphicsPipelineDesc {
-			.vertexShader = shadersList.findOrCreateEntry(ShaderType::Vertex, sourcesCache.findOrCreateEntry("test.hlsl")),
+			.vertexShader = shadersList.findOrCreateEntry(ShaderType::Vertex, *sourcesCache.findOrCreateEntry("test.hlsl"), testLayout),
 			.renderTargetsFormats = { HAL::TexelViewFormat::R8G8B8A8_UNORM },
 		});
 }
