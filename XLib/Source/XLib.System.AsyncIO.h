@@ -41,7 +41,7 @@ namespace XLib
 		State state = State::None;
 
 		inline void clear()
-			{ Memory::Set(this, 0, sizeof(*this)); }
+			{ memorySet(this, 0, sizeof(*this)); }
 
 	public:
 		void cancel();

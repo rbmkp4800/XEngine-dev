@@ -78,7 +78,7 @@ GeometrySectionBundleInstanceHandle Scene::insertGeometrySectionBundleInstance(
 		sectionRecords[i] = { a, b };
 	}
 
-	Memory::Copy(mappedDrawArgsBuffer + sizeof(SectionRecord) * batch.sectionCount,
+	memoryCopy(mappedDrawArgsBuffer + sizeof(SectionRecord) * batch.sectionCount,
 		&sectionRecords, sizeof(SectionRecord) * bundle.sectionCount);
 
 	batch.sectionCount += bundle.sectionCount;
@@ -88,5 +88,5 @@ GeometrySectionBundleInstanceHandle Scene::insertGeometrySectionBundleInstance(
 
 void Scene::updateTransforms(TransformAddress startAddress, uint32 count, const XLib::Matrix3x4* transforms)
 {
-	Memory::Copy(mappedTransformsBuffer + uintptr(startAddress), transforms, sizeof(Matrix3x4) * count);
+	memoryCopy(mappedTransformsBuffer + uintptr(startAddress), transforms, sizeof(Matrix3x4) * count);
 }

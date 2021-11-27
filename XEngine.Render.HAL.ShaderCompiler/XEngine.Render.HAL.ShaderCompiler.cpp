@@ -267,13 +267,13 @@ bool Host::CompilePipelineLayout(Platform platform,
 		header.sourceHash = 0; // TODO: ...
 		header.bindPointCount = bindPointCount;
 
-		Memory::Copy(objectDataBytes + bindPointRecordsOffset, bindPointRecords, sizeof(PipelineBindPointRecord) * bindPointCount);
-		Memory::Copy(objectDataBytes + rootSignatureOffset, d3dRootSignature->GetBufferPointer(), d3dRootSignature->GetBufferSize());
+		memoryCopy(objectDataBytes + bindPointRecordsOffset, bindPointRecords, sizeof(PipelineBindPointRecord) * bindPointCount);
+		memoryCopy(objectDataBytes + rootSignatureOffset, d3dRootSignature->GetBufferPointer(), d3dRootSignature->GetBufferSize());
 	}
 	result.object.fillGenericHeaderAndFinalize(PipelineLayoutObjectSignature);
 
 	// Fill compiled object metadata
-	Memory::Copy(result.bindPointsMetadata, bindPointsMetadata,
+	memoryCopy(result.bindPointsMetadata, bindPointsMetadata,
 		sizeof(CompiledPipelineLayout::BindPointMetadata) * bindPointCount);
 
 	return true;
@@ -388,7 +388,7 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipeli
 		header.pipelineLayoutSourceHash = pipelineLayout.getSourceHash();
 		header.objectType = TranslateShaderTypeToPipelineBytecodeObjectType(shaderType);
 
-		Memory::Copy(objectDataBytes + bytecodeOffset, dxcBytecodeBlob->GetBufferPointer(), dxcBytecodeBlob->GetBufferSize());
+		memoryCopy(objectDataBytes + bytecodeOffset, dxcBytecodeBlob->GetBufferPointer(), dxcBytecodeBlob->GetBufferSize());
 	}
 	result.object.fillGenericHeaderAndFinalize(PipelineBytecodeObjectSignature);
 
@@ -462,9 +462,9 @@ bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayo
 		baseObject.generic = {}; // Will be filled later
 		baseObject.pipelineLayoutSourceHash = pipelineLayout.getSourceHash();
 
-		Memory::Copy(baseObject.bytecodeObjectsCRCs, bytecodeObjectsCRCs, sizeof(uint32) * bytecodeObjectCount);
+		memoryCopy(baseObject.bytecodeObjectsCRCs, bytecodeObjectsCRCs, sizeof(uint32) * bytecodeObjectCount);
 
-		Memory::Copy(baseObject.renderTargetFormats, desc.renderTargetsFormats, sizeof(TexelViewFormat) * MaxRenderTargetCount);
+		memoryCopy(baseObject.renderTargetFormats, desc.renderTargetsFormats, sizeof(TexelViewFormat) * MaxRenderTargetCount);
 		baseObject.depthStencilFormat = desc.depthStencilFormat;
 
 		baseObject.enabledShaderStages.vertex			= desc.vertexShader			!= nullptr;

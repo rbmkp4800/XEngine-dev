@@ -144,7 +144,7 @@ void MaterialHeap::updateMaterialConstants(MaterialHandle handle,
 		effect.materialConstantsSize * material.constantsIndex;
 
 	byte *materialConstants = mappedMaterialConstantsTableArena + materialConstantsAbsoluteOffset;
-	Memory::Copy(materialConstants + effect.materialUserSpecifiedConstantsOffset + offset, data, size);
+	memoryCopy(materialConstants + effect.materialUserSpecifiedConstantsOffset + offset, data, size);
 }
 
 void MaterialHeap::updateMaterialTexture(MaterialHandle handle, uint32 slot, TextureHandle textureHandle)

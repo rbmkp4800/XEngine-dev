@@ -300,8 +300,8 @@ void Renderer::render(Scene& scene, const Camera& camera, GBuffer& gBuffer, Targ
 		cameraTransformConstantsOffset + sizeof(LightingPassConstants),
 		D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 
-	Memory::Copy(mappedUploadBuffer + cameraTransformConstantsOffset, &cameraTransformConstants, sizeof(cameraTransformConstants));
-	Memory::Copy(mappedUploadBuffer + lightingPassConstantsOffset, &lightingPassConstants, sizeof(lightingPassConstants));
+	memoryCopy(mappedUploadBuffer + cameraTransformConstantsOffset, &cameraTransformConstants, sizeof(cameraTransformConstants));
+	memoryCopy(mappedUploadBuffer + lightingPassConstantsOffset, &lightingPassConstants, sizeof(lightingPassConstants));
 
 	const D3D12_GPU_VIRTUAL_ADDRESS uploadBufferAddress = d3dUploadBuffer->GetGPUVirtualAddress();
 

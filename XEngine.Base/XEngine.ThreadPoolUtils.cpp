@@ -31,7 +31,7 @@ void AsyncMemoryCopyContext::TaskRoutine(AsyncMemoryCopyContext::Task& task)
 	const bool isFinalPiece = context.size <= asyncMemoryCopyBytesPerTaskRun;
 	const uintptr pieceSize = isFinalPiece ? context.size : asyncMemoryCopyBytesPerTaskRun;
 
-	Memory::Copy(context.destination, context.source, pieceSize);
+	memoryCopy(context.destination, context.source, pieceSize);
 
 	if (isFinalPiece)
 	{

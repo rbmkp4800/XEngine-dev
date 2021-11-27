@@ -132,7 +132,7 @@ namespace XLib
 
 			inline void clear()
 			{
-				Memory::Set(this, 0, sizeof(*this));
+				memorySet(this, 0, sizeof(*this));
 			}
 		};
 

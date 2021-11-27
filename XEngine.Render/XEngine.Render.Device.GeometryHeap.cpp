@@ -21,7 +21,7 @@ GeometrySectionBundleHandle GeometryHeap::createSectionBundle(
 
 	bundle.sections = (GeometrySectionDesc*)
 		SystemHeapAllocator::Allocate(sizeof(GeometrySectionDesc) * sectionCount);
-	Memory::Copy(bundle.sections, sections, sizeof(GeometrySectionDesc) * sectionCount);
+	memoryCopy(bundle.sections, sections, sizeof(GeometrySectionDesc) * sectionCount);
 
 	bundle.sectionCount = uint16(sectionCount);
 

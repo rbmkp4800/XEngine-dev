@@ -45,7 +45,7 @@ void Uploader::uploadTexture2DMIPLevel(DXGI_FORMAT format,
 
 		for (uint32 i = 0; i < rowsToUpload; i++)
 		{
-			Memory::Copy(mappedUploadBuffer + i * uploadRowPitch,
+			memoryCopy(mappedUploadBuffer + i * uploadRowPitch,
 				to<byte*>(sourceData) + (rowsUploaded + i) * sourceRowPitch, rowByteSize);
 		}
 
@@ -92,7 +92,7 @@ void Uploader::uploadBuffer(ID3D12Resource* d3dDestBuffer,
 	{
 		uint32 currentUploadSize = min(size - bytesUploaded, uploadBufferSize);
 
-		Memory::Copy(mappedUploadBuffer, to<byte*>(data) + bytesUploaded, currentUploadSize);
+		memoryCopy(mappedUploadBuffer, to<byte*>(data) + bytesUploaded, currentUploadSize);
 
 		d3dCommandList->CopyBufferRegion(d3dDestBuffer, destOffset + bytesUploaded,
 			d3dUploadBuffer, 0, currentUploadSize);
