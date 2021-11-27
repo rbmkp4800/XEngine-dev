@@ -457,6 +457,15 @@ namespace XEngine::Render::HAL
 		inline DescriptorAddress composeDescriptorAddress(uint32 srvHeapDescriptorIndex) const;
 		inline uint32 resolveDescriptorAddress(DescriptorAddress address) const;
 
+		inline Resource& getResourceByHandle(ResourceHandle handle);
+		inline ShaderResourceView& getShaderResourceViewByHandle(ShaderResourceViewHandle handle);
+		inline PipelineLayout& getPipelineLayoutByHandle(PipelineLayoutHandle handle);
+		inline Pipeline& getPipelineByHandle(PipelineHandle handle);
+		inline Fence& getFenceByHandle(FenceHandle handle);
+		inline const Fence& getFenceByHandle(FenceHandle handle) const;
+		inline SwapChain& getSwapChainByHandle(SwapChainHandle handle);
+		inline const SwapChain& getSwapChainByHandle(SwapChainHandle handle) const;
+
 	private:
 		static uint32 CalculateTextureSubresourceIndex(const Resource& resource, const TextureSubresource& subresource);
 

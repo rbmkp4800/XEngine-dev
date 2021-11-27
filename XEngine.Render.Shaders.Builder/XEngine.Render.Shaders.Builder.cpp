@@ -155,9 +155,7 @@ void Builder::composePack(const char* packPath)
 	const uint32 pipelineRecordsSizeBytes = pipelineRecords.getSize() * sizeof(PipelineRecord);
 	const uint32 bytecodeObjectRecordsSizeBytes = bytecodeObjectRecords.getSize() * sizeof(ObjectRecord);
 	const uint32 objectsBaseOffset = sizeof(PackHeader) +
-		pipelineLayoutRecordsSizeBytes +
-		pipelineRecordsSizeBytes +
-		bytecodeObjectRecordsSizeBytes;
+		pipelineLayoutRecordsSizeBytes + pipelineRecordsSizeBytes + bytecodeObjectRecordsSizeBytes;
 
 	File file;
 	file.open(packPath, FileAccessMode::Write, FileOpenMode::Override);

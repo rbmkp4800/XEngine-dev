@@ -153,8 +153,7 @@ void CommandList::setPipelineLayout(PipelineLayoutHandle pipelineLayoutHandle)
 	if (currentPipelineLayoutHandle == pipelineLayoutHandle)
 		return;
 
-	const Device::PipelineLayout& pipelineLayout =
-		device->pipelineLayoutsTable[device->resolvePipelineLayoutHandle(pipelineLayoutHandle)];
+	const Device::PipelineLayout& pipelineLayout = device->getPipelineLayoutByHandle(pipelineLayoutHandle);
 
 	if (currentPipelineType == PipelineType::Graphics)
 		d3dCommandList->SetGraphicsRootSignature(pipelineLayout.d3dRootSignature);
@@ -170,7 +169,7 @@ void CommandList::setPipeline(PipelineHandle pipelineHandle)
 {
 	XEAssert(state == State::Recording);
 
-	const Device::Pipeline& pipeline = device->pipelinesTable[device->resolvePipelineHandle(pipelineHandle)];
+	const Device::Pipeline& pipeline = device->getPipelineByHandle(pipelineHandle);
 	XEAssert(pipeline.type == currentPipelineType);
 	XEAssert(pipeline.pipelineLayoutHandle == currentPipelineLayoutHandle);
 
@@ -222,7 +221,7 @@ void CommandList::bindBuffer(BufferBindType bindType,
 	XEAssertImply(bindType == BufferBindType::ReadWrite, bindPointsLUTEntry.getType() == PipelineBindPointType::ReadWriteBuffer);
 	const uint32 rootParameterIndex = bindPointsLUTEntry.getRootParameterIndex();
 
-	const Device::Resource& resource = device->resourcesTable[device->resolveResourceHandle(bufferHandle)];
+	const Device::Resource& resource = device->getResourceByHandle(bufferHandle);
 	XEAssert(resource.type == ResourceType::Buffer);
 	XEAssert(resource.d3dResource);
 
@@ -273,7 +272,7 @@ void CommandList::resourceBarrierStateTransition(ResourceHandle resourceHandle,
 {
 	XEAssert(state == State::Recording);
 
-	const Device::Resource& resource = device->resourcesTable[device->resolveResourceHandle(resourceHandle)];
+	const Device::Resource& resource = device->getResourceByHandle(resourceHandle);
 	XEAssert(resource.d3dResource);
 
 	const uint32 subresourceIndex = textureSubresource ?
@@ -292,8 +291,8 @@ void CommandList::copyBufferRegion(ResourceHandle srcBufferHandle, uint64 srcOff
 {
 	XEAssert(state == State::Recording);
 
-	const Device::Resource& srcBuffer = device->resourcesTable[device->resolveResourceHandle(srcBufferHandle)];
-	const Device::Resource& destBuffer = device->resourcesTable[device->resolveResourceHandle(destBufferHandle)];
+	const Device::Resource& srcBuffer = device->getResourceByHandle(srcBufferHandle);
+	const Device::Resource& destBuffer = device->getResourceByHandle(destBufferHandle);
 	XEAssert(srcBuffer.type == ResourceType::Buffer && srcBuffer.d3dResource);
 	XEAssert(destBuffer.type == ResourceType::Buffer && destBuffer.d3dResource);
 
@@ -321,8 +320,7 @@ void CommandList::copyTextureRegion(const TextureDataLocation& destLocation, uin
 		LocationInfo result = {};
 		if (location.type == TextureDataLocationType::Texture)
 		{
-			const Device::Resource& resource =
-				device->resourcesTable[device->resolveResourceHandle(location.texture.resourceHandle)];
+			const Device::Resource& resource = device->getResourceByHandle(location.texture.resourceHandle);
 			XEAssert(resource.type == ResourceType::Texture && resource.d3dResource);
 
 			result.d3dLocation.pResource = resource.d3dResource;
@@ -335,8 +333,7 @@ void CommandList::copyTextureRegion(const TextureDataLocation& destLocation, uin
 		}
 		else if (location.type == TextureDataLocationType::Buffer)
 		{
-			const Device::Resource& resource =
-				device->resourcesTable[device->resolveResourceHandle(location.buffer.resourceHandle)];
+			const Device::Resource& resource = device->getResourceByHandle(location.buffer.resourceHandle);
 			XEAssert(resource.type == ResourceType::Buffer && resource.d3dResource);
 
 			result.d3dLocation.pResource = resource.d3dResource;
@@ -573,7 +570,7 @@ ResourceHandle Device::createTexture(const TextureDim& dim, TextureFormat format
 
 ShaderResourceViewHandle Device::createShaderResourceView(ResourceHandle resourceHandle, const ShaderResourceViewDesc& viewDesc)
 {
-	const Resource& resource = resourcesTable[resolveResourceHandle(resourceHandle)];
+	const Resource& resource = getResourceByHandle(resourceHandle);
 	XEAssert(resource.d3dResource);
 
 	const D3D12_RESOURCE_DESC d3dResourceDesc = resource.d3dResource->GetDesc();
@@ -620,7 +617,7 @@ ShaderResourceViewHandle Device::createShaderResourceView(ResourceHandle resourc
 
 RenderTargetViewHandle Device::createRenderTargetView(ResourceHandle textureHandle)
 {
-	const Resource& resource = resourcesTable[resolveResourceHandle(textureHandle)];
+	const Resource& resource = getResourceByHandle(textureHandle);
 	XEAssert(resource.type == ResourceType::Texture);
 	XEAssert(resource.d3dResource);
 
@@ -635,7 +632,7 @@ RenderTargetViewHandle Device::createRenderTargetView(ResourceHandle textureHand
 
 DepthStencilViewHandle Device::createDepthStencilView(ResourceHandle textureHandle)
 {
-	const Resource& resource = resourcesTable[resolveResourceHandle(textureHandle)];
+	const Resource& resource = getResourceByHandle(textureHandle);
 	XEAssert(resource.type == ResourceType::Texture);
 	XEAssert(resource.d3dResource);
 
@@ -717,7 +714,7 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 {
 	using namespace ObjectFormat;
 
-	const Device::PipelineLayout& pipelineLayout = pipelineLayoutsTable[resolvePipelineLayoutHandle(pipelineLayoutHandle)];
+	const Device::PipelineLayout& pipelineLayout = getPipelineLayoutByHandle(pipelineLayoutHandle);
 	XEAssert(pipelineLayout.d3dRootSignature);
 
 	const sint32 pipelineIndex = pipelineLayoutsTableAllocationMask.findFirstZeroAndSet();
@@ -886,7 +883,7 @@ PipelineHandle Device::createComputePipeline(PipelineLayoutHandle pipelineLayout
 {
 	using namespace ObjectFormat;
 
-	const Device::PipelineLayout& pipelineLayout = pipelineLayoutsTable[resolvePipelineLayoutHandle(pipelineLayoutHandle)];
+	const Device::PipelineLayout& pipelineLayout = getPipelineLayoutByHandle(pipelineLayoutHandle);
 	XEAssert(pipelineLayout.d3dRootSignature);
 
 	const sint32 pipelineIndex = pipelineLayoutsTableAllocationMask.findFirstZeroAndSet();
@@ -1033,26 +1030,24 @@ void Device::submitGraphics(CommandList& commandList, const FenceSignalDesc* fen
 
 	for (uint32 i = 0; i < fenceSignalCount; i++)
 	{
-		const Fence& fence = fencesTable[resolveFenceHandle(fenceSignals[i].fenceHandle)];
+		const Fence& fence = getFenceByHandle(fenceSignals[i].fenceHandle);
 		d3dGraphicsQueue->Signal(fence.d3dFence, fenceSignals[i].value);
 	}
 }
 
 void Device::submitFlip(SwapChainHandle swapChainHandle)
 {
-	SwapChain& swapChain = swapChainsTable[resolveSwapChainHandle(swapChainHandle)];
-	swapChain.dxgiSwapChain->Present(1, 0);
+	getSwapChainByHandle(swapChainHandle).dxgiSwapChain->Present(1, 0);
 }
 
 uint64 Device::getFenceValue(FenceHandle fenceHandle) const
 {
-	const Fence& fence = fencesTable[resolveFenceHandle(fenceHandle)];
-	return fence.d3dFence->GetCompletedValue();
+	return getFenceByHandle(fenceHandle).d3dFence->GetCompletedValue();
 }
 
 ResourceHandle Device::getSwapChainTexture(SwapChainHandle swapChainHandle, uint32 textureIndex) const
 {
-	const SwapChain& swapChain = swapChainsTable[resolveSwapChainHandle(swapChainHandle)];
+	const SwapChain& swapChain = getSwapChainByHandle(swapChainHandle);
 	XEAssert(textureIndex < countof(swapChain.textures));
 	return swapChain.textures[textureIndex];
 }
