@@ -2,6 +2,18 @@
 
 namespace D3D12Helpers
 {
+	inline D3D12_BOX Box(UINT left, UINT top, UINT front, UINT right, UINT bottom, UINT back)
+	{
+		D3D12_BOX box = {};
+		box.left = left;
+		box.top = top;
+		box.front = front;
+		box.right = right;
+		box.bottom = bottom;
+		box.back = back;
+		return box;
+	}
+
 	inline D3D12_COMMAND_QUEUE_DESC CommandQueueDesc(D3D12_COMMAND_LIST_TYPE type,
 		INT priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL,
 		D3D12_COMMAND_QUEUE_FLAGS flags = D3D12_COMMAND_QUEUE_FLAG_NONE)

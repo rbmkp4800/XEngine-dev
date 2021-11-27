@@ -30,8 +30,8 @@ namespace XEngine::Render::HAL
 	enum class ShaderResourceViewHandle : uint32;
 	enum class RenderTargetViewHandle : uint32;
 	enum class DepthStencilViewHandle : uint32;
-	enum class DescriptorBundleLayoutHandle : uint32;
-	enum class DescriptorBundleHandle : uint32;
+	enum class DescriptorTableLayoutHandle : uint32;
+	enum class DescriptorTableHandle : uint32;
 	enum class PipelineLayoutHandle : uint32;
 	enum class PipelineHandle : uint32;
 	enum class FenceHandle : uint32;
@@ -130,9 +130,9 @@ namespace XEngine::Render::HAL
 		Stencil,
 	};
 
-	struct TextureSubresourceIdx
+	struct TextureSubresource
 	{
-		uint8 mip;
+		uint8 mipLevel;
 		TextureAspect aspect;
 		uint16 arraySlice;
 	};
@@ -183,6 +183,37 @@ namespace XEngine::Render::HAL
 		inline bool isMutable() const { return (rawState & MutableFlag) != 0; }
 		inline ResourceImmutableState getImmutable() const { XEAssert(!isMutable()); return immutableState; }
 		inline ResourceMutableState getMutable() const { XEAssert(isMutable()); return mutableState; }
+	};
+
+	enum class TextureDataLocationType : uint8
+	{
+		Texture = 0,
+		Buffer,
+	};
+
+	struct TextureDataLocation
+	{
+		TextureDataLocationType type;
+
+		union
+		{
+			struct
+			{
+				ResourceHandle resourceHandle;
+				TextureSubresource subresource;
+			} texture;
+
+			struct
+			{
+				ResourceHandle resourceHandle;
+				uint64 offset;
+				TextureFormat format;
+				uint16 width;
+				uint16 height;
+				uint16 depth;
+				uint32 rowPitch;
+			} buffer;
+		};
 	};
 
 	struct TextureRegion
@@ -324,7 +355,7 @@ namespace XEngine::Render::HAL
 		void bindConstants(uint32 bindPointNameCRC, const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0);
 		void bindBuffer(BufferBindType bindType, uint32 bindPointNameCRC, ResourceHandle bufferHandle, uint32 offset = 0);
 		void bindDescriptor(uint32 bindPointNameCRC, DescriptorAddress address);
-		void bindDescriptorBundle(uint32 bindPointNameCRC, DescriptorBundleHandle bundleHandle);
+		void bindDescriptorTable(uint32 bindPointNameCRC, DescriptorTableHandle bundleHandle);
 		void bindDescriptorArray(uint32 bindPointNameCRC, DescriptorAddress arrayStartAddress);
 
 		void drawNonIndexed(uint32 vertexCount, uint32 startVertexIndex = 0);
@@ -335,15 +366,12 @@ namespace XEngine::Render::HAL
 
 		void resourceBarrierStateTransition(ResourceHandle resourceHandle,
 			ResourceState stateBefore, ResourceState stateAfter,
-			const TextureSubresourceIdx* textureSubresource = nullptr);
-		void resourceBarrierReadWrite(ResourceHandle resourceHandle, const TextureSubresourceIdx* textureSubresource = nullptr);
+			const TextureSubresource* textureSubresource = nullptr);
+		void resourceBarrierReadWrite(ResourceHandle resourceHandle, const TextureSubresource* textureSubresource = nullptr);
 
-		void copyFromBufferToBuffer(ResourceHandle srcBufferHandle, uint64 srcOffset, ResourceHandle destBufferHandle, uint64 destOffset, uint64 size);
-		void copyFromBufferToTexture();
-		void copyFromTextureToTexture(ResourceHandle srcTextureHandle, const TextureSubresourceIdx& srcSubresource,
-			ResourceHandle destTextureHandle, const TextureSubresourceIdx& destSubresource,
-			uint16 destX, uint16 destY, uint16 destZ, const TextureRegion* srcRegion);
-		void copyFromTextureToBuffer();
+		void copyBufferRegion(ResourceHandle dstBufferHandle, uint64 dstOffset, ResourceHandle srcBufferHandle, uint64 srcOffset, uint64 size);
+		void copyTextureRegion(const TextureDataLocation& destLocation, uint16 destX, uint16 destY, uint16 destZ,
+			const TextureDataLocation& srcLocation, const TextureRegion* srcRegion = nullptr);
 	};
 
 	class Device : public XLib::NonCopyable
@@ -430,6 +458,9 @@ namespace XEngine::Render::HAL
 		inline uint32 resolveDescriptorAddress(DescriptorAddress address) const;
 
 	private:
+		static uint32 CalculateTextureSubresourceIndex(const Resource& resource, const TextureSubresource& subresource);
+
+	private:
 		void initialize(IDXGIAdapter4* dxgiAdapter);
 
 	public:
@@ -454,11 +485,11 @@ namespace XEngine::Render::HAL
 		DescriptorAddress allocateDescriptors(uint32 count = 1);
 		void releaseDescriptors(DescriptorAddress address);
 
-		DescriptorBundleLayoutHandle createDescriptorBundleLayout(ObjectDataView objectData);
-		void destroyDescriptorBundleLayout(DescriptorBundleLayoutHandle handle);
+		DescriptorTableLayoutHandle createDescriptorTableLayout(ObjectDataView objectData);
+		void destroyDescriptorTableLayout(DescriptorTableLayoutHandle handle);
 
-		DescriptorBundleHandle createDescriptorBundle(DescriptorBundleLayoutHandle layoutHandle);
-		void destroyDescriptorBundle(DescriptorBundleHandle handle);
+		DescriptorTableHandle createDescriptorTable(DescriptorTableLayoutHandle layoutHandle);
+		void destroyDescriptorTable(DescriptorTableHandle handle);
 
 		PipelineLayoutHandle createPipelineLayout(ObjectDataView objectData);
 		void destroyPipelineLayout(PipelineLayoutHandle handle);
@@ -479,7 +510,7 @@ namespace XEngine::Render::HAL
 		void destroyCommandList(CommandList& commandList);
 
 		void writeDescriptor(DescriptorAddress descriptorAddress, ShaderResourceViewHandle srvHandle);
-		void writeBundleDescriptor(DescriptorBundleHandle bundle, uint32 bindPointNameCRC, ShaderResourceViewHandle srvHandle);
+		void writeTableDescriptor(DescriptorTableHandle bundle, uint32 bindPointNameCRC, ShaderResourceViewHandle srvHandle);
 
 		PipelineBindPointId getPipelineBindPointId(PipelineLayoutHandle pipelineLayoutHandle, uint64 bindPointNameCRC) const;
 
@@ -493,7 +524,7 @@ namespace XEngine::Render::HAL
 		inline void submitAsyncCopy(CommandList& commandList, const FenceSignalDesc& fenceSignal) { submitAsyncCopy(commandList, &fenceSignal, 1); }
 
 		void* getUploadBufferCPUPtr(ResourceHandle uploadBufferHandle);
-		DescriptorAddress getDescriptorBundleStartAddress(DescriptorBundleHandle bundleHandle) const;
+		DescriptorAddress getDescriptorTableStartAddress(DescriptorTableHandle bundleHandle) const;
 		uint64 getFenceValue(FenceHandle fenceHandle) const;
 		ResourceHandle getSwapChainTexture(SwapChainHandle swapChainHandle, uint32 textureIndex) const;
 

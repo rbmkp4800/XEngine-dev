@@ -2,7 +2,7 @@
 
 // NOTE: This file should not be included directly by HAL users.
 
-static inline D3D12_HEAP_TYPE TranslateBufferMemoryTypeToD3D12HeapType(BufferMemoryType type)
+inline D3D12_HEAP_TYPE TranslateBufferMemoryTypeToD3D12HeapType(BufferMemoryType type)
 {
 	switch (type)
 	{
@@ -14,7 +14,7 @@ static inline D3D12_HEAP_TYPE TranslateBufferMemoryTypeToD3D12HeapType(BufferMem
 	XEMasterAssertUnreachableCode();
 }
 
-static inline DXGI_FORMAT TranslateTextureFormatToDXGIFormat(TextureFormat format)
+inline DXGI_FORMAT TranslateTextureFormatToDXGIFormat(TextureFormat format)
 {
 	switch (format)
 	{
@@ -38,7 +38,7 @@ static inline DXGI_FORMAT TranslateTextureFormatToDXGIFormat(TextureFormat forma
 	XEMasterAssertUnreachableCode();
 }
 
-static inline DXGI_FORMAT TranslateTexelViewFormatToDXGIFormat(TexelViewFormat format)
+inline DXGI_FORMAT TranslateTexelViewFormatToDXGIFormat(TexelViewFormat format)
 {
 	switch (format)
 	{
@@ -60,7 +60,7 @@ static inline DXGI_FORMAT TranslateTexelViewFormatToDXGIFormat(TexelViewFormat f
 	XEMasterAssertUnreachableCode();
 }
 
-static inline DXGI_FORMAT TranslateDepthStencilFormatToDXGIFormat(DepthStencilFormat format)
+inline DXGI_FORMAT TranslateDepthStencilFormatToDXGIFormat(DepthStencilFormat format)
 {
 	switch (format)
 	{
@@ -74,7 +74,7 @@ static inline DXGI_FORMAT TranslateDepthStencilFormatToDXGIFormat(DepthStencilFo
 	XEMasterAssertUnreachableCode();
 }
 
-static inline D3D12_RESOURCE_STATES TranslateResourceStateToD3D12ResourceState(ResourceState state)
+inline D3D12_RESOURCE_STATES TranslateResourceStateToD3D12ResourceState(ResourceState state)
 {
 	if (state.isMutable())
 	{
@@ -109,4 +109,16 @@ static inline D3D12_RESOURCE_STATES TranslateResourceStateToD3D12ResourceState(R
 			d3dResultStates |= D3D12_RESOURCE_STATE_COPY_SOURCE;
 		return d3dResultStates;
 	}
+}
+
+inline D3D12_BOX TranslateTextureRegionToD3D12Box(const TextureRegion& region)
+{
+	D3D12_BOX box = {};
+	box.left = region.left;
+	box.top = region.top;
+	box.front = region.front;
+	box.right = region.right;
+	box.bottom = region.bottom;
+	box.back = region.back;
+	return box;
 }
