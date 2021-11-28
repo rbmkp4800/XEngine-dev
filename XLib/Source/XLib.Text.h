@@ -117,6 +117,6 @@ namespace XLib
 	{
 		uint64 value;
 		inline WFmtUDec(uint64 value) : value(value) {}
-		template <typename StreamType> inline bool write(StreamType& stream) const { return TextStreamWriteSIntDec(value); }
+		template <typename StreamType> inline bool write(StreamType& stream) const { return TextStreamWriteSIntDec(stream, value); }
 	};
 }

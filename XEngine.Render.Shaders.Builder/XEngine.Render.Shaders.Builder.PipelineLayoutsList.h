@@ -74,7 +74,7 @@ namespace XEngine::Render::Shaders::Builder_
 
 		PipelineLayout* findEntry(const char* name) const;
 
-		inline uint16 getSize() const { return entriesStorageList.getSize(); }
+		inline uint32 getSize() const { return entriesStorageList.getSize(); }
 
 		inline Iterator begin() { return entriesOrderedSearchTree.begin(); }
 		inline Iterator end() { return entriesOrderedSearchTree.end(); }

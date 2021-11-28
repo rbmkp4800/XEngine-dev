@@ -48,8 +48,8 @@ void Object::fillGenericHeaderAndFinalize(uint64 signature)
 	XAssert(!block->finalized);
 
 	void* data = block + 1;
-	XAssert(block->dataSize >= sizeof(ObjectFormat::GenericObjectHeader));
-	ObjectFormat::GenericObjectHeader& header = *(ObjectFormat::GenericObjectHeader*)data;
+	XAssert(block->dataSize >= sizeof(GenericObjectHeader));
+	GenericObjectHeader& header = *(GenericObjectHeader*)data;
 	header.signature = signature;
 	header.objectSize = block->dataSize;
 	header.objectCRC = 0;

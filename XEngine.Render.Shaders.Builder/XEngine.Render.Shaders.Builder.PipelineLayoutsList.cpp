@@ -14,9 +14,12 @@ bool PipelineLayout::compile()
 
 	PipelineLayoutsList::BindPointsStorageList::Iterator srcBindPointsIt =
 		parentList.bindPointsStorageList.getIteratorAt(bindPointsOffsetInParentStorage);
+	const PipelineLayoutsList::BindPointsStorageList::Iterator bindPointsStorageEndIt =
+		parentList.bindPointsStorageList.end();
+
 	for (uint8 i = 0; i < bindPointCount; i++)
 	{
-		XAssert(srcBindPointsIt.isValid());
+		XAssert(srcBindPointsIt != bindPointsStorageEndIt);
 		const BindPointDesc& src = *srcBindPointsIt;
 		srcBindPointsIt++;
 

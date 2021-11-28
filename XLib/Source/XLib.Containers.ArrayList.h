@@ -171,7 +171,7 @@ namespace XLib
 
 	private:
 		Type* buffers[MaxBufferCount] = {};
-		uint32 size;
+		uint32 size = 0;
 		uint8 allocatedBufferCount = 0;
 
 	private:
@@ -181,17 +181,18 @@ namespace XLib
 		class Iterator
 		{
 		private:
-			StaticSegmentedArrayList& parent;
-			Type* current;
-			Type* currentBlockBack;
-			uint8 currentBlockIndex;
+			StaticSegmentedArrayList* parent = nullptr;
+			Type* current = nullptr;
+			Type* currentBlockBack = nullptr;
+			uint8 currentBlockIndex = 0;
 
 		public:
-			inline Iterator(StaticSegmentedArrayList& parent);
+			Iterator() = default;
 			~Iterator() = default;
 
 			inline void operator ++();
-			inline bool operator != (const Iterator& that) const;
+			inline bool operator == (const Iterator& that) const;
+			inline bool operator != (const Iterator& that) const { return !operator==(that); }
 			inline Type& operator *() { return *current; }
 		};
 
@@ -219,6 +220,8 @@ namespace XLib
 
 		inline Type& operator [] (uint32 index);
 		inline const Type& operator [] (uint32 index) const;
+
+		inline Iterator getIteratorAt(uint32 index) const;
 
 		inline uint32 calculateIndex(const Type* ptr) const;
 
@@ -281,7 +284,7 @@ namespace XLib
 		ensureCapacity(size + 1);
 
 		Type& result = buffer[size];
-		construct(result, forwardRValue(args) ...);
+		construct(result, forwardRValue<ConstructorArgsTypes>(args) ...);
 		size++;
 
 		return result;
@@ -307,9 +310,12 @@ namespace XLib
 	inline auto ArrayList<Type, CounterType, IsSafe, AllocatorType>::
 		popBack() -> Type
 	{
-		// ???
-		//...;
-		//return move(buffer[--size]);
+		XAssert(!isEmpty());
+
+		const CounterType elementIndex = size - 1;
+		Type element = asRValue(buffer[elementIndex]);
+		size--;
+		return element;
 	}
 
 	template <typename Type, typename CounterType, bool IsSafe, typename AllocatorType>
@@ -394,14 +400,14 @@ namespace XLib
 	inline auto StaticSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
 		ensureCapacity(const uint8 requiredBufferCount) -> void
 	{
-		// ASSERT(requiredBufferCount <= MaxBufferCount);
+		XAssert(requiredBufferCount <= MaxBufferCount);
 
 		if (requiredBufferCount <= allocatedBufferCount)
 			return;
 
 		for (uint8 i = allocatedBufferCount; i < requiredBufferCount; i++)
 		{
-			// ASSERT(!buffers[i]);
+			XAssert(!buffers[i]);
 			buffers[i] = (Type*)AllocatorBase::allocate(CalculateNthBufferSize(i));
 		}
 
@@ -425,7 +431,7 @@ namespace XLib
 		ensureCapacity(realIndex.bufferIndex + 1);
 		
 		Type& result = buffers[realIndex.bufferIndex][realIndex.offset];
-		construct(result, forwardRValue(args) ...);
+		construct(result, forwardRValue<ConstructorArgsTypes>(args) ...);
 		size++;
 
 		return result;
@@ -485,10 +491,10 @@ namespace XLib
 		if (size > 0)
 			requiredBufferCount = ConvertVirtualToRealIndex(size - 1).bufferIndex + 1;
 
-		// ASSERT(requiredBufferCount <= allocatedBufferCount);
+		XAssert(requiredBufferCount <= allocatedBufferCount);
 		for (uint8 i = requiredBufferCount; i < allocatedBufferCount; i++)
 		{
-			// ASSERT(buffers[i]);
+			XAssert(buffers[i]);
 			AllocatorBase::release(buffers[i]);
 			buffers[i] = nullptr;
 		}

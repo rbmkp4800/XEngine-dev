@@ -31,30 +31,36 @@ static_assert(sizeof(uintptr) == sizeof(void*) && sizeof(sintptr) == sizeof(void
 
 // Type utils //////////////////////////////////////////////////////////////////////////////////
 
-template <typename T> struct removeReference abstract final { using type = T; };
-template <typename T> struct removeReference<T&> abstract final { using type = T; };
-template <typename T> struct removeReference<T&&> abstract final { using type = T; };
+namespace XLib::Internal
+{
+	template <typename T> struct RemoveReferenceHelper abstract final { using ResultType = T; };
+	template <typename T> struct RemoveReferenceHelper<T&> abstract final { using ResultType = T; };
+	template <typename T> struct RemoveReferenceHelper<T&&> abstract final { using ResultType = T; };
+}
 
-template <typename T> inline typename removeReference<T>::type&& asRValue(T&& object) { return (typename removeReference<T>::type&&)object; }
+template <typename T> using removeReference = typename XLib::Internal::RemoveReferenceHelper<T>::ResultType;
 
-template <typename T> inline T&& forwardRValue(typename removeReference<T>::type& value) { return (T&&)value; }
+template <typename T> inline removeReference<T>&& asRValue(T&& object) { return (removeReference<T>&&)object; }
+
+template <typename T> inline T&& forwardRValue(removeReference<T>& value) { return (T&&)value; }
+template <typename T> inline T&& forwardRValue(removeReference<T>&& value) { return (T&&)value; }
 
 template <typename resultType, typename argumentType>
-inline typename removeReference<resultType>::type as(argumentType&& value)
+inline removeReference<resultType> as(argumentType&& value)
 {
 	static_assert(sizeof(resultType) == sizeof(argumentType));
 	return *((resultType*)&value);
 }
 
 template <typename resultType, typename argumentType>
-inline typename removeReference<resultType>::type& as(argumentType& value)
+inline removeReference<resultType>& as(argumentType& value)
 {
 	static_assert(sizeof(resultType) == sizeof(argumentType));
 	return *((resultType*)&value);
 }
 
 template <typename resultType, typename argumentType>
-inline typename removeReference<resultType>::type to(const argumentType& value) { return resultType(value); }
+inline removeReference<resultType> to(const argumentType& value) { return resultType(value); }
 
 // Construction utils //////////////////////////////////////////////////////////////////////////
 
@@ -169,6 +175,6 @@ namespace XLib
 	};
 }
 
-#define XAssert(expression) do { if (!(expression)) { Debug::Fail("Assertion failed: `" #expression "`\n"); } } while (false)
-#define XAssertImply(antecedent, consequent) do { if ((antecedent) && !(consequent)) { Debug::Fail("Assertion failed: IMPLY `" #antecedent "` -> `" #consequent "`\n"); } } while (false)
-#define XAssertUnreachableCode() { Debug::Fail("Assertion failed: unreachable code reached\n"); }
+#define XAssert(expression) do { if (!(expression)) { XLib::Debug::Fail("Assertion failed: `" #expression "`\n"); } } while (false)
+#define XAssertImply(antecedent, consequent) do { if ((antecedent) && !(consequent)) { XLib::Debug::Fail("Assertion failed: IMPLY `" #antecedent "` -> `" #consequent "`\n"); } } while (false)
+#define XAssertUnreachableCode() { XLib::Debug::Fail("Assertion failed: unreachable code reached\n"); }

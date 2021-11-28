@@ -16,7 +16,12 @@ using namespace XEngine::Render::Shaders::Builder_;
 
 bool Builder::loadIndex(const char* indexPath)
 {
-	PipelineLayout& testLayout = *pipelineLayoutsList.createEntry("TestPipelineLayout", ...);
+	BindPointDesc bp0 = {};
+	bp0.name = "name0";
+	bp0.type = HAL::PipelineBindPointType::ConstantBuffer;
+	bp0.shaderVisibility = HAL::ShaderCompiler::PipelineBindPointShaderVisibility::All;
+
+	PipelineLayout& testLayout = *pipelineLayoutsList.createEntry("TestPipelineLayout", &bp0, 1);
 
 	pipelinesList.createGraphicsPipeline(
 		"TestGfxPipeline",
@@ -25,6 +30,8 @@ bool Builder::loadIndex(const char* indexPath)
 			.vertexShader = shadersList.findOrCreateEntry(ShaderType::Vertex, *sourcesCache.findOrCreateEntry("test.hlsl"), testLayout),
 			.renderTargetsFormats = { HAL::TexelViewFormat::R8G8B8A8_UNORM },
 		});
+
+	return true;
 }
 
 void Builder::build()
@@ -81,7 +88,7 @@ void Builder::composePack(const char* packPath)
 		const uint16 pipelineLayoutIndex =
 			*pipelineLayoutNameCRCToGenericObjectIdxMap.find(pipeline.getPipelineLayout().getNameCRC());
 
-		const bool isGraphics = pipeline.isGraphics();
+		const bool isGraphics = pipeline.isGraphicsPipeline();
 
 		PipelineRecord& pipelineRecord = pipelineRecords.pushBack(PipelineRecord{});
 		pipelineRecord.nameCRC = pipeline.getNameCRC();
@@ -163,9 +170,9 @@ void Builder::composePack(const char* packPath)
 	PackHeader header = {};
 	header.signature = PackSignature;
 	header.version = PackCurrentVersion;
-	header.pipelineLayoutCount = pipelineLayoutRecords.getSize();
-	header.pipelineCount = pipelineRecords.getSize();
-	header.bytecodeObjectCount = bytecodeObjectRecords.getSize();
+	header.pipelineLayoutCount = uint16(pipelineLayoutRecords.getSize()); // TODO: Check overflows
+	header.pipelineCount = uint16(pipelineRecords.getSize());
+	header.bytecodeObjectCount = uint16(bytecodeObjectRecords.getSize());
 	header.objectsBaseOffset = objectsBaseOffset;
 	file.write(header);
 
