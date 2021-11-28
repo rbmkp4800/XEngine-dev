@@ -33,7 +33,6 @@
     <ClInclude Include="Source\XLib.Containers.CyclicQueue.h" />
     <ClInclude Include="Source\XLib.Containers.IntrusiveBinaryTree.h" />
     <ClInclude Include="Source\XLib.CRC.h" />
-    <ClInclude Include="Source\XLib.Debug.h" />
     <ClInclude Include="Source\XLib.Delegate.h" />
     <ClInclude Include="Source\XLib.Math.Matrix3x4.h" />
     <ClInclude Include="Source\XLib.Path.h" />
@@ -41,7 +40,6 @@
     <ClInclude Include="Source\XLib.Platform.D3D11.Helpers.h" />
     <ClInclude Include="Source\XLib.Platform.D3D12.Helpers.h" />
     <ClInclude Include="Source\XLib.Platform.DXGI.Helpers.h" />
-    <ClInclude Include="Source\XLib.PoolAllocator.h" />
     <ClInclude Include="Source\XLib.Program.h" />
     <ClInclude Include="Source\XLib.Containers.Set.h" />
     <ClInclude Include="Source\XLib.Float.Conversion.h" />
@@ -78,7 +76,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\XLib.CRC.cpp" />
-    <ClCompile Include="Source\XLib.Debug.cpp" />
     <ClCompile Include="Source\XLib.Platform.COMPtr.cpp" />
     <ClCompile Include="Source\XLib.Program.cpp" />
     <ClCompile Include="Source\XLib.SystemHeapAllocator.cpp" />

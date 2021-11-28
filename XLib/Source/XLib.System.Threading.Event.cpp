@@ -1,7 +1,6 @@
 #include <Windows.h>
 
 #include "XLib.System.Threading.Event.h"
-#include "XLib.Debug.h"
 
 using namespace XLib;
 
@@ -12,16 +11,16 @@ void Event::initialize(bool state, bool manualReset)
 }
 void Event::set()
 {
-	XASSERT(isInitialized(), "not initialized");
+	XAssert(isInitialized());
 	SetEvent(handle);
 }
 void Event::reset()
 {
-	XASSERT(isInitialized(), "not initialized");
+	XAssert(isInitialized());
 	ResetEvent(handle);
 }
 void Event::pulse()
 {
-	XASSERT(isInitialized(), "not initialized");
+	XAssert(isInitialized());
 	PulseEvent(handle);
 }

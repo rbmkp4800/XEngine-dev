@@ -1,7 +1,6 @@
 #include <Windows.h>
 
 #include "XLib.System.NamedPipe.h"
-#include "XLib.Debug.h"
 
 using namespace XLib;
 
@@ -34,7 +33,7 @@ bool NamedPipe::create(const char* name, uint32 outBufferSize, uint32 inBufferSi
 
 bool NamedPipe::connect()
 {
-	XASSERT(isInitialized(), "not initialized");
+	XAssert(isInitialized());
 
 	if (!ConnectNamedPipe(handle, nullptr))
 	{
@@ -46,7 +45,7 @@ bool NamedPipe::connect()
 
 bool NamedPipe::asyncConnect(DispatchedAsyncTask& task, NamedPipeConnectedHandler handler, uintptr key)
 {
-	XASSERT(isInitialized(), "not initialized");
+	XAssert(isInitialized());
 
 	task.rawHandler = handler.toRaw();
 	task.key = key;

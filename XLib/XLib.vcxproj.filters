@@ -7,9 +7,7 @@
     <ClInclude Include="Source\XLib.Float.Conversion.h" />
     <ClInclude Include="Source\XLib.Program.h" />
     <ClInclude Include="Source\XLib.Delegate.h" />
-    <ClInclude Include="Source\XLib.Debug.h" />
     <ClInclude Include="Source\XLib.StringWriter.h" />
-    <ClInclude Include="Source\XLib.PoolAllocator.h" />
     <ClInclude Include="Source\XLib.Color.h" />
     <ClInclude Include="Source\XLib.Path.h" />
     <ClInclude Include="Source\XLib.AllocatorAdapterBase.h" />
@@ -61,7 +59,6 @@
   <ItemGroup>
     <ClCompile Include="Source\XLib.Random.cpp" />
     <ClCompile Include="Source\XLib.Program.cpp" />
-    <ClCompile Include="Source\XLib.Debug.cpp" />
     <ClCompile Include="Source\XLib.cpp" />
     <ClCompile Include="Source\XLib.StringWriter.cpp" />
     <ClCompile Include="Source\XLib.SystemHeapAllocator.cpp" />

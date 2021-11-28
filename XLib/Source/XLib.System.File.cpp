@@ -2,8 +2,6 @@
 
 #include "XLib.System.File.h"
 
-#include "XLib.Debug.h"
-
 using namespace XLib;
 
 static_assert(DWORD(FileAccessMode::Read) == GENERIC_READ, "FileAccessMode::Read must be equal to GENERIC_READ");

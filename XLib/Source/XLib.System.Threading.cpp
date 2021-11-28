@@ -2,8 +2,6 @@
 
 #include "XLib.System.Threading.h"
 
-#include "XLib.Debug.h"
-
 using namespace XLib;
 
 struct ThreadMainWrapperArgs

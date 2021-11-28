@@ -1,6 +1,5 @@
 #include <Windows.h>
 
-#include <XLib.Debug.h>
 #include <XLib.System.Threading.h>
 #include <XLib.System.Threading.Event.h>
 
@@ -278,7 +277,7 @@ void Output_SetCursorState(CursorState state)
 
 void Output::Initialize()
 {
-	XASSERT(!dispatchThread.isInitialized(), "already initialized");
+	XAssert(!dispatchThread.isInitialized());
 
 	// Initailize Raw Input
 	if (!rawInputRegistered)

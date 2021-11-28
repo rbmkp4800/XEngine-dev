@@ -3,8 +3,6 @@
 
 #include "XLib.System.Network.Socket.h"
 
-#include "XLib.Debug.h"
-
 using namespace XLib;
 
 static_assert(uint32(ProtocolType::TCP) == SOCK_STREAM, "XLib.System.Network.Socket.ProtocolType::TCP != SOCK_STREAM");

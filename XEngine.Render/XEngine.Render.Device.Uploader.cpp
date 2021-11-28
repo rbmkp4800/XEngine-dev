@@ -1,6 +1,5 @@
 #include <d3d12.h>
 
-#include <XLib.Debug.h>
 #include <XLib.Platform.D3D12.Helpers.h>
 
 #include "XEngine.Render.Device.Uploader.h"
@@ -118,7 +117,7 @@ void Uploader::uploadTexture2DAndGenerateMIPs(ID3D12Resource* d3dDstTexture,
 
 	uint16x2 mipSize = { uint16(desc.Width), uint16(desc.Height) };
 
-	XASSERT(mipSize.x * pixelPitch <= uploadBufferSize, "texture is too large");
+	XAssert(mipSize.x * pixelPitch <= uploadBufferSize);
 
 	const void *mipSourceData = sourceData;
 	uint32 mipSourceRowPitch = sourceRowPitch;

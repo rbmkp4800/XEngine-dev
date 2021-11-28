@@ -1,7 +1,6 @@
 #include <Windows.h>
 
 #include "XLib.h"
-#include "XLib.Debug.h"
 #include "XLib.System.AsyncIO.h"
 #include "XLib.System.Network.Socket.h"
 #include "XLib.System.NamedPipe.h"

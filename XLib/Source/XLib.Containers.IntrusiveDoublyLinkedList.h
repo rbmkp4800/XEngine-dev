@@ -1,6 +1,6 @@
 #pragma once
 
-#include "XLib.Debug.h"
+#include "XLib.h"
 
 #define XLib_hookPrev(item)	( (Item*&) ( ((item)->*hook).prev ) )
 #define XLib_hookNext(item)	( (Item*&) ( ((item)->*hook).next ) )
@@ -64,7 +64,7 @@ namespace XLib
 
 		inline void pushBack(Item* item)
 		{
-			XASSERT(!XLib_hookPrev(item) && !XLib_hookNext(item), "item already in list");
+			XAssert(!XLib_hookPrev(item) && !XLib_hookNext(item)); // Item already in list
 
 			if (tail)
 			{
@@ -75,7 +75,7 @@ namespace XLib
 			}
 			else
 			{
-				XASSERT(!head, "internal structure broken");
+				XAssert(!head); // Internal structure broken
 
 				XLib_hookPrev(item) = nullptr;
 				XLib_hookNext(item) = nullptr;
@@ -86,7 +86,7 @@ namespace XLib
 		}
 		inline Item* popFront()
 		{
-			XASSERT(!isEmpty(), "list is empty");
+			XAssert(!isEmpty());
 
 			Item* result = head;
 			head = XLib_hookNext(result);
@@ -102,13 +102,13 @@ namespace XLib
 		}
 		inline void remove(Item* item)
 		{
-			XASSERT(XLib_hookPrev(item) || XLib_hookNext(item), "item not in list");
+			XAssert(XLib_hookPrev(item) || XLib_hookNext(item)); // Item not in list
 
 			if (XLib_hookPrev(item))
 				XLib_hookNext(XLib_hookPrev(item)) = XLib_hookNext(item);
 			else
 			{
-				XASSERT(head == item, "item from another list");
+				XAssert(head == item); // Item from another list
 				head = XLib_hookNext(item);
 			}
 
@@ -116,7 +116,7 @@ namespace XLib
 				XLib_hookPrev(XLib_hookNext(item)) = XLib_hookPrev(item);
 			else
 			{
-				XASSERT(tail == item, "item from another list");
+				XAssert(tail == item); // Item from another list
 				tail = XLib_hookPrev(item);
 			}
 

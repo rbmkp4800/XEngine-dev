@@ -115,20 +115,6 @@ template <typename T> constexpr inline T unlerp(const T& left, const T& right, c
 template <typename VT, typename XT>
 constexpr inline VT remap(const XT& x, const XT& fromLeft, const XT& fromRight, const VT& toLeft, const VT& toRight) { return lerp(toLeft, toRight, unlerp(fromLeft, fromRight, x)); }
 
-// Bitwise utils ///////////////////////////////////////////////////////////////////////////////
-
-uint8 countLeadingZeros32(uint32 value);
-uint8 countLeadingZeros64(uint64 value);
-uint8 countTrailingZeros32(uint32 value);
-uint8 countTrailingZeros64(uint64 value);
-
-// Memory utils ////////////////////////////////////////////////////////////////////////////////
-
-void memorySet(void* memory, byte value, uintptr size);
-void memoryCopy(void* destination, const void* source, uintptr size);
-void memoryMove(void* destination, const void* source, uintptr size);
-
-////////////////////////////////////////////////////////////////////////////////////////////////
 // TODO:
 
 #if 0
@@ -149,3 +135,40 @@ auto min(const T1& a, const T2 b)
 }
 
 #endif
+
+// Bitwise utils ///////////////////////////////////////////////////////////////////////////////
+
+uint8 countLeadingZeros32(uint32 value);
+uint8 countLeadingZeros64(uint64 value);
+uint8 countTrailingZeros32(uint32 value);
+uint8 countTrailingZeros64(uint64 value);
+
+// Memory utils ////////////////////////////////////////////////////////////////////////////////
+
+void memorySet(void* memory, byte value, uintptr size);
+void memoryCopy(void* destination, const void* source, uintptr size);
+void memoryMove(void* destination, const void* source, uintptr size);
+
+// Debug ///////////////////////////////////////////////////////////////////////////////////////
+
+namespace XLib
+{
+	class Debug abstract final
+	{
+	public:
+		using FailureHandler = void(*)(const char* message);
+
+	private:
+		static FailureHandler failureHandler;
+
+	public:
+		static void DefaultFailureHandler(const char* message);
+
+		static inline void OverrideFailureHandler(FailureHandler handler) { failureHandler = handler ? handler : DefaultFailureHandler; }
+		static inline void Fail(const char* message = nullptr) { failureHandler(message); }
+	};
+}
+
+#define XAssert(expression) if (!(expression)) { Debug::Fail("Assertion failed: `" #expression "`\n"); } else {}
+#define XAssertImply(antecedent, consequent) if (antecedent) { if (!(consequent)) { Debug::Fail("Assertion failed: IMPLY `" #antecedent "` -> `" #consequent "`\n"); } } else {}
+#define XAssertUnreachableCode() { Debug::Fail("Assertion failed: unreachable code reached\n"); }

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "XLib.h"
-#include "XLib.Debug.h"
 
 namespace XLib
 {
@@ -17,7 +16,7 @@ namespace XLib
 	template <typename Type, typename StoragePolicy = CyclicQueueStoragePolicy::InternalHeap>
 	class CyclicQueue
 	{
-		static_assert(true, "XLib.Containers.CyclicQueue: invalid storage policy");
+		static_assert(false, "XLib.Containers.CyclicQueue: invalid storage policy");
 	};
 
 	// TODO: add rvalues and destructors
@@ -46,14 +45,14 @@ namespace XLib
 
 		inline void pushBack(const Type& value)
 		{
-			XASSERT(!isFull(), "queue is full");
+			XAssert(!isFull());
 
 			buffer[backIdx] = value;
 			backIdx = (backIdx + 1) % bufferSize;
 		}
 		inline Type popFront()
 		{
-			XASSERT(!isEmpty(), "queue is empty");
+			XAssert(!isEmpty());
 
 			Type value = buffer[frontIdx];
 			frontIdx = (frontIdx + 1) % bufferSize;
@@ -61,7 +60,7 @@ namespace XLib
 		}
 		inline void dropFront()
 		{
-			XASSERT(!isEmpty(), "queue is empty");
+			XAssert(!isEmpty());
 
 			buffer[frontIdx].~Type();
 			frontIdx = (frontIdx + 1) % bufferSize;
@@ -89,14 +88,14 @@ namespace XLib
 
 		inline void pushBack(const Type& value)
 		{
-			XASSERT(!isFull(), "queue is full");
+			XAssert(!isFull());
 
 			buffer[backIdx] = value;
 			backIdx = (backIdx + 1) % bufferSize;
 		}
 		inline Type popFront()
 		{
-			XASSERT(!isEmpty(), "queue is empty");
+			XAssert(!isEmpty());
 
 			Type value = buffer[frontIdx];
 			frontIdx = (frontIdx + 1) % bufferSize;
@@ -104,7 +103,7 @@ namespace XLib
 		}
 		inline void dropFront()
 		{
-			XASSERT(!isEmpty(), "queue is empty");
+			XAssert(!isEmpty());
 
 			buffer[frontIdx]->~Type();
 			frontIdx = (frontIdx + 1) % bufferSize;

@@ -1,6 +1,5 @@
 #include <intrin.h>
-#include <memory.h>
-#include <string.h>
+#include <Windows.h>
 
 #include "XLib.h"
 
@@ -14,3 +13,15 @@ uint8 countTrailingZeros64(uint64 value) { return uint8(_tzcnt_u64(value)); }
 void memorySet(void* memory, byte value, uintptr size) { memset(memory, value, size); }
 void memoryCopy(void* destination, const void* source, uintptr size) { memcpy(destination, source, size); }
 void memoryMove(void* destination, const void* source, uintptr size) { memmove(destination, source, size); }
+
+Debug::FailureHandler Debug::failureHandler = Debug::DefaultFailureHandler;
+
+void Debug::DefaultFailureHandler(const char* message)
+{
+	if (message)
+	{
+		if (::IsDebuggerPresent())
+			OutputDebugStringA(message);
+	}
+	::DebugBreak();
+}

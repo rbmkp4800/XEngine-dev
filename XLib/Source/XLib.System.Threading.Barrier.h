@@ -1,7 +1,6 @@
 #pragma once
 
 #include "XLib.h"
-#include "XLib.Debug.h"
 #include "XLib.NonCopyable.h"
 #include "XLib.System.Threading.Event.h"
 #include "XLib.System.Threading.Atomics.h"
@@ -44,7 +43,7 @@ namespace XLib
 
 		inline void initialize(uint32 _threadCount)
 		{
-			XASSERT(_threadCount > 0, "invalid thread count value");
+			XAssert(_threadCount > 0);
 
 			counter.value = 0;
 			events[0].initialize(false);
@@ -57,7 +56,7 @@ namespace XLib
 		template <typename PreTriggerAction>
 		inline void ready(PreTriggerAction action)
 		{
-			XASSERT(isInitialized(), "not initialized");
+			XAssert(isInitialized());
 
 			Event &event = events[eventSelector];
 			event.reset();
@@ -86,11 +85,11 @@ namespace XLib
 	public:
 		inline void wait()
 		{
-			XASSERT(isInitialized(), "not initialized");
+			XAssert(isInitialized());
 		}
 		inline void trigger()
 		{
-			XASSERT(isInitialized(), "not initialized");
+			XAssert(isInitialized());
 		}
 
 		inline bool isInitialized() { }
