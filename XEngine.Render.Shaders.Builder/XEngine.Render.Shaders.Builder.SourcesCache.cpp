@@ -49,7 +49,7 @@ bool SourcesCacheEntry::retrieveText(StringView& resultText)
 	fullPath.append(parentCache.getSourcesRootPath());
 	fullPath.append(localPath);
 
-	XEAssert(text.isEmpty());
+	XAssert(text.isEmpty());
 
 	File file;
 	if (!file.open(fullPath.getCStr(), FileAccessMode::Read, FileOpenMode::OpenExisting))

@@ -119,7 +119,7 @@ void Builder::composePack(const char* packPath)
 			}
 
 			// Bytecode objects
-			XEAssert(compiled.getBytecodeObjectCount() < countof(pipelineRecord.bytecodeObjectsIndices));
+			XAssert(compiled.getBytecodeObjectCount() < countof(pipelineRecord.bytecodeObjectsIndices));
 			for (uint8 i = 0; i < compiled.getBytecodeObjectCount(); i++)
 				pipelineRecord.bytecodeObjectsIndices[i] = deduplicateBytecodeObject(compiled.getBytecodeObject(i));
 			bytecodeObjectCount = compiled.getBytecodeObjectCount();
@@ -187,8 +187,8 @@ void Builder::composePack(const char* packPath)
 		bytecodeObjectsTotalSizeCheck += object.getSize();
 	}
 
-	XEAssert(genericObjectsTotalSizeCheck == genericObjectsTotalSize);
-	XEAssert(bytecodeObjectsTotalSizeCheck == bytecodeObjectsTotalSize);
+	XAssert(genericObjectsTotalSizeCheck == genericObjectsTotalSize);
+	XAssert(bytecodeObjectsTotalSizeCheck == bytecodeObjectsTotalSize);
 
 	file.close();
 }

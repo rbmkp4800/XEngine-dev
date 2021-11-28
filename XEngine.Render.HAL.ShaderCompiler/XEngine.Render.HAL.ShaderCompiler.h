@@ -117,11 +117,11 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		void finalize();
 		Object clone() const;
 
-		inline void* getMutableData() { XEAssert(block && !block->finalized); return block + 1; }
-		inline const void* getData() const { XEAssert(block && block->finalized); return block + 1; }
-		inline uint32 getSize() const { XEAssert(block); return block->dataSize; }
+		inline void* getMutableData() { XAssert(block && !block->finalized); return block + 1; }
+		inline const void* getData() const { XAssert(block && block->finalized); return block + 1; }
+		inline uint32 getSize() const { XAssert(block); return block->dataSize; }
 
-		inline ObjectHash getHash() const { XEAssert(block && block->finalized); return block->hash; }
+		inline ObjectHash getHash() const { XAssert(block && block->finalized); return block->hash; }
 
 		inline uint32 getCRC() const;
 

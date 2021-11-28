@@ -10,13 +10,13 @@ using namespace XEngine::Render::Shaders::Builder_;
 bool PipelineLayout::compile()
 {
 	ShaderCompiler::PipelineBindPointDesc compilerBindPointDescs[MaxPipelineBindPointCount] = {};
-	XEAssert(bindPointCount <= countof(compilerBindPointDescs));
+	XAssert(bindPointCount <= countof(compilerBindPointDescs));
 
 	PipelineLayoutsList::BindPointsStorageList::Iterator srcBindPointsIt =
 		parentList.bindPointsStorageList.getIteratorAt(bindPointsOffsetInParentStorage);
 	for (uint8 i = 0; i < bindPointCount; i++)
 	{
-		XEAssert(srcBindPointsIt.isValid());
+		XAssert(srcBindPointsIt.isValid());
 		const BindPointDesc& src = *srcBindPointsIt;
 		srcBindPointsIt++;
 
@@ -33,7 +33,7 @@ bool PipelineLayout::compile()
 
 PipelineLayout* PipelineLayoutsList::createEntry(const char* name, const BindPointDesc* bindPoints, uint8 bindPointCount)
 {
-	XEAssert(bindPointCount <= MaxPipelineBindPointCount); // TODO: Make this an error.
+	XAssert(bindPointCount <= MaxPipelineBindPointCount); // TODO: Make this an error.
 
 	const uint32 nameLength = GetCStrLength(name);
 	const uint64 nameCRC = CRC64::Compute(name, nameLength);

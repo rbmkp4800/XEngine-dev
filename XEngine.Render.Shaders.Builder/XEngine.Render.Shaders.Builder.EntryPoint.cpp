@@ -48,7 +48,7 @@ int main()
 
 	Builder builder;
 	builder.build();
-	builder.storePackage("...");
+	builder.composePack("...");
 
 #if 0
 	if (!LoadShadersListFile(shadersListFilePath.cstr(), shadersList, sourcesCache))

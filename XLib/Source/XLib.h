@@ -169,6 +169,6 @@ namespace XLib
 	};
 }
 
-#define XAssert(expression) if (!(expression)) { Debug::Fail("Assertion failed: `" #expression "`\n"); } else {}
-#define XAssertImply(antecedent, consequent) if (antecedent) { if (!(consequent)) { Debug::Fail("Assertion failed: IMPLY `" #antecedent "` -> `" #consequent "`\n"); } } else {}
+#define XAssert(expression) do { if (!(expression)) { Debug::Fail("Assertion failed: `" #expression "`\n"); } } while (false)
+#define XAssertImply(antecedent, consequent) do { if ((antecedent) && !(consequent)) { Debug::Fail("Assertion failed: IMPLY `" #antecedent "` -> `" #consequent "`\n"); } } while (false)
 #define XAssertUnreachableCode() { Debug::Fail("Assertion failed: unreachable code reached\n"); }

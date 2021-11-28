@@ -14,10 +14,6 @@
 
 #include "XEngine.Render.HAL.ShaderCompiler.h"
 
-#define XEAssert(cond)
-#define XEAssertImply(cond0, cond1)
-#define XEAssertUnreachableCode()
-
 using namespace Microsoft::WRL;
 using namespace XLib;
 using namespace XEngine::Render::HAL;
@@ -35,7 +31,7 @@ static inline PipelineBytecodeObjectType TranslateShaderTypeToPipelineBytecodeOb
 		case ShaderType::Pixel:			return PipelineBytecodeObjectType::PixelShader;
 	}
 
-	XEAssertUnreachableCode();
+	XAssertUnreachableCode();
 }
 
 static inline ObjectHash CalculateObjectHash(const void* data, uint32 size)
@@ -48,11 +44,11 @@ static inline ObjectHash CalculateObjectHash(const void* data, uint32 size)
 
 void Object::fillGenericHeaderAndFinalize(uint64 signature)
 {
-	XEAssert(block);
-	XEAssert(!block->finalized);
+	XAssert(block);
+	XAssert(!block->finalized);
 
 	void* data = block + 1;
-	XEAssert(block->dataSize >= sizeof(ObjectFormat::GenericObjectHeader));
+	XAssert(block->dataSize >= sizeof(ObjectFormat::GenericObjectHeader));
 	ObjectFormat::GenericObjectHeader& header = *(ObjectFormat::GenericObjectHeader*)data;
 	header.signature = signature;
 	header.objectSize = block->dataSize;
@@ -78,8 +74,8 @@ Object::~Object()
 
 void Object::finalize()
 {
-	XEAssert(block);
-	XEAssert(!block->finalized);
+	XAssert(block);
+	XAssert(!block->finalized);
 
 	block->hash = CalculateObjectHash(block + 1, block->dataSize);
 	block->finalized = true;
@@ -89,8 +85,8 @@ void Object::finalize()
 
 Object Object::clone() const
 {
-	XEAssert(block);
-	XEAssert(block->finalized);
+	XAssert(block);
+	XAssert(block->finalized);
 	Atomics::Increment(block->referenceCount);
 
 	Object newObject;
@@ -100,7 +96,7 @@ Object Object::clone() const
 
 Object Object::Create(uint32 size)
 {
-	XEAssert(size);
+	XAssert(size);
 	Object object;
 	object.block = (BlockHeader*)SystemHeapAllocator::Allocate(sizeof(BlockHeader) + size);
 	object.block->referenceCount = 1;
@@ -142,7 +138,7 @@ ShaderType CompiledShader::getShaderType() const
 		case PipelineBytecodeObjectType::MeshShader:			return ShaderType::Mesh;
 		case PipelineBytecodeObjectType::PixelShader:			return ShaderType::Pixel;
 	}
-	XEAssertUnreachableCode();
+	XAssertUnreachableCode();
 }
 
 bool Host::CompilePipelineLayout(Platform platform,
@@ -172,7 +168,7 @@ bool Host::CompilePipelineLayout(Platform platform,
 		const uint8 rootParameterIndex = rootParameterCount;
 		rootParameterCount++;
 
-		XEAssert(objectBindPointRecord.nameCRC);
+		XAssert(objectBindPointRecord.nameCRC);
 		const uintptr bindPointNameLength = ComputeCStrLength(bindPointDesc.name);
 		const uint32 bindPointNameCRC = CRC32::Compute(bindPointDesc.name, bindPointNameLength);
 
@@ -233,7 +229,7 @@ bool Host::CompilePipelineLayout(Platform platform,
 			uavRegisterCount++;
 		}
 		else
-			XEAssertUnreachableCode();
+			XAssertUnreachableCode();
 
 		d3dRootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL; // TODO: ...
 	}
@@ -284,7 +280,7 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipeli
 {
 	result.destroy();
 
-	XEAssert(pipelineLayout.isInitialized());
+	XAssert(pipelineLayout.isInitialized());
 
 	// Patch source code substituting bindings
 	String patchedSourceString;
@@ -344,7 +340,7 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipeli
 			case ShaderType::Mesh:			dxcProfile = L"-Tms_6_6"; break;
 			case ShaderType::Pixel:			dxcProfile = L"-Tps_6_6"; break;
 		}
-		XEAssert(dxcTargetProfile);
+		XAssert(dxcProfile);
 		dxcArgsList.pushBack(dxcProfile);
 	}
 
@@ -370,7 +366,7 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipeli
 
 	ComPtr<IDxcBlob> dxcBytecodeBlob = nullptr;
 	dxcResult->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&dxcBytecodeBlob), nullptr);
-	XEAssert(dxcBytecodeBlob != nullptr && dxcBytecodeBlob->GetBufferSize() > 0);
+	XAssert(dxcBytecodeBlob != nullptr && dxcBytecodeBlob->GetBufferSize() > 0);
 
 	// Compose compiled object
 
@@ -400,19 +396,19 @@ bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayo
 {
 	result.destroy();
 
-	XEAssertImply(desc.vertexShader,		desc.vertexShader->isInitialized());
-	XEAssertImply(desc.amplificationShader,	desc.amplificationShader->isInitialized());
-	XEAssertImply(desc.meshShader,			desc.meshShader->isInitialized());
-	XEAssertImply(desc.pixelShader,			desc.vertexShader->isInitialized());
+	XAssertImply(desc.vertexShader, desc.vertexShader->isInitialized());
+	XAssertImply(desc.amplificationShader, desc.amplificationShader->isInitialized());
+	XAssertImply(desc.meshShader, desc.meshShader->isInitialized());
+	XAssertImply(desc.pixelShader, desc.vertexShader->isInitialized());
 
-	XEAssertImply(desc.vertexShader,		desc.vertexShader->getShaderType() == ShaderType::Vertex);
-	XEAssertImply(desc.amplificationShader,	desc.amplificationShader->getShaderType() == ShaderType::Amplification);
-	XEAssertImply(desc.meshShader,			desc.meshShader->getShaderType() == ShaderType::Mesh);
-	XEAssertImply(desc.pixelShader,			desc.vertexShader->getShaderType() == ShaderType::Pixel);
+	XAssertImply(desc.vertexShader, desc.vertexShader->getShaderType() == ShaderType::Vertex);
+	XAssertImply(desc.amplificationShader, desc.amplificationShader->getShaderType() == ShaderType::Amplification);
+	XAssertImply(desc.meshShader, desc.meshShader->getShaderType() == ShaderType::Mesh);
+	XAssertImply(desc.pixelShader, desc.vertexShader->getShaderType() == ShaderType::Pixel);
 
 	// Validate enabled shader stages combination
-	XEAssert((desc.vertexShader != nullptr) ^ (desc.meshShader != nullptr));
-	XEAssert(desc.vertexShader, !desc.amplificationShader);
+	XAssert((desc.vertexShader != nullptr) ^ (desc.meshShader != nullptr));
+	XAssert(desc.vertexShader, !desc.amplificationShader);
 
 	// Validate render targets
 	{
@@ -420,7 +416,7 @@ bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayo
 		for (TexelViewFormat renderTargetFormat : desc.renderTargetsFormats)
 		{
 			if (undefinedRenderTargetFound)
-				XEAssert(renderTargetFormat == TexelViewFormat::Undefined);
+				XAssert(renderTargetFormat == TexelViewFormat::Undefined);
 			else if (renderTargetFormat == TexelViewFormat::Undefined)
 				undefinedRenderTargetFound = true;
 			else
@@ -428,7 +424,7 @@ bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayo
 		}
 	}
 
-	XEAssert(ValidateTexelFormatValue(desc.depthStencilFormat));
+	XAssert(ValidateDepthStencilFormatValue(desc.depthStencilFormat));
 
 	Object bytecodeObjects[MaxGraphicsPipelineBytecodeObjectCount];
 	uint32 bytecodeObjectsCRCs[MaxGraphicsPipelineBytecodeObjectCount] = {};
@@ -441,11 +437,11 @@ bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayo
 				return;
 
 			const Object& object = shader->getObject();
-			XEAssert(object.isValid())
+			XAssert(object.isValid());
 			bytecodeObjects[bytecodeObjectCount] = object.clone();
 			bytecodeObjectsCRCs[bytecodeObjectCount] = object.getCRC();
 			bytecodeObjectCount++;
-			XEAssert(bytecodeObjectCount <= MaxGraphicsPipelineBytecodeObjectCount);
+			XAssert(bytecodeObjectCount <= MaxGraphicsPipelineBytecodeObjectCount);
 		};
 
 		pushBytecodeObject(desc.vertexShader);
