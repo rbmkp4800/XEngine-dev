@@ -46,7 +46,7 @@ namespace XEngine::Render::Shaders::Builder_
 	{
 	private:
 		using EntriesSearchTree = XLib::IntrusiveBinaryTree<SourcesCacheEntry, &SourcesCacheEntry::entriesSearchTreeHook>;
-		using EntriesStorageList = XLib::StaticSegmentedArrayList<SourcesCacheEntry, 5, 16>;
+		using EntriesStorageList = XLib::FixedLogSegmentedArrayList<SourcesCacheEntry, 5, 16>;
 
 	private:
 		EntriesSearchTree entriesSearchTree;

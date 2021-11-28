@@ -54,8 +54,8 @@ namespace XEngine::Render::Shaders::Builder_
 
 	private:
 		using EntriesOrderedSearchTree = XLib::IntrusiveBinaryTree<PipelineLayout, &PipelineLayout::searchTreeHook>;
-		using EntriesStorageList = XLib::StaticSegmentedArrayList<PipelineLayout, 4, 10>;
-		using BindPointsStorageList = XLib::StaticSegmentedArrayList<BindPointDesc, 6, 14>;
+		using EntriesStorageList = XLib::FixedLogSegmentedArrayList<PipelineLayout, 4, 10>;
+		using BindPointsStorageList = XLib::ArrayList<BindPointDesc, uint32, false>;
 
 	private:
 		EntriesOrderedSearchTree entriesOrderedSearchTree;

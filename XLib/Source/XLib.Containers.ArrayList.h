@@ -3,9 +3,10 @@
 // `ArrayList` - single dynamic storage chunk.
 // `InplaceArrayList` - inplace static storage.
 // `ExpandableInplaceArrayList` - acts like `InplaceArrayList` up to its capacity, then switches to dynamic mode like `ArrayList`.
-// `StaticSegmentedArrayList` - multiple static storage chunks with fast indexing.
+// `FixedSegmenterArrayList` - array list stored in multiple fixed segments of same size. Supports push/pop to/from front.
+// `FixedLogSegmentedArrayList` - array list stored in multiple fixed segments. Segment count scales as log2 of capacity.
 
-// TODO: Introduce overflow checks for `StaticSegmentedArrayList`.
+// TODO: Introduce overflow checks for `FixedLogSegmentedArrayList`.
 // TODO: Introduce `CounterType` overflows checks.
 
 #include "XLib.h"
@@ -152,8 +153,23 @@ namespace XLib
 	};
 
 
+	template <typename Type, uintptr SegmentSize, uintptr InplaceSegmentTableSize = 1, bool IsSafe = true, typename AllocatorType = SystemHeapAllocator>
+	class FixedSegmenterArrayList :
+		private AllocatorAdapterBase<AllocatorType>,
+		public NonCopyable
+	{
+	private:
+		Type* segments[InplaceSegmentTableSize] = {};
+		uint32 size = 0;
+
+	public:
+		FixedSegmenterArrayList() = default;
+		inline ~FixedSegmenterArrayList();
+	};
+
+
 	template <typename Type, uint8 MinCapacityLog2, uint8 MaxCapacityLog2, bool IsSafe = true, typename AllocatorType = SystemHeapAllocator>
-	class StaticSegmentedArrayList :
+	class FixedLogSegmentedArrayList :
 		private AllocatorAdapterBase<AllocatorType>,
 		public NonCopyable
 	{
@@ -163,25 +179,25 @@ namespace XLib
 	private:
 		using AllocatorBase = AllocatorAdapterBase<AllocatorType>;
 
-		static constexpr uint8 MaxBufferCount = MinCapacityLog2 - MaxCapacityLog2 + 1;
+		static constexpr uint8 MaxSegmentCount = MinCapacityLog2 - MaxCapacityLog2 + 1;
 
 		struct RealIndex;
 		static inline RealIndex ConvertVirtualToRealIndex(uint32 virtualIndex);
-		static inline uint32 CalculateNthBufferSize(uint8 bufferIndex);
+		static inline uint32 CalculateSegmentSize(uint8 segmentIndex);
 
 	private:
-		Type* buffers[MaxBufferCount] = {};
+		Type* segments[MaxSegmentCount] = {};
 		uint32 size = 0;
-		uint8 allocatedBufferCount = 0;
+		uint8 allocatedSegmentCount = 0;
 
 	private:
-		inline void ensureCapacity(uint8 requiredBufferCount);
+		inline void ensureCapacity(uint8 requiredSegmentCount);
 
 	public:
 		class Iterator
 		{
 		private:
-			StaticSegmentedArrayList* parent = nullptr;
+			FixedLogSegmentedArrayList* parent = nullptr;
 			Type* current = nullptr;
 			Type* currentBlockBack = nullptr;
 			uint8 currentBlockIndex = 0;
@@ -191,17 +207,18 @@ namespace XLib
 			~Iterator() = default;
 
 			inline void operator ++();
+			inline void operator ++(int) { operator++(0); }
 			inline bool operator == (const Iterator& that) const;
 			inline bool operator != (const Iterator& that) const { return !operator==(that); }
 			inline Type& operator *() { return *current; }
 		};
 
 	public:
-		StaticSegmentedArrayList() = default;
-		inline ~StaticSegmentedArrayList();
+		FixedLogSegmentedArrayList() = default;
+		inline ~FixedLogSegmentedArrayList();
 
-		inline StaticSegmentedArrayList(StaticSegmentedArrayList&& that);
-		inline void operator = (StaticSegmentedArrayList&& that);
+		inline FixedLogSegmentedArrayList(FixedLogSegmentedArrayList&& that);
+		inline void operator = (FixedLogSegmentedArrayList&& that);
 
 		template <typename ... ConstructorArgsTypes>
 		inline Type& emplaceBack(ConstructorArgsTypes&& ... constructorArgs);
@@ -369,54 +386,57 @@ namespace XLib
 	// ExpandableInplaceArrayList //////////////////////////////////////////////////////////////////
 
 
-	// StaticSegmentedArrayList ////////////////////////////////////////////////////////////////////
+	// FixedSegmenterArrayList /////////////////////////////////////////////////////////////////////
+
+
+	// FixedLogSegmentedArrayList //////////////////////////////////////////////////////////////////
 
 	template <typename Type, uint8 MinCapacityLog2, uint8 MaxCapacityLog2, bool IsSafe, typename AllocatorType>
-	struct StaticSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::RealIndex
+	struct FixedLogSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::RealIndex
 	{
 		uint32 offset;
-		uint8 bufferIndex;
+		uint8 segmentIndex;
 	};
 
 	template <typename Type, uint8 MinCapacityLog2, uint8 MaxCapacityLog2, bool IsSafe, typename AllocatorType>
-	inline auto StaticSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
+	inline auto FixedLogSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
 		ConvertVirtualToRealIndex(const uint32 virtualIndex) -> RealIndex
 	{
-		const uint8 bufferIndex = 32 - countLeadingZeros32(virtualIndex >> MinCapacityLog2);
-		const uint8 offsetMaskNumBits = max<sint8>(bufferIndex, 1) + sint8(MinCapacityLog2 - 1);
+		const uint8 segmentIndex = 32 - countLeadingZeros32(virtualIndex >> MinCapacityLog2);
+		const uint8 offsetMaskNumBits = max<sint8>(segmentIndex, 1) + sint8(MinCapacityLog2 - 1);
 		const uint32 offset = virtualIndex & ~(~uint32(0) << offsetMaskNumBits);
-		return RealIndex { offset, bufferIndex };
+		return RealIndex { offset, segmentIndex };
 	}
 
 	template <typename Type, uint8 MinCapacityLog2, uint8 MaxCapacityLog2, bool IsSafe, typename AllocatorType>
-	inline auto StaticSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
-		CalculateNthBufferSize(const uint8 bufferIndex) -> uint32
+	inline auto FixedLogSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
+		CalculateSegmentSize(const uint8 segmentIndex) -> uint32
 	{
-		const uint8 bufferSizeLog2 = max<sint8>(bufferIndex, 1) + sint8(MinCapacityLog2 - 1);
-		return 1 << bufferSizeLog2;
+		const uint8 segmentSizeLog2 = max<sint8>(segmentIndex, 1) + sint8(MinCapacityLog2 - 1);
+		return 1 << segmentSizeLog2;
 	}
 
 	template <typename Type, uint8 MinCapacityLog2, uint8 MaxCapacityLog2, bool IsSafe, typename AllocatorType>
-	inline auto StaticSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
-		ensureCapacity(const uint8 requiredBufferCount) -> void
+	inline auto FixedLogSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
+		ensureCapacity(const uint8 requiredSegmentCount) -> void
 	{
-		XAssert(requiredBufferCount <= MaxBufferCount);
+		XAssert(requiredSegmentCount <= MaxSegmentCount);
 
-		if (requiredBufferCount <= allocatedBufferCount)
+		if (requiredSegmentCount <= allocatedSegmentCount)
 			return;
 
-		for (uint8 i = allocatedBufferCount; i < requiredBufferCount; i++)
+		for (uint8 i = allocatedSegmentCount; i < requiredSegmentCount; i++)
 		{
-			XAssert(!buffers[i]);
-			buffers[i] = (Type*)AllocatorBase::allocate(CalculateNthBufferSize(i));
+			XAssert(!segments[i]);
+			segments[i] = (Type*)AllocatorBase::allocate(CalculateSegmentSize(i));
 		}
 
-		allocatedBufferCount = requiredBufferCount;
+		allocatedSegmentCount = requiredSegmentCount;
 	}
 
 	template <typename Type, uint8 MinCapacityLog2, uint8 MaxCapacityLog2, bool IsSafe, typename AllocatorType>
-	inline StaticSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
-		~StaticSegmentedArrayList()
+	inline FixedLogSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
+		~FixedLogSegmentedArrayList()
 	{
 		clear();
 		compact();
@@ -424,13 +444,13 @@ namespace XLib
 
 	template <typename Type, uint8 MinCapacityLog2, uint8 MaxCapacityLog2, bool IsSafe, typename AllocatorType>
 	template <typename ... ConstructorArgsTypes>
-	inline auto StaticSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
+	inline auto FixedLogSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
 		emplaceBack(ConstructorArgsTypes&& ... args) -> Type&
 	{
 		const RealIndex realIndex = ConvertVirtualToRealIndex(size);
-		ensureCapacity(realIndex.bufferIndex + 1);
+		ensureCapacity(realIndex.segmentIndex + 1);
 		
-		Type& result = buffers[realIndex.bufferIndex][realIndex.offset];
+		Type& result = segments[realIndex.segmentIndex][realIndex.offset];
 		construct(result, forwardRValue<ConstructorArgsTypes>(args) ...);
 		size++;
 
@@ -438,13 +458,13 @@ namespace XLib
 	}
 
 	template <typename Type, uint8 MinCapacityLog2, uint8 MaxCapacityLog2, bool IsSafe, typename AllocatorType>
-	inline auto StaticSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
+	inline auto FixedLogSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
 		pushBack(const Type& value) -> Type&
 	{
 		const RealIndex realIndex = ConvertVirtualToRealIndex(size);
-		ensureCapacity(realIndex.bufferIndex + 1);
+		ensureCapacity(realIndex.segmentIndex + 1);
 
-		Type& result = buffers[realIndex.bufferIndex][realIndex.offset];
+		Type& result = segments[realIndex.segmentIndex][realIndex.offset];
 		if constexpr (IsSafe)
 			construct(result, value);
 		else
@@ -455,18 +475,18 @@ namespace XLib
 	}
 
 	template <typename Type, uint8 MinCapacityLog2, uint8 MaxCapacityLog2, bool IsSafe, typename AllocatorType>
-	inline auto StaticSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
+	inline auto FixedLogSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
 		popBack() -> Type
 	{
 
 	}
 
 	template <typename Type, uint8 MinCapacityLog2, uint8 MaxCapacityLog2, bool IsSafe, typename AllocatorType>
-	inline auto StaticSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
+	inline auto FixedLogSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
 		resize(const uint32 newSize) -> void
 	{
 		const RealIndex newEndRealIndex = ConvertVirtualToRealIndex(newSize);
-		ensureCapacity(newEndRealIndex.bufferIndex + 1);
+		ensureCapacity(newEndRealIndex.segmentIndex + 1);
 
 		if constexpr (IsSafe)
 		{
@@ -484,40 +504,40 @@ namespace XLib
 	}
 
 	template <typename Type, uint8 MinCapacityLog2, uint8 MaxCapacityLog2, bool IsSafe, typename AllocatorType>
-	inline auto StaticSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
+	inline auto FixedLogSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
 		compact() -> void
 	{
-		uint8 requiredBufferCount = 0;
+		uint8 requiredSegmentCount = 0;
 		if (size > 0)
-			requiredBufferCount = ConvertVirtualToRealIndex(size - 1).bufferIndex + 1;
+			requiredSegmentCount = ConvertVirtualToRealIndex(size - 1).segmentIndex + 1;
 
-		XAssert(requiredBufferCount <= allocatedBufferCount);
-		for (uint8 i = requiredBufferCount; i < allocatedBufferCount; i++)
+		XAssert(requiredSegmentCount <= allocatedSegmentCount);
+		for (uint8 i = requiredSegmentCount; i < allocatedSegmentCount; i++)
 		{
-			XAssert(buffers[i]);
-			AllocatorBase::release(buffers[i]);
-			buffers[i] = nullptr;
+			XAssert(segments[i]);
+			AllocatorBase::release(segments[i]);
+			segments[i] = nullptr;
 		}
 
-		allocatedBufferCount = requiredBufferCount;
+		allocatedSegmentCount = requiredSegmentCount;
 	}
 
 	template <typename Type, uint8 MinCapacityLog2, uint8 MaxCapacityLog2, bool IsSafe, typename AllocatorType>
-	inline auto StaticSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
+	inline auto FixedLogSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
 		reserve(const uint32 newCapacity) -> void
 	{
 		if (!newCapacity)
 			return;
 
-		const uint8 requiredBufferCount = ConvertVirtualToRealIndex(newCapacity - 1).bufferIndex + 1;
-		ensureCapacity(requiredBufferCount);
+		const uint8 requiredSegmentCount = ConvertVirtualToRealIndex(newCapacity - 1).segmentIndex + 1;
+		ensureCapacity(requiredSegmentCount);
 	}
 
 	template <typename Type, uint8 MinCapacityLog2, uint8 MaxCapacityLog2, bool IsSafe, typename AllocatorType>
-	inline auto StaticSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
+	inline auto FixedLogSegmentedArrayList<Type, MinCapacityLog2, MaxCapacityLog2, IsSafe, AllocatorType>::
 		operator [] (const uint32 index) -> Type&
 	{
 		const RealIndex realIndex = ConvertVirtualToRealIndex(index);
-		return buffers[realIndex.bufferIndex][realIndex.offset];
+		return segments[realIndex.segmentIndex][realIndex.offset];
 	}
 }

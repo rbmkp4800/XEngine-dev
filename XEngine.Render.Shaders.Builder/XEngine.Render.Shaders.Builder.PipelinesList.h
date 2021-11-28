@@ -60,7 +60,7 @@ namespace XEngine::Render::Shaders::Builder_
 	{
 	private:
 		using EntriesOrderedSearchTree = XLib::IntrusiveBinaryTree<Pipeline, &Pipeline::searchTreeHook>;
-		using EntriesStorageList = XLib::StaticSegmentedArrayList<Pipeline, 5, 16>;
+		using EntriesStorageList = XLib::FixedLogSegmentedArrayList<Pipeline, 5, 16>;
 
 	private:
 		EntriesOrderedSearchTree entriesOrderedSearchTree;

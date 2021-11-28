@@ -11,18 +11,11 @@ bool PipelineLayout::compile()
 {
 	ShaderCompiler::PipelineBindPointDesc compilerBindPointDescs[MaxPipelineBindPointCount] = {};
 	XAssert(bindPointCount <= countof(compilerBindPointDescs));
-
-	PipelineLayoutsList::BindPointsStorageList::Iterator srcBindPointsIt =
-		parentList.bindPointsStorageList.getIteratorAt(bindPointsOffsetInParentStorage);
-	const PipelineLayoutsList::BindPointsStorageList::Iterator bindPointsStorageEndIt =
-		parentList.bindPointsStorageList.end();
+	XAssert(bindPointsOffsetInParentStorage + bindPointCount <= parentList.bindPointsStorageList.getSize());
 
 	for (uint8 i = 0; i < bindPointCount; i++)
 	{
-		XAssert(srcBindPointsIt != bindPointsStorageEndIt);
-		const BindPointDesc& src = *srcBindPointsIt;
-		srcBindPointsIt++;
-
+		const BindPointDesc& src = parentList.bindPointsStorageList[bindPointsOffsetInParentStorage + i];
 		ShaderCompiler::PipelineBindPointDesc& dst = compilerBindPointDescs[i];
 		dst.name = src.name;
 		dst.type = src.type;
@@ -38,7 +31,7 @@ PipelineLayout* PipelineLayoutsList::createEntry(const char* name, const BindPoi
 {
 	XAssert(bindPointCount <= MaxPipelineBindPointCount); // TODO: Make this an error.
 
-	const uint32 nameLength = GetCStrLength(name);
+	const uint32 nameLength = uint32(GetCStrLength(name));
 	const uint64 nameCRC = CRC64::Compute(name, nameLength);
 
 	if (entriesOrderedSearchTree.find(nameCRC).isValid())
