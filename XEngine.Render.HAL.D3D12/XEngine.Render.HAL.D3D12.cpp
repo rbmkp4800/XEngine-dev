@@ -12,7 +12,7 @@
 
 using namespace XLib::Platform;
 using namespace XEngine::Render::HAL;
-using namespace XEngine::Render::HAL::Internal;
+//using namespace XEngine::Render::HAL::Internal;
 
 static COMPtr<IDXGIFactory7> dxgiFactory;
 
@@ -24,16 +24,16 @@ static inline bool ValidateGenericObjectHeader(const ObjectFormat::GenericObject
 	// TODO: Check object CRC
 }
 
-struct XEngine::Render::HAL::Internal::PipelineBindPointsLUTEntry
-{
-	uint32 data;
-
-	inline bool isNameCRCMatching(uint32 nameCRC) const;
-	inline PipelineBindPointType getType() const;
-
-	inline uint8 getRootParameterIndex() const;
-	inline uint8 getConstantsSize32bitValues() const;
-};
+//struct XEngine::Render::HAL::Internal::PipelineBindPointsLUTEntry
+//{
+//	uint32 data;
+//
+//	inline bool isNameCRCMatching(uint32 nameCRC) const;
+//	inline PipelineBindPointType getType() const;
+//
+//	inline uint8 getRootParameterIndex() const;
+//	inline uint8 getConstantsSize32bitValues() const;
+//};
 
 // CommandList /////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,13 +45,13 @@ enum class CommandList::State : uint8
 	Executing,
 };
 
-inline PipelineBindPointsLUTEntry CommandList::lookupBindPointsLUT(uint32 bindPointNameCRC) const
-{
-	const uint32 lutIndex = (bindPointNameHash >> bindPointsLUTKeyShift) & bindPointsLUTKeyAndMask;
-	const PipelineBindPointsLUTEntry lutEntry = bindPointsLUT[lutIndex];
-	XEAssert(lutEntry.isNameCRCMatching(bindPointNameCRC));
-	return lutEntry;
-}
+//inline PipelineBindPointsLUTEntry CommandList::lookupBindPointsLUT(uint32 bindPointNameCRC) const
+//{
+	//const uint32 lutIndex = (bindPointNameHash >> bindPointsLUTKeyShift) & bindPointsLUTKeyAndMask;
+	//const PipelineBindPointsLUTEntry lutEntry = bindPointsLUT[lutIndex];
+	//XEAssert(lutEntry.isNameCRCMatching(bindPointNameCRC));
+	//return lutEntry;
+//}
 
 void CommandList::begin()
 {
@@ -177,21 +177,6 @@ void CommandList::setPipeline(PipelineHandle pipelineHandle)
 	d3dCommandList->SetPipelineState(pipeline.d3dPipelineState);
 }
 
-void CommandList::bindConstants(PipelineBindPointId bindPointId,
-	const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0)
-{
-	XEAssert(state == State::Recording);
-
-	const uint32 rootParameterIndex = ...;
-
-	if (currentPipelineType == PipelineType::Graphics)
-		d3dCommandList->SetGraphicsRoot32BitConstants(rootParameterIndex, size32bitValues, data, offset32bitValues);
-	else if (currentPipelineType == PipelineType::Compute)
-		d3dCommandList->SetComputeRoot32BitConstants(rootParameterIndex, size32bitValues, data, offset32bitValues);
-	else
-		XEAssertUnreachableCode();
-}
-
 void CommandList::bindConstants(uint32 bindPointNameCRC,
 	const void* data, uint32 size32bitValues, uint32 offset32bitValues)
 {
@@ -210,8 +195,8 @@ void CommandList::bindConstants(uint32 bindPointNameCRC,
 		XEAssertUnreachableCode();
 }
 
-void CommandList::bindBuffer(BufferBindType bindType,
-	uint32 bindPointNameCRC, ResourceHandle bufferHandle, uint32 offset)
+void CommandList::bindBuffer(uint32 bindPointNameCRC,
+	BufferBindType bindType, ResourceHandle bufferHandle, uint32 offset)
 {
 	XEAssert(state == State::Recording);
 
@@ -286,95 +271,102 @@ void CommandList::resourceBarrierStateTransition(ResourceHandle resourceHandle,
 	d3dCommandList->ResourceBarrier(1, &d3dBarrier);
 }
 
-void CommandList::copyBufferRegion(ResourceHandle srcBufferHandle, uint64 srcOffset,
-	ResourceHandle destBufferHandle, uint64 destOffset, uint64 size)
+void CommandList::copyBuffer(ResourceHandle dstBufferHandle, uint64 dstOffset,
+	ResourceHandle srcBufferHandle, uint64 srcOffset, uint64 size)
 {
 	XEAssert(state == State::Recording);
 
+	const Device::Resource& dstBuffer = device->getResourceByHandle(dstBufferHandle);
 	const Device::Resource& srcBuffer = device->getResourceByHandle(srcBufferHandle);
-	const Device::Resource& destBuffer = device->getResourceByHandle(destBufferHandle);
+	XEAssert(dstBuffer.type == ResourceType::Buffer && dstBuffer.d3dResource);
 	XEAssert(srcBuffer.type == ResourceType::Buffer && srcBuffer.d3dResource);
-	XEAssert(destBuffer.type == ResourceType::Buffer && destBuffer.d3dResource);
 
-	d3dCommandList->CopyBufferRegion(destBuffer.d3dResource, destOffset, srcBuffer.d3dResource, srcOffset, size);
+	d3dCommandList->CopyBufferRegion(dstBuffer.d3dResource, dstOffset, srcBuffer.d3dResource, srcOffset, size);
 }
 
-void CommandList::copyTextureRegion(const TextureDataLocation& destLocation, uint16 destX, uint16 destY, uint16 destZ,
-	const TextureDataLocation& srcLocation, const TextureRegion* srcRegion = nullptr)
+void CommandList::copyTexture(ResourceHandle dstTextureHandle, TextureSubresource dstSubresource, uint16x3 dstOffset,
+	ResourceHandle srcTextureHandle, TextureSubresource srcSubresource, const TextureRegion* srcRegion)
+{
+	XEAssert(state == State::Recording);
+
+	const Device::Resource& dstTexture = device->getResourceByHandle(dstTextureHandle);
+	const Device::Resource& srcTexture = device->getResourceByHandle(srcTextureHandle);
+	XEAssert(dstTexture.type == ResourceType::Texture && dstBuffer.d3dResource);
+	XEAssert(srcTexture.type == ResourceType::Texture && srcBuffer.d3dResource);
+
+	D3D12_TEXTURE_COPY_LOCATION d3dDstLocation = {};
+	d3dDstLocation.pResource = dstTexture.d3dResource;
+	d3dDstLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+	d3dDstLocation.SubresourceIndex = Device::CalculateTextureSubresourceIndex(dstTexture, dstSubresource);
+
+	D3D12_TEXTURE_COPY_LOCATION d3dSrcLocation = {};
+	d3dSrcLocation.pResource = srcTexture.d3dResource;
+	d3dSrcLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+	d3dSrcLocation.SubresourceIndex = Device::CalculateTextureSubresourceIndex(srcTexture, srcSubresource);
+
+	D3D12_BOX d3dSrcBox = srcRegion ?
+		D3D12Helpers::BoxFromOffsetAndSize(srcRegion->offset, srcRegion->size) :
+		D3D12Helpers::BoxFromOffsetAndSize(uint16x3 { 0, 0, 0 },
+			Device::CalculateMipLevelSize(srcTexture.texture.size, srcSubresource.mipLevel));
+
+	// TODO: Add texture subresource bounds validation.
+
+	d3dCommandList->CopyTextureRegion(&d3dDstLocation, dstOffset.x, dstOffset.y, dstOffset.z, &d3dSrcLocation, &d3dSrcBox);
+}
+
+void CommandList::copyBufferTexture(CopyBufferTextureDirection direction,
+	ResourceHandle bufferHandle, uint64 bufferOffset, uint32 bufferRowPitch,
+	ResourceHandle textureHandle, TextureSubresource textureSubresource, const TextureRegion* textureRegion)
 {
 	XEAssert(state == State::Recording);
 
 	// TODO: BC formats handling
 
-	struct LocationInfo
+	const Device::Resource& buffer = device->getResourceByHandle(bufferHandle);
+	const Device::Resource& texture = device->getResourceByHandle(textureHandle);
+	XEAssert(buffer.type == ResourceType::Buffer && buffer.d3dResource);
+	XEAssert(texture.type == ResourceType::Texture && texture.d3dResource);
+
+	uint16x3 textureRegionSize = textureRegion ?
+		textureRegion->size : Device::CalculateMipLevelSize(texture.texture.size, textureSubresource.mipLevel);
+
+	D3D12_TEXTURE_COPY_LOCATION d3dBufferLocation = {};
+	d3dBufferLocation.pResource = buffer.d3dResource;
+	d3dBufferLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+	d3dBufferLocation.PlacedFootprint.Offset = bufferOffset;
+	d3dBufferLocation.PlacedFootprint.Footprint.Format = TranslateTextureFormatToDXGIFormat(texture.texture.format);
+	d3dBufferLocation.PlacedFootprint.Footprint.Width = textureRegionSize.x;
+	d3dBufferLocation.PlacedFootprint.Footprint.Height = textureRegionSize.y;
+	d3dBufferLocation.PlacedFootprint.Footprint.Depth = textureRegionSize.z;
+	d3dBufferLocation.PlacedFootprint.Footprint.RowPitch = bufferRowPitch;
+
+	D3D12_TEXTURE_COPY_LOCATION d3dTextureLocation = {};
+	d3dTextureLocation.pResource = texture.d3dResource;
+	d3dTextureLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+	d3dTextureLocation.SubresourceIndex = Device::CalculateTextureSubresourceIndex(texture, textureSubresource);
+
+	const bool copyBufferToTexture = (direction == CopyBufferTextureDirection::BufferToTexture);
+	const bool copyTextureToBuffer = !copyBufferToTexture;
+
+	const D3D12_TEXTURE_COPY_LOCATION& d3dDstLocation = copyBufferToTexture ? d3dTextureLocation : d3dBufferLocation;
+	const D3D12_TEXTURE_COPY_LOCATION& d3dSrcLocation = copyBufferToTexture ? d3dBufferLocation : d3dTextureLocation;
+
+	const uint16x3 textureRegionOffset = textureRegion ? textureRegion->offset : uint16x3 { 0, 0, 0 };
+	const uint16x3 dstOffset = copyBufferToTexture ? textureRegionOffset : uint16x3 { 0, 0, 0 };
+
+	D3D12_BOX d3dSrcBox = {};
+	const D3D12_BOX* p_d3dSrcBox = nullptr;
+	if (copyTextureToBuffer)
 	{
-		D3D12_TEXTURE_COPY_LOCATION d3dLocation;
-		uint16 width;
-		uint16 depth;
-		uint16 height;
-		TextureFormat format;
-	};
-
-	auto fillLocationInfo = [this](const TextureDataLocation& location) -> LocationInfo
-	{
-		LocationInfo result = {};
-		if (location.type == TextureDataLocationType::Texture)
-		{
-			const Device::Resource& resource = device->getResourceByHandle(location.texture.resourceHandle);
-			XEAssert(resource.type == ResourceType::Texture && resource.d3dResource);
-
-			result.d3dLocation.pResource = resource.d3dResource;
-			result.d3dLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-			result.d3dLocation.SubresourceIndex = Device::CalculateTextureSubresourceIndex(resource, location.texture.subresource);
-			result.width = ...; // TODO: Calculate using MIP level (BC!)
-			result.height = ...;
-			result.depth = ...;
-			result.format = resource.texture.format;
-		}
-		else if (location.type == TextureDataLocationType::Buffer)
-		{
-			const Device::Resource& resource = device->getResourceByHandle(location.buffer.resourceHandle);
-			XEAssert(resource.type == ResourceType::Buffer && resource.d3dResource);
-
-			result.d3dLocation.pResource = resource.d3dResource;
-			result.d3dLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-			result.d3dLocation.PlacedFootprint.Offset = location.buffer.offset;
-			result.d3dLocation.PlacedFootprint.Footprint.Format = TranslateTextureFormatToDXGIFormat(location.buffer.format);
-			result.d3dLocation.PlacedFootprint.Footprint.Width = location.buffer.width;
-			result.d3dLocation.PlacedFootprint.Footprint.Height = location.buffer.height;
-			result.d3dLocation.PlacedFootprint.Footprint.Depth = location.buffer.depth;
-			result.d3dLocation.PlacedFootprint.Footprint.RowPitch = location.buffer.rowPitch;
-			result.width = location.buffer.width;
-			result.height = location.buffer.height;
-			result.depth = location.buffer.depth;
-			result.format = location.buffer.format;
-		}
-		else
-			XEAssertUnreachableCode();
-		return result;
-	};
-
-	const LocationInfo destInfo = fillLocationInfo(destLocation);
-	const LocationInfo srcInfo = fillLocationInfo(srcLocation);
-
-	XEAssert(destInfo.format == srcInfo.format)
-
-	if (srcRegion)
-	{
-		XEAssert(srcRegion->left < srcRegion->right && srcRegion->top < srcRegion->bottom && srcRegion->front < srcRegion->back);
-		XEAssert(srcRegion->right <= srcInfo.width && srcRegion->bottom <= srcInfo.height && srcRegion->back <= srcInfo.depth);
+		d3dSrcBox = textureRegion ?
+			D3D12Helpers::BoxFromOffsetAndSize(textureRegion->offset, textureRegion->size) :
+			D3D12Helpers::BoxFromOffsetAndSize(uint16x3 { 0, 0, 0 },
+				Device::CalculateMipLevelSize(texture.texture.size, textureSubresource.mipLevel));
+		p_d3dSrcBox = &d3dSrcBox;
 	}
 
-	const D3D12_BOX d3dSrcBox = srcRegion ?
-		TranslateTextureRegionToD3D12Box(srcRegion) :
-		D3D12Helpers::Box(0, 0, 0, srcInfo.width, srcInfo.height, srcInfo.depth);
-
-	const uint16 regionWidth = uint16(d3dSrcBox.right - d3dSrcBox.left);
-	const uint16 regionHeight = uint16(d3dSrcBox.bottom - d3dSrcBox.top);
-	const uint16 regionDepth = uint16(d3dSrcBox.back - d3dSrcBox.front);
-	XEAssert(destX + regionWidth <= destInfo.width && destY + regionHeight <= destInfo.height && destZ + regionDepth <= destInfo.depth);
-
-	d3dCommandList->CopyTextureRegion(&destInfo.d3dLocation, destX, destY, destZ, &srcInfo.d3dLocation, &d3dSrcBox);
+	d3dCommandList->CopyTextureRegion(&d3dDstLocation, dstOffset.x, dstOffset.y, dstOffset.z,
+		&d3dSrcLocation, p_d3dSrcBox);
 }
 
 // Device //////////////////////////////////////////////////////////////////////////////////////////
@@ -390,12 +382,10 @@ struct Device::Resource
 	{
 		struct
 		{
+			uint16x3 size;
 			TextureType type;
 			TextureFormat format;
 			uint8 mipLevelCount;
-			uint16 width;
-			uint16 height;
-			uint16 depth;
 		} texture;
 
 		struct
@@ -457,7 +447,7 @@ uint32 Device::CalculateTextureSubresourceIndex(const Resource& resource, const 
 
 	const uint32 planeIndex = isStencilAspect ? 1 : 0;
 	const uint32 mipLevelCount = resource.texture.mipLevelCount;
-	const uint32 arraySize = resource.texture.depth;
+	const uint32 arraySize = resource.texture.size.z;
 
 	return subresource.mipLevel + (subresource.arraySlice * mipLevelCount) + (planeIndex * mipLevelCount * arraySize);
 }
@@ -534,8 +524,8 @@ ResourceHandle Device::createBuffer(uint64 size, BufferMemoryType memoryType, Bu
 	return composeResourceHandle(resourceIndex);
 }
 
-ResourceHandle Device::createTexture(const TextureDim& dim, TextureFormat format,
-	TextureCreationFlags flags, uint8 mipLevelCount)
+ResourceHandle Device::createTexture(TextureType type, uint16x3 size,
+	TextureFormat format, TextureCreationFlags flags, uint8 mipLevelCount)
 {
 	const sint32 resourceIndex = resourcesTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(resourceIndex >= 0);
@@ -559,7 +549,7 @@ ResourceHandle Device::createTexture(const TextureDim& dim, TextureFormat format
 
 	// TODO: Check if `mipLevelCount` is not greater than max possible level count for this resource.
 	const D3D12_RESOURCE_DESC d3dResourceDesc =
-		D3D12Helpers::ResourceDescForTexture2D(dim.width, dim.height, mipLevelCount, dxgiFormat, d3dResourceFlags);
+		D3D12Helpers::ResourceDescForTexture2D(size.x, size.y, mipLevelCount, dxgiFormat, d3dResourceFlags);
 
 	d3dDevice->CreateCommittedResource(&d3dHeapProps, D3D12_HEAP_FLAG_NONE,
 		&d3dResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,

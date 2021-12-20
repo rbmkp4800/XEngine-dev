@@ -4,14 +4,20 @@ namespace D3D12Helpers
 {
 	inline D3D12_BOX Box(UINT left, UINT top, UINT front, UINT right, UINT bottom, UINT back)
 	{
-		D3D12_BOX box = {};
-		box.left = left;
-		box.top = top;
-		box.front = front;
-		box.right = right;
-		box.bottom = bottom;
-		box.back = back;
-		return box;
+		return D3D12_BOX
+		{
+			left, top, front,
+			right, bottom, back,
+		};
+	}
+
+	inline D3D12_BOX BoxFromOffsetAndSize(uint16x3 offset, uint16x3 size)
+	{
+		return D3D12_BOX
+		{
+			offset.x, offset.y, offset.z,
+			offset.x + size.x, offset.y + size.y, offset.z + size.z,
+		};
 	}
 
 	inline D3D12_COMMAND_QUEUE_DESC CommandQueueDesc(D3D12_COMMAND_LIST_TYPE type,

@@ -169,7 +169,7 @@ bool Host::CompilePipelineLayout(Platform platform,
 		rootParameterCount++;
 
 		XAssert(objectBindPointRecord.nameCRC);
-		const uintptr bindPointNameLength = ComputeCStrLength(bindPointDesc.name);
+		const uintptr bindPointNameLength = GetCStrLength(bindPointDesc.name);
 		const uint32 bindPointNameCRC = CRC32::Compute(bindPointDesc.name, bindPointNameLength);
 
 		objectBindPointRecord.nameCRC = bindPointNameCRC;

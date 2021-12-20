@@ -41,7 +41,7 @@ namespace XEngine
 		static void OccupyThread(OccupantRoutine routine, void* routineArg, const char* occupantName);
 		static void OccupantWaitForConditionBusyLoop();
 		static void OccupantWaitForConditionExternalWake(ExternalWakeToken& externalWakeToken);
-		static void OccupanSleepPrecise();
+		static void OccupantSleepPrecise();
 
 		template <typename ConcreteTask>
 		static inline void QueueTask(ConcreteTask& task, TaskRoutine<ConcreteTask> routine)

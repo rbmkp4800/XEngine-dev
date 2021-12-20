@@ -110,15 +110,3 @@ inline D3D12_RESOURCE_STATES TranslateResourceStateToD3D12ResourceState(Resource
 		return d3dResultStates;
 	}
 }
-
-inline D3D12_BOX TranslateTextureRegionToD3D12Box(const TextureRegion& region)
-{
-	D3D12_BOX box = {};
-	box.left = region.left;
-	box.top = region.top;
-	box.front = region.front;
-	box.right = region.right;
-	box.bottom = region.bottom;
-	box.back = region.back;
-	return box;
-}

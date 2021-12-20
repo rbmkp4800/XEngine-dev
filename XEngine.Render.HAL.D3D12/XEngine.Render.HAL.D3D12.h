@@ -1,6 +1,7 @@
 #pragma once
 
 #include <XLib.h>
+#include <XLib.Vectors.h>
 #include <XLib.NonCopyable.h>
 #include <XLib.Platform.COMPtr.h>
 #include <XLib.Containers.BitSet.h>
@@ -37,7 +38,7 @@ namespace XEngine::Render::HAL
 	enum class FenceHandle : uint32;
 	enum class SwapChainHandle : uint32;
 
-	enum class PipelineBindPointId : uint32;
+	//enum class PipelineBindPointId : uint32;
 
 	using DescriptorAddress = uint32;
 
@@ -185,53 +186,16 @@ namespace XEngine::Render::HAL
 		inline ResourceMutableState getMutable() const { XEAssert(isMutable()); return mutableState; }
 	};
 
-	enum class TextureDataLocationType : uint8
+	enum class CopyBufferTextureDirection : uint8
 	{
-		Texture = 0,
-		Buffer,
-	};
-
-	struct TextureDataLocation
-	{
-		TextureDataLocationType type;
-
-		union
-		{
-			struct
-			{
-				ResourceHandle resourceHandle;
-				TextureSubresource subresource;
-			} texture;
-
-			struct
-			{
-				ResourceHandle resourceHandle;
-				uint64 offset;
-				TextureFormat format;
-				uint16 width;
-				uint16 height;
-				uint16 depth;
-				uint32 rowPitch;
-			} buffer;
-		};
+		BufferToTexture,
+		TextureToBuffer,
 	};
 
 	struct TextureRegion
 	{
-		uint16 left;
-		uint16 top;
-		uint16 front;
-		uint16 right;
-		uint16 bottom;
-		uint16 back;
-	};
-
-	struct TextureDim
-	{
-		TextureType type;
-		uint16 width;
-		uint16 height;
-		uint16 depth;
+		uint16x3 offset;
+		uint16x3 size;
 	};
 
 	struct ShaderResourceViewDesc
@@ -305,10 +269,10 @@ namespace XEngine::Render::HAL
 		uint64 value;
 	};
 
-	namespace Internal
-	{
-		struct PipelineBindPointsLUTEntry;
-	}
+	//namespace Internal
+	//{
+	//	struct PipelineBindPointsLUTEntry;
+	//}
 
 	class CommandList : public XLib::NonCopyable
 	{
@@ -326,10 +290,10 @@ namespace XEngine::Render::HAL
 		State state = State(0);
 		PipelineType currentPipelineType = PipelineType::Undefined;
 		PipelineLayoutHandle currentPipelineLayoutHandle = ZeroPipelineLayoutHandle;
-		Internal::PipelineBindPointsLUTEntry* pipelineBindPointsLUTShortcut = nullptr;
+		//Internal::PipelineBindPointsLUTEntry* pipelineBindPointsLUTShortcut = nullptr;
 
 	private:
-		inline Internal::PipelineBindPointsLUTEntry lookupBindPointsLUT(uint32 bindPointNameCRC) const;
+		//inline Internal::PipelineBindPointsLUTEntry lookupBindPointsLUT(uint32 bindPointNameCRC) const;
 
 	public:
 		CommandList() = default;
@@ -350,10 +314,10 @@ namespace XEngine::Render::HAL
 		void setPipelineLayout(PipelineLayoutHandle pipelineLayoutHandle);
 		void setPipeline(PipelineHandle pipelineHandle);
 
-		void bindConstants(PipelineBindPointId bindPointId, const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0);
+		//void bindConstants(PipelineBindPointId bindPointId, const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0);
 
 		void bindConstants(uint32 bindPointNameCRC, const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0);
-		void bindBuffer(BufferBindType bindType, uint32 bindPointNameCRC, ResourceHandle bufferHandle, uint32 offset = 0);
+		void bindBuffer(uint32 bindPointNameCRC, BufferBindType bindType, ResourceHandle bufferHandle, uint32 offset = 0);
 		void bindDescriptor(uint32 bindPointNameCRC, DescriptorAddress address);
 		void bindDescriptorTable(uint32 bindPointNameCRC, DescriptorTableHandle bundleHandle);
 		void bindDescriptorArray(uint32 bindPointNameCRC, DescriptorAddress arrayStartAddress);
@@ -369,9 +333,12 @@ namespace XEngine::Render::HAL
 			const TextureSubresource* textureSubresource = nullptr);
 		void resourceBarrierReadWrite(ResourceHandle resourceHandle, const TextureSubresource* textureSubresource = nullptr);
 
-		void copyBufferRegion(ResourceHandle dstBufferHandle, uint64 dstOffset, ResourceHandle srcBufferHandle, uint64 srcOffset, uint64 size);
-		void copyTextureRegion(const TextureDataLocation& destLocation, uint16 destX, uint16 destY, uint16 destZ,
-			const TextureDataLocation& srcLocation, const TextureRegion* srcRegion = nullptr);
+		void copyBuffer(ResourceHandle dstBufferHandle, uint64 dstOffset, ResourceHandle srcBufferHandle, uint64 srcOffset, uint64 size);
+		void copyTexture(ResourceHandle dstTextureHandle, TextureSubresource dstSubresource, uint16x3 dstOffset,
+			ResourceHandle srcTextureHandle, TextureSubresource srcSubresource, const TextureRegion* srcRegion = nullptr);
+		void copyBufferTexture(CopyBufferTextureDirection direction,
+			ResourceHandle bufferHandle, uint64 bufferOffset, uint32 bufferRowPitch,
+			ResourceHandle textureHandle, TextureSubresource textureSubresource, const TextureRegion* textureRegion = nullptr);
 	};
 
 	class Device : public XLib::NonCopyable
@@ -479,7 +446,7 @@ namespace XEngine::Render::HAL
 		ResourceHandle createBuffer(uint64 size, BufferMemoryType memoryType, BufferCreationFlags flags);
 		void destroyBuffer(ResourceHandle handle);
 
-		ResourceHandle createTexture(const TextureDim& dim, TextureFormat format, TextureCreationFlags flags = {}, uint8 mipLevelCount = 0);
+		ResourceHandle createTexture(TextureType type, uint16x3 size, TextureFormat format, TextureCreationFlags flags = {}, uint8 mipLevelCount = 0);
 		void destroyTexture(ResourceHandle handle);
 
 		ShaderResourceViewHandle createShaderResourceView(ResourceHandle resourceHandle, const ShaderResourceViewDesc& viewDesc);
@@ -521,7 +488,7 @@ namespace XEngine::Render::HAL
 		void writeDescriptor(DescriptorAddress descriptorAddress, ShaderResourceViewHandle srvHandle);
 		void writeTableDescriptor(DescriptorTableHandle bundle, uint32 bindPointNameCRC, ShaderResourceViewHandle srvHandle);
 
-		PipelineBindPointId getPipelineBindPointId(PipelineLayoutHandle pipelineLayoutHandle, uint64 bindPointNameCRC) const;
+		//PipelineBindPointId getPipelineBindPointId(PipelineLayoutHandle pipelineLayoutHandle, uint64 bindPointNameCRC) const;
 
 		void submitGraphics(CommandList& commandList, const FenceSignalDesc* fenceSignals = nullptr, uint32 fenceSignalCount = 0);
 		void submitAsyncCompute(CommandList& commandList, const FenceSignalDesc* fenceSignals = nullptr, uint32 fenceSignalCount = 0);
@@ -538,6 +505,9 @@ namespace XEngine::Render::HAL
 		ResourceHandle getSwapChainTexture(SwapChainHandle swapChainHandle, uint32 textureIndex) const;
 
 		const char* getName() const;
+
+	public:
+		static uint16x3 CalculateMipLevelSize(uint16x3 srcSize, uint8 mipLevel);
 	};
 
 	class Host abstract final
