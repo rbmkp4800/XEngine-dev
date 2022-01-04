@@ -306,7 +306,7 @@ void CommandList::copyTexture(ResourceHandle dstTextureHandle, TextureSubresourc
 
 	D3D12_BOX d3dSrcBox = srcRegion ?
 		D3D12Helpers::BoxFromOffsetAndSize(srcRegion->offset, srcRegion->size) :
-		D3D12Helpers::BoxFromOffsetAndSize(uint16x3 { 0, 0, 0 },
+		D3D12Helpers::BoxFromOffsetAndSize(uint16x3(0, 0, 0),
 			Device::CalculateMipLevelSize(srcTexture.texture.size, srcSubresource.mipLevel));
 
 	// TODO: Add texture subresource bounds validation.
@@ -351,8 +351,8 @@ void CommandList::copyBufferTexture(CopyBufferTextureDirection direction,
 	const D3D12_TEXTURE_COPY_LOCATION& d3dDstLocation = copyBufferToTexture ? d3dTextureLocation : d3dBufferLocation;
 	const D3D12_TEXTURE_COPY_LOCATION& d3dSrcLocation = copyBufferToTexture ? d3dBufferLocation : d3dTextureLocation;
 
-	const uint16x3 textureRegionOffset = textureRegion ? textureRegion->offset : uint16x3 { 0, 0, 0 };
-	const uint16x3 dstOffset = copyBufferToTexture ? textureRegionOffset : uint16x3 { 0, 0, 0 };
+	const uint16x3 textureRegionOffset = textureRegion ? textureRegion->offset : uint16x3(0, 0, 0);
+	const uint16x3 dstOffset = copyBufferToTexture ? textureRegionOffset : uint16x3(0, 0, 0);
 
 	D3D12_BOX d3dSrcBox = {};
 	const D3D12_BOX* p_d3dSrcBox = nullptr;
@@ -360,7 +360,7 @@ void CommandList::copyBufferTexture(CopyBufferTextureDirection direction,
 	{
 		d3dSrcBox = textureRegion ?
 			D3D12Helpers::BoxFromOffsetAndSize(textureRegion->offset, textureRegion->size) :
-			D3D12Helpers::BoxFromOffsetAndSize(uint16x3 { 0, 0, 0 },
+			D3D12Helpers::BoxFromOffsetAndSize(uint16x3(0, 0, 0),
 				Device::CalculateMipLevelSize(texture.texture.size, textureSubresource.mipLevel));
 		p_d3dSrcBox = &d3dSrcBox;
 	}
@@ -1040,6 +1040,21 @@ ResourceHandle Device::getSwapChainTexture(SwapChainHandle swapChainHandle, uint
 	const SwapChain& swapChain = getSwapChainByHandle(swapChainHandle);
 	XEAssert(textureIndex < countof(swapChain.textures));
 	return swapChain.textures[textureIndex];
+}
+
+uint16x3 Device::CalculateMipLevelSize(uint16x3 srcSize, uint8 mipLevel)
+{
+	uint16x3 size = srcSize;
+	size.x >>= mipLevel;
+	size.y >>= mipLevel;
+	size.z >>= mipLevel;
+	if (size == uint16x3(0, 0, 0))
+		return uint16x3(0, 0, 0);
+
+	size.x = max<uint16>(size.x, 1);
+	size.y = max<uint16>(size.y, 1);
+	size.z = max<uint16>(size.z, 1);
+	return size;
 }
 
 // Host ////////////////////////////////////////////////////////////////////////////////////////////
