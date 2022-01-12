@@ -73,6 +73,7 @@
     <ClInclude Include="Source\XLib.Vectors.Arithmetics.h" />
     <ClInclude Include="Source\XLib.Vectors.h" />
     <ClInclude Include="Source\XLib.Vectors.Math.h" />
+    <ClInclude Include="Source\XLib.Containers.AVLTreeLogic.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\XLib.CRC.cpp" />
