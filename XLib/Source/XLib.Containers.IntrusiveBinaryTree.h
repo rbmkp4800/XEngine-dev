@@ -2,11 +2,82 @@
 
 #include "XLib.h"
 #include "XLib.NonCopyable.h"
+#include "XLib.Containers.AVLTreeLogic.h"
+
+namespace XLib
+{
+	class IntrusiveBinaryTreeNodeHook
+	{
+		template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*)>
+		friend class IntrusiveBinaryTree;
+
+	private:
+		void* left = nullptr;
+		void* right = nullptr;
+		void* parent = nullptr;
+
+	public:
+		IntrusiveBinaryTreeNodeHook() = default;
+		~IntrusiveBinaryTreeNodeHook() = default;
+
+		inline bool isHooked() const { return left != nullptr || right != nullptr || parent != nullptr; }
+	};
+
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook)>
+	class IntrusiveBinaryTree : public NonCopyable
+	{
+	private:
+		class NodeAdapter;
+		using TreeLogic = AVLTreeLogic<NodeAdapter>;
+
+	public:
+		Node* root = nullptr;
+
+	public:
+		class Iterator;
+
+	public:
+		IntrusiveBinaryTree() = default;
+		~IntrusiveBinaryTree() = default;
+
+		template <typename Key>
+		inline Iterator find(const Key& key);
+
+		inline Iterator insert(Node& node, Iterator* outExistingNode = nullptr);
+		inline Iterator remove(Node& node);
+
+		inline void clear();
+
+		inline Iterator begin() const;
+		inline Iterator end() const;
+
+		inline bool isEmpty() const { return root == nullptr; }
+	};
+
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook)>
+	class IntrusiveBinaryTree<Node, nodeHook>::Iterator
+	{
+	private:
+		Node* node = nullptr;
+
+	public:
+		Iterator() = default;
+		~Iterator() = default;
+
+		inline void operator ++ ();
+		inline void operator -- ();
+
+		inline Node& operator * () { return *node; }
+		inline bool operator == (const Iterator& that) const { return node == that.node; }
+		inline bool operator != (const Iterator& that) const { return node != that.node; }
+	};
+}
+
+#if 0
 
 // TODO: do we need NonCopyable on IntrusiveBinaryTreeNodeHook?
-// TODO: do we need to zero IntrusiveBinaryTreeNodeHook members?
 // TODO: implement const iterator
-// TODO: specify that hook shout be 8 bytes aligned and store height diff in lower pointer bits
+// TODO: specify that hook should be 8 bytes aligned and store height diff in lower pointer bits
 
 #define hookLeft(node)		(((node).*(Hook (Node::*))nodeHook).left)
 #define hookRight(node)		(((node).*(Hook (Node::*))nodeHook).right)
@@ -234,3 +305,67 @@ namespace XLib
 #undef hookRight
 #undef hookParent
 #undef hookHeight
+
+#endif
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Definition //////////////////////////////////////////////////////////////////////////////////////
+
+namespace XLib
+{
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook)>
+	class IntrusiveBinaryTree<Node, nodeHook>::NodeAdapter
+	{
+	public:
+		using NodeRef = Node*;
+		static constexpr NodeRef ZeroNodeRef = nullptr;
+
+		inline Node* getNodeParent(Node* node) const;
+		inline Node* getNodeChild(Node* node, uint8 childIndex) const;
+		inline uint8 getNodeAux2bits(Node* node) const;
+
+		inline void setNodeParent(Node* node, Node* parentToSet);
+		inline void setNodeChild(Node* parent, uint8 childIndex, Node* childToSet);
+		inline void setNodeAux2bits(Node* node, uint8 aux2bits);
+
+		inline void setNodeFull(Node* node, Node* parent, Node* leftChild, Node* rightChild, uint8 aux2bits);
+
+		inline WeakOrdering compareNodeTo(Node* left, Node* right) const;
+	};
+
+
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook)>
+	template <typename Key>
+	inline auto IntrusiveBinaryTree<Node, nodeHook>::find(const Key& key) -> Iterator
+	{
+
+	}
+
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook)>
+	inline auto IntrusiveBinaryTree<Node, nodeHook>::insert(Node& node, Iterator* outExistingNode) -> Iterator
+	{
+		TreeLogic::InsertLocation insertLocation = {};
+		Node* existingNode = TreeLogic::FindInsertLocation<Node*>(NodeAdapter(), root, &node, insertLocation);
+		if (existingNode)
+		{
+			// Node with such key exists. Can't insert.
+			if (outExistingNode)
+				*outExistingNode = existingNode;
+			return Iterator();
+		}
+		root = TreeLogic::InsertAndRebalance(NodeAdapter(), root, insertLocation, &node);
+		return Iterator(&node);
+	}
+
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook)>
+	inline auto IntrusiveBinaryTree<Node, nodeHook>::begin() const -> Iterator
+	{
+		return Iterator(TreeLogic::FindExtreme(NodeAdapter(), root, 0));
+	}
+
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook)>
+	inline auto IntrusiveBinaryTree<Node, nodeHook>::end() const -> Iterator
+	{
+		return Iterator(nullptr);
+	}
+}

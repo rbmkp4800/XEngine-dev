@@ -28,12 +28,15 @@ namespace XLib
 		static inline NodeRef Find(NodeAdapter& adapter, NodeRef root, const Key& searchKey);
 
 		template <typename Key>
-		static inline bool FindInsertLocation(NodeAdapter& adapter, NodeRef rootNode, const Key& insertionKey, InsertLocation& resultLocation);
+		static inline NodeRef FindInsertLocation(NodeAdapter& adapter, NodeRef rootNode, const Key& insertionKey, InsertLocation& resultLocation);
 		static inline NodeRef InsertAndRebalance(NodeAdapter& adapter, NodeRef rootNode, InsertLocation location, NodeRef nodeToInsert);
 		static inline NodeRef RemoveAndRebalance(NodeAdapter& adapter, NodeRef rootNode, NodeRef nodeToRemove);
 
 		static inline NodeRef FindExtreme(NodeAdapter& adapter, NodeRef rootNode, uint8 direction);
 		static inline NodeRef Iterate(NodeAdapter& adapter, NodeRef node, uint8 direction);
+
+		// `FindInsertLocation` returns existing node with same key. If return value is not null (such node exists) insert location
+		// is invalid and new node can't be inserted and vice versa.
 
 	private:
 		struct BalanceResult
@@ -106,7 +109,7 @@ namespace XLib
 	template <typename NodeAdapter>
 	template <typename Key>
 	inline auto AVLTreeLogic<NodeAdapter>::FindInsertLocation(
-		NodeAdapter& adapter, NodeRef rootNode, const Key& insertionKey, InsertLocation& resultLocation) -> bool
+		NodeAdapter& adapter, NodeRef rootNode, const Key& insertionKey, InsertLocation& resultLocation) -> NodeRef
 	{
 		if (rootNode == ZeroNodeRef)
 		{
@@ -121,7 +124,7 @@ namespace XLib
 			const WeakOrdering order = adapter.compareNodeTo(currentNode, insertionKey);
 
 			if (order == WeakOrdering::Equivalent)
-				return false;
+				return currentNode;
 
 			// Moving right if current node is less than search key and vice versa.
 			const uint8 nextChildDirection = (order == WeakOrdering::Less) ? 1 : 0;
@@ -131,7 +134,7 @@ namespace XLib
 			{
 				resultLocation.parentNode = currentNode;
 				resultLocation.childIndex = nextChildDirection;
-				return true;
+				return ZeroNodeRef;
 			}
 
 			currentNode = nextNode;
