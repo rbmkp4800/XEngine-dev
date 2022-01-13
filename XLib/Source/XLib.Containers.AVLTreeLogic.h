@@ -25,7 +25,7 @@ namespace XLib
 		};
 
 		template <typename Key>
-		static inline NodeRef Find(NodeAdapter& adapter, NodeRef root, const Key& searchKey);
+		static inline NodeRef Find(NodeAdapter& adapter, NodeRef rootNode, const Key& key);
 
 		template <typename Key>
 		static inline NodeRef FindInsertLocation(NodeAdapter& adapter, NodeRef rootNode, const Key& insertionKey, InsertLocation& resultLocation);
@@ -89,17 +89,17 @@ namespace XLib
 	template <typename NodeAdapter>
 	template <typename Key>
 	inline auto AVLTreeLogic<NodeAdapter>::Find(
-		NodeAdapter& adapter, NodeRef root, const Key& searchKey) -> NodeRef
+		NodeAdapter& adapter, NodeRef rootNode, const Key& key) -> NodeRef
 	{
-		NodeRef currentNode = root;
+		NodeRef currentNode = rootNode;
 		while (currentNode != ZeroNodeRef)
 		{
-			const WeakOrdering order = adapter.compareNodeTo(currentNode, searchKey);
+			const WeakOrdering order = adapter.compareNodeTo(currentNode, key);
 
 			if (order == WeakOrdering::Equivalent)
 				return currentNode;
 
-			// Moving right if current node is less than search key and vice versa.
+			// Moving right if current node is less than key and vice versa.
 			const uint8 nextChildDirection = (order == WeakOrdering::Less) ? 1 : 0;
 			currentNode = adapter.getNodeChild(currentNode, nextChildDirection);
 		}

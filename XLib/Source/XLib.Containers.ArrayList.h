@@ -3,7 +3,7 @@
 // `ArrayList` - single dynamic storage chunk.
 // `InplaceArrayList` - inplace static storage.
 // `ExpandableInplaceArrayList` - acts like `InplaceArrayList` up to its capacity, then switches to dynamic mode like `ArrayList`.
-// `FixedSegmenterArrayList` - array list stored in multiple fixed segments of same size. Supports push/pop to/from front.
+// `FixedSegmentedArrayList` - array list stored in multiple fixed segments of same size. Supports push/pop to/from front.
 // `FixedLogSegmentedArrayList` - array list stored in multiple fixed segments. Segment count scales as log2 of capacity.
 
 // TODO: Introduce overflow checks for `FixedLogSegmentedArrayList`.
@@ -154,7 +154,7 @@ namespace XLib
 
 
 	template <typename Type, uintptr SegmentSize, uintptr InplaceSegmentTableSize = 1, bool IsSafe = true, typename AllocatorType = SystemHeapAllocator>
-	class FixedSegmenterArrayList :
+	class FixedSegmentedArrayList :
 		private AllocatorAdapterBase<AllocatorType>,
 		public NonCopyable
 	{
@@ -163,8 +163,8 @@ namespace XLib
 		uint32 size = 0;
 
 	public:
-		FixedSegmenterArrayList() = default;
-		inline ~FixedSegmenterArrayList();
+		FixedSegmentedArrayList() = default;
+		inline ~FixedSegmentedArrayList();
 	};
 
 
@@ -386,7 +386,7 @@ namespace XLib
 	// ExpandableInplaceArrayList //////////////////////////////////////////////////////////////////
 
 
-	// FixedSegmenterArrayList /////////////////////////////////////////////////////////////////////
+	// FixedSegmentedArrayList /////////////////////////////////////////////////////////////////////
 
 
 	// FixedLogSegmentedArrayList //////////////////////////////////////////////////////////////////

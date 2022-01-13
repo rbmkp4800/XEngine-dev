@@ -1,26 +1,25 @@
 #pragma once
 
 #include "XLib.h"
-#include "XLib.NonCopyable.h"
 #include "XLib.Containers.AVLTreeLogic.h"
+#include "XLib.NonCopyable.h"
 
 namespace XLib
 {
-	class IntrusiveBinaryTreeNodeHook
+	class IntrusiveBinaryTreeNodeHook : public XLib::NonCopyable
 	{
 		template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*)>
 		friend class IntrusiveBinaryTree;
 
 	private:
-		void* left = nullptr;
-		void* right = nullptr;
+		void* children[2] = {};
 		void* parent = nullptr;
 
 	public:
 		IntrusiveBinaryTreeNodeHook() = default;
 		~IntrusiveBinaryTreeNodeHook() = default;
 
-		inline bool isHooked() const { return left != nullptr || right != nullptr || parent != nullptr; }
+		inline bool isHooked() const;
 	};
 
 	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook)>
@@ -32,6 +31,9 @@ namespace XLib
 
 	public:
 		Node* root = nullptr;
+
+	private:
+		static inline IntrusiveBinaryTreeNodeHook& GetNodeHook(Node& node) { return (((node).*nodeHook).parent); }
 
 	public:
 		class Iterator;
@@ -75,7 +77,6 @@ namespace XLib
 
 #if 0
 
-// TODO: do we need NonCopyable on IntrusiveBinaryTreeNodeHook?
 // TODO: implement const iterator
 // TODO: specify that hook should be 8 bytes aligned and store height diff in lower pointer bits
 
@@ -320,12 +321,12 @@ namespace XLib
 		using NodeRef = Node*;
 		static constexpr NodeRef ZeroNodeRef = nullptr;
 
-		inline Node* getNodeParent(Node* node) const;
-		inline Node* getNodeChild(Node* node, uint8 childIndex) const;
+		inline Node* getNodeParent(Node* node) const { return GetNodeHook(*node).parent; }
+		inline Node* getNodeChild(Node* node, uint8 childIndex) const { return GetNodeHook(*node).children[childIndex]; }
 		inline uint8 getNodeAux2bits(Node* node) const;
 
-		inline void setNodeParent(Node* node, Node* parentToSet);
-		inline void setNodeChild(Node* parent, uint8 childIndex, Node* childToSet);
+		inline void setNodeParent(Node* node, Node* parentToSet) { GetNodeHook(*node).parent = parentToSet; }
+		inline void setNodeChild(Node* parent, uint8 childIndex, Node* childToSet) { GetNodeHook(*node).children[childIndex] = childToSet; }
 		inline void setNodeAux2bits(Node* node, uint8 aux2bits);
 
 		inline void setNodeFull(Node* node, Node* parent, Node* leftChild, Node* rightChild, uint8 aux2bits);
@@ -338,12 +339,14 @@ namespace XLib
 	template <typename Key>
 	inline auto IntrusiveBinaryTree<Node, nodeHook>::find(const Key& key) -> Iterator
 	{
-
+		return Iterator(TreeLogic::Find<Key>(NodeAdapter(), root, key));
 	}
 
 	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook)>
 	inline auto IntrusiveBinaryTree<Node, nodeHook>::insert(Node& node, Iterator* outExistingNode) -> Iterator
 	{
+		XAssert(!GetNodeHook(node).isHooked());
+
 		TreeLogic::InsertLocation insertLocation = {};
 		Node* existingNode = TreeLogic::FindInsertLocation<Node*>(NodeAdapter(), root, &node, insertLocation);
 		if (existingNode)
