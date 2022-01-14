@@ -49,9 +49,6 @@ namespace XLib
 		// Parent of returned node is not set. This should be done by caller.
 		static inline NodeRef RotateSimple(NodeAdapter& adapter, NodeRef parentNode, NodeRef childNode, uint8 direction); // direction: 0 - left, 1 - right
 		static inline NodeRef RotateDouble(NodeAdapter& adapter, NodeRef parentNode, NodeRef childNode, uint8 direction); // direction: 0 - right-left, 1 - left-right
-
-		static constexpr inline uint8 BalanceFactorToAux2bits(sint32 balanceFactor) { return uint8(balanceFactor + 2) & 0x3; }
-		static constexpr inline sint32 Aux2bitsToBalanceFactor(uint8 aux2bits) { return sint32(aux2bits) - 2; }
 	};
 }
 
@@ -68,13 +65,13 @@ namespace XLib
 //	
 //		NodeRef getNodeParent(NodeRef node) const;
 //		NodeRef getNodeChild(NodeRef node, uint8 childIndex) const;
-//		uint8 getNodeAux2bits(NodeRef node) const;
+//		sint8 getNodeBalanceFactor(NodeRef node) const;
 //	
 //		void setNodeParent(NodeRef node, NodeRef parentToSet);
 //		void setNodeChild(NodeRef parent, uint8 childIndex, NodeRef childToSet);
-//		void setNodeAux2bits(NodeRef node, uint8 aux2bits);
+//		void setNodeBalanceFactor(NodeRef node, sint8 balanceFactor);
 //	
-//		void setNodeFull(NodeRef node, NodeRef parent, NodeRef leftChild, NodeRef rightChild, uint8 aux2bits);
+//		void setNodeFull(NodeRef node, NodeRef parent, NodeRef leftChild, NodeRef rightChild, sint8 balanceFactor);
 //	
 //		WeakOrdering compareNodeTo(NodeRef left, NodeRef right) const;
 //		WeakOrdering compareNodeTo(NodeRef left, OtherKeyType right) const;
@@ -88,8 +85,8 @@ namespace XLib
 {
 	template <typename NodeAdapter>
 	template <typename Key>
-	inline auto AVLTreeLogic<NodeAdapter>::Find(
-		NodeAdapter& adapter, NodeRef rootNode, const Key& key) -> NodeRef
+	inline auto AVLTreeLogic<NodeAdapter>::
+		Find(NodeAdapter& adapter, NodeRef rootNode, const Key& key) -> NodeRef
 	{
 		NodeRef currentNode = rootNode;
 		while (currentNode != ZeroNodeRef)
@@ -108,14 +105,15 @@ namespace XLib
 
 	template <typename NodeAdapter>
 	template <typename Key>
-	inline auto AVLTreeLogic<NodeAdapter>::FindInsertLocation(
-		NodeAdapter& adapter, NodeRef rootNode, const Key& insertionKey, InsertLocation& resultLocation) -> NodeRef
+	inline auto AVLTreeLogic<NodeAdapter>::
+		FindInsertLocation(NodeAdapter& adapter, NodeRef rootNode,
+			const Key& insertionKey, InsertLocation& resultLocation) -> NodeRef
 	{
 		if (rootNode == ZeroNodeRef)
 		{
 			resultLocation.parentNode = ZeroNodeRef;
 			resultLocation.childIndex = 0;
-			return true;
+			return ZeroNodeRef;
 		}
 
 		NodeRef currentNode = rootNode;
@@ -142,13 +140,13 @@ namespace XLib
 	}
 
 	template <typename NodeAdapter>
-	inline auto AVLTreeLogic<NodeAdapter>::InsertAndRebalance(
-		NodeAdapter& adapter, NodeRef rootNode, InsertLocation location, NodeRef nodeToInsert) -> NodeRef
+	inline auto AVLTreeLogic<NodeAdapter>::
+		InsertAndRebalance(NodeAdapter& adapter, NodeRef rootNode, InsertLocation location, NodeRef nodeToInsert) -> NodeRef
 	{
 		XAssert(location.childIndex < 2);
 		XAssert((location.parentNode == ZeroNodeRef) == (rootNode == ZeroNodeRef));
 
-		adapter.setNodeFull(nodeToInsert, location.parentNode, ZeroNodeRef, ZeroNodeRef, BalanceFactorToAux2bits(0));
+		adapter.setNodeFull(nodeToInsert, location.parentNode, ZeroNodeRef, ZeroNodeRef, 0);
 
 		if (location.parentNode == ZeroNodeRef)
 			return nodeToInsert;
@@ -158,7 +156,7 @@ namespace XLib
 
 		// Retrace
 		NodeRef currentNode = nodeToInsert;
-		sint32 currentNodeBalanceFactor = 0;
+		sint8 currentNodeBalanceFactor = 0;
 		for (;;)
 		{
 			const NodeRef parentNode = adapter.getNodeParent(currentNode);
@@ -173,11 +171,11 @@ namespace XLib
 				adapter.getNodeChild(parentNode, 1) == currentNode);
 			const bool currentNodeIsLeft = (adapter.getNodeChild(parentNode, 0) == currentNode);
 
-			const sint32 balanceFactorToThisSide = currentNodeIsLeft ? -1 : +1;
-			const sint32 balanceFactorToOtherSide = currentNodeIsLeft ? +1 : -1;
+			const sint8 balanceFactorToThisSide = currentNodeIsLeft ? -1 : +1;
+			const sint8 balanceFactorToOtherSide = currentNodeIsLeft ? +1 : -1;
 			const uint8 directionToOtherSide = currentNodeIsLeft ? 1 : 0;
 
-			const sint32 parentNodeBalanceFactor = Aux2bitsToBalanceFactor(adapter.getNodeAux2bits(parentNode));
+			const sint8 parentNodeBalanceFactor = adapter.getNodeBalanceFactor(parentNode);
 			XAssert(parentNodeBalanceFactor >= -1 && parentNodeBalanceFactor <= +1);
 
 			if (parentNodeBalanceFactor == balanceFactorToThisSide)
@@ -214,7 +212,7 @@ namespace XLib
 			if (parentNodeBalanceFactor == balanceFactorToOtherSide)
 			{
 				// Subtree becomes balanced after insertion.
-				adapter.setNodeAux2bits(parentNode, BalanceFactorToAux2bits(0));
+				adapter.setNodeBalanceFactor(parentNode, 0);
 
 				break;
 			}
@@ -222,7 +220,7 @@ namespace XLib
 			XAssert(parentNodeBalanceFactor == 0);
 
 			// Subtree was balanced before insertion so height diff becomes 1 after insertion.
-			adapter.setNodeAux2bits(parentNode, BalanceFactorToAux2bits(balanceFactorToThisSide));
+			adapter.setNodeBalanceFactor(parentNode, balanceFactorToThisSide);
 
 			currentNode = parentNode;
 			currentNodeBalanceFactor = balanceFactorToThisSide;
@@ -232,8 +230,8 @@ namespace XLib
 	}
 
 	template <typename NodeAdapter>
-	inline auto AVLTreeLogic<NodeAdapter>::RemoveAndRebalance(
-		NodeAdapter& adapter, NodeRef rootNode, NodeRef nodeToRemove) -> NodeRef
+	inline auto AVLTreeLogic<NodeAdapter>::
+		RemoveAndRebalance(NodeAdapter& adapter, NodeRef rootNode, NodeRef nodeToRemove) -> NodeRef
 	{
 
 	}
@@ -282,8 +280,8 @@ namespace XLib
 	}
 
 	template <typename NodeAdapter>
-	inline auto AVLTreeLogic<NodeAdapter>::RotateSimple(
-		NodeAdapter& adapter, NodeRef parentNode, NodeRef childNode, uint8 direction) -> NodeRef
+	inline auto AVLTreeLogic<NodeAdapter>::
+		RotateSimple(NodeAdapter& adapter, NodeRef parentNode, NodeRef childNode, uint8 direction) -> NodeRef
 	{
 		// Left rotation (direction = 0):
 		//    X              Z'
@@ -330,18 +328,18 @@ namespace XLib
 		adapter.setNodeChild(Z, direction, X);
 		adapter.setNodeParent(X, Z);
 
-		const sint32 zBalanceFactor = Aux2bitsToBalanceFactor(adapter.getNodeAux2bits(Z));
+		const sint8 zBalanceFactor = adapter.getNodeBalanceFactor(Z);
 		XAssert(zBalanceFactor == 0 || zBalanceFactor == (direction ? -1 : +1));
-		const sint32 Q = (zBalanceFactor == 0) ? (direction ? +1 : -1) : 0;
-		adapter.setNodeAux2bits(X, BalanceFactorToAux2bits(-Q));
-		adapter.setNodeAux2bits(Z, BalanceFactorToAux2bits(+Q));
+		const sint8 Q = (zBalanceFactor == 0) ? (direction ? +1 : -1) : 0;
+		adapter.setNodeBalanceFactor(X, -Q);
+		adapter.setNodeBalanceFactor(Z, +Q);
 
 		return Z;
 	}
 
 	template <typename NodeAdapter>
-	inline auto AVLTreeLogic<NodeAdapter>::RotateDouble(
-		NodeAdapter& adapter, NodeRef parentNode, NodeRef childNode, uint8 direction) -> NodeRef
+	inline auto AVLTreeLogic<NodeAdapter>::
+		RotateDouble(NodeAdapter& adapter, NodeRef parentNode, NodeRef childNode, uint8 direction) -> NodeRef
 	{
 		// Right-left rotation (direction = 0):
 		//    X
@@ -366,6 +364,12 @@ namespace XLib
 		//  a   Y         / \     / \
 		//     / \       a   b   c   d
 		//    b   c
+		//
+		// Preconditions:
+		//   Z is left child of X
+		//   height(Z) = height(d) + 2   =>   balanceFactor(X) = -2
+		//   height(Y) > height(a)   =>   balanceFactor(Z) = +1
+		//   balanceFactor(Y) in [-1..+1]
 
 		XAssert(direction == 0 || direction == 1);
 		XAssert(adapter.getNodeChild(parentNode, direction ^ 1) == childNode);
@@ -396,14 +400,14 @@ namespace XLib
 		// balanceFactor(Y) =  0   =>   height(a) = height(b) = height(c)     = height(d)   =>   balanceFactor(P) =  0 and balanceFactor(Q) =  0
 		// balanceFactor(Y) = +1   =>   height(a) = height(b) + 1 = height(c) = height(d)   =>   balanceFactor(P) = -1 and balanceFactor(Q) =  0
 
-		const sint32 yBalanceFactor = Aux2bitsToBalanceFactor(adapter.getNodeAux2bits(Y));
+		const sint8 yBalanceFactor = adapter.getNodeBalanceFactor(Y);
 		XAssert(yBalanceFactor >= -1 && yBalanceFactor <= +1);
-		adapter.setNodeAux2bits(P, BalanceFactorToAux2bits(-max<sint32>(yBalanceFactor, 0)));
-		adapter.setNodeAux2bits(Q, BalanceFactorToAux2bits(-min<sint32>(yBalanceFactor, 0)));
+		adapter.setNodeBalanceFactor(P, -max<sint8>(yBalanceFactor, 0));
+		adapter.setNodeBalanceFactor(Q, -min<sint8>(yBalanceFactor, 0));
 
 		adapter.setNodeChild(Y, 0, P);
 		adapter.setNodeChild(Y, 1, Q);
-		adapter.setNodeAux2bits(Y, BalanceFactorToAux2bits(0));
+		adapter.setNodeBalanceFactor(Y, 0);
 
 		adapter.setNodeParent(P, Y);
 		adapter.setNodeParent(Q, Y);
