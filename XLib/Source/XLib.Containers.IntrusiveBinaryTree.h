@@ -13,13 +13,11 @@ namespace XLib
 
 	private:
 		void* children[2] = {};
-		void* parent = nullptr;
+		uintptr parent_aux = 0;
 
 	public:
 		IntrusiveBinaryTreeNodeHook() = default;
 		~IntrusiveBinaryTreeNodeHook() = default;
-
-		inline bool isHooked() const;
 	};
 
 	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook)>
@@ -28,6 +26,9 @@ namespace XLib
 	private:
 		class NodeAdapter;
 		using TreeLogic = AVLTreeLogic<NodeAdapter>;
+
+		static constexpr uintptr NodeParentPtrAuxMask = uintptr(0b11);
+		static constexpr uintptr NodePtrMask = ~NodeParentPtrAuxMask;
 
 	public:
 		Node* root = nullptr;
@@ -321,18 +322,80 @@ namespace XLib
 		using NodeRef = Node*;
 		static constexpr NodeRef ZeroNodeRef = nullptr;
 
-		inline Node* getNodeParent(Node* node) const { return GetNodeHook(*node).parent; }
-		inline Node* getNodeChild(Node* node, uint8 childIndex) const { return GetNodeHook(*node).children[childIndex]; }
-		inline uint8 getNodeAux2bits(Node* node) const;
+		inline Node* getNodeParent(Node* node) const;
+		inline Node* getNodeChild(Node* node, uint8 childIndex) const;
+		inline sint8 getNodeBalanceFactor(Node* node) const;
 
-		inline void setNodeParent(Node* node, Node* parentToSet) { GetNodeHook(*node).parent = parentToSet; }
-		inline void setNodeChild(Node* parent, uint8 childIndex, Node* childToSet) { GetNodeHook(*node).children[childIndex] = childToSet; }
-		inline void setNodeAux2bits(Node* node, uint8 aux2bits);
+		inline void setNodeParent(Node* node, Node* parentToSet);
+		inline void setNodeChild(Node* parent, uint8 childIndex, Node* childToSet);
+		inline void setNodeBalanceFactor(Node* node, sint8 balanceFactor);
 
-		inline void setNodeFull(Node* node, Node* parent, Node* leftChild, Node* rightChild, uint8 aux2bits);
+		inline void setNodeFull(Node* node, Node* parent, Node* leftChild, Node* rightChild, sint8 balanceFactor);
 
 		inline WeakOrdering compareNodeTo(Node* left, Node* right) const;
 	};
+
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook)>
+	inline auto IntrusiveBinaryTree<Node, nodeHook>::NodeAdapter::getNodeParent(Node* node) const -> Node*
+	{
+		return (Node*)(GetNodeHook(*node).parent_aux & NodePtrMask)
+	}
+
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook)>
+	inline auto IntrusiveBinaryTree<Node, nodeHook>::NodeAdapter::getNodeChild(Node* node, uint8 childIndex) const -> Node*
+	{
+		XAssert(childIndex < 2);
+		return GetNodeHook(*node).children[childIndex];
+	}
+
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook)>
+	inline auto IntrusiveBinaryTree<Node, nodeHook>::NodeAdapter::getNodeBalanceFactor(Node* node) const -> sint8
+	{
+		const uintptr aux = GetNodeHook(*node).parent_aux & NodeParentPtrAuxMask;
+		XAssert(aux >= 1 && aux <= 3);
+		return sint8(aux) - 2;
+	}
+
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook)>
+	inline void IntrusiveBinaryTree<Node, nodeHook>::NodeAdapter::setNodeParent(Node* node, Node* parentToSet)
+	{
+		XAssert((uintptr(parentToSet) & ~NodePtrMask) == 0);
+		IntrusiveBinaryTreeNodeHook& hook = GetNodeHook(*node);
+		hook.parent_aux &= NodePtrMask;
+		hook.parent_aux |= uintptr(parentToSet);
+	}
+
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook)>
+	inline void IntrusiveBinaryTree<Node, nodeHook>::NodeAdapter::setNodeChild(Node* parent, uint8 childIndex, Node* childToSet)
+	{
+		XAssert(childIndex < 2);
+		XAssert((uintptr(childToSet) & ~NodePtrMask) == 0);
+		GetNodeHook(*parent).children[childIndex] = childToSet;
+	}
+
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook)>
+	inline void IntrusiveBinaryTree<Node, nodeHook>::NodeAdapter::setNodeBalanceFactor(Node* node, sint8 balanceFactor)
+	{
+		XAssert(balanceFactor >= -1 && balanceFactor <= +1);
+		IntrusiveBinaryTreeNodeHook& hook = GetNodeHook(*node);
+		hook.parent_aux &= NodeParentPtrAuxMask;
+		hook.parent_aux |= uintptr(balanceFactor + 2);
+	}
+
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook)>
+	inline void IntrusiveBinaryTree<Node, nodeHook>::NodeAdapter::setNodeFull(
+		Node* node, Node* parent, Node* leftChild, Node* rightChild, sint8 balanceFactor)
+	{
+		XAssert((uintptr(parent) & ~NodePtrMask) == 0);
+		XAssert((uintptr(leftChild) & ~NodePtrMask) == 0);
+		XAssert((uintptr(rightChild) & ~NodePtrMask) == 0);
+		XAssert(balanceFactor >= -1 && balanceFactor <= +1);
+
+		IntrusiveBinaryTreeNodeHook& hook = GetNodeHook(*node);
+		hook.children[0] = leftChild;
+		hook.children[1] = rightChild;
+		hook.parent_aux = uintptr(parent) | uintptr(balanceFactor + 2);
+	}
 
 
 	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook)>
