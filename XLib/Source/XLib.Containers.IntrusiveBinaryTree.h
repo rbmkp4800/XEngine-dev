@@ -34,7 +34,7 @@ namespace XLib
 		Node* root = nullptr;
 
 	private:
-		static inline IntrusiveBinaryTreeNodeHook& GetNodeHook(Node& node) { return (((node).*nodeHook).parent); }
+		static inline IntrusiveBinaryTreeNodeHook& GetNodeHook(Node& node) { return ((node).*nodeHook); }
 
 	public:
 		class Iterator;
@@ -60,8 +60,14 @@ namespace XLib
 	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook), typename NodeComparator>
 	class IntrusiveBinaryTree<Node, nodeHook, NodeComparator>::Iterator
 	{
+		template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*), typename NodeComparator>
+		friend class IntrusiveBinaryTree;
+
 	private:
 		Node* node = nullptr;
+
+	private:
+		inline Iterator(Node* node) : node(node) {}
 
 	public:
 		Iterator() = default;
@@ -71,6 +77,7 @@ namespace XLib
 		inline void operator -- ();
 
 		inline Node& operator * () { return *node; }
+		inline Node* operator -> () { return node; }
 		inline bool operator == (const Iterator& that) const { return node == that.node; }
 		inline bool operator != (const Iterator& that) const { return node != that.node; }
 	};
@@ -81,6 +88,8 @@ namespace XLib
 
 namespace XLib
 {
+	// IntrusiveBinaryTree::NodeAdapter ////////////////////////////////////////////////////////////
+
 	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook), typename NodeComparator>
 	class IntrusiveBinaryTree<Node, nodeHook, NodeComparator>::NodeAdapter
 	{
@@ -116,7 +125,7 @@ namespace XLib
 		getNodeChild(Node* node, uint8 childIndex) const -> Node*
 	{
 		XAssert(childIndex < 2);
-		return GetNodeHook(*node).children[childIndex];
+		return (Node*)GetNodeHook(*node).children[childIndex];
 	}
 
 	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook), typename NodeComparator>
@@ -134,7 +143,7 @@ namespace XLib
 	{
 		XAssert((uintptr(parentToSet) & ~NodePtrMask) == 0);
 		IntrusiveBinaryTreeNodeHook& hook = GetNodeHook(*node);
-		hook.parent_aux &= NodePtrMask;
+		hook.parent_aux &= ~NodePtrMask;
 		hook.parent_aux |= uintptr(parentToSet);
 	}
 
@@ -153,7 +162,7 @@ namespace XLib
 	{
 		XAssert(balanceFactor >= -1 && balanceFactor <= +1);
 		IntrusiveBinaryTreeNodeHook& hook = GetNodeHook(*node);
-		hook.parent_aux &= NodeParentPtrAuxMask;
+		hook.parent_aux &= ~NodeParentPtrAuxMask;
 		hook.parent_aux |= uintptr(balanceFactor + 2);
 	}
 
@@ -173,12 +182,15 @@ namespace XLib
 	}
 
 
+	// IntrusiveBinaryTree /////////////////////////////////////////////////////////////////////////
+
 	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook), typename NodeComparator>
 	template <typename Key>
 	inline auto IntrusiveBinaryTree<Node, nodeHook, NodeComparator>::
 		find(const Key& key) -> Iterator
 	{
-		return Iterator(TreeLogic::Find(NodeAdapter(), root, key));
+		NodeAdapter nodeAdapter;
+		return Iterator(TreeLogic::Find(nodeAdapter, root, key));
 	}
 
 	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook), typename NodeComparator>
@@ -187,28 +199,47 @@ namespace XLib
 	{
 		//XAssert(!GetNodeHook(node).isHooked());
 
+		NodeAdapter nodeAdapter;
 		typename TreeLogic::InsertLocation insertLocation = {};
-		Node* existingNode = TreeLogic::FindInsertLocation(NodeAdapter(), root, &node, insertLocation);
+		Node* existingNode = TreeLogic::FindInsertLocation(nodeAdapter, root, &node, insertLocation);
 		if (existingNode)
 		{
 			// Node with such key exists. Can't insert.
 			if (outExistingNode)
-				*outExistingNode = existingNode;
+				*outExistingNode = Iterator(existingNode);
 			return Iterator();
 		}
-		root = TreeLogic::InsertAndRebalance(NodeAdapter(), root, insertLocation, &node);
+		root = TreeLogic::InsertAndRebalance(nodeAdapter, root, insertLocation, &node);
 		return Iterator(&node);
 	}
 
 	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook), typename NodeComparator>
 	inline auto IntrusiveBinaryTree<Node, nodeHook, NodeComparator>::begin() const -> Iterator
 	{
-		return Iterator(TreeLogic::FindExtreme(NodeAdapter(), root, 0));
+		NodeAdapter nodeAdapter;
+		return Iterator(TreeLogic::FindExtreme(nodeAdapter, root, 0));
 	}
 
 	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook), typename NodeComparator>
 	inline auto IntrusiveBinaryTree<Node, nodeHook, NodeComparator>::end() const -> Iterator
 	{
 		return Iterator(nullptr);
+	}
+
+
+	// IntrusiveBinaryTree::Iterator ///////////////////////////////////////////////////////////////
+
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::* nodeHook), typename NodeComparator>
+	inline void IntrusiveBinaryTree<Node, nodeHook, NodeComparator>::Iterator::operator++()
+	{
+		NodeAdapter nodeAdapter;
+		node = TreeLogic::Iterate(nodeAdapter, node, 1);
+	}
+
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::* nodeHook), typename NodeComparator>
+	inline void IntrusiveBinaryTree<Node, nodeHook, NodeComparator>::Iterator::operator--()
+	{
+		NodeAdapter nodeAdapter;
+		node = TreeLogic::Iterate(nodeAdapter, node, 0);
 	}
 }
