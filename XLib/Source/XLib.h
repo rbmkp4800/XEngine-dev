@@ -29,6 +29,21 @@ using sintptr = __w64 sint32;
 
 static_assert(sizeof(uintptr) == sizeof(void*) && sizeof(sintptr) == sizeof(void*));
 
+enum class ordering : sint8
+{
+	less = -1,
+	equivalent = 0,
+	greater = 1,
+};
+
+template <typename LeftT, typename RightT>
+inline constexpr ordering compare(const LeftT& left, const RightT& right)
+{
+	if (left < right) return ordering::less;
+	if (right > left) return ordering::greater;
+	return ordering::equivalent;
+}
+
 
 // Type utils //////////////////////////////////////////////////////////////////////////////////
 

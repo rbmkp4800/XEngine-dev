@@ -4,13 +4,6 @@
 
 namespace XLib
 {
-	enum class WeakOrdering : uint8
-	{
-		Less,
-		Equivalent,
-		Greater,
-	};
-
 	template <typename NodeAdapter>
 	class AVLTreeLogic
 	{
@@ -73,8 +66,8 @@ namespace XLib
 //	
 //		void setNodeFull(NodeRef node, NodeRef parent, NodeRef leftChild, NodeRef rightChild, sint8 balanceFactor);
 //	
-//		WeakOrdering compareNodeTo(NodeRef left, NodeRef right) const;
-//		WeakOrdering compareNodeTo(NodeRef left, OtherKeyType right) const;
+//		ordering compareNodeTo(NodeRef left, NodeRef right) const;
+//		ordering compareNodeTo(NodeRef left, OtherKeyType right) const;
 //	};
 
 
@@ -91,13 +84,13 @@ namespace XLib
 		NodeRef currentNode = rootNode;
 		while (currentNode != ZeroNodeRef)
 		{
-			const WeakOrdering order = adapter.compareNodeTo(currentNode, key);
+			const ordering order = adapter.compareNodeTo(currentNode, key);
 
-			if (order == WeakOrdering::Equivalent)
+			if (order == ordering::equivalent)
 				return currentNode;
 
 			// Moving right if current node is less than key and vice versa.
-			const uint8 nextChildDirection = (order == WeakOrdering::Less) ? 1 : 0;
+			const uint8 nextChildDirection = (order == ordering::less) ? 1 : 0;
 			currentNode = adapter.getNodeChild(currentNode, nextChildDirection);
 		}
 		return ZeroNodeRef;
@@ -119,13 +112,13 @@ namespace XLib
 		NodeRef currentNode = rootNode;
 		for (;;)
 		{
-			const WeakOrdering order = adapter.compareNodeTo(currentNode, insertionKey);
+			const ordering order = adapter.compareNodeTo(currentNode, insertionKey);
 
-			if (order == WeakOrdering::Equivalent)
+			if (order == ordering::equivalent)
 				return currentNode;
 
 			// Moving right if current node is less than search key and vice versa.
-			const uint8 nextChildDirection = (order == WeakOrdering::Less) ? 1 : 0;
+			const uint8 nextChildDirection = (order == ordering::less) ? 1 : 0;
 			const NodeRef nextNode = adapter.getNodeChild(currentNode, nextChildDirection);
 
 			if (nextNode == ZeroNodeRef)

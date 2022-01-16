@@ -20,7 +20,7 @@ namespace XLib
 		~IntrusiveBinaryTreeNodeHook() = default;
 	};
 
-	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook), typename NodeComparator>
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::* nodeHook), typename NodeComparator>
 	class IntrusiveBinaryTree : public NonCopyable
 	{
 	private:
@@ -57,7 +57,7 @@ namespace XLib
 		inline bool isEmpty() const { return root == nullptr; }
 	};
 
-	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook), typename NodeComparator>
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::* nodeHook), typename NodeComparator>
 	class IntrusiveBinaryTree<Node, nodeHook, NodeComparator>::Iterator
 	{
 		template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*), typename NodeComparator>
@@ -83,6 +83,15 @@ namespace XLib
 	};
 }
 
+// Node comparator template:
+//
+//	class MyNodeComparator abstract final
+//	{
+//	public:
+//		static ordering Compare(const MyNode& left, const MyNode& right);
+//		static ordering Compare(const MyNode& left, const SomeOtherKey& right);
+//	};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Definition //////////////////////////////////////////////////////////////////////////////////////
 
@@ -90,7 +99,7 @@ namespace XLib
 {
 	// IntrusiveBinaryTree::NodeAdapter ////////////////////////////////////////////////////////////
 
-	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook), typename NodeComparator>
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::* nodeHook), typename NodeComparator>
 	class IntrusiveBinaryTree<Node, nodeHook, NodeComparator>::NodeAdapter
 	{
 	public:
@@ -107,20 +116,20 @@ namespace XLib
 
 		inline void setNodeFull(Node* node, Node* parent, Node* leftChild, Node* rightChild, sint8 balanceFactor);
 
-		inline WeakOrdering compareNodeTo(Node* left, Node* right) const { return NodeComparator::Compare(*left, *right); }
+		inline ordering compareNodeTo(Node* left, Node* right) const { return NodeComparator::Compare(*left, *right); }
 
 		template <typename Key>
-		inline WeakOrdering compareNodeTo(Node* left, Key right) const { return NodeComparator::Compare(*left, right); }
+		inline ordering compareNodeTo(Node* left, Key right) const { return NodeComparator::Compare(*left, right); }
 	};
 
-	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook), typename NodeComparator>
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::* nodeHook), typename NodeComparator>
 	inline auto IntrusiveBinaryTree<Node, nodeHook, NodeComparator>::NodeAdapter::
 		getNodeParent(Node* node) const -> Node*
 	{
 		return (Node*)(GetNodeHook(*node).parent_aux & NodePtrMask);
 	}
 
-	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook), typename NodeComparator>
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::* nodeHook), typename NodeComparator>
 	inline auto IntrusiveBinaryTree<Node, nodeHook, NodeComparator>::NodeAdapter::
 		getNodeChild(Node* node, uint8 childIndex) const -> Node*
 	{
@@ -128,7 +137,7 @@ namespace XLib
 		return (Node*)GetNodeHook(*node).children[childIndex];
 	}
 
-	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook), typename NodeComparator>
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::* nodeHook), typename NodeComparator>
 	inline auto IntrusiveBinaryTree<Node, nodeHook, NodeComparator>::NodeAdapter::
 		getNodeBalanceFactor(Node* node) const -> sint8
 	{
@@ -137,7 +146,7 @@ namespace XLib
 		return sint8(aux) - 2;
 	}
 
-	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook), typename NodeComparator>
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::* nodeHook), typename NodeComparator>
 	inline void IntrusiveBinaryTree<Node, nodeHook, NodeComparator>::NodeAdapter::
 		setNodeParent(Node* node, Node* parentToSet)
 	{
@@ -147,7 +156,7 @@ namespace XLib
 		hook.parent_aux |= uintptr(parentToSet);
 	}
 
-	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook), typename NodeComparator>
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::* nodeHook), typename NodeComparator>
 	inline void IntrusiveBinaryTree<Node, nodeHook, NodeComparator>::NodeAdapter::
 		setNodeChild(Node* parent, uint8 childIndex, Node* childToSet)
 	{
@@ -156,7 +165,7 @@ namespace XLib
 		GetNodeHook(*parent).children[childIndex] = childToSet;
 	}
 
-	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook), typename NodeComparator>
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::* nodeHook), typename NodeComparator>
 	inline void IntrusiveBinaryTree<Node, nodeHook, NodeComparator>::NodeAdapter::
 		setNodeBalanceFactor(Node* node, sint8 balanceFactor)
 	{
@@ -166,7 +175,7 @@ namespace XLib
 		hook.parent_aux |= uintptr(balanceFactor + 2);
 	}
 
-	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook), typename NodeComparator>
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::* nodeHook), typename NodeComparator>
 	inline void IntrusiveBinaryTree<Node, nodeHook, NodeComparator>::NodeAdapter::
 		setNodeFull(Node* node, Node* parent, Node* leftChild, Node* rightChild, sint8 balanceFactor)
 	{
@@ -184,7 +193,7 @@ namespace XLib
 
 	// IntrusiveBinaryTree /////////////////////////////////////////////////////////////////////////
 
-	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook), typename NodeComparator>
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::* nodeHook), typename NodeComparator>
 	template <typename Key>
 	inline auto IntrusiveBinaryTree<Node, nodeHook, NodeComparator>::
 		find(const Key& key) -> Iterator
@@ -193,7 +202,7 @@ namespace XLib
 		return Iterator(TreeLogic::Find(nodeAdapter, root, key));
 	}
 
-	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook), typename NodeComparator>
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::* nodeHook), typename NodeComparator>
 	inline auto IntrusiveBinaryTree<Node, nodeHook, NodeComparator>::
 		insert(Node& node, Iterator* outExistingNode) -> Iterator
 	{
@@ -214,14 +223,14 @@ namespace XLib
 		return Iterator(&node);
 	}
 
-	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook), typename NodeComparator>
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::* nodeHook), typename NodeComparator>
 	inline auto IntrusiveBinaryTree<Node, nodeHook, NodeComparator>::begin() const -> Iterator
 	{
 		NodeAdapter nodeAdapter;
 		return Iterator(TreeLogic::FindExtreme(nodeAdapter, root, 0));
 	}
 
-	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::*nodeHook), typename NodeComparator>
+	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::* nodeHook), typename NodeComparator>
 	inline auto IntrusiveBinaryTree<Node, nodeHook, NodeComparator>::end() const -> Iterator
 	{
 		return Iterator(nullptr);
