@@ -396,15 +396,15 @@ bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayo
 {
 	result.destroy();
 
-	XAssertImply(desc.vertexShader, desc.vertexShader->isInitialized());
-	XAssertImply(desc.amplificationShader, desc.amplificationShader->isInitialized());
-	XAssertImply(desc.meshShader, desc.meshShader->isInitialized());
-	XAssertImply(desc.pixelShader, desc.vertexShader->isInitialized());
+	XAssert(imply(desc.vertexShader, desc.vertexShader->isInitialized()));
+	XAssert(imply(desc.amplificationShader, desc.amplificationShader->isInitialized()));
+	XAssert(imply(desc.meshShader, desc.meshShader->isInitialized()));
+	XAssert(imply(desc.pixelShader, desc.vertexShader->isInitialized()));
 
-	XAssertImply(desc.vertexShader, desc.vertexShader->getShaderType() == ShaderType::Vertex);
-	XAssertImply(desc.amplificationShader, desc.amplificationShader->getShaderType() == ShaderType::Amplification);
-	XAssertImply(desc.meshShader, desc.meshShader->getShaderType() == ShaderType::Mesh);
-	XAssertImply(desc.pixelShader, desc.vertexShader->getShaderType() == ShaderType::Pixel);
+	XAssert(imply(desc.vertexShader, desc.vertexShader->getShaderType() == ShaderType::Vertex));
+	XAssert(imply(desc.amplificationShader, desc.amplificationShader->getShaderType() == ShaderType::Amplification));
+	XAssert(imply(desc.meshShader, desc.meshShader->getShaderType() == ShaderType::Mesh));
+	XAssert(imply(desc.pixelShader, desc.vertexShader->getShaderType() == ShaderType::Pixel));
 
 	// Validate enabled shader stages combination
 	XAssert((desc.vertexShader != nullptr) ^ (desc.meshShader != nullptr));

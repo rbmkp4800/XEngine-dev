@@ -29,6 +29,9 @@ using sintptr = __w64 sint32;
 
 static_assert(sizeof(uintptr) == sizeof(void*) && sizeof(sintptr) == sizeof(void*));
 
+
+// Ordering ////////////////////////////////////////////////////////////////////////////////////
+
 enum class ordering : sint8
 {
 	less = -1,
@@ -43,6 +46,11 @@ inline constexpr ordering compare(const LeftT& left, const RightT& right)
 	if (right > left) return ordering::greater;
 	return ordering::equivalent;
 }
+
+
+// Logical utils ///////////////////////////////////////////////////////////////////////////////
+
+inline bool imply(bool a, bool b) { return !a || b; } // a -> b
 
 
 // Type utils //////////////////////////////////////////////////////////////////////////////////
@@ -217,5 +225,4 @@ namespace XLib
 }
 
 #define XAssert(expression) do { if (!(expression)) { XLib::Debug::Fail("Assertion failed: `" #expression "`\n"); } } while (false)
-#define XAssertImply(antecedent, consequent) do { if ((antecedent) && !(consequent)) { XLib::Debug::Fail("Assertion failed: IMPLY `" #antecedent "` -> `" #consequent "`\n"); } } while (false)
 #define XAssertUnreachableCode() { XLib::Debug::Fail("Assertion failed: unreachable code reached\n"); }
