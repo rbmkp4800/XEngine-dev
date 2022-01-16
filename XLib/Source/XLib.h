@@ -29,6 +29,7 @@ using sintptr = __w64 sint32;
 
 static_assert(sizeof(uintptr) == sizeof(void*) && sizeof(sintptr) == sizeof(void*));
 
+
 // Type utils //////////////////////////////////////////////////////////////////////////////////
 
 namespace XLib::Internal
@@ -62,6 +63,26 @@ inline removeReference<resultType>& as(argumentType& value)
 template <typename resultType, typename argumentType>
 inline removeReference<resultType> to(const argumentType& value) { return resultType(value); }
 
+namespace XLib::Internal
+{
+	template <typename T> struct IsIntHelper { static constexpr bool Result = false; };
+
+	template <> struct IsIntHelper<unsigned char>		{ static constexpr bool Result = true; };
+	template <> struct IsIntHelper<signed char>			{ static constexpr bool Result = true; };
+	template <> struct IsIntHelper<unsigned short int>	{ static constexpr bool Result = true; };
+	template <> struct IsIntHelper<signed short int>	{ static constexpr bool Result = true; };
+	template <> struct IsIntHelper<unsigned int>		{ static constexpr bool Result = true; };
+	template <> struct IsIntHelper<signed int>			{ static constexpr bool Result = true; };
+	template <> struct IsIntHelper<unsigned long int>	{ static constexpr bool Result = true; };
+	template <> struct IsIntHelper<signed long int>		{ static constexpr bool Result = true; };
+	template <> struct IsIntHelper<unsigned long long int>	{ static constexpr bool Result = true; };
+	template <> struct IsIntHelper<signed long long int>	{ static constexpr bool Result = true; };
+}
+
+template <typename T>
+static constexpr bool isInt = XLib::Internal::IsIntHelper<T>::Result;
+
+
 // Construction utils //////////////////////////////////////////////////////////////////////////
 
 namespace XLib::Internal
@@ -78,6 +99,7 @@ inline void construct(Type& value, ConstructorArgsTypes&& ... constructorArgs)
 	new (XLib::Internal::PlacementNewToken(), &value) Type(forwardRValue<ConstructorArgsTypes>(constructorArgs) ...);
 }
 
+
 // Data utils //////////////////////////////////////////////////////////////////////////////////
 
 template <typename T, uintptr size> constexpr uintptr countof(T(&)[size]) { return size; }
@@ -92,6 +114,7 @@ inline void swap(T& a, T& b)
 	a = asRValue(b);
 	b = asRValue(tmp);
 }
+
 
 // Math utils //////////////////////////////////////////////////////////////////////////////////
 
@@ -142,6 +165,7 @@ auto min(const T1& a, const T2 b)
 
 #endif
 
+
 // Bitwise utils ///////////////////////////////////////////////////////////////////////////////
 
 uint8 countLeadingZeros32(uint32 value);
@@ -149,11 +173,13 @@ uint8 countLeadingZeros64(uint64 value);
 uint8 countTrailingZeros32(uint32 value);
 uint8 countTrailingZeros64(uint64 value);
 
+
 // Memory utils ////////////////////////////////////////////////////////////////////////////////
 
 void memorySet(void* memory, byte value, uintptr size);
 void memoryCopy(void* destination, const void* source, uintptr size);
 void memoryMove(void* destination, const void* source, uintptr size);
+
 
 // Debug ///////////////////////////////////////////////////////////////////////////////////////
 

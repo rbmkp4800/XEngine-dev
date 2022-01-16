@@ -1,8 +1,8 @@
 #pragma once
 
 #include "XLib.h"
-
-//bool IsWhitespace(char c) { return c == ' ' || c == '\f' || c == '\n' || c == '\r' || c == '\t' || c == '\v'; }
+#include "XLib.NonCopyable.h"
+#include "XLib.System.File.h"
 
 namespace XLib
 {
@@ -12,68 +12,76 @@ namespace XLib
 	{
 	private:
 		const char* current = nullptr;
-		const char* limit = nullptr;
+		const char* end = nullptr;
 
 	public:
 		MemoryTextReader() = default;
 		~MemoryTextReader() = default;
 
-		inline MemoryTextReader(const char* data, uintptr length) { current = data; limit = data + length; }
+		inline MemoryTextReader(const char* data, uintptr length = uintptr(-1));
 
-		inline char peekChar() const { return current == limit ? 0 : *current; }
-		inline char getChar();
-		inline bool canGetChar() const { return current == limit; }
-
-		inline void readChars();
+		inline bool canGetChar() const { return current != end && *current != 0; }
+		inline uint32 peekChar() const { return canGetChar() ? *current : uint32(-1); }
+		inline uint32 getChar() { return canGetChar() ? *current++ : uint32(-1); }
+		inline uint32 peekCharUnsafe() const { return *current; }
+		inline uint32 getCharUnsafe() { return *current++; }
 	};
 
 	class MemoryTextWriter
 	{
 	private:
 		char* current = nullptr;
-		const char* limit = nullptr;
+		const char* end = nullptr;
 
 	public:
 		MemoryTextWriter() = default;
 		~MemoryTextWriter() = default;
 
-		inline MemoryTextWriter(char* data, uintptr length) { current = data; limit = data + length; }
+		inline MemoryTextWriter(char* data, uintptr length);
 
-		inline bool putChar(char c);
 		inline bool canPutChar() const;
+		inline bool putChar(char c);
 
 		inline void writeChars();
 	};
 
-	template <typename BaseDataReader, uint32 BufferSize>
-	class BufferedTextReader
+	template <uint32 BufferSize = 4096>
+	class FileTextReader : public NonCopyable
 	{
 	private:
 		char buffer[BufferSize];
-		BaseDataReader& baseReader;
+		File& file;
 
 	public:
-		inline BufferedTextReader(BaseDataReader& baseReader) : baseReader(baseReader) {}
-		~BufferedTextReader() = default;
+		inline FileTextReader(File& file) : file(file) {}
+		~FileTextReader() = default;
 
+		inline bool canGetChar() const;
 		inline char peekChar() const;
 		inline char getChar();
-		inline bool canGetChar() const;
-
-		inline void readChars();
+		inline char peekCharUnsafe() const;
+		inline char getCharUnsafe();
 	};
 
-	template <typename BaseWriter>
-	class BufferedTextWriter
+	template <uint32 BufferSize = 4096>
+	class FileTextWriter : public NonCopyable
 	{
-		inline bool putChar();
+	private:
+		char buffer[BufferSize];
+		File& file;
+
+	public:
+		inline FileTextWriter(File& file) : file(file) {}
+		~FileTextWriter() = default;
+
 		inline bool canPutChar() const;
+		inline bool putChar();
 
 		inline void writeChars();
 	};
 
 	template <typename StringType>
-	class StringWriter
+	class StringWriter : public NonCopyable
 	{
 	private:
 		StringType& string;
@@ -86,6 +94,8 @@ namespace XLib
 
 	// Text utils //////////////////////////////////////////////////////////////////////////////////
 
+	bool IsWhitespace(char c) { return c == ' ' || c == '\f' || c == '\n' || c == '\r' || c == '\t' || c == '\v'; }
+
 	enum class TextReadTokenResult : uint8
 	{
 		Success = 0,
@@ -94,7 +104,7 @@ namespace XLib
 	};
 
 	// "skip whitespaces" returns true if at least one char consumed
-	// "skip to new line" returns true if at least one line consumed (not reached end of stream)
+	// "skip to new line" returns true if at least one line consumed (not reached end of text)
 	// "skip/forward to first occurrence" stops at next char
 
 	template <typename TextReader> inline bool TextSkipWhitespaces(TextReader& reader);
@@ -119,16 +129,15 @@ namespace XLib
 	bool TextToInt(const char* text, uintptr textLength, sint64& result);
 	bool TextToFP32(const char* text, uintptr textLength, float32& result);
 
-	void TextFromInt(sint64 value, char* outTextBuffer, uintptr outTextBufferLength, char format);
-	void TextFromFP32(float32 value, char* outTextBuffer, uintptr outTextBufferLength, char format);
+	void TextFromInt(char* outTextBuffer, uintptr outTextBufferLength, sint64 value, char format);
+	void TextFromFP32(char* outTextBuffer, uintptr outTextBufferLength, float32 value, char format);
 
 
 	// Standart types to/from text converstion utils for readers-writers ///////////////////////////
 
-	template <typename TextReader, typename Result>
-	inline bool TextReadInt(TextReader& reader, Result& result, char format = 'd');
-	template <typename TextReader> inline bool TextReadFP32(TextReader& reader, float32& result);
-	template <typename TextReader> inline bool TextReadFP64(TextReader& reader, float64& result);
+	template <typename TextReader, typename Result> inline bool TextReadInt(TextReader& reader, Result* result, char format = 'd');
+	template <typename TextReader> inline bool TextReadFP32(TextReader& reader, float32* result);
+	template <typename TextReader> inline bool TextReadFP64(TextReader& reader, float64* result);
 
 	template <typename TextWriter> inline bool TextWriteInt(TextWriter& writer, sint64 value, char format = 'd');
 	template <typename TextWriter> inline bool TextWriteFP32(TextWriter& writer, float32 value, char format);
@@ -141,10 +150,10 @@ namespace XLib
 	// Formatted text read-write ///////////////////////////////////////////////////////////////////
 
 	template <typename TextReader, typename ... FmtArgs>
-	inline bool TextReadFmt(TextReader& reader, FmtArgs ... fmtArgs) { return (... && TextReadFmt_HandleArg(reader, fmtArgs)); }
+	inline bool TextReadFmt(TextReader& reader, const FmtArgs& ... fmtArgs) { return (... && TextReadFmt_HandleArg(reader, fmtArgs)); }
 
 	template <typename TextWriter, typename ... FmtArgs>
-	inline bool TextWriteFmt(TextWriter& writer, FmtArgs ... fmtArgs) { return (... && TextWriteFmt_HandleArg(writer, fmtArgs)); }
+	inline bool TextWriteFmt(TextWriter& writer, const FmtArgs& ... fmtArgs) { return (... && TextWriteFmt_HandleArg(writer, fmtArgs)); }
 
 
 	template <typename ... FmtArgs> inline bool TextReadFmtStdIn(FmtArgs ... fmtArgs);
@@ -156,9 +165,18 @@ namespace XLib
 	struct RFmtSkipWS {};
 	struct RFmtSkip2NL {};
 
-	struct RFmtDec
+	class RFmtInt
 	{
+		template <typename TextReader>
+		friend bool TextReadFmt_HandleArg(TextReader& reader, const RFmtInt& arg);
 
+	private:
+		void* outValue;
+		uint8 outValueSize;
+		char format;
+
+	public:
+		template <typename T> inline RFmtInt(T* outValue, char format = 'd');
 	};
 
 	struct WFmtDec
@@ -168,9 +186,8 @@ namespace XLib
 
 	template <typename TextReader> inline bool TextReadFmt_HandleArg(TextReader& reader, const RFmtSkipWS& arg) { TextSkipWhitespaces(reader); return true; }
 	template <typename TextReader> inline bool TextReadFmt_HandleArg(TextReader& reader, const RFmtSkip2NL& arg) { TextSkipToNewLine(reader); return true; }
-	template <typename TextReader> inline bool TextReadFmt_HandleArg(TextReader& reader, sint64& arg);
-	template <typename TextReader> inline bool TextReadFmt_HandleArg(TextReader& reader, float32& arg);
-	template <typename TextReader> inline bool TextReadFmt_HandleArg(TextReader& reader, float64& arg);
+	template <typename TextReader, typename IntegerArg> inline bool TextReadFmt_HandleArg(TextReader& reader, IntegerArg* arg) { return TextReadInt(reader, arg); }
+	template <typename TextReader> inline bool TextReadFmt_HandleArg(TextReader& reader, const RFmtInt& arg);
 
 	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, char c);
 	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, const char* str);
@@ -183,18 +200,13 @@ namespace XLib
 
 namespace XLib
 {
-	inline char MemoryTextReader::getChar()
-	{
-		if (current == limit)
-			return 0;
-		const char result = *current;
-		current++;
-		return result;
-	}
+	inline MemoryTextReader::MemoryTextReader(const char* data, uintptr length) :
+		current(data),
+		end((length == uintptr(-1)) ? nullptr : data + length) {}
 
 	inline bool MemoryTextWriter::putChar(char c)
 	{
-		if (current == limit)
+		if (current == end)
 			return false;
 		*current = c;
 		current++;
@@ -202,25 +214,102 @@ namespace XLib
 	}
 
 
-	template <typename TextReader, typename Result>
-	inline bool TextReadInt(TextReader& reader, Result& result, char format)
+	template <typename TextReader>
+	inline bool TextSkipWhitespaces(TextReader& reader)
 	{
-		uint64 r = 0;
-		bool atLeastOneDigitConsumed = false;
-		for (;;)
+		bool atLeastOneCharConsumed = false;
+		while ( IsWhitespace(char(reader.peekChar())) )
 		{
-			const char c = reader.peekChar();
-			if (c < '0' || c > '9')
-				break;
-			reader.getChar();
-			atLeastOneDigitConsumed = true;
-			r *= 10;
-			r += c - '0';
+			reader.getCharUnsafe();
+			atLeastOneCharConsumed = true;
 		}
-
-		result = Result(r);
-		return atLeastOneDigitConsumed;
+		return atLeastOneCharConsumed;
 	}
+
+	template <typename TextReader>
+	inline bool TextSkipToNewLine(TextReader& reader)
+	{
+		while (reader.canGetChar())
+		{
+			if (reader.getCharUnsafe() == '\n')
+				return true;
+		}
+		return false;
+	}
+
+
+	namespace Internal
+	{
+		template <uint32 ResultSize> struct IntSizeToUnsignedType { using T = void; };
+		template <> struct IntSizeToUnsignedType<1> { using T = uint8; };
+		template <> struct IntSizeToUnsignedType<2> { using T = uint16; };
+		template <> struct IntSizeToUnsignedType<4> { using T = uint32; };
+		template <> struct IntSizeToUnsignedType<8> { using T = uint64; };
+
+		template <typename TextReader, uint32 ResultSize>
+		inline bool TextReadIntHelper(TextReader& reader, void* result, char format)
+		{
+			using ResultT = typename IntSizeToUnsignedType<ResultSize>::T;
+
+			ResultT r = 0;
+			bool atLeastOneDigitConsumed = false;
+			for (;;)
+			{
+				const char c = char(reader.peekChar());
+				if (c < '0' || c > '9')
+					break;
+				reader.getChar();
+				atLeastOneDigitConsumed = true;
+				r *= 10;
+				r += c - '0';
+			}
+
+			*(ResultT*)result = ResultT(r);
+			return atLeastOneDigitConsumed;
+		}
+	}
+
+	template <typename TextReader, typename Result>
+	inline bool TextReadInt(TextReader& reader, Result* result, char format)
+	{
+		static_assert(isInt<Result>);
+		return Internal::TextReadIntHelper<TextReader, sizeof(*result)>(reader, result, format);
+	}
+
+	namespace Internal
+	{
+		class BufferedDbgOutTextWriter
+		{
+		private:
+			char buffer[4096];
+
+		public:
+			BufferedDbgOutTextWriter() = default;
+			~BufferedDbgOutTextWriter() = default;
+
+			inline bool putChar(char c);
+			inline bool canPutChar() const { return true; }
+
+			inline void flush();
+		};
+	}
+
+	template <typename ... FmtArgs>
+	inline bool TextWriteFmtDbgOut(FmtArgs ... fmtArgs)
+	{
+		Internal::BufferedDbgOutTextWriter dbgOutWriter;
+		//TextWriteFmt(...);
+		dbgOutWriter.flush();
+	}
+
+
+	template <typename TextReader>
+	inline bool TextReadFmt_HandleArg(TextReader& reader, const RFmtInt& arg)
+	{
+		*(int*)arg.outValue = 999;
+		return true;
+	}
+
 
 	template <typename TextWriter>
 	inline bool TextWriteFmt_HandleArg(TextWriter& writer, const char* str)
