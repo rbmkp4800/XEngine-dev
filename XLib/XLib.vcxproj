@@ -41,7 +41,6 @@
     <ClInclude Include="Source\XLib.Platform.D3D12.Helpers.h" />
     <ClInclude Include="Source\XLib.Platform.DXGI.Helpers.h" />
     <ClInclude Include="Source\XLib.Program.h" />
-    <ClInclude Include="Source\XLib.Containers.Set.h" />
     <ClInclude Include="Source\XLib.Float.Conversion.h" />
     <ClInclude Include="Source\XLib.SystemHeapAllocator.h" />
     <ClInclude Include="Source\XLib.Containers.ArrayList.h" />

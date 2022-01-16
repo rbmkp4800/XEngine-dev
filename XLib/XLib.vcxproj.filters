@@ -26,7 +26,6 @@
     <ClInclude Include="Source\XLib.Containers.FlatHashMap.h" />
     <ClInclude Include="Source\XLib.Containers.IntrusiveBinaryTree.h" />
     <ClInclude Include="Source\XLib.Containers.IntrusiveDoublyLinkedList.h" />
-    <ClInclude Include="Source\XLib.Containers.Set.h" />
     <ClInclude Include="Source\XLib.Math.h" />
     <ClInclude Include="Source\XLib.Math.Matrix2x3.h" />
     <ClInclude Include="Source\XLib.Math.Matrix3x4.h" />

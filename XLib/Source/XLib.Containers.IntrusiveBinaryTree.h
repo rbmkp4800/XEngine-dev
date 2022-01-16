@@ -198,6 +198,7 @@ namespace XLib
 		insert(Node& node, Iterator* outExistingNode) -> Iterator
 	{
 		//XAssert(!GetNodeHook(node).isHooked());
+		XAssert((uintptr(&node) & ~NodePtrMask) == 0);
 
 		NodeAdapter nodeAdapter;
 		typename TreeLogic::InsertLocation insertLocation = {};
