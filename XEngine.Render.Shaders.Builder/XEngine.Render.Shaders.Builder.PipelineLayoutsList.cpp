@@ -34,7 +34,7 @@ PipelineLayout* PipelineLayoutsList::createEntry(const char* name, const BindPoi
 	const uint32 nameLength = uint32(GetCStrLength(name));
 	const uint64 nameCRC = CRC64::Compute(name, nameLength);
 
-	if (entriesOrderedSearchTree.find(nameCRC).isValid())
+	if (entriesOrderedSearchTree.find(nameCRC))
 		return nullptr; // Duplicate name found or CRC collision (can be handled separately).
 
 	const uint32 bindPointsOffset = bindPointsStorageList.getSize();

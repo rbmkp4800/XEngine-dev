@@ -44,7 +44,9 @@ namespace XEngine::Render::Shaders::Builder_
 	class ShadersList : public XLib::NonCopyable
 	{
 	private:
-		using EntriesSearchTree = XLib::IntrusiveBinaryTree<Shader, &Shader::searchTreeHook>;
+		struct EntriesSearchTreeComparator;
+
+		using EntriesSearchTree = XLib::IntrusiveBinaryTree<Shader, &Shader::searchTreeHook, EntriesSearchTreeComparator>;
 		using EntriesStorageList = XLib::FixedLogSegmentedArrayList<Shader, 5, 16>;
 
 	private:
@@ -66,5 +68,11 @@ namespace XEngine::Render::Shaders::Builder_
 
 		inline Iterator begin() { return entriesSearchTree.begin(); }
 		inline Iterator end() { return entriesSearchTree.end(); }
+	};
+
+	struct ShadersList::EntriesSearchTreeComparator abstract final
+	{
+		static inline ordering Compare(const Shader& left, const Shader& right) { return compare(left.configurationHash, right.configurationHash); }
+		static inline ordering Compare(const Shader& left, uint64 right) { return compare(left.configurationHash, right); }
 	};
 }

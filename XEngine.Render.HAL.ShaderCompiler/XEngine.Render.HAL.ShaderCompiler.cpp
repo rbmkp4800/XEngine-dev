@@ -287,21 +287,21 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipeli
 	{
 		patchedSourceString.reserve(sourceLength);
 
-		TextStreamReader sourceReader(source, sourceLength);
-		StringTextStreamWriter patchedSourceWriter(patchedSourceString);
+		MemoryTextReader sourceReader(source, sourceLength);
+		StringWriter<String> patchedSourceWriter(patchedSourceString);
 
 		for (;;)
 		{
-			const bool bindingFound = TextStreamForwardToFirstOccurrence(sourceReader, "@binding", patchedSourceWriter);
+			const bool bindingFound = TextForwardToFirstOccurrence(sourceReader, "@binding", patchedSourceWriter);
 			if (!bindingFound)
 				break;
 
 			InplaceString<64> bindPointName;
-			TextStreamSkipWritespaces(sourceReader);
-			if (TextStreamReadCIdentifier(sourceReader, bindPointName) != TextStreamReadFormatStringResult::Success)
+			TextSkipWhitespaces(sourceReader);
+			if (TextReadCIdentifier(sourceReader, bindPointName) != TextReadTokenResult::Success)
 				return false;
-			TextStreamSkipWritespaces(sourceReader);
-			if (sourceReader.get() != ')')
+			TextSkipWhitespaces(sourceReader);
+			if (sourceReader.getChar() != ')')
 				return false;
 
 			const uint32 bindPointNameCRC = CRC32::Compute(bindPointName.getData(), bindPointName.getLength());
@@ -309,8 +309,8 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipeli
 			if (!pipelineLayout.findBindPointMetadata(bindPointNameCRC, bindPointMetadata))
 				return false;
 
-			TextStreamWriteFmt(patchedSourceWriter, ": register(",
-				bindPointMetadata.registerType, WFmtUDec(bindPointMetadata.registerIndex), ')');
+			TextWriteFmt(patchedSourceWriter, ": register(",
+				bindPointMetadata.registerType, bindPointMetadata.registerIndex, ')');
 		}
 
 		patchedSourceString.compact();
@@ -372,7 +372,7 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipeli
 
 	const uint32 headerOffset = 0;
 	const uint32 bytecodeOffset = headerOffset + sizeof(PipelineBytecodeObjectHeader);
-	const uint32 objectSize = bytecodeOffset + dxcBytecodeBlob->GetBufferSize();
+	const uint32 objectSize = uint32(bytecodeOffset + dxcBytecodeBlob->GetBufferSize());
 
 	result.object = Object::Create(objectSize);
 	{

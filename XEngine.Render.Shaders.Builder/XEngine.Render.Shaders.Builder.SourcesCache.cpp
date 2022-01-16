@@ -82,8 +82,8 @@ bool SourcesCacheEntry::retrieveText(StringView& resultText)
 SourcesCacheEntry* SourcesCache::findOrCreateEntry(const char* localPath)
 {
 	EntriesSearchTree::Iterator existingIt = entriesSearchTree.find(localPath);
-	if (existingIt.isValid())
-		return &existingIt.get();
+	if (existingIt)
+		return existingIt;
 
 	SourcesCacheEntry& entry = entriesStorageList.emplaceBack(*this);
 	entry.localPath = localPath;

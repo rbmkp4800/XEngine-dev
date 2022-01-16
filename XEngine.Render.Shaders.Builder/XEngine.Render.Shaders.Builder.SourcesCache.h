@@ -31,10 +31,11 @@ namespace XEngine::Render::Shaders::Builder_
 		bool writeTimeChecked = false;
 
 	private:
-		inline SourcesCacheEntry(SourcesCache& parentCache) : parentCache(parentCache) {}
 		~SourcesCacheEntry() = default;
 
 	public:
+		inline SourcesCacheEntry(SourcesCache& parentCache) : parentCache(parentCache) {}
+
 		// Returns `InvalidTimePoint` if can't open file.
 		XLib::TimePoint checkWriteTime();
 
@@ -45,7 +46,9 @@ namespace XEngine::Render::Shaders::Builder_
 	class SourcesCache : public XLib::NonCopyable
 	{
 	private:
-		using EntriesSearchTree = XLib::IntrusiveBinaryTree<SourcesCacheEntry, &SourcesCacheEntry::entriesSearchTreeHook>;
+		struct EntriesSearchTreeComparator;
+
+		using EntriesSearchTree = XLib::IntrusiveBinaryTree<SourcesCacheEntry, &SourcesCacheEntry::entriesSearchTreeHook, EntriesSearchTreeComparator>;
 		using EntriesStorageList = XLib::FixedLogSegmentedArrayList<SourcesCacheEntry, 5, 16>;
 
 	private:
@@ -62,5 +65,11 @@ namespace XEngine::Render::Shaders::Builder_
 		SourcesCacheEntry* findOrCreateEntry(const char* localPath);
 
 		inline const char* getSourcesRootPath() const { return sourcesRootPath; }
+	};
+
+	struct SourcesCache::EntriesSearchTreeComparator abstract final
+	{
+		static inline ordering Compare(const SourcesCacheEntry& left, const SourcesCacheEntry& right);
+		static inline ordering Compare(const SourcesCacheEntry& left, const char* right);
 	};
 }

@@ -11,7 +11,7 @@ bool Shader::compile()
 		return false;
 
 	return ShaderCompiler::Host::CompileShader(ShaderCompiler::Platform::D3D12,
-		pipelineLayout.getCompiled(), type, source.getData(), source.getLength(), compiledShader);
+		pipelineLayout.getCompiled(), type, source.getData(), uint32(source.getLength()), compiledShader);
 }
 
 Shader* ShadersList::findOrCreateEntry(ShaderCompiler::ShaderType type,

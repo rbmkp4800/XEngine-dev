@@ -59,15 +59,17 @@ namespace XEngine::Render::Shaders::Builder_
 	class PipelinesList : public XLib::NonCopyable
 	{
 	private:
-		using EntriesOrderedSearchTree = XLib::IntrusiveBinaryTree<Pipeline, &Pipeline::searchTreeHook>;
+		struct EntriesSearchTreeComparator;
+
+		using EntriesSearchTree = XLib::IntrusiveBinaryTree<Pipeline, &Pipeline::searchTreeHook, EntriesSearchTreeComparator>;
 		using EntriesStorageList = XLib::FixedLogSegmentedArrayList<Pipeline, 5, 16>;
 
 	private:
-		EntriesOrderedSearchTree entriesOrderedSearchTree;
+		EntriesSearchTree entriesOrderedSearchTree;
 		EntriesStorageList entriesStorageList;
 
 	public:
-		using Iterator = EntriesOrderedSearchTree::Iterator;
+		using Iterator = EntriesSearchTree::Iterator;
 
 	public:
 		PipelinesList() = default;
@@ -80,5 +82,11 @@ namespace XEngine::Render::Shaders::Builder_
 
 		inline Iterator begin() { return entriesOrderedSearchTree.begin(); }
 		inline Iterator end() { return entriesOrderedSearchTree.end(); }
+	};
+
+	struct PipelinesList::EntriesSearchTreeComparator abstract final
+	{
+		static inline ordering Compare(const Pipeline& left, const Pipeline& right) { return compare(left.nameCRC, right.nameCRC); }
+		static inline ordering Compare(const Pipeline& left, uint64 right) { return compare(left.nameCRC, right); }
 	};
 }
