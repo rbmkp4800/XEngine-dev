@@ -407,8 +407,8 @@ bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayo
 	XAssert(imply(desc.pixelShader, desc.vertexShader->getShaderType() == ShaderType::Pixel));
 
 	// Validate enabled shader stages combination
-	XAssert((desc.vertexShader != nullptr) ^ (desc.meshShader != nullptr));
-	XAssert(desc.vertexShader, !desc.amplificationShader);
+	XAssert((desc.vertexShader != nullptr) != (desc.meshShader != nullptr));
+	XAssert(imply(desc.vertexShader, !desc.amplificationShader));
 
 	// Validate render targets
 	{
@@ -424,7 +424,8 @@ bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayo
 		}
 	}
 
-	XAssert(ValidateDepthStencilFormatValue(desc.depthStencilFormat));
+	// TODO:
+	//XAssert(ValidateDepthStencilFormatValue(desc.depthStencilFormat));
 
 	Object bytecodeObjects[MaxGraphicsPipelineBytecodeObjectCount];
 	uint32 bytecodeObjectsCRCs[MaxGraphicsPipelineBytecodeObjectCount] = {};
