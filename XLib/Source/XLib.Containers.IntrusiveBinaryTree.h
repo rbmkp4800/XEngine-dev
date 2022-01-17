@@ -76,9 +76,9 @@ namespace XLib
 		inline void operator ++ ();
 		inline void operator -- ();
 
-		inline operator Node* () { return node; }
-		inline Node& operator * () { return *node; }
-		inline Node* operator -> () { return node; }
+		inline operator Node* () const { return node; }
+		inline Node& operator * () const { return *node; }
+		inline Node* operator -> () const { return node; }
 		inline bool operator == (const Iterator& that) const { return node == that.node; }
 		inline bool operator != (const Iterator& that) const { return node != that.node; }
 	};

@@ -1,5 +1,9 @@
+#include <XLib.CRC.h>
+#include <XLib.String.h>
+
 #include "XEngine.Render.Shaders.Builder.PipelinesList.h"
 
+using namespace XLib;
 using namespace XEngine::Render::HAL;
 using namespace XEngine::Render::Shaders::Builder_;
 
@@ -22,12 +26,25 @@ bool Pipeline::compile()
 		pipelineLayout.getCompiled(), desc, compiledGraphicsPipeline);
 }
 
-Pipeline* PipelinesList::createGraphicsPipeline(const char* name, const PipelineLayout& pipelineLayout, const GraphicsPipelineDesc& pipelineDesc)
+Pipeline* PipelinesList::createPipelineInternal(const char* name, const PipelineLayout& pipelineLayout,
+	const GraphicsPipelineDesc* graphicsPipelineDesc, Shader* computeShader)
 {
+	XAssert((graphicsPipelineDesc == nullptr) != (computeShader == nullptr));
 
-}
+	const uintptr nameLength = GetCStrLength(name);
+	const uint64 nameCRC = CRC64::Compute(name, nameLength);
 
-Pipeline* PipelinesList::createComputePipeline(const char* name, const PipelineLayout& pipelineLayout, const Shader& computeShader)
-{
+	if (entriesSearchTree.find(nameCRC))
+		return nullptr; // Duplicate name found or CRC collision (can be handled separately).
 
+	Pipeline& pipeline = entriesStorageList.emplaceBack(pipelineLayout);
+	pipeline.name = name;
+	pipeline.nameCRC = nameCRC;
+	pipeline.graphicsDesc = graphicsPipelineDesc ? *graphicsPipelineDesc : GraphicsPipelineDesc {};
+	pipeline.computeShader = computeShader;
+	pipeline.isGraphics = (graphicsPipelineDesc != nullptr);
+
+	entriesSearchTree.insert(pipeline);
+
+	return &pipeline;
 }

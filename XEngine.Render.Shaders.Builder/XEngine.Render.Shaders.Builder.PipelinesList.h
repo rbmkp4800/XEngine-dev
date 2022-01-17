@@ -42,10 +42,11 @@ namespace XEngine::Render::Shaders::Builder_
 		HAL::ShaderCompiler::CompiledGraphicsPipeline compiledGraphicsPipeline;
 
 	private:
-		Pipeline() = default;
 		~Pipeline() = default;
 
 	public:
+		inline Pipeline(const PipelineLayout& pipelineLayout) : pipelineLayout(pipelineLayout) {}
+
 		bool compile();
 
 		inline const char* getName() const { return name; }
@@ -65,8 +66,12 @@ namespace XEngine::Render::Shaders::Builder_
 		using EntriesStorageList = XLib::FixedLogSegmentedArrayList<Pipeline, 5, 16>;
 
 	private:
-		EntriesSearchTree entriesOrderedSearchTree;
+		EntriesSearchTree entriesSearchTree;
 		EntriesStorageList entriesStorageList;
+
+	private:
+		Pipeline* createPipelineInternal(const char* name, const PipelineLayout& pipelineLayout,
+			const GraphicsPipelineDesc* graphicsPipelineDesc, Shader* computeShader);
 
 	public:
 		using Iterator = EntriesSearchTree::Iterator;
@@ -75,13 +80,13 @@ namespace XEngine::Render::Shaders::Builder_
 		PipelinesList() = default;
 		~PipelinesList() = default;
 
-		Pipeline* createGraphicsPipeline(const char* name, const PipelineLayout& pipelineLayout, const GraphicsPipelineDesc& pipelineDesc);
-		Pipeline* createComputePipeline(const char* name, const PipelineLayout& pipelineLayout, const Shader& computeShader);
+		Pipeline* createGraphicsPipeline(const char* name, const PipelineLayout& pipelineLayout, const GraphicsPipelineDesc& pipelineDesc) { createPipelineInternal(name, pipelineLayout, &pipelineDesc, nullptr); }
+		Pipeline* createComputePipeline(const char* name, const PipelineLayout& pipelineLayout, Shader& computeShader) { createPipelineInternal(name, pipelineLayout, nullptr, &computeShader); }
 
-		inline uint32 getSize() const;
+		inline uint32 getSize() const { return entriesStorageList.getSize(); }
 
-		inline Iterator begin() { return entriesOrderedSearchTree.begin(); }
-		inline Iterator end() { return entriesOrderedSearchTree.end(); }
+		inline Iterator begin() { return entriesSearchTree.begin(); }
+		inline Iterator end() { return entriesSearchTree.end(); }
 	};
 
 	struct PipelinesList::EntriesSearchTreeComparator abstract final

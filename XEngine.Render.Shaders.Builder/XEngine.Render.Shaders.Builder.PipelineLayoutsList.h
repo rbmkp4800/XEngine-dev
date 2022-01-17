@@ -61,7 +61,7 @@ namespace XEngine::Render::Shaders::Builder_
 		using BindPointsStorageList = XLib::ArrayList<BindPointDesc, uint32, false>;
 
 	private:
-		EntriesSearchTree entriesOrderedSearchTree;
+		EntriesSearchTree entriesSearchTree;
 		EntriesStorageList entriesStorageList;
 		BindPointsStorageList bindPointsStorageList;
 
@@ -79,8 +79,8 @@ namespace XEngine::Render::Shaders::Builder_
 
 		inline uint32 getSize() const { return entriesStorageList.getSize(); }
 
-		inline Iterator begin() { return entriesOrderedSearchTree.begin(); }
-		inline Iterator end() { return entriesOrderedSearchTree.end(); }
+		inline Iterator begin() { return entriesSearchTree.begin(); }
+		inline Iterator end() { return entriesSearchTree.end(); }
 	};
 
 	struct PipelineLayoutsList::EntriesSearchTreeComparator abstract final

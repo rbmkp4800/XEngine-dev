@@ -31,10 +31,10 @@ PipelineLayout* PipelineLayoutsList::createEntry(const char* name, const BindPoi
 {
 	XAssert(bindPointCount <= MaxPipelineBindPointCount); // TODO: Make this an error.
 
-	const uint32 nameLength = uint32(GetCStrLength(name));
+	const uintptr nameLength = GetCStrLength(name);
 	const uint64 nameCRC = CRC64::Compute(name, nameLength);
 
-	if (entriesOrderedSearchTree.find(nameCRC))
+	if (entriesSearchTree.find(nameCRC))
 		return nullptr; // Duplicate name found or CRC collision (can be handled separately).
 
 	const uint32 bindPointsOffset = bindPointsStorageList.getSize();
@@ -47,7 +47,7 @@ PipelineLayout* PipelineLayoutsList::createEntry(const char* name, const BindPoi
 	pipelineLayout.bindPointsOffsetInParentStorage = bindPointsOffset;
 	pipelineLayout.bindPointCount = bindPointCount;
 
-	entriesOrderedSearchTree.insert(pipelineLayout);
+	entriesSearchTree.insert(pipelineLayout);
 
 	return &pipelineLayout;
 }

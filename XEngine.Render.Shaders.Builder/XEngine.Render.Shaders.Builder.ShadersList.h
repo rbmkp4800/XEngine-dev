@@ -31,10 +31,11 @@ namespace XEngine::Render::Shaders::Builder_
 		HAL::ShaderCompiler::CompiledShader compiledShader;
 
 	private:
-		Shader() = default;
 		~Shader() = default;
 
 	public:
+		inline Shader(SourcesCacheEntry& mainSource, const PipelineLayout& pipelineLayout) : mainSource(mainSource), pipelineLayout(pipelineLayout) {}
+
 		bool compile();
 
 		inline HAL::ShaderCompiler::ShaderType getType() const { return type; }

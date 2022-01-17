@@ -1,6 +1,7 @@
-#include <XLib.System.File.h>
+#include <XLib.CRC.h>
 #include <XLib.FileSystem.h>
 #include <XLib.String.h>
+#include <XLib.System.File.h>
 
 #include "XEngine.Render.Shaders.Builder.SourcesCache.h"
 
@@ -59,7 +60,7 @@ bool SourcesCacheEntry::retrieveText(StringView& resultText)
 	}
 
 	// TODO: Check for overflows
-	const uint32 fileSize = file.getSize();
+	const uint32 fileSize = uint32(file.getSize());
 
 	text.resize(fileSize + 1); // To have zero terminator in any case.
 	const bool readResult = file.read(text.getMutableData(), fileSize);
@@ -79,16 +80,20 @@ bool SourcesCacheEntry::retrieveText(StringView& resultText)
 	return true;
 }
 
-SourcesCacheEntry* SourcesCache::findOrCreateEntry(const char* localPath)
+SourcesCacheEntry& SourcesCache::findOrCreateEntry(const char* localPath)
 {
-	EntriesSearchTree::Iterator existingIt = entriesSearchTree.find(localPath);
-	if (existingIt)
-		return existingIt;
+	const uintptr localPathLength = GetCStrLength(localPath);
+	const uint64 localPathCRC = CRC64::Compute(localPath, localPathLength);
+
+	const EntriesSearchTree::Iterator existingItemIt = entriesSearchTree.find(localPathCRC);
+	if (existingItemIt)
+		return *existingItemIt;
 
 	SourcesCacheEntry& entry = entriesStorageList.emplaceBack(*this);
 	entry.localPath = localPath;
+	entry.localPathCRC = localPathCRC;
 
 	entriesSearchTree.insert(entry);
 
-	return &entry;
+	return entry;
 }

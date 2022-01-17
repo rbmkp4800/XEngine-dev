@@ -23,6 +23,7 @@ namespace XEngine::Render::Shaders::Builder_
 
 		XLib::IntrusiveBinaryTreeNodeHook entriesSearchTreeHook;
 		const char* localPath = nullptr;
+		uint64 localPathCRC = 0;
 
 		XLib::String text;
 		TextState textState = TextState(0);
@@ -41,6 +42,9 @@ namespace XEngine::Render::Shaders::Builder_
 
 		// Returns false if can't open file.
 		bool retrieveText(XLib::StringView& resultText);
+
+		inline const char* getLocalPath() const { return localPath; }
+		inline uint64 getLocalPathCRC() const { return localPathCRC; }
 	};
 
 	class SourcesCache : public XLib::NonCopyable
@@ -62,14 +66,14 @@ namespace XEngine::Render::Shaders::Builder_
 
 		void initialize(const char* sourcesRootPath);
 
-		SourcesCacheEntry* findOrCreateEntry(const char* localPath);
+		SourcesCacheEntry& findOrCreateEntry(const char* localPath);
 
 		inline const char* getSourcesRootPath() const { return sourcesRootPath; }
 	};
 
 	struct SourcesCache::EntriesSearchTreeComparator abstract final
 	{
-		static inline ordering Compare(const SourcesCacheEntry& left, const SourcesCacheEntry& right);
-		static inline ordering Compare(const SourcesCacheEntry& left, const char* right);
+		static inline ordering Compare(const SourcesCacheEntry& left, const SourcesCacheEntry& right) { return compare(left.localPathCRC, right.localPathCRC); }
+		static inline ordering Compare(const SourcesCacheEntry& left, uint64 right) { return compare(left.localPathCRC, right); }
 	};
 }
