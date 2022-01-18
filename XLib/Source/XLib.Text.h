@@ -4,6 +4,8 @@
 #include "XLib.NonCopyable.h"
 #include "XLib.System.File.h"
 
+// TODO: Handle limited string storage in `StringWriter`.
+
 namespace XLib
 {
 	// Common text readers-writers /////////////////////////////////////////////////////////////////
@@ -25,6 +27,8 @@ namespace XLib
 		inline uint32 getChar() { return canGetChar() ? *current++ : uint32(-1); }
 		inline uint32 peekCharUnsafe() const { return *current; }
 		inline uint32 getCharUnsafe() { return *current++; }
+
+		//inline void readChars();
 	};
 
 	class MemoryTextWriter
@@ -42,7 +46,7 @@ namespace XLib
 		inline bool canPutChar() const;
 		inline bool putChar(char c);
 
-		inline void writeChars();
+		//inline void writeChars();
 	};
 
 	template <uint32 BufferSize = 4096>
@@ -61,6 +65,8 @@ namespace XLib
 		inline char getChar();
 		inline char peekCharUnsafe() const;
 		inline char getCharUnsafe();
+
+		//inline void readChars();
 	};
 
 	template <uint32 BufferSize = 4096>
@@ -75,9 +81,9 @@ namespace XLib
 		~FileTextWriter() = default;
 
 		inline bool canPutChar() const;
-		inline bool putChar();
+		inline bool putChar(char c);
 
-		inline void writeChars();
+		//inline void writeChars();
 	};
 
 	template <typename StringType>
@@ -89,6 +95,9 @@ namespace XLib
 	public:
 		inline StringWriter(StringType& string) : string(string) {}
 		~StringWriter() = default;
+
+		inline bool canPutChar() const { return true; }
+		inline bool putChar(char c) { string.pushBack(c); return true; }
 	};
 
 
@@ -186,12 +195,24 @@ namespace XLib
 
 	template <typename TextReader> inline bool TextReadFmt_HandleArg(TextReader& reader, const RFmtSkipWS& arg) { TextSkipWhitespaces(reader); return true; }
 	template <typename TextReader> inline bool TextReadFmt_HandleArg(TextReader& reader, const RFmtSkip2NL& arg) { TextSkipToNewLine(reader); return true; }
+
 	template <typename TextReader, typename IntegerArg> inline bool TextReadFmt_HandleArg(TextReader& reader, IntegerArg* arg) { return TextReadInt(reader, arg); }
+
 	template <typename TextReader> inline bool TextReadFmt_HandleArg(TextReader& reader, const RFmtInt& arg);
 
-	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, char c);
+	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, char c) { return writer.putChar(c); }
+	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, unsigned char c) { return writer.putChar(c); }
 	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, const char* str);
-	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, sint64 arg) { return TextWriteInt(writer, arg); }
+
+	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, unsigned short int arg) { return TextWriteInt(writer, arg); }
+	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, signed short int arg) { return TextWriteInt(writer, arg); }
+	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, unsigned int arg) { return TextWriteInt(writer, arg); }
+	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, signed int arg) { return TextWriteInt(writer, arg); }
+	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, unsigned long int arg) { return TextWriteInt(writer, arg); }
+	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, signed long int arg) { return TextWriteInt(writer, arg); }
+	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, unsigned long long int arg) { return TextWriteInt(writer, arg); }
+	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, signed long long int arg) { return TextWriteInt(writer, arg); }
+
 	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, WFmtDec arg);
 }
 

@@ -251,7 +251,7 @@ bool Host::CompilePipelineLayout(Platform platform,
 	const uint32 headerOffset = 0;
 	const uint32 bindPointRecordsOffset = headerOffset + sizeof(PipelineLayoutObjectHeader);
 	const uint32 rootSignatureOffset = bindPointRecordsOffset + sizeof(PipelineBindPointRecord) * bindPointCount;
-	const uint32 objectSize = rootSignatureOffset + d3dRootSignature->GetBufferSize();
+	const uint32 objectSize = rootSignatureOffset + uint32(d3dRootSignature->GetBufferSize());
 
 	result.object = Object::Create(objectSize);
 	{
