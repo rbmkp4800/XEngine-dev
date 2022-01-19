@@ -34,13 +34,11 @@ namespace XLib
 
 	private:
 		inline void ensureCapacity(CounterType requiredCapacity);
+		inline void reallocate(CounterType newCapacity);
 
 	public:
 		ArrayList() = default;
 		inline ~ArrayList();
-
-		ArrayList(const ArrayList& that) = delete;
-		void operator = (const ArrayList& that) = delete;
 
 		inline ArrayList(ArrayList&& that);
 		inline void operator = (ArrayList&& that);
@@ -261,7 +259,16 @@ namespace XLib
 		if (requiredCapacity <= capacity)
 			return;
 
-		capacity = max<CounterType>(requiredCapacity, capacity * 2, IntialBufferCapacity);
+		const CounterType newCapacity = max<CounterType>(requiredCapacity, capacity * 2, IntialBufferCapacity);
+		reallocate(newCapacity);
+	}
+
+	template <typename Type, typename CounterType, bool IsSafe, typename AllocatorType>
+	inline auto ArrayList<Type, CounterType, IsSafe, AllocatorType>::
+		reallocate(const CounterType newCapacity) -> void
+	{
+		XAssert(newCapacity > 0);
+		capacity = newCapacity;
 
 		if constexpr (!IsSafe)
 		{
@@ -289,8 +296,10 @@ namespace XLib
 	inline ArrayList<Type, CounterType, IsSafe, AllocatorType>::
 		~ArrayList()
 	{
-		clear();
-		compact();
+		AllocatorBase::release(buffer);
+		buffer = nullptr;
+		capacity = 0;
+		size = 0;
 	}
 
 	template <typename Type, typename CounterType, bool IsSafe, typename AllocatorType>
@@ -362,20 +371,15 @@ namespace XLib
 	inline auto ArrayList<Type, CounterType, IsSafe, AllocatorType>::
 		compact() -> void
 	{
-		capacity = size;
-
-		if (capacity == 0)
+		if (size == 0)
 		{
 			AllocatorBase::release(buffer);
-			buffer = 0;
-
-			Type* newBuffer = (Type*)AllocatorBase::reallocate(buffer, capacity * sizeof(Type));
-
-			// TODO: Move data if buffer relocated
+			buffer = nullptr;
+			capacity = 0;
 		}
 		else
 		{
-			
+			reallocate(size);
 		}
 	}
 

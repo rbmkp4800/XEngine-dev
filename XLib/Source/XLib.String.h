@@ -37,19 +37,20 @@ namespace XLib
 		CounterType capacity = 0;
 		CounterType length = 0;
 
+	private:
+		inline void ensureCapacity(CounterType requiredCapacity);
+
 	public:
 		BaseString() = default;
-		~BaseString() = default;
+		~BaseString();
 
-		inline void append();
+		inline void append(const char* cstr);
 		inline void pushBack(CharType c);
 
 		inline void resize(CounterType newLength);
 		inline void clear();
 		inline void compact();
 		inline void reserve(CounterType newCapacity);
-
-		inline void truncate(CounterType newLength);
 
 		inline CharType* getMutableData() { return buffer; }
 
@@ -119,6 +120,21 @@ namespace XLib
 
 namespace XLib
 {
+	template <typename CharType, typename CounterType, typename AllocatorType>
+	BaseString<CharType, CounterType, AllocatorType>::~BaseString()
+	{
+		AllocatorBase::release(buffer);
+		buffer = nullptr;
+		capacity = 0;
+		length = 0;
+	}
+
+	template <typename CharType, typename CounterType, typename AllocatorType>
+	void BaseString<CharType, CounterType, AllocatorType>::pushBack(CharType c)
+	{
+
+	}
+
 	template <typename CharType>
 	inline uintptr GetCStrLength(const CharType* cstr)
 	{
