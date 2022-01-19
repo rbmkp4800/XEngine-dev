@@ -25,7 +25,9 @@ TimePoint SourcesCacheEntry::checkWriteTime()
 	fullPath.append(localPath);
 	// TODO: Assert total length
 
-	writeTime = FileSystem::GetFileLastWriteTime(fullPath.getCStr());
+	// TODO:
+	XAssert(false);
+	writeTime = 0; // FileSystem::GetFileLastWriteTime(fullPath.getCStr());
 	writeTimeChecked = true;
 
 	if (writeTime == InvalidTimePoint)

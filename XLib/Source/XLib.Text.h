@@ -103,7 +103,7 @@ namespace XLib
 
 	// Text utils //////////////////////////////////////////////////////////////////////////////////
 
-	bool IsWhitespace(char c) { return c == ' ' || c == '\f' || c == '\n' || c == '\r' || c == '\t' || c == '\v'; }
+	inline bool IsWhitespace(char c) { return c == ' ' || c == '\f' || c == '\n' || c == '\r' || c == '\t' || c == '\v'; }
 
 	enum class TextReadTokenResult : uint8
 	{

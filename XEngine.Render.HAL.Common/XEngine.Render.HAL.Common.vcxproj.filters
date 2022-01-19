@@ -3,6 +3,8 @@
   <ItemGroup>
     <ClInclude Include="XEngine.Render.HAL.ObjectFormat.h" />
     <ClInclude Include="XEngine.Render.HAL.Common.h" />
-    <ClInclude Include="XEngine.Render.HAL.TextureFormat.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="XEngine.Render.HAL.Common.cpp" />
   </ItemGroup>
 </Project>

@@ -74,8 +74,7 @@ Object::~Object()
 
 void Object::finalize()
 {
-	XAssert(block);
-	XAssert(!block->finalized);
+	XAssert(block && !block->finalized);
 
 	block->hash = CalculateObjectHash(block + 1, block->dataSize);
 	block->finalized = true;
@@ -85,13 +84,24 @@ void Object::finalize()
 
 Object Object::clone() const
 {
-	XAssert(block);
-	XAssert(block->finalized);
+	XAssert(block && block->finalized);
 	Atomics::Increment(block->referenceCount);
 
 	Object newObject;
 	newObject.block = block;
 	return newObject;
+}
+
+uint32 Object::getCRC() const
+{
+	XAssert(block);
+	XAssert(block->finalized);
+
+	void* data = block + 1;
+	XAssert(block->dataSize >= sizeof(GenericObjectHeader));
+	GenericObjectHeader& header = *(GenericObjectHeader*)data;
+
+	return header.objectCRC;
 }
 
 Object Object::Create(uint32 size)
@@ -129,6 +139,9 @@ uint32 CompiledPipelineLayout::getSourceHash() const
 
 ShaderType CompiledShader::getShaderType() const
 {
+	if (!object.isValid())
+		return ShaderType::Undefined;
+
 	const PipelineBytecodeObjectHeader& header = *(PipelineBytecodeObjectHeader*)object.getData();
 	switch (header.objectType)
 	{
@@ -324,7 +337,8 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipeli
 	dxcSourceBuffer.Size = patchedSourceString.getLength();
 	dxcSourceBuffer.Encoding = CP_UTF8;
 
-	using DXCArgsList = ExpandableInplaceArrayList<LPCWSTR, 32, uint16, false>;
+	// TODO: Use `ExpandableInplaceArrayList<LPCWSTR, 32>` here when ready.
+	using DXCArgsList = ArrayList<LPCWSTR>;
 	DXCArgsList dxcArgsList;
 
 	// Build arguments list
@@ -396,15 +410,14 @@ bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayo
 {
 	result.destroy();
 
-	XAssert(imply(desc.vertexShader, desc.vertexShader->isInitialized()));
-	XAssert(imply(desc.amplificationShader, desc.amplificationShader->isInitialized()));
-	XAssert(imply(desc.meshShader, desc.meshShader->isInitialized()));
-	XAssert(imply(desc.pixelShader, desc.vertexShader->isInitialized()));
-
-	XAssert(imply(desc.vertexShader, desc.vertexShader->getShaderType() == ShaderType::Vertex));
-	XAssert(imply(desc.amplificationShader, desc.amplificationShader->getShaderType() == ShaderType::Amplification));
-	XAssert(imply(desc.meshShader, desc.meshShader->getShaderType() == ShaderType::Mesh));
-	XAssert(imply(desc.pixelShader, desc.vertexShader->getShaderType() == ShaderType::Pixel));
+	if (desc.vertexShader)
+		XAssert(desc.vertexShader->getShaderType() == ShaderType::Vertex);
+	if (desc.amplificationShader)
+		XAssert(desc.amplificationShader->getShaderType() == ShaderType::Amplification);
+	if (desc.meshShader)
+		XAssert(desc.meshShader->getShaderType() == ShaderType::Mesh);
+	if (desc.pixelShader)
+		XAssert(desc.pixelShader->getShaderType() == ShaderType::Pixel);
 
 	// Validate enabled shader stages combination
 	XAssert((desc.vertexShader != nullptr) != (desc.meshShader != nullptr));

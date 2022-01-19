@@ -85,6 +85,8 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		uint64 b;
 	};
 
+	inline bool operator == (const ObjectHash& left, const ObjectHash& right) { return left.a == right.a && left.b == right.b; }
+
 	class Object : public XLib::NonCopyable
 	{
 		friend Host;
@@ -116,14 +118,12 @@ namespace XEngine::Render::HAL::ShaderCompiler
 
 		void finalize();
 		Object clone() const;
+		uint32 getCRC() const;
 
 		inline void* getMutableData() { XAssert(block && !block->finalized); return block + 1; }
 		inline const void* getData() const { XAssert(block && block->finalized); return block + 1; }
 		inline uint32 getSize() const { XAssert(block); return block->dataSize; }
-
 		inline ObjectHash getHash() const { XAssert(block && block->finalized); return block->hash; }
-
-		inline uint32 getCRC() const;
 
 		inline bool isInitialized() const { return block != nullptr; }
 		inline bool isValid() const { return block ? block->finalized : false; }

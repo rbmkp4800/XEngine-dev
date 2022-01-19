@@ -80,8 +80,8 @@ namespace XEngine::Render::Shaders::Builder_
 		PipelinesList() = default;
 		~PipelinesList() = default;
 
-		Pipeline* createGraphicsPipeline(const char* name, const PipelineLayout& pipelineLayout, const GraphicsPipelineDesc& pipelineDesc) { createPipelineInternal(name, pipelineLayout, &pipelineDesc, nullptr); }
-		Pipeline* createComputePipeline(const char* name, const PipelineLayout& pipelineLayout, Shader& computeShader) { createPipelineInternal(name, pipelineLayout, nullptr, &computeShader); }
+		Pipeline* createGraphicsPipeline(const char* name, const PipelineLayout& pipelineLayout, const GraphicsPipelineDesc& pipelineDesc) { return createPipelineInternal(name, pipelineLayout, &pipelineDesc, nullptr); }
+		Pipeline* createComputePipeline(const char* name, const PipelineLayout& pipelineLayout, Shader& computeShader) { return createPipelineInternal(name, pipelineLayout, nullptr, &computeShader); }
 
 		inline uint32 getSize() const { return entriesStorageList.getSize(); }
 

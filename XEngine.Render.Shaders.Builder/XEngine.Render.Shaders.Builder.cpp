@@ -1,6 +1,5 @@
 #include <XLib.h>
 #include <XLib.Containers.ArrayList.h>
-#include <XLib.Containers.FlatHashMap.h>
 #include <XLib.System.File.h>
 #include <XLib.SystemHeapAllocator.h>
 
@@ -27,7 +26,7 @@ bool Builder::loadIndex(const char* indexPath)
 		"TestGfxPipeline",
 		testLayout,
 		Builder_::GraphicsPipelineDesc {
-			.vertexShader = shadersList.findOrCreateEntry(ShaderType::Vertex, *sourcesCache.findOrCreateEntry("test.hlsl"), testLayout),
+			.vertexShader = shadersList.findOrCreateEntry(ShaderType::Vertex, sourcesCache.findOrCreateEntry("test.hlsl"), testLayout),
 			.renderTargetsFormats = { HAL::TexelViewFormat::R8G8B8A8_UNORM },
 		});
 
@@ -46,6 +45,43 @@ void Builder::build()
 		pipeline.compile();
 }
 
+// TODO: Replace with `HashMap` when ready
+template <typename Key, typename Value>
+class Map
+{
+private:
+	struct Pair
+	{
+		Key key;
+		Value value;
+	};
+
+private:
+	ArrayList<Pair> pairs;
+
+public:
+	inline bool insert(const Key& key, const Value& value)
+	{
+		for (const Pair& pair : pairs)
+		{
+			if (pair.key == key)
+				return false;
+		}
+		pairs.pushBack(Pair { key, value });
+		return true;
+	}
+
+	inline Value* find(const Key& key)
+	{
+		for (Pair& pair : pairs)
+		{
+			if (pair.key == key)
+				return &pair.value;
+		}
+		return nullptr;
+	}
+};
+
 void Builder::composePack(const char* packPath)
 {
 	using namespace PackFormat;
@@ -57,8 +93,8 @@ void Builder::composePack(const char* packPath)
 	ArrayList<Object, uint16> genericObjects;
 	ArrayList<Object, uint16> bytecodeObjects;
 
-	FlatHashMap<uint64, uint16> pipelineLayoutNameCRCToGenericObjectIdxMap;
-	FlatHashMap<ObjectHash, uint16> bytecodeObjectHashToIdxMap;
+	Map<uint64, uint16> pipelineLayoutNameCRCToGenericObjectIdxMap;
+	Map<ObjectHash, uint16> bytecodeObjectHashToIdxMap;
 
 	uint32 genericObjectsOffsetAccum = 0;
 

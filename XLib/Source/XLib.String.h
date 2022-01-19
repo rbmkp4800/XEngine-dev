@@ -6,23 +6,23 @@
 
 namespace XLib
 {
-	template <typename CharType = char, typename CounterType = uintptr>
+	template <typename CharType = char>
 	class BaseStringView
 	{
 	private:
 		const CharType* data = nullptr;
-		CounterType length = 0;
+		uintptr length = 0;
 
 	public:
 		BaseStringView() = default;
 		~BaseStringView() = default;
 
-		inline BaseStringView(const CharType* data, CounterType length) : data(data), length(length) {}
+		inline BaseStringView(const CharType* data, uintptr length) : data(data), length(length) {}
 		inline BaseStringView(const CharType* cstr);
 
-		inline const CharType& operator [] (CounterType index) const { return data[index]; }
+		inline const CharType& operator [] (uintptr index) const { return data[index]; }
 		inline const CharType* getData() const { return data; }
-		inline CounterType getLength() const { return length; }
+		inline uintptr getLength() const { return length; }
 		inline bool isEmpty() const { return length == 0; }
 	};
 
@@ -42,6 +42,7 @@ namespace XLib
 		~BaseString() = default;
 
 		inline void append();
+		inline void pushBack(CharType c);
 
 		inline void resize(CounterType newLength);
 		inline void clear();
