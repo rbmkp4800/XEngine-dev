@@ -4,6 +4,8 @@
 #include "XLib.AllocatorAdapterBase.h"
 #include "XLib.SystemHeapAllocator.h"
 
+// TODO: Decide what to do with `String::getCStr()` for empty string.
+
 namespace XLib
 {
 	template <typename CharType = char>
@@ -33,24 +35,33 @@ namespace XLib
 	class BaseString : private AllocatorAdapterBase<AllocatorType>
 	{
 	private:
+		using AllocatorBase = AllocatorAdapterBase<AllocatorType>;
+
+		static constexpr CounterType IntialBufferCapacity = 16;
+
+	private:
 		CharType* buffer = nullptr;
 		CounterType capacity = 0;
 		CounterType length = 0;
 
 	private:
-		inline void ensureCapacity(CounterType requiredCapacity);
+		inline void ensureCapacity(CounterType requiredLength);
 
 	public:
 		BaseString() = default;
 		~BaseString();
 
-		inline void append(const char* cstr);
-		inline void pushBack(CharType c);
+		inline BaseString(BaseString&& that);
+		inline void operator = (BaseString&& that);
 
-		inline void resize(CounterType newLength);
+		inline void pushBack(CharType c);
+		inline void append(const char* stringToAppend);
+
+		inline void resize(CounterType newLength, CharType c = '\0');
+		inline void resizeUnsafe(CounterType newLength);
 		inline void clear();
 		inline void compact();
-		inline void reserve(CounterType newCapacity);
+		inline void reserve(CounterType newMaxLength) { ensureCapacity(newMaxLength); }
 
 		inline CharType* getMutableData() { return buffer; }
 
@@ -59,9 +70,10 @@ namespace XLib
 		inline const CharType* getData() const { return buffer; }
 		inline CounterType getLength() const { return length; }
 		inline bool isEmpty() const { return length == 0; }
-	};
 
-	using String = BaseString<>;
+		inline CharType& operator [] (CounterType index) { return buffer[index]; }
+		inline CharType operator [] (CounterType index) const { return buffer[index]; }
+	};
 
 
 	template <uintptr Capacity, typename CounterType = uint8, typename CharType = char>
@@ -81,6 +93,7 @@ namespace XLib
 		inline bool copyFrom(const char* cstr, uintptr lengthLimit = uintptr(-1));
 		inline bool copyFrom(StringView string);
 
+		inline void pushBack(CharType c);
 		inline bool append(const char* cstr, uintptr appendLengthLimit = uintptr(-1));
 		inline bool append(StringView string);
 
@@ -100,6 +113,8 @@ namespace XLib
 		static constexpr CounterType GetCapacity() { return Capacity; }
 		static constexpr CounterType GetMaxLength() { return Capacity - 1; }
 	};
+
+	using String = BaseString<>;
 
 	using InplaceString32 = InplaceString<31, uint8>;		static_assert(sizeof(InplaceString32) == 32);
 	using InplaceString64 = InplaceString<63, uint8>;		static_assert(sizeof(InplaceString64) == 64);
@@ -121,19 +136,88 @@ namespace XLib
 namespace XLib
 {
 	template <typename CharType, typename CounterType, typename AllocatorType>
-	BaseString<CharType, CounterType, AllocatorType>::~BaseString()
+	inline void BaseString<CharType, CounterType, AllocatorType>::ensureCapacity(CounterType requiredLength)
 	{
-		AllocatorBase::release(buffer);
+		const CounterType requiredCapacity = requiredLength + 1;
+		if (requiredCapacity <= capacity)
+			return;
+
+		// TODO: Maybe align up to 16 or some adaptive pow of 2.
+		capacity = max<CounterType>(requiredCapacity, capacity * 2, IntialBufferCapacity);
+		buffer = (CharType*)AllocatorBase::reallocate(buffer, capacity * sizeof(CharType));
+	}
+
+	template <typename CharType, typename CounterType, typename AllocatorType>
+	inline BaseString<CharType, CounterType, AllocatorType>::~BaseString()
+	{
+		if (buffer)
+			AllocatorBase::release(buffer);
 		buffer = nullptr;
 		capacity = 0;
 		length = 0;
 	}
 
 	template <typename CharType, typename CounterType, typename AllocatorType>
-	void BaseString<CharType, CounterType, AllocatorType>::pushBack(CharType c)
+	inline void BaseString<CharType, CounterType, AllocatorType>::pushBack(CharType c)
 	{
-
+		ensureCapacity(length + 1);
+		buffer[length] = c;
+		length++;
+		buffer[length] = '\0';
 	}
+
+	template <typename CharType, typename CounterType, typename AllocatorType>
+	inline void BaseString<CharType, CounterType, AllocatorType>::append(const char* stringToAppend)
+	{
+		// TODO: Assert for `CounterType` overflow.
+		const CounterType stringToAppendLength = CounterType(GetCStrLength(stringToAppend));
+		ensureCapacity(length + stringToAppendLength);
+		memoryCopy(buffer + length, stringToAppend, stringToAppendLength + 1);
+		length += stringToAppendLength;
+	}
+
+	template <typename CharType, typename CounterType, typename AllocatorType>
+	inline void BaseString<CharType, CounterType, AllocatorType>::resize(CounterType newLength, CharType c)
+	{
+		if (length < newLength)
+		{
+			ensureCapacity(newLength);
+			for (CharType* i = buffer + length; i != buffer + newLength; i++)
+				*i = c;
+		}
+		if (buffer)
+			buffer[newLength] = '\0';
+		length = newLength;
+	}
+
+	template <typename CharType, typename CounterType, typename AllocatorType>
+	inline void BaseString<CharType, CounterType, AllocatorType>::resizeUnsafe(CounterType newLength)
+	{
+		ensureCapacity(newLength);
+		buffer[newLength] = '\0';
+		length = newLength;
+	}
+
+	template <typename CharType, typename CounterType, typename AllocatorType>
+	inline void BaseString<CharType, CounterType, AllocatorType>::clear()
+	{
+		if (buffer)
+			buffer[0] = '\0';
+		length = 0;
+	}
+
+	template <typename CharType, typename CounterType, typename AllocatorType>
+	inline void BaseString<CharType, CounterType, AllocatorType>::compact()
+	{
+		if (capacity > length + 1)
+		{
+			capacity = length + 1;
+			buffer = (CharType*)AllocatorBase::reallocate(buffer, capacity * sizeof(CharType));
+		}
+
+		// TODO: Handle case for length == 0
+	}
+
 
 	template <typename CharType>
 	inline uintptr GetCStrLength(const CharType* cstr)

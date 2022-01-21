@@ -20,7 +20,7 @@ TimePoint SourcesCacheEntry::checkWriteTime()
 	if (writeTimeChecked)
 		return writeTime;
 
-	InplaceString1024 fullPath;
+	String fullPath; // TODO: Use `InplaceString1024` when ready.
 	fullPath.append(parentCache.getSourcesRootPath());
 	fullPath.append(localPath);
 	// TODO: Assert total length
@@ -48,7 +48,7 @@ bool SourcesCacheEntry::retrieveText(StringView& resultText)
 		return true;
 	}
 
-	InplaceString1024 fullPath;
+	String fullPath; // TODO: Use `InplaceString1024` when ready.
 	fullPath.append(parentCache.getSourcesRootPath());
 	fullPath.append(localPath);
 
@@ -64,7 +64,7 @@ bool SourcesCacheEntry::retrieveText(StringView& resultText)
 	// TODO: Check for overflows
 	const uint32 fileSize = uint32(file.getSize());
 
-	text.resize(fileSize + 1); // To have zero terminator in any case.
+	text.resizeUnsafe(fileSize);
 	const bool readResult = file.read(text.getMutableData(), fileSize);
 
 	file.close();

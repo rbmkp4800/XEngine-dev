@@ -25,7 +25,7 @@ namespace XLib
 		using AllocatorBase = AllocatorAdapterBase<AllocatorType>;
 
 		static constexpr uintptr IntialBufferByteSize = 64;
-		static constexpr CounterType IntialBufferCapacity = CounterType(divRoundUp(IntialBufferByteSize, sizeof(Type)));
+		static constexpr CounterType IntialBufferCapacity = divRoundUp<CounterType>(IntialBufferByteSize, sizeof(Type));
 
 	private:
 		Type* buffer = nullptr;
@@ -259,6 +259,7 @@ namespace XLib
 		if (requiredCapacity <= capacity)
 			return;
 
+		// TODO: Maybe align up to 16 or some adaptive pow of 2.
 		const CounterType newCapacity = max<CounterType>(requiredCapacity, capacity * 2, IntialBufferCapacity);
 		reallocate(newCapacity);
 	}
@@ -288,7 +289,8 @@ namespace XLib
 		for (CounterType i = 0; i < size; i++)
 			construct(newBuffer[i], asRValue(buffer[i]));
 
-		AllocatorBase::release(buffer);
+		if (buffer)
+			AllocatorBase::release(buffer);
 		buffer = newBuffer;
 	}
 
@@ -296,7 +298,8 @@ namespace XLib
 	inline ArrayList<Type, CounterType, IsSafe, AllocatorType>::
 		~ArrayList()
 	{
-		AllocatorBase::release(buffer);
+		if (buffer)
+			AllocatorBase::release(buffer);
 		buffer = nullptr;
 		capacity = 0;
 		size = 0;
@@ -373,7 +376,8 @@ namespace XLib
 	{
 		if (size == 0)
 		{
-			AllocatorBase::release(buffer);
+			if (buffer)
+				AllocatorBase::release(buffer);
 			buffer = nullptr;
 			capacity = 0;
 		}

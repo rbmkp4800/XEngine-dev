@@ -25,8 +25,8 @@ namespace XLib
 		inline bool canGetChar() const { return current != end && *current != 0; }
 		inline uint32 peekChar() const { return canGetChar() ? *current : uint32(-1); }
 		inline uint32 getChar() { return canGetChar() ? *current++ : uint32(-1); }
-		inline uint32 peekCharUnsafe() const { return *current; }
-		inline uint32 getCharUnsafe() { return *current++; }
+		inline char peekCharUnsafe() const { return *current; }
+		inline char getCharUnsafe() { return *current++; }
 
 		//inline void readChars();
 	};
@@ -61,8 +61,8 @@ namespace XLib
 		~FileTextReader() = default;
 
 		inline bool canGetChar() const;
-		inline char peekChar() const;
-		inline char getChar();
+		inline uint32 peekChar() const;
+		inline uint32 getChar();
 		inline char peekCharUnsafe() const;
 		inline char getCharUnsafe();
 
@@ -104,6 +104,9 @@ namespace XLib
 	// Text utils //////////////////////////////////////////////////////////////////////////////////
 
 	inline bool IsWhitespace(char c) { return c == ' ' || c == '\f' || c == '\n' || c == '\r' || c == '\t' || c == '\v'; }
+	inline bool IsLetter(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
+	inline bool IsDigit(char c) { return c >= '0' && c <= '9'; }
+	inline bool IsLetterOrDigit(char c) { return IsLetter(c) || IsDigit(c); }
 
 	enum class TextReadTokenResult : uint8
 	{
@@ -130,7 +133,7 @@ namespace XLib
 	//inline bool TextForwardToFirstOccurrence(TextReader& reader, StringView str, TextWriter& writer);
 
 	template <typename TextReader, typename TextWriter>
-	inline bool TextForwardToFirstOccurrence(TextReader& reader, const char* c, TextWriter& writer);
+	inline bool TextForwardToFirstOccurrence(TextReader& reader, const char* substring, TextWriter& writer);
 
 
 	// Standart types to/from text converstion utils for plain chars ///////////////////////////////
@@ -148,12 +151,12 @@ namespace XLib
 	template <typename TextReader> inline bool TextReadFP32(TextReader& reader, float32* result);
 	template <typename TextReader> inline bool TextReadFP64(TextReader& reader, float64* result);
 
-	template <typename TextWriter> inline bool TextWriteInt(TextWriter& writer, sint64 value, char format = 'd');
+	template <typename TextWriter> inline bool TextWriteInt(TextWriter& writer, uint64 value, char format = 'd');
 	template <typename TextWriter> inline bool TextWriteFP32(TextWriter& writer, float32 value, char format);
 	template <typename TextWriter> inline bool TextWriteFP64(TextWriter& writer, float64 value, char format);
 
 	template <typename TextReader, typename ResultString>
-	inline TextReadTokenResult TextReadCIdentifier(TextReader& reader, ResultString& result);
+	inline bool TextReadCIdentifier(TextReader& reader, ResultString& result);
 
 
 	// Formatted text read-write ///////////////////////////////////////////////////////////////////
@@ -258,6 +261,91 @@ namespace XLib
 		return false;
 	}
 
+	template <typename TextReader, typename TextWriter>
+	inline bool TextForwardToFirstOccurrence(TextReader& reader, const char* substring, TextWriter& writer)
+	{
+		// TODO: User proper rolling hash.
+		// TODO: For now we do not stop if write fails.
+
+		constexpr uint32 selectionBufferSizeLog2 = 10;
+		constexpr uint32 selectionBufferSize = 1 << selectionBufferSizeLog2;
+		constexpr uint32 selectionBufferIdxMask = selectionBufferSize - 1;
+
+		uintptr substringLength = 0;
+		uint32 substringHash = 0;
+		while (substring[substringLength])
+		{
+			substringHash += substring[substringLength];
+			substringLength++;
+		}
+
+		XAssert(substringLength <= selectionBufferSize);
+		if (substringLength > selectionBufferSize)
+			return false;
+
+		char selectionBuffer[selectionBufferSize];
+		uint32 selectionHash = 0;
+		uint32 selectionStartIdx = 0;
+
+		// Fill selection buffer.
+		for (uint32 i = 0; i < substringLength; i++)
+		{
+			if (!reader.canGetChar())
+			{
+				// Flush selection buffer and quit.
+				for (uint32 j = 0; j < i; j++)
+					writer.putChar(selectionBuffer[j]);
+
+				return false;
+			}
+
+			const char c = reader.getCharUnsafe();
+			selectionHash += c;
+			selectionBuffer[i] = c;
+		}
+
+		for (;;)
+		{
+			if (selectionHash == substringHash)
+			{
+				bool isEqual = true;
+				for (uint32 i = 0; i < substringLength; i++)
+				{
+					if (selectionBuffer[(selectionStartIdx + i) & selectionBufferIdxMask] != substring[i])
+					{
+						isEqual = false;
+						break;
+					}
+				}
+
+				if (isEqual)
+					return true;
+			}
+
+			// Move selection and update hash.
+
+			if (!reader.canGetChar())
+				break;
+
+			const char charToAdd = reader.getCharUnsafe();
+			const char charToRemove = selectionBuffer[selectionStartIdx & selectionBufferIdxMask];
+
+			selectionHash += charToAdd;
+			selectionHash -= charToRemove;
+
+			selectionBuffer[(selectionStartIdx + substringLength) & selectionBufferIdxMask] = charToAdd;
+			selectionStartIdx++;
+
+			writer.putChar(charToRemove);
+		}
+
+		// If we are here reader is empty and substring is not found. Flush selection buffer and quit.
+		for (uint32 i = 0; i < substringLength; i++)
+			writer.putChar(selectionBuffer[(selectionStartIdx + i) & selectionBufferIdxMask]);
+
+		return false;
+	}
+
 
 	namespace Internal
 	{
@@ -296,6 +384,57 @@ namespace XLib
 		static_assert(isInt<Result>);
 		return Internal::TextReadIntHelper<TextReader, sizeof(*result)>(reader, result, format);
 	}
+
+	template <typename TextWriter>
+	inline bool TextWriteInt(TextWriter& writer, uint64 value, char format)
+	{
+		char buffer[24];
+		sint8 charCount = 0;
+		for (;;)
+		{
+			buffer[charCount] = value % 10 + '0';
+			charCount++;
+			value /= 10;
+			if (!value)
+				break;
+		}
+
+		while (charCount)
+		{
+			charCount--;
+			if (!writer.putChar(buffer[charCount]))
+				return false;
+		}
+
+		return true;
+	}
+
+	template <typename TextReader, typename ResultString>
+	inline bool TextReadCIdentifier(TextReader& reader, ResultString& result)
+	{
+		if (!reader.canGetChar())
+			return false;
+		const char firstChar = reader.peekCharUnsafe();
+		const bool isIdenitfier = IsLetter(firstChar) || firstChar == '_';
+		if (!isIdenitfier)
+			return false;
+
+		reader.getCharUnsafe();
+		result.clear();
+		result.pushBack(firstChar);
+
+		for (;;)
+		{
+			const char c = char(reader.peekChar());
+			if (!IsLetterOrDigit(c) && c != '_')
+				break;
+			reader.getCharUnsafe();
+			result.pushBack(c); // TODO: Handle when this fails for `InplaceString`
+		}
+
+		return true;
+	}
+
 
 	namespace Internal
 	{

@@ -30,8 +30,8 @@ static inline PipelineBytecodeObjectType TranslateShaderTypeToPipelineBytecodeOb
 		case ShaderType::Mesh:			return PipelineBytecodeObjectType::MeshShader;
 		case ShaderType::Pixel:			return PipelineBytecodeObjectType::PixelShader;
 	}
-
 	XAssertUnreachableCode();
+	return PipelineBytecodeObjectType::Undefined;
 }
 
 static inline ObjectHash CalculateObjectHash(const void* data, uint32 size)
@@ -152,6 +152,7 @@ ShaderType CompiledShader::getShaderType() const
 		case PipelineBytecodeObjectType::PixelShader:			return ShaderType::Pixel;
 	}
 	XAssertUnreachableCode();
+	return ShaderType::Undefined;
 }
 
 bool Host::CompilePipelineLayout(Platform platform,
@@ -309,9 +310,9 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipeli
 			if (!bindingFound)
 				break;
 
-			InplaceString<64> bindPointName;
+			String bindPointName; // TODO: Use `InplaceString64` when ready.
 			TextSkipWhitespaces(sourceReader);
-			if (TextReadCIdentifier(sourceReader, bindPointName) != TextReadTokenResult::Success)
+			if (!TextReadCIdentifier(sourceReader, bindPointName))
 				return false;
 			TextSkipWhitespaces(sourceReader);
 			if (sourceReader.getChar() != ')')
