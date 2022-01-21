@@ -182,9 +182,12 @@ bool Host::CompilePipelineLayout(Platform platform,
 		const uint8 rootParameterIndex = rootParameterCount;
 		rootParameterCount++;
 
-		XAssert(objectBindPointRecord.nameCRC);
+		XAssert(bindPointDesc.name);
 		const uintptr bindPointNameLength = GetCStrLength(bindPointDesc.name);
 		const uint32 bindPointNameCRC = CRC32::Compute(bindPointDesc.name, bindPointNameLength);
+
+		// HAL requires this because user can set bindpoint by CRC and zero CRC should be invalid input.
+		XAssert(bindPointNameCRC);
 
 		objectBindPointRecord.nameCRC = bindPointNameCRC;
 		objectBindPointRecord.type = bindPointDesc.type;
@@ -370,7 +373,7 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipeli
 
 	if (dxcErrorsBlob != nullptr && dxcErrorsBlob->GetStringLength() > 0)
 	{
-
+		OutputDebugStringA(dxcErrorsBlob->GetStringPointer());
 	}
 
 	HRESULT hCompileStatus = E_FAIL;

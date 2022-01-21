@@ -15,7 +15,7 @@ using namespace XEngine::Render::Shaders::Builder_;
 
 bool Builder::loadIndex(const char* indexPath)
 {
-	sourcesCache.setSourcesRootPath("D:\\");
+	sourcesCache.setSourcesRootPath("..\\XEngine.Render\\Shaders\\");
 
 	BindPointDesc bp0 = {};
 	bp0.name = "name0";
@@ -28,7 +28,7 @@ bool Builder::loadIndex(const char* indexPath)
 		"TestGfxPipeline",
 		testLayout,
 		Builder_::GraphicsPipelineDesc {
-			.vertexShader = shadersList.findOrCreateEntry(ShaderType::Vertex, sourcesCache.findOrCreateEntry("test.hlsl"), testLayout),
+			.vertexShader = shadersList.findOrCreateEntry(ShaderType::Vertex, sourcesCache.findOrCreateEntry("UIColorVS.hlsl"), testLayout),
 			.renderTargetsFormats = { HAL::TexelViewFormat::R8G8B8A8_UNORM },
 		});
 

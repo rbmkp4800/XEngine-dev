@@ -49,7 +49,7 @@ int main()
 	Builder builder;
 	builder.loadIndex(nullptr);
 	builder.build();
-	builder.composePack("...");
+	builder.composePack("..\\Build\\shaderpack");
 
 #if 0
 	if (!LoadShadersListFile(shadersListFilePath.cstr(), shadersList, sourcesCache))
