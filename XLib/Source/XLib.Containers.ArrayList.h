@@ -436,7 +436,7 @@ namespace XLib
 		for (uint8 i = allocatedSegmentCount; i < requiredSegmentCount; i++)
 		{
 			XAssert(!segments[i]);
-			segments[i] = (Type*)AllocatorBase::allocate(CalculateSegmentSize(i));
+			segments[i] = (Type*)AllocatorBase::allocate(CalculateSegmentSize(i) * sizeof(Type));
 		}
 
 		allocatedSegmentCount = requiredSegmentCount;
