@@ -77,5 +77,6 @@
     <ClCompile Include="Source\XLib.System.Network.cpp" />
     <ClCompile Include="Source\XLib.System.Network.Socket.cpp" />
     <ClCompile Include="Source\XLib.Platform.COMPtr.cpp" />
+    <ClCompile Include="Source\XLib.Text.cpp" />
   </ItemGroup>
 </Project>

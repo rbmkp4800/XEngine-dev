@@ -27,7 +27,6 @@ namespace XLib
 		inline uint32 getChar() { return canGetChar() ? *current++ : uint32(-1); }
 		inline char peekCharUnsafe() const { return *current; }
 		inline char getCharUnsafe() { return *current++; }
-
 		//inline void readChars();
 	};
 
@@ -45,45 +44,60 @@ namespace XLib
 
 		inline bool canPutChar() const;
 		inline bool putChar(char c);
-
 		//inline void writeChars();
 	};
 
-	template <uint32 BufferSize = 4096>
 	class FileTextReader : public NonCopyable
 	{
 	private:
+		static constexpr uint32 BufferSize = 4096;
+
+	private:
 		char buffer[BufferSize];
-		File& file;
+		File* file = nullptr;
 
 	public:
-		inline FileTextReader(File& file) : file(file) {}
+		FileTextReader() = default;
 		~FileTextReader() = default;
+
+		inline FileTextReader(File& file) : file(&file) {}
+
+		inline void initialize(File& file);
 
 		inline bool canGetChar() const;
 		inline uint32 peekChar() const;
 		inline uint32 getChar();
 		inline char peekCharUnsafe() const;
 		inline char getCharUnsafe();
-
 		//inline void readChars();
+
+		inline bool isInitialized() const { return file != nullptr; }
 	};
 
-	template <uint32 BufferSize = 4096>
 	class FileTextWriter : public NonCopyable
 	{
 	private:
+		static constexpr uint32 BufferSize = 4096;
+
+	private:
 		char buffer[BufferSize];
-		File& file;
+		File* file = nullptr;
+		uint16 bufferedCharCount = 0;
 
 	public:
-		inline FileTextWriter(File& file) : file(file) {}
+		FileTextWriter() = default;
 		~FileTextWriter() = default;
 
-		inline bool canPutChar() const;
-		inline bool putChar(char c);
+		inline FileTextWriter(File& file) : file(&file) {}
 
+		inline void initialize(File& file);
+
+		inline bool canPutChar() const { return file && file->isInitialized(); }
+		inline bool putChar(char c);
 		//inline void writeChars();
+		inline void flush();
+
+		inline bool isInitialized() const { return file != nullptr; }
 	};
 
 	template <typename StringType>
@@ -99,6 +113,11 @@ namespace XLib
 		inline bool canPutChar() const { return true; }
 		inline bool putChar(char c) { string.pushBack(c); return true; }
 	};
+
+
+	FileTextReader& GetStdInTextReader();
+	FileTextWriter& GetStdOutTextWriter();
+	FileTextWriter& GetStdErrTextWriter();
 
 
 	// Text utils //////////////////////////////////////////////////////////////////////////////////
@@ -168,10 +187,10 @@ namespace XLib
 	inline bool TextWriteFmt(TextWriter& writer, const FmtArgs& ... fmtArgs) { return (... && TextWriteFmt_HandleArg(writer, fmtArgs)); }
 
 
-	template <typename ... FmtArgs> inline bool TextReadFmtStdIn(FmtArgs ... fmtArgs);
-	template <typename ... FmtArgs> inline bool TextWriteFmtStdOut(FmtArgs ... fmtArgs);
-	template <typename ... FmtArgs> inline bool TextWriteFmtStdErr(FmtArgs ... fmtArgs);
-	template <typename ... FmtArgs> inline bool TextWriteFmtDbgOut(FmtArgs ... fmtArgs);
+	template <typename ... FmtArgs> inline bool TextReadFmtStdIn(const FmtArgs& ... fmtArgs);
+	template <typename ... FmtArgs> inline void TextWriteFmtStdOut(const FmtArgs& ... fmtArgs);
+	template <typename ... FmtArgs> inline void TextWriteFmtStdErr(const FmtArgs& ... fmtArgs);
+	template <typename ... FmtArgs> inline void TextWriteFmtDbgOut(const FmtArgs& ... fmtArgs);
 
 
 	struct RFmtSkipWS {};
@@ -235,6 +254,34 @@ namespace XLib
 		*current = c;
 		current++;
 		return true;
+	}
+
+	inline void FileTextReader::initialize(File& file)
+	{
+		this->file = &file;
+	}
+
+	inline void FileTextWriter::initialize(File& file)
+	{
+		this->file = &file;
+		bufferedCharCount = 0;
+	}
+
+	inline bool FileTextWriter::putChar(char c)
+	{
+		// TODO: Do we need to fail if `file` is null?
+		buffer[bufferedCharCount] = c;
+		bufferedCharCount++;
+		if (bufferedCharCount == BufferSize)
+			flush();
+		return true;
+	}
+
+	inline void FileTextWriter::flush()
+	{
+		if (file)
+			file->write(buffer, bufferedCharCount);
+		bufferedCharCount = 0;
 	}
 
 
@@ -455,7 +502,15 @@ namespace XLib
 	}
 
 	template <typename ... FmtArgs>
-	inline bool TextWriteFmtDbgOut(FmtArgs ... fmtArgs)
+	inline void TextWriteFmtStdOut(const FmtArgs& ... fmtArgs)
+	{
+		FileTextWriter& stdOutWriter = GetStdOutTextWriter();
+		TextWriteFmt(stdOutWriter, fmtArgs ...);
+		stdOutWriter.flush();
+	}
+
+	template <typename ... FmtArgs>
+	inline void TextWriteFmtDbgOut(const FmtArgs& ... fmtArgs)
 	{
 		Internal::BufferedDbgOutTextWriter dbgOutWriter;
 		//TextWriteFmt(...);

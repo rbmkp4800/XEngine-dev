@@ -3,6 +3,8 @@
 #include "XLib.h"
 #include "XLib.NonCopyable.h"
 
+// TODO: Rename `File::isInitialized` to `File::isOpen`.
+
 namespace XLib
 {
 	enum class FileAccessMode : uint32
@@ -74,5 +76,10 @@ namespace XLib
 
 		inline bool isInitialized() { return handle ? true : false; }
 		inline void* getHandle() { return handle; }
+
+	public:
+		static File& GetStdIn();
+		static File& GetStdOut();
+		static File& GetStdErr();
 	};
 }

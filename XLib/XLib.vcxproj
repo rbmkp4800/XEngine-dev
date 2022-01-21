@@ -95,6 +95,7 @@
     <ClCompile Include="Source\XLib.System.Timer.cpp" />
     <ClCompile Include="Source\XLib.System.Window.cpp" />
     <ClCompile Include="Source\XLib.cpp" />
+    <ClCompile Include="Source\XLib.Text.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{DF81A513-72E3-4B74-B866-97F3BB61D45F}</ProjectGuid>

@@ -2,6 +2,8 @@
 
 #include "XLib.System.File.h"
 
+// TODO: Make StdIn, StdOut, StdErr getters thread safe.
+
 using namespace XLib;
 
 static_assert(DWORD(FileAccessMode::Read) == GENERIC_READ, "FileAccessMode::Read must be equal to GENERIC_READ");
@@ -14,6 +16,17 @@ static_assert(DWORD(FileOpenMode::OpenExisting) == OPEN_EXISTING, "FileOpenMode:
 static_assert(DWORD(FilePosition::Begin) == FILE_BEGIN, "FilePosition::Begin must be equal to FILE_BEGIN");
 static_assert(DWORD(FilePosition::Current) == FILE_CURRENT, "FilePosition::Current must be equal to FILE_CURRENT");
 static_assert(DWORD(FilePosition::End) == FILE_END, "FilePosition::End must be equal to FILE_END");
+
+namespace
+{
+	File StdIn;
+	File StdOut;
+	File StdErr;
+
+	bool StdInIsInitialized = false;
+	bool StdOutIsInitialized = false;
+	bool StdErrIsInitialized = false;
+}
 
 bool File::open(const char* name, FileAccessMode accessMode, FileOpenMode openMode)
 {
@@ -111,4 +124,40 @@ uint64 File::setPosition(sint64 offset, FilePosition origin)
 		return uint64(-1);
 	}
 	return postion.QuadPart;
+}
+
+File& File::GetStdIn()
+{
+	if (!StdInIsInitialized)
+	{
+		const HANDLE hStdIn = GetStdHandle(STD_INPUT_HANDLE);
+		if (hStdIn != INVALID_HANDLE_VALUE)
+			StdIn.handle = hStdIn;
+		StdInIsInitialized = true;
+	}
+	return StdIn;
+}
+
+File& File::GetStdOut()
+{
+	if (!StdOutIsInitialized)
+	{
+		const HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+		if (hStdOut != INVALID_HANDLE_VALUE)
+			StdOut.handle = hStdOut;
+		StdOutIsInitialized = true;
+	}
+	return StdOut;
+}
+
+File& File::GetStdErr()
+{
+	if (!StdErrIsInitialized)
+	{
+		const HANDLE hStdErr = GetStdHandle(STD_ERROR_HANDLE);
+		if (hStdErr != INVALID_HANDLE_VALUE)
+			StdErr.handle = hStdErr;
+		StdErrIsInitialized = true;
+	}
+	return StdErr;
 }
