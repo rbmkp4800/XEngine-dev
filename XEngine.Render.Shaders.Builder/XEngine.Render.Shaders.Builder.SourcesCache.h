@@ -64,10 +64,9 @@ namespace XEngine::Render::Shaders::Builder_
 		SourcesCache() = default;
 		~SourcesCache() = default;
 
-		void initialize(const char* sourcesRootPath);
-
 		SourcesCacheEntry& findOrCreateEntry(const char* localPath);
 
+		inline void setSourcesRootPath(const char* sourcesRootPath) { this->sourcesRootPath = sourcesRootPath; }
 		inline const char* getSourcesRootPath() const { return sourcesRootPath; }
 	};
 

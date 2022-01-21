@@ -47,6 +47,7 @@ int main()
 #endif
 
 	Builder builder;
+	builder.loadIndex(nullptr);
 	builder.build();
 	builder.composePack("...");
 

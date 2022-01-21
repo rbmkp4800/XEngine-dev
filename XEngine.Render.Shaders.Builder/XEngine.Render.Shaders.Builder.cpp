@@ -15,6 +15,8 @@ using namespace XEngine::Render::Shaders::Builder_;
 
 bool Builder::loadIndex(const char* indexPath)
 {
+	sourcesCache.setSourcesRootPath("D:\\");
+
 	BindPointDesc bp0 = {};
 	bp0.name = "name0";
 	bp0.type = HAL::PipelineBindPointType::ConstantBuffer;

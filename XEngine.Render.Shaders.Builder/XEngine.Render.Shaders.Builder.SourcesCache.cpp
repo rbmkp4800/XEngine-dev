@@ -84,6 +84,8 @@ bool SourcesCacheEntry::retrieveText(StringView& resultText)
 
 SourcesCacheEntry& SourcesCache::findOrCreateEntry(const char* localPath)
 {
+	XAssert(sourcesRootPath);
+
 	const uintptr localPathLength = GetCStrLength(localPath);
 	const uint64 localPathCRC = CRC64::Compute(localPath, localPathLength);
 
