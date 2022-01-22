@@ -2,6 +2,7 @@
 #include <XLib.Containers.ArrayList.h>
 #include <XLib.System.File.h>
 #include <XLib.SystemHeapAllocator.h>
+#include <XLib.Text.h>
 
 #include <XEngine.Render.HAL.ShaderCompiler.h>
 #include <XEngine.Render.Shaders.PackFormat.h>
@@ -12,40 +13,6 @@ using namespace XLib;
 using namespace XEngine::Render::HAL::ShaderCompiler;
 using namespace XEngine::Render::Shaders;
 using namespace XEngine::Render::Shaders::Builder_;
-
-bool Builder::loadIndex(const char* indexPath)
-{
-	sourcesCache.setSourcesRootPath("..\\XEngine.Render\\Shaders\\");
-
-	BindPointDesc bp0 = {};
-	bp0.name = "name0";
-	bp0.type = HAL::PipelineBindPointType::ConstantBuffer;
-	bp0.shaderVisibility = HAL::ShaderCompiler::PipelineBindPointShaderVisibility::All;
-
-	PipelineLayout& testLayout = *pipelineLayoutsList.createEntry("TestPipelineLayout", &bp0, 1);
-
-	pipelinesList.createGraphicsPipeline(
-		"TestGfxPipeline",
-		testLayout,
-		Builder_::GraphicsPipelineDesc {
-			.vertexShader = shadersList.findOrCreateEntry(ShaderType::Vertex, sourcesCache.findOrCreateEntry("UIColorVS.hlsl"), testLayout),
-			.renderTargetsFormats = { HAL::TexelViewFormat::R8G8B8A8_UNORM },
-		});
-
-	return true;
-}
-
-void Builder::build()
-{
-	for (PipelineLayout& pipelineLayout : pipelineLayoutsList)
-		pipelineLayout.compile();
-
-	for (Shader& shader : shadersList)
-		shader.compile();
-
-	for (Pipeline& pipeline : pipelinesList)
-		pipeline.compile();
-}
 
 // TODO: Replace with `HashMap` when ready
 template <typename Key, typename Value>
@@ -84,8 +51,66 @@ public:
 	}
 };
 
-void Builder::composePack(const char* packPath)
+void Builder::run(const char* indexPath, const char* packPath)
 {
+	// Load ingex.
+
+	sourcesCache.setSourcesRootPath("..\\XEngine.Render\\Shaders\\");
+
+	BindPointDesc bp0 = {};
+	bp0.name = "name0";
+	bp0.type = HAL::PipelineBindPointType::ConstantBuffer;
+	bp0.shaderVisibility = HAL::ShaderCompiler::PipelineBindPointShaderVisibility::All;
+
+	PipelineLayout& testLayout = *pipelineLayoutsList.createEntry("TestPipelineLayout", &bp0, 1);
+
+	pipelinesList.createGraphicsPipeline(
+		"TestGfxPipeline",
+		testLayout,
+		Builder_::GraphicsPipelineDesc {
+			.vertexShader = shadersList.findOrCreateEntry(ShaderType::Vertex, sourcesCache.findOrCreateEntry("UIColorVS.hlsl"), testLayout),
+			.renderTargetsFormats = { HAL::TexelViewFormat::R8G8B8A8_UNORM },
+		});
+
+	// Compile.
+
+	for (PipelineLayout& pipelineLayout : pipelineLayoutsList)
+	{
+		TextWriteFmtStdOut("Compiling pipeline layout \"", pipelineLayout.getName(), "\"\n");
+
+		if (!pipelineLayout.compile())
+		{
+			TextWriteFmtStdOut("Failed to compile pipeline layout \"", pipelineLayout.getName(), "\"\n");
+			return;
+		}
+	}
+
+	for (Shader& shader : shadersList)
+	{
+		TextWriteFmtStdOut("Compiling shader \"", "shader.getName()", "\"\n");
+
+		if (!shader.compile())
+		{
+			TextWriteFmtStdOut("Failed to compile shader \"", "shader.getName()", "\"\n");
+			return;
+		}
+	}
+
+	for (Pipeline& pipeline : pipelinesList)
+	{
+		TextWriteFmtStdOut("Compiling pipeline \"", pipeline.getName(), "\"\n");
+
+		if (!pipeline.compile())
+		{
+			TextWriteFmtStdOut("Failed to compile pipeline \"", pipeline.getName(), "\"\n");
+			return;
+		}
+	}
+
+	// Compose pack.
+
+	TextWriteFmtStdOut("Composing shaderpack \"", packPath, "\"\n");
+
 	using namespace PackFormat;
 
 	ArrayList<PipelineLayoutRecord> pipelineLayoutRecords;
@@ -236,6 +261,8 @@ void Builder::composePack(const char* packPath)
 	XAssert(bytecodeObjectsTotalSizeCheck == bytecodeObjectsTotalSize);
 
 	file.close();
+
+	TextWriteFmtStdOut("Build successful\n");
 }
 
 #if 0

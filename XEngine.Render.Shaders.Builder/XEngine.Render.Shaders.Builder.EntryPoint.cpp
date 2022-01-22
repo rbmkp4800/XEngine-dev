@@ -47,9 +47,7 @@ int main()
 #endif
 
 	Builder builder;
-	builder.loadIndex(nullptr);
-	builder.build();
-	builder.composePack("..\\Build\\shaderpack");
+	builder.run(nullptr, "..\\Build\\shaderpack");
 
 #if 0
 	if (!LoadShadersListFile(shadersListFilePath.cstr(), shadersList, sourcesCache))
