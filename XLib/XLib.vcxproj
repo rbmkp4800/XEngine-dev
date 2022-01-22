@@ -50,7 +50,6 @@
     <ClInclude Include="Source\XLib.Math.h" />
     <ClInclude Include="Source\XLib.Random.h" />
     <ClInclude Include="Source\XLib.String.h" />
-    <ClInclude Include="Source\XLib.StringWriter.h" />
     <ClInclude Include="Source\XLib.System.AsyncIO.h" />
     <ClInclude Include="Source\XLib.System.File.h" />
     <ClInclude Include="Source\XLib.FileSystem.h" />
@@ -82,7 +81,6 @@
     <ClCompile Include="Source\XLib.Math.cpp" />
     <ClCompile Include="Source\XLib.Random.cpp" />
     <ClCompile Include="Source\XLib.String.cpp" />
-    <ClCompile Include="Source\XLib.StringWriter.cpp" />
     <ClCompile Include="Source\XLib.System.AsyncIO.cpp" />
     <ClCompile Include="Source\XLib.System.File.cpp" />
     <ClCompile Include="Source\XLib.FileSystem.cpp" />
