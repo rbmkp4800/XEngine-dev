@@ -9,10 +9,8 @@
 #include <XEngine.Render.HAL.Common.h>
 
 #define XEAssert(cond)
-#define XEAssertImply(cond0, cond1)
 #define XEAssertUnreachableCode()
 #define XEMasterAssert(cond)
-#define XEMasterAssertImply(cond0, cond1)
 #define XEMasterAssertUnreachableCode()
 
 struct ID3D12CommandAllocator;

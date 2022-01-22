@@ -35,6 +35,69 @@ static inline bool ValidateGenericObjectHeader(const ObjectFormat::GenericObject
 //	inline uint8 getConstantsSize32bitValues() const;
 //};
 
+
+struct Device::Resource
+{
+	ID3D12Resource2* d3dResource;
+	ResourceType type;
+	uint8 handleGeneration;
+	bool internalOwnership; // For example swap chain. User can't release it.
+
+	union
+	{
+		struct
+		{
+			uint16x3 size;
+			TextureType type;
+			TextureFormat format;
+			uint8 mipLevelCount;
+		} texture;
+
+		struct
+		{
+			uint64 size;
+		} buffer;
+	};
+};
+
+struct Device::ShaderResourceView
+{
+	ResourceHandle resourceHandle;
+	ShaderResourceViewType type;
+	uint8 handleGeneration;
+};
+
+struct Device::PipelineLayout
+{
+	ID3D12RootSignature* d3dRootSignature;
+	uint32 sourceHash;
+	uint8 handleGeneration;
+
+	//uint32 bindPointsLUT[MaxPipelineBindPointCount];
+	ObjectFormat::PipelineBindPointRecord bindPoints[MaxPipelineBindPointCount];
+	uint8 bindPointCount;
+};
+
+struct Device::Pipeline
+{
+	ID3D12PipelineState* d3dPipelineState;
+	PipelineLayoutHandle pipelineLayoutHandle;
+	PipelineType type;
+	uint8 handleGeneration;
+};
+
+struct Device::Fence
+{
+	ID3D12Fence* d3dFence;
+};
+
+struct Device::SwapChain
+{
+	IDXGISwapChain4* dxgiSwapChain;
+	ResourceHandle textures[SwapChainTextureCount];
+};
+
+
 // CommandList /////////////////////////////////////////////////////////////////////////////////////
 
 enum class CommandList::State : uint8
@@ -181,11 +244,26 @@ void CommandList::bindConstants(uint32 bindPointNameCRC,
 	const void* data, uint32 size32bitValues, uint32 offset32bitValues)
 {
 	XEAssert(state == State::Recording);
+	XEAssert(currentPipelineLayoutHandle != ZeroPipelineLayoutHandle);
 
-	const PipelineBindPointsLUTEntry bindPointsLUTEntry = lookupBindPointsLUT(bindPointNameCRC);
-	XEAssert(bindPointsLUTEntry.getType() == PipelineBindPointType::Constants);
-	XEAssert(offset32bitValues + size32bitValues <= bindPointsLUTEntry.getConstantsSize32bitValues());
-	const uint32 rootParameterIndex = bindPointsLUTEntry.getRootParameterIndex();
+	const Device::PipelineLayout& pipelineLayout = device->getPipelineLayoutByHandle(currentPipelineLayoutHandle);
+
+	const ObjectFormat::PipelineBindPointRecord* bindPointRecord = nullptr;
+	for (uint8 i = 0; i < pipelineLayout.bindPointCount; i++)
+	{
+		if (pipelineLayout.bindPoints[i].nameCRC == bindPointNameCRC)
+		{
+			bindPointRecord = &pipelineLayout.bindPoints[i];
+			break;
+		}
+	}
+
+	XAssert(bindPointRecord);
+
+	//const PipelineBindPointsLUTEntry bindPointsLUTEntry = lookupBindPointsLUT(bindPointNameCRC);
+	//XEAssert(bindPointsLUTEntry.getType() == PipelineBindPointType::Constants);
+	//XEAssert(offset32bitValues + size32bitValues <= bindPointsLUTEntry.getConstantsSize32bitValues());
+	const uint32 rootParameterIndex = bindPointRecord->rootParameterIndex; //bindPointsLUTEntry.getRootParameterIndex();
 
 	if (currentPipelineType == PipelineType::Graphics)
 		d3dCommandList->SetGraphicsRoot32BitConstants(rootParameterIndex, size32bitValues, data, offset32bitValues);
@@ -200,11 +278,12 @@ void CommandList::bindBuffer(uint32 bindPointNameCRC,
 {
 	XEAssert(state == State::Recording);
 
-	const PipelineBindPointsLUTEntry bindPointsLUTEntry = lookupBindPointsLUT(bindPointNameCRC);
-	XEAssertImply(bindType == BufferBindType::Constant, bindPointsLUTEntry.getType() == PipelineBindPointType::ConstantBuffer);
-	XEAssertImply(bindType == BufferBindType::ReadOnly, bindPointsLUTEntry.getType() == PipelineBindPointType::ReadOnlyBuffer);
-	XEAssertImply(bindType == BufferBindType::ReadWrite, bindPointsLUTEntry.getType() == PipelineBindPointType::ReadWriteBuffer);
-	const uint32 rootParameterIndex = bindPointsLUTEntry.getRootParameterIndex();
+	//const PipelineBindPointsLUTEntry bindPointsLUTEntry = lookupBindPointsLUT(bindPointNameCRC);
+	//XEAssertImply(bindType == BufferBindType::Constant, bindPointsLUTEntry.getType() == PipelineBindPointType::ConstantBuffer);
+	//XEAssertImply(bindType == BufferBindType::ReadOnly, bindPointsLUTEntry.getType() == PipelineBindPointType::ReadOnlyBuffer);
+	//XEAssertImply(bindType == BufferBindType::ReadWrite, bindPointsLUTEntry.getType() == PipelineBindPointType::ReadWriteBuffer);
+	//const uint32 rootParameterIndex = bindPointsLUTEntry.getRootParameterIndex();
+	const uint32 rootParameterIndex = 0;
 
 	const Device::Resource& resource = device->getResourceByHandle(bufferHandle);
 	XEAssert(resource.type == ResourceType::Buffer);
@@ -304,9 +383,9 @@ void CommandList::copyTexture(ResourceHandle dstTextureHandle, TextureSubresourc
 	d3dSrcLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
 	d3dSrcLocation.SubresourceIndex = Device::CalculateTextureSubresourceIndex(srcTexture, srcSubresource);
 
-	D3D12_BOX d3dSrcBox = srcRegion ?
-		D3D12Helpers::BoxFromOffsetAndSize(srcRegion->offset, srcRegion->size) :
-		D3D12Helpers::BoxFromOffsetAndSize(uint16x3(0, 0, 0),
+	const D3D12_BOX d3dSrcBox = srcRegion ?
+		D3D12BoxFromOffsetAndSize(srcRegion->offset, srcRegion->size) :
+		D3D12BoxFromOffsetAndSize(uint16x3(0, 0, 0),
 			Device::CalculateMipLevelSize(srcTexture.texture.size, srcSubresource.mipLevel));
 
 	// TODO: Add texture subresource bounds validation.
@@ -359,8 +438,8 @@ void CommandList::copyBufferTexture(CopyBufferTextureDirection direction,
 	if (copyTextureToBuffer)
 	{
 		d3dSrcBox = textureRegion ?
-			D3D12Helpers::BoxFromOffsetAndSize(textureRegion->offset, textureRegion->size) :
-			D3D12Helpers::BoxFromOffsetAndSize(uint16x3(0, 0, 0),
+			D3D12BoxFromOffsetAndSize(textureRegion->offset, textureRegion->size) :
+			D3D12BoxFromOffsetAndSize(uint16x3(0, 0, 0),
 				Device::CalculateMipLevelSize(texture.texture.size, textureSubresource.mipLevel));
 		p_d3dSrcBox = &d3dSrcBox;
 	}
@@ -369,72 +448,14 @@ void CommandList::copyBufferTexture(CopyBufferTextureDirection direction,
 		&d3dSrcLocation, p_d3dSrcBox);
 }
 
+
 // Device //////////////////////////////////////////////////////////////////////////////////////////
-
-struct Device::Resource
-{
-	ID3D12Resource2* d3dResource;
-	ResourceType type;
-	uint8 handleGeneration;
-	bool internalOwnership; // For example swap chain. User can't release it.
-
-	union
-	{
-		struct
-		{
-			uint16x3 size;
-			TextureType type;
-			TextureFormat format;
-			uint8 mipLevelCount;
-		} texture;
-
-		struct
-		{
-			uint64 size;
-		} buffer;
-	};
-};
-
-struct Device::ShaderResourceView
-{
-	ResourceHandle resourceHandle;
-	ShaderResourceViewType type;
-	uint8 handleGeneration;
-};
-
-struct Device::PipelineLayout
-{
-	ID3D12RootSignature* d3dRootSignature;
-	uint32 sourceHash;
-	uint8 handleGeneration;
-
-	uint32 bindPointsLUT[MaxPipelineBindPointCount];
-};
-
-struct Device::Pipeline
-{
-	ID3D12PipelineState* d3dPipelineState;
-	PipelineLayoutHandle pipelineLayoutHandle;
-	PipelineType type;
-	uint8 handleGeneration;
-};
-
-struct Device::Fence
-{
-	ID3D12Fence* d3dFence;
-};
-
-struct Device::SwapChain
-{
-	IDXGISwapChain4* dxgiSwapChain;
-	ResourceHandle textures[SwapChainTextureCount];
-};
 
 uint32 Device::CalculateTextureSubresourceIndex(const Resource& resource, const TextureSubresource& subresource)
 {
 	XEAssert(resource.type == ResourceType::Texture);
 	XEAssert(subresource.mipLevel < resource.texture.mipLevelCount);
-	XEAssertImply(subresource.arraySlice > 0, resource.texture.type == TextureType::Texture2DArray);
+	XEAssert(imply(subresource.arraySlice > 0, resource.texture.type == TextureType::Texture2DArray));
 	XEAssert(subresource.arraySlice < resource.texture.depth);
 
 	const TextureFormat format = resource.texture.format;
@@ -443,7 +464,7 @@ uint32 Device::CalculateTextureSubresourceIndex(const Resource& resource, const 
 	const bool isColorAspect = (subresource.aspect == TextureAspect::Color);
 	const bool isStencilAspect = (subresource.aspect == TextureAspect::Stencil);
 	XEAssert(isDepthStencilTexture ^ isColorAspect);
-	XEAssertImply(isStencilAspect, hasStencil);
+	XEAssert(imply(isStencilAspect, hasStencil));
 
 	const uint32 planeIndex = isStencilAspect ? 1 : 0;
 	const uint32 mipLevelCount = resource.texture.mipLevelCount;
@@ -661,15 +682,17 @@ PipelineLayoutHandle Device::createPipelineLayout(ObjectDataView objectData)
 
 	XEMasterAssert(header.bindPointCount > 0);
 	XEMasterAssert(header.bindPointCount <= MaxPipelineBindPointCount);
-	const uint8 bindPointsLUTSizeLog2 = uint8(32 - countLeadingZeros32(header.bindPointCount));
-	const uint8 bindPointsLUTSize = 1 << bindPointsLUTSizeLog2;
+	//const uint8 bindPointsLUTSizeLog2 = uint8(32 - countLeadingZeros32(header.bindPointCount));
+	//const uint8 bindPointsLUTSize = 1 << bindPointsLUTSizeLog2;
 
-	XEMasterAssert(header.bindPointsLUTKeyShift + bindPointsLUTSizeLog2 < 32);
-	const uint8 bindPointsLUTKeyShift = header.bindPointsLUTKeyShift;
-	const uint8 bindPointsLUTKeyAndMask = bindPointsLUTSize - 1;
+	//XEMasterAssert(header.bindPointsLUTKeyShift + bindPointsLUTSizeLog2 < 32);
+	//const uint8 bindPointsLUTKeyShift = header.bindPointsLUTKeyShift;
+	//const uint8 bindPointsLUTKeyAndMask = bindPointsLUTSize - 1;
 
-	pipelineLayout.bindPointsLUTKeyShift = bindPointsLUTKeyShift;
-	pipelineLayout.bindPointsLUTKeyAndMask = bindPointsLUTKeyAndMask;
+	//pipelineLayout.bindPointsLUTKeyShift = bindPointsLUTKeyShift;
+	//pipelineLayout.bindPointsLUTKeyAndMask = bindPointsLUTKeyAndMask;
+
+	pipelineLayout.bindPointCount = header.bindPointCount;
 
 	const PipelineBindPointRecord* bindPoints =
 		(const PipelineBindPointRecord*)(objectDataBytes + sizeof(PipelineLayoutObjectHeader));
@@ -678,10 +701,12 @@ PipelineLayoutHandle Device::createPipelineLayout(ObjectDataView objectData)
 	{
 		const PipelineBindPointRecord& bindPoint = bindPoints[i];
 		XEMasterAssert(bindPoint.nameCRC);
-		const uint8 lutIndex = (bindPoint.nameCRC >> bindPointsLUTKeyShift) & bindPointsLUTKeyAndMask;
+		//const uint8 lutIndex = (bindPoint.nameCRC >> bindPointsLUTKeyShift) & bindPointsLUTKeyAndMask;
 
-		XEMasterAssert(!pipelineLayout.bindPointsLUT[lutIndex]); // Check collision
-		pipelineLayout.bindPointsLUT[lutIndex] = ...;
+		//XEMasterAssert(!pipelineLayout.bindPointsLUT[lutIndex]); // Check collision
+		//pipelineLayout.bindPointsLUT[lutIndex] = ...;
+
+		pipelineLayout.bindPoints[i] = bindPoint;
 	}
 
 	const uint32 headerAndBindPointsLength =
@@ -722,7 +747,7 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 
 	// Validate enabled shader stages combination
 	XEMasterAssert(baseObject.enabledShaderStages.vertex ^ baseObject.enabledShaderStages.mesh);
-	XEMasterAssertImply(baseObject.enabledShaderStages.vertex, !baseObject.enabledShaderStages.amplification);
+	XEMasterAssert(imply(baseObject.enabledShaderStages.vertex, !baseObject.enabledShaderStages.amplification));
 
 	// Calculate expected bytecode objects number and their types
 
@@ -1002,7 +1027,7 @@ void Device::writeDescriptor(DescriptorAddress descriptorAddress, ShaderResource
 		D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 }
 
-void Device::submitGraphics(CommandList& commandList, const FenceSignalDesc* fenceSignals = nullptr, uint32 fenceSignalCount = 0)
+void Device::submitGraphics(CommandList& commandList, const FenceSignalDesc* fenceSignals, uint32 fenceSignalCount)
 {
 	XEAssert(commandList.state != CommandList::State::Executing);
 
@@ -1011,9 +1036,6 @@ void Device::submitGraphics(CommandList& commandList, const FenceSignalDesc* fen
 	commandList.state = CommandList::State::Executing;
 	commandList.currentPipelineType = PipelineType::Undefined;
 	commandList.currentPipelineLayoutHandle = ZeroPipelineLayoutHandle;
-	commandList.bindPointsLUTKeyShift = 0;
-	commandList.bindPointsLUTKeyAndMask = 0;
-	commandList.bindPointsLUT = nullptr;
 
 	ID3D12CommandList* d3dCommandListsToExecute[] = { commandList.d3dCommandList };
 	d3dGraphicsQueue->ExecuteCommandLists(1, d3dCommandListsToExecute);

@@ -8,7 +8,7 @@ namespace XLib
 	class BitSet
 	{
 	private:
-		static constexpr uint32 StorageSizeU64s = divRoundUp(BitCount, 64);
+		static constexpr uint32 StorageSizeU64s = divRoundUp<uint32>(BitCount, 64);
 
 	public:
 		inline BitSet();

@@ -110,6 +110,12 @@
     <ProjectReference Include="..\XEngine.Base\XEngine.Base.vcxproj">
       <Project>{276891e4-c661-4502-b581-781efb8098d6}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\XEngine.Render.HAL.Common\XEngine.Render.HAL.Common.vcxproj">
+      <Project>{102d6f8c-faad-4fd3-9b3a-16923042465e}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\XEngine.Render.HAL.D3D12\XEngine.Render.HAL.D3D12.vcxproj">
+      <Project>{1ed495b0-b69b-4409-83fc-587f590eab29}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\XEngine.Render\XEngine.Render.vcxproj">
       <Project>{25b57cc9-0f71-4901-ba27-3ea9952fa23c}</Project>
     </ProjectReference>

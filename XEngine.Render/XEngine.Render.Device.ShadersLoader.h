@@ -2,7 +2,7 @@
 
 #include <XLib.h>
 
-//#include <XEngine.Render.HAL.D3D12.h>
+#include <XEngine.Render.HAL.D3D12.h>
 
 namespace XEngine::Render::Device_
 {
@@ -20,6 +20,6 @@ namespace XEngine::Render::Device_
 		PipelineToken registerPipeline(uint64 nameCRC);
 		void unregisterPipeline(PipelineToken token);
 
-		//HAL::GraphicsPipeline& acquirePipeline(PipelineToken token);
+		HAL::PipelineHandle& acquirePipeline(PipelineToken token);
 	};
 }
