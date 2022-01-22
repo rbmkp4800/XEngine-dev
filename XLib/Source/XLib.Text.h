@@ -33,18 +33,23 @@ namespace XLib
 	class MemoryTextWriter
 	{
 	private:
-		char* current = nullptr;
-		const char* end = nullptr;
+		char* buffer = nullptr;
+		uint32 bufferSize = 0;
+		uint32 length = 0;
 
 	public:
 		MemoryTextWriter() = default;
 		~MemoryTextWriter() = default;
 
-		inline MemoryTextWriter(char* data, uintptr length);
+		inline MemoryTextWriter(char* buffer, uintptr bufferSize) : buffer(buffer), bufferSize(bufferSize) {}
 
-		inline bool canPutChar() const;
+		inline bool canPutChar() const { return length + 1 < bufferSize; }
 		inline bool putChar(char c);
 		//inline void writeChars();
+
+		inline void terminate();
+
+		inline uint32 getLength() const { return length; }
 	};
 
 	class FileTextReader : public NonCopyable
@@ -249,11 +254,18 @@ namespace XLib
 
 	inline bool MemoryTextWriter::putChar(char c)
 	{
-		if (current == end)
+		if (!canPutChar())
 			return false;
-		*current = c;
-		current++;
-		return true;
+		buffer[length] = c;
+		length++;
+	}
+
+	inline void MemoryTextWriter::terminate()
+	{
+		if (!bufferSize)
+			return;
+		XAssert(length < bufferSize);
+		buffer[length] = '\0';
 	}
 
 	inline void FileTextReader::initialize(File& file)
@@ -483,24 +495,6 @@ namespace XLib
 	}
 
 
-	namespace Internal
-	{
-		class BufferedDbgOutTextWriter
-		{
-		private:
-			char buffer[4096];
-
-		public:
-			BufferedDbgOutTextWriter() = default;
-			~BufferedDbgOutTextWriter() = default;
-
-			inline bool putChar(char c);
-			inline bool canPutChar() const { return true; }
-
-			inline void flush();
-		};
-	}
-
 	template <typename ... FmtArgs>
 	inline void TextWriteFmtStdOut(const FmtArgs& ... fmtArgs)
 	{
@@ -512,9 +506,11 @@ namespace XLib
 	template <typename ... FmtArgs>
 	inline void TextWriteFmtDbgOut(const FmtArgs& ... fmtArgs)
 	{
-		Internal::BufferedDbgOutTextWriter dbgOutWriter;
-		//TextWriteFmt(...);
-		dbgOutWriter.flush();
+		char buffer[4096];
+		MemoryTextWriter bufferWriter(buffer, sizeof(buffer));
+		TextWriteFmt(bufferWriter, fmtArgs ...);
+		bufferWriter.terminate();
+		Debug::Output(buffer);
 	}
 
 

@@ -217,6 +217,8 @@ namespace XLib
 		static FailureHandler failureHandler;
 
 	public:
+		static void Output(const char* message);
+
 		static void DefaultFailureHandler(const char* message);
 
 		static inline void OverrideFailureHandler(FailureHandler handler) { failureHandler = handler ? handler : DefaultFailureHandler; }

@@ -16,6 +16,11 @@ void memoryMove(void* destination, const void* source, uintptr size) { memmove(d
 
 Debug::FailureHandler Debug::failureHandler = Debug::DefaultFailureHandler;
 
+void Debug::Output(const char* message)
+{
+	OutputDebugStringA(message);
+}
+
 void Debug::DefaultFailureHandler(const char* message)
 {
 	if (message)
