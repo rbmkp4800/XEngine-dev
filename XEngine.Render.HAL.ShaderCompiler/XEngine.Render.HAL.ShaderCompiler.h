@@ -250,7 +250,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 
 		// Temporary
 		static bool CompileShader(Platform platform, const CompiledPipelineLayout& pipelineLayout,
-			ShaderType shaderType, const char* source, uint32 sourceLength, CompiledShader& result);
+			ShaderType shaderType, const char* shaderName, const char* source, uint32 sourceLength, CompiledShader& result);
 
 		static bool CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayout& pipelineLayout,
 			const GraphicsPipelineDesc& desc, CompiledGraphicsPipeline& result);

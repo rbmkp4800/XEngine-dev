@@ -160,6 +160,13 @@ namespace XLib
 	inline bool TextForwardToFirstOccurrence(TextReader& reader, const char* substring, TextWriter& writer);
 
 
+	// Encoding convertion utils ///////////////////////////////////////////////////////////////////
+
+	// Converts until null-terminator of input string is reached or until lengthLimit is reached.
+	// Returns number of characters processed.
+	uintptr TextConvertASCIIToWide(const char* asciText, wchar* resultWideText, uintptr lengthLimit = uintptr(-1));
+
+
 	// Standart types to/from text converstion utils for plain chars ///////////////////////////////
 	
 	bool TextToInt(const char* text, uintptr textLength, sint64& result);

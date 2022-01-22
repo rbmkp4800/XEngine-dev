@@ -293,11 +293,17 @@ bool Host::CompilePipelineLayout(Platform platform,
 }
 
 bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipelineLayout,
-	ShaderType shaderType, const char* source, uint32 sourceLength, CompiledShader& result)
+	ShaderType shaderType, const char* shaderName, const char* source, uint32 sourceLength, CompiledShader& result)
 {
 	result.destroy();
 
 	XAssert(pipelineLayout.isInitialized());
+
+	// TODO: Tidy this when more conver utils is ready.
+	wchar shaderNameW[64];
+	const uintptr shaderNameLength = TextConvertASCIIToWide(shaderName, shaderNameW, countof(shaderNameW) - 1);
+	XAssert(shaderNameLength < countof(shaderNameW));
+	shaderNameW[shaderNameLength] = L'\0';
 
 	// Patch source code substituting bindings
 	String patchedSourceString;
@@ -347,6 +353,7 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipeli
 
 	// Build arguments list
 	{
+		dxcArgsList.pushBack(shaderNameW);
 		dxcArgsList.pushBack(L"-enable-16bit-types");
 
 		LPCWSTR dxcProfile = nullptr;
@@ -373,7 +380,7 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipeli
 
 	if (dxcErrorsBlob != nullptr && dxcErrorsBlob->GetStringLength() > 0)
 	{
-		OutputDebugStringA(dxcErrorsBlob->GetStringPointer());
+		TextWriteFmtStdOut(dxcErrorsBlob->GetStringPointer());
 	}
 
 	HRESULT hCompileStatus = E_FAIL;

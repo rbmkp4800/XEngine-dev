@@ -31,3 +31,14 @@ FileTextWriter& XLib::GetStdErrTextWriter()
 		StdErrWriter.initialize(File::GetStdErr());
 	return StdErrWriter;
 }
+
+uintptr XLib::TextConvertASCIIToWide(const char* asciText, wchar* resultWideText, uintptr lengthLimit)
+{
+	for (uintptr i = 0; i < lengthLimit; i++)
+	{
+		if (!asciText[i])
+			return i;
+		resultWideText[i] = wchar(asciText[i]); // T_T
+	}
+	return lengthLimit;
+}

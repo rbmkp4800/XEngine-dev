@@ -86,6 +86,8 @@ SourcesCacheEntry& SourcesCache::findOrCreateEntry(const char* localPath)
 {
 	XAssert(sourcesRootPath);
 
+	// TODO: Normalize path.
+	// TODO: Use lowercase for CRC computation.
 	const uintptr localPathLength = GetCStrLength(localPath);
 	const uint64 localPathCRC = CRC64::Compute(localPath, localPathLength);
 
