@@ -8,10 +8,10 @@
 
 #include <XEngine.Render.HAL.Common.h>
 
-#define XEAssert(cond)
-#define XEAssertUnreachableCode()
-#define XEMasterAssert(cond)
-#define XEMasterAssertUnreachableCode()
+#define XEAssert(cond) XAssert(cond)
+#define XEAssertUnreachableCode() XAssertUnreachableCode()
+#define XEMasterAssert(cond) XAssert(cond)
+#define XEMasterAssertUnreachableCode() XAssertUnreachableCode()
 
 struct ID3D12CommandAllocator;
 struct ID3D12CommandQueue;

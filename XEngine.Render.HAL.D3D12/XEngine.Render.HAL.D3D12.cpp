@@ -370,8 +370,8 @@ void CommandList::copyTexture(ResourceHandle dstTextureHandle, TextureSubresourc
 
 	const Device::Resource& dstTexture = device->getResourceByHandle(dstTextureHandle);
 	const Device::Resource& srcTexture = device->getResourceByHandle(srcTextureHandle);
-	XEAssert(dstTexture.type == ResourceType::Texture && dstBuffer.d3dResource);
-	XEAssert(srcTexture.type == ResourceType::Texture && srcBuffer.d3dResource);
+	XEAssert(dstTexture.type == ResourceType::Texture && dstTexture.d3dResource);
+	XEAssert(srcTexture.type == ResourceType::Texture && srcTexture.d3dResource);
 
 	D3D12_TEXTURE_COPY_LOCATION d3dDstLocation = {};
 	d3dDstLocation.pResource = dstTexture.d3dResource;
@@ -456,7 +456,7 @@ uint32 Device::CalculateTextureSubresourceIndex(const Resource& resource, const 
 	XEAssert(resource.type == ResourceType::Texture);
 	XEAssert(subresource.mipLevel < resource.texture.mipLevelCount);
 	XEAssert(imply(subresource.arraySlice > 0, resource.texture.type == TextureType::Texture2DArray));
-	XEAssert(subresource.arraySlice < resource.texture.depth);
+	XEAssert(subresource.arraySlice < resource.texture.size.z);
 
 	const TextureFormat format = resource.texture.format;
 	const bool hasStencil = (format == TextureFormat::D24S8 || format == TextureFormat::D32S8);
@@ -524,7 +524,7 @@ ResourceHandle Device::createBuffer(uint64 size, BufferMemoryType memoryType, Bu
 	XEMasterAssert(resourceIndex >= 0);
 
 	Resource& resource = resourcesTable[resourceIndex];
-	XEAssert(resource == ResourceType::Undefined);
+	XEAssert(resource.type == ResourceType::Undefined);
 	XEAssert(!resource.d3dResource);
 	resource.type = ResourceType::Buffer;
 	resource.internalOwnership = false;
@@ -552,7 +552,7 @@ ResourceHandle Device::createTexture(TextureType type, uint16x3 size,
 	XEMasterAssert(resourceIndex >= 0);
 
 	Resource& resource = resourcesTable[resourceIndex];
-	XEAssert(resource == ResourceType::Undefined);
+	XEAssert(resource.type == ResourceType::Undefined);
 	XEAssert(!resource.d3dResource);
 	resource.type = ResourceType::Texture;
 	resource.internalOwnership = false;
@@ -660,7 +660,7 @@ DescriptorAddress Device::allocateDescriptors(uint32 count)
 {
 	const uint32 startIndex = allocatedResourceDescriptorCount;
 	allocatedResourceDescriptorCount += count;
-	XEAssert(allocatedResourceDescriptorCount < ShaderVisibleSRVHeapSize);
+	XEAssert(allocatedResourceDescriptorCount < MaxResourceDescriptorCount);
 
 	return composeDescriptorAddress(startIndex);
 }
@@ -910,10 +910,10 @@ PipelineHandle Device::createComputePipeline(PipelineLayoutHandle pipelineLayout
 
 	const byte* objectDataBytes = (const byte*)computeShaderObjectData.data;
 
-	XEMasterAssert(bytecodeObjectData.size > sizeof(ComputePipelineBytecodeObjectHeader));
+	XEMasterAssert(computeShaderObjectData.size > sizeof(PipelineBytecodeObjectHeader));
 	const PipelineBytecodeObjectHeader& header = *(const PipelineBytecodeObjectHeader*)objectDataBytes;
 
-	XEMasterAssert(ValidateGenericObjectHeader(&header.generic, PipelineBytecodeObjectSignature, baseObjectData.size));
+	XEMasterAssert(ValidateGenericObjectHeader(&header.generic, PipelineBytecodeObjectSignature, computeShaderObjectData.size));
 	XEMasterAssert(header.pipelineLayoutSourceHash == pipelineLayout.sourceHash);
 
 	D3D12_SHADER_BYTECODE d3dCS = {};
@@ -1001,7 +1001,7 @@ SwapChainHandle Device::createSwapChain(uint16 width, uint16 height, void* hWnd)
 		XEMasterAssert(resourceIndex >= 0);
 
 		Resource& resource = resourcesTable[resourceIndex];
-		XEAssert(resource == ResourceType::Undefined);
+		XEAssert(resource.type == ResourceType::Undefined);
 		XEAssert(!resource.d3dResource);
 		resource.type = ResourceType::Texture;
 		resource.internalOwnership = true;
