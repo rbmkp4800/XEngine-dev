@@ -139,6 +139,7 @@
     <ClCompile Include="XEngine.Render.Device.GeometryHeap.cpp" />
     <ClCompile Include="XEngine.Render.Device.GPUDescriptorHeap.cpp" />
     <ClCompile Include="XEngine.Render.Device.Renderer.cpp" />
+    <ClCompile Include="XEngine.Render.Device.ShadersLoader.cpp" />
     <ClCompile Include="XEngine.Render.Device.TextureHeap.cpp" />
     <ClCompile Include="XEngine.Render.Device.UIResources.cpp" />
     <ClCompile Include="XEngine.Render.Device.Uploader.cpp" />
@@ -245,6 +246,9 @@
     </ProjectReference>
     <ProjectReference Include="..\XEngine.Render.HAL.D3D12\XEngine.Render.HAL.D3D12.vcxproj">
       <Project>{1ed495b0-b69b-4409-83fc-587f590eab29}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\XEngine.Render.Shaders.PackFormat\XEngine.Render.Shaders.PackFormat.vcxproj">
+      <Project>{e41c3648-b10a-4c33-a052-d98f8ed51ab0}</Project>
     </ProjectReference>
     <ProjectReference Include="..\XLib\XLib.vcxproj">
       <Project>{df81a513-72e3-4b74-b866-97f3bb61d45f}</Project>

@@ -29,6 +29,7 @@ Device::Device() :
 	textureHeap(*this),
 	materialHeap(*this),
 	geometryHeap(*this),
+	shadersLoader(*this),
 	renderer(*this),
 	uploader(*this)
 { }

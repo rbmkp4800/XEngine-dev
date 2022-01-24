@@ -2,6 +2,8 @@
 
 #include <XLib.h>
 
+// TODO: Describe format properly.
+
 namespace XEngine::Render::Shaders::PackFormat
 {
 	static constexpr uint32 PackSignature = 0;

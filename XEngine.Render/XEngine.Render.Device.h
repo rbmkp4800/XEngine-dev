@@ -5,6 +5,8 @@
 #include <XLib.Platform.COMPtr.h>
 #include <XLib.Color.h>
 
+#include <XEngine.Render.HAL.D3D12.h>
+
 #include "XEngine.Render.Base.h"
 #include "XEngine.Render.Device.BufferHeap.h"
 #include "XEngine.Render.Device.GeometryHeap.h"
@@ -37,6 +39,7 @@ namespace XEngine::Render
 		friend Device_::MaterialHeap;
 		friend Device_::GeometryHeap;
 
+		friend Device_::ShadersLoader;
 		friend Device_::Renderer;
 		friend Device_::Uploader;
 
@@ -46,6 +49,8 @@ namespace XEngine::Render
 		friend CustomDrawBatch;
 
 	private:
+		HAL::Device halDevice;
+
 		static XLib::Platform::COMPtr<IDXGIFactory5> dxgiFactory;
 
 		XLib::Platform::COMPtr<ID3D12Device2> d3dDevice;

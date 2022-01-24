@@ -43,6 +43,7 @@
     <ClCompile Include="XEngine.Render.Scene.cpp" />
     <ClCompile Include="XEngine.Render.Target.cpp" />
     <ClCompile Include="XEngine.Render.CustomDrawBatch.cpp" />
+    <ClCompile Include="XEngine.Render.Device.ShadersLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\BloomBlurHorizontalPS.hlsl">

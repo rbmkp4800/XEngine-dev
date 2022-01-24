@@ -1,25 +1,44 @@
 #pragma once
 
 #include <XLib.h>
+#include <XLib.Containers.ArrayList.h>
 
 #include <XEngine.Render.HAL.D3D12.h>
 
+// NOTE: This is temporary implementation.
+
+namespace XEngine::Render { class Device; }
+
 namespace XEngine::Render::Device_
 {
-	class ShadersLoader
+	class ShadersLoader : public XLib::NonCopyable
 	{
 	private:
+		struct PipelineLayout
+		{
+			uint64 nameCRC;
+			HAL::PipelineLayoutHandle halPipelineLayoutHandle;
+		};
+
+		struct Pipeline
+		{
+			uint64 nameCRC;
+			HAL::PipelineHandle halPipelineHandle;
+		};
+
+	private:
+		Device& device;
+
+		XLib::ArrayList<PipelineLayout> pipelineLayoutsList;
+		XLib::ArrayList<Pipeline> pipelinesList;
 
 	public:
-		using PipelineToken = uint32;
-
-	public:
-		ShadersLoader() = default;
+		ShadersLoader(Device& device) : device(device) {}
 		~ShadersLoader() = default;
 
-		PipelineToken registerPipeline(uint64 nameCRC);
-		void unregisterPipeline(PipelineToken token);
+		void load(const char* packPath);
 
-		HAL::PipelineHandle& acquirePipeline(PipelineToken token);
+		HAL::PipelineHandle getPipeline(uint64 pipelineNameCRC) const ;
+		HAL::PipelineLayoutHandle getPipelineLayout(uint64 pipelineLayoutNameCRC) const;
 	};
 }

@@ -11,7 +11,7 @@ namespace XLib
 		static constexpr uint32 StorageSizeU64s = divRoundUp<uint32>(BitCount, 64);
 
 	public:
-		inline BitSet();
+		inline BitSet() {}
 		~BitSet() = default;
 
 		inline void clear();
