@@ -45,6 +45,9 @@ namespace XEngine::Render::HAL
 	static constexpr RenderTargetViewHandle ZeroRenderTargetViewHandle = RenderTargetViewHandle(0);
 	static constexpr DepthStencilViewHandle ZeroDepthStencilViewHandle = DepthStencilViewHandle(0);
 	static constexpr PipelineLayoutHandle ZeroPipelineLayoutHandle = PipelineLayoutHandle(0);
+	static constexpr PipelineHandle ZeroPipelineHandle = PipelineHandle(0);
+	static constexpr FenceHandle ZeroFenceHandle = FenceHandle(0);
+	static constexpr SwapChainHandle ZeroSwapChainHandle = SwapChainHandle(0);
 
 	enum class ResourceType : uint8
 	{

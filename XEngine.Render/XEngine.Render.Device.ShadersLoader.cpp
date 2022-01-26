@@ -123,3 +123,13 @@ void ShadersLoader::load(const char* packPath)
 
 	SystemHeapAllocator::Release(packData);
 }
+
+HAL::PipelineLayoutHandle ShadersLoader::getPipelineLayout(uint64 pipelineLayoutNameCRC) const
+{
+	return HAL::ZeroPipelineLayoutHandle;
+}
+
+HAL::PipelineHandle ShadersLoader::getPipeline(uint64 pipelineNameCRC) const
+{
+	return HAL::ZeroPipelineHandle;
+}

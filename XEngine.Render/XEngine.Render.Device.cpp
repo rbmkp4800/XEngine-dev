@@ -89,7 +89,7 @@ bool Device::initialize()
 	//materialHeap.initialize();
 	//geometryHeap.initialize();
 
-	//shadersLoader.initialize();
+	//shadersLoader.load("..\\Build\\shaderpack");
 	//psoBuilder.initialize();
 	renderer.initialize();
 	uploader.initialize();

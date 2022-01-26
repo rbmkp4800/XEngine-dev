@@ -38,7 +38,7 @@ namespace XEngine::Render::Device_
 
 		void load(const char* packPath);
 
-		HAL::PipelineHandle getPipeline(uint64 pipelineNameCRC) const ;
 		HAL::PipelineLayoutHandle getPipelineLayout(uint64 pipelineLayoutNameCRC) const;
+		HAL::PipelineHandle getPipeline(uint64 pipelineNameCRC) const;
 	};
 }
