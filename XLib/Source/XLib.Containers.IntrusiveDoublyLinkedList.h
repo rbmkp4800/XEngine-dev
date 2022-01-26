@@ -2,6 +2,8 @@
 
 #include "XLib.h"
 
+// TODO: Refactor this.
+
 #define XLib_hookPrev(item)	( (Item*&) ( ((item)->*hook).prev ) )
 #define XLib_hookNext(item)	( (Item*&) ( ((item)->*hook).next ) )
 

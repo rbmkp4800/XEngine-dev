@@ -20,7 +20,7 @@
     <ClInclude Include="Source\XLib.Algorithm.QuickSort.h" />
     <ClInclude Include="Source\XLib.Containers.ArrayList.h" />
     <ClInclude Include="Source\XLib.Containers.BinaryHeap.h" />
-    <ClInclude Include="Source\XLib.Containers.BitSet.h" />
+    <ClInclude Include="Source\XLib.Containers.BitArray.h" />
     <ClInclude Include="Source\XLib.Containers.CyclicQueue.h" />
     <ClInclude Include="Source\XLib.Containers.FlatHashMap.h" />
     <ClInclude Include="Source\XLib.Containers.IntrusiveBinaryTree.h" />

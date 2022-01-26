@@ -46,7 +46,7 @@ namespace XLib
 }
 
 // Node adapter template:
-// 
+//
 //	class MyNodeAdater
 //	{
 //	private:

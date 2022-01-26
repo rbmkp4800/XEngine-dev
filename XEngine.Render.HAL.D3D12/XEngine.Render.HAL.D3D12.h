@@ -4,7 +4,7 @@
 #include <XLib.Vectors.h>
 #include <XLib.NonCopyable.h>
 #include <XLib.Platform.COMPtr.h>
-#include <XLib.Containers.BitSet.h>
+#include <XLib.Containers.BitArray.h>
 
 #include <XEngine.Render.HAL.Common.h>
 
@@ -380,14 +380,14 @@ namespace XEngine::Render::HAL
 		Fence* fencesTable = nullptr;
 		SwapChain* swapChainsTable = nullptr;
 
-		XLib::BitSet<MaxResourceCount> resourcesTableAllocationMask;
-		XLib::BitSet<MaxShaderResourceViewCount> shaderResourceViewsTableAllocationMask;
-		XLib::BitSet<MaxRenderTargetViewCount> renderTargetViewsTableAllocationMask;
-		XLib::BitSet<MaxDepthStencilViewCount> depthStencilViewsTableAllocationMask;
-		XLib::BitSet<MaxPipelineLayoutCount> pipelineLayoutsTableAllocationMask;
-		XLib::BitSet<MaxPipelineCount> pipelinesTableAllocationMask;
-		XLib::BitSet<MaxFenceCount> fencesTableAllocationMask;
-		XLib::BitSet<MaxSwapChainCount> swapChainsTableAllocationMask;
+		XLib::InplaceBitArray<MaxResourceCount> resourcesTableAllocationMask;
+		XLib::InplaceBitArray<MaxShaderResourceViewCount> shaderResourceViewsTableAllocationMask;
+		XLib::InplaceBitArray<MaxRenderTargetViewCount> renderTargetViewsTableAllocationMask;
+		XLib::InplaceBitArray<MaxDepthStencilViewCount> depthStencilViewsTableAllocationMask;
+		XLib::InplaceBitArray<MaxPipelineLayoutCount> pipelineLayoutsTableAllocationMask;
+		XLib::InplaceBitArray<MaxPipelineCount> pipelinesTableAllocationMask;
+		XLib::InplaceBitArray<MaxFenceCount> fencesTableAllocationMask;
+		XLib::InplaceBitArray<MaxSwapChainCount> swapChainsTableAllocationMask;
 		uint32 allocatedResourceDescriptorCount = 0;
 
 		uint64 referenceSRVHeapStartPtr = 0;
