@@ -404,35 +404,35 @@ namespace XEngine::Render::HAL
 		uint16 dsvDescriptorSize = 0;
 
 	private:
-		inline ResourceHandle composeResourceHandle(uint32 resourceIndex) const;
-		inline ShaderResourceViewHandle composeShaderResourceViewHandle(uint32 resourceViewIndex) const;
-		inline RenderTargetViewHandle composeRenderTargetViewHandle(uint32 renderTargetIndex) const;
-		inline DepthStencilViewHandle composeDepthStencilViewHandle(uint32 depthStencilIndex) const;
-		inline FenceHandle composeFenceHandle(uint32 fenceIndex) const;
-		inline PipelineLayoutHandle composePipelineLayoutHandle(uint32 pipelineLayoutIndex) const;
-		inline PipelineHandle composePipelineHandle(uint32 pipelineIndex) const;
-		inline SwapChainHandle composeSwapChainHandle(uint32 swapChainIndex) const;
+		ResourceHandle composeResourceHandle(uint32 resourceIndex) const;
+		ShaderResourceViewHandle composeShaderResourceViewHandle(uint32 resourceViewIndex) const;
+		RenderTargetViewHandle composeRenderTargetViewHandle(uint32 renderTargetIndex) const;
+		DepthStencilViewHandle composeDepthStencilViewHandle(uint32 depthStencilIndex) const;
+		FenceHandle composeFenceHandle(uint32 fenceIndex) const;
+		PipelineLayoutHandle composePipelineLayoutHandle(uint32 pipelineLayoutIndex) const;
+		PipelineHandle composePipelineHandle(uint32 pipelineIndex) const;
+		SwapChainHandle composeSwapChainHandle(uint32 swapChainIndex) const;
 
-		inline uint32 resolveResourceHandle(ResourceHandle handle) const;
-		inline uint32 resolveShaderResourceViewHandle(ShaderResourceViewHandle handle) const;
-		inline uint32 resolveRenderTargetViewHandle(RenderTargetViewHandle handle) const;
-		inline uint32 resolveDepthStencilViewHandle(DepthStencilViewHandle handle) const;
-		inline uint32 resolvePipelineLayoutHandle(PipelineLayoutHandle handle) const;
-		inline uint32 resolvePipelineHandle(PipelineHandle handle) const;
-		inline uint32 resolveFenceHandle(FenceHandle handle) const;
-		inline uint32 resolveSwapChainHandle(SwapChainHandle handle) const;
+		uint32 resolveResourceHandle(ResourceHandle handle) const;
+		uint32 resolveShaderResourceViewHandle(ShaderResourceViewHandle handle) const;
+		uint32 resolveRenderTargetViewHandle(RenderTargetViewHandle handle) const;
+		uint32 resolveDepthStencilViewHandle(DepthStencilViewHandle handle) const;
+		uint32 resolvePipelineLayoutHandle(PipelineLayoutHandle handle) const;
+		uint32 resolveFenceHandle(FenceHandle handle) const;
+		uint32 resolvePipelineHandle(PipelineHandle handle) const;
+		uint32 resolveSwapChainHandle(SwapChainHandle handle) const;
 
-		inline DescriptorAddress composeDescriptorAddress(uint32 srvHeapDescriptorIndex) const;
-		inline uint32 resolveDescriptorAddress(DescriptorAddress address) const;
+		DescriptorAddress composeDescriptorAddress(uint32 srvHeapDescriptorIndex) const { return DescriptorAddress(srvHeapDescriptorIndex); }
+		uint32 resolveDescriptorAddress(DescriptorAddress address) const { return uint32(address); }
 
-		inline Resource& getResourceByHandle(ResourceHandle handle);
-		inline ShaderResourceView& getShaderResourceViewByHandle(ShaderResourceViewHandle handle);
-		inline PipelineLayout& getPipelineLayoutByHandle(PipelineLayoutHandle handle);
-		inline Pipeline& getPipelineByHandle(PipelineHandle handle);
-		inline Fence& getFenceByHandle(FenceHandle handle);
-		inline const Fence& getFenceByHandle(FenceHandle handle) const;
-		inline SwapChain& getSwapChainByHandle(SwapChainHandle handle);
-		inline const SwapChain& getSwapChainByHandle(SwapChainHandle handle) const;
+		Resource& getResourceByHandle(ResourceHandle handle);
+		ShaderResourceView& getShaderResourceViewByHandle(ShaderResourceViewHandle handle);
+		PipelineLayout& getPipelineLayoutByHandle(PipelineLayoutHandle handle);
+		Pipeline& getPipelineByHandle(PipelineHandle handle);
+		Fence& getFenceByHandle(FenceHandle handle);
+		const Fence& getFenceByHandle(FenceHandle handle) const;
+		SwapChain& getSwapChainByHandle(SwapChainHandle handle);
+		const SwapChain& getSwapChainByHandle(SwapChainHandle handle) const;
 
 	private:
 		static uint32 CalculateTextureSubresourceIndex(const Resource& resource, const TextureSubresource& subresource);
@@ -516,15 +516,4 @@ namespace XEngine::Render::HAL
 	public:
 		static void CreateDevice(Device& device);
 	};
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Definition //////////////////////////////////////////////////////////////////////////////////////
-
-namespace XEngine::Render::HAL
-{
-	inline ResourceHandle Device::composeResourceHandle(uint32 resourceIndex) const
-	{
-		XEAssert(resourceIndex < MaxResourceCount);
-	}
 }

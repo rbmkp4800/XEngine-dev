@@ -1085,3 +1085,145 @@ void Host::CreateDevice(Device& device)
 {
 
 }
+
+
+// Handles /////////////////////////////////////////////////////////////////////////////////////////
+
+ResourceHandle Device::composeResourceHandle(uint32 resourceIndex) const
+{
+	XEAssert(resourceIndex < MaxResourceCount);
+	const uint32 generation = resourcesTable[resourceIndex].handleGeneration;
+	return ResourceHandle((generation << 24) | resourceIndex);
+}
+
+ShaderResourceViewHandle Device::composeShaderResourceViewHandle(uint32 resourceViewIndex) const
+{
+	XEAssert(resourceViewIndex < MaxShaderResourceViewCount);
+	const uint32 generation = shaderResourceViewsTable[resourceViewIndex].handleGeneration;
+	return ShaderResourceViewHandle((generation << 24) | resourceViewIndex);
+}
+
+RenderTargetViewHandle Device::composeRenderTargetViewHandle(uint32 renderTargetViewIndex) const
+{
+	XEAssert(renderTargetViewIndex < MaxRenderTargetViewCount);
+	const uint32 generation = 0; // renderTargetViewsTable[renderTargetViewIndex].handleGeneration;
+	return RenderTargetViewHandle((generation << 24) | renderTargetViewIndex);
+}
+
+DepthStencilViewHandle Device::composeDepthStencilViewHandle(uint32 depthStencilViewIndex) const
+{
+	XEAssert(depthStencilViewIndex < MaxDepthStencilViewCount);
+	const uint32 generation = 0; // depthStencilViewsTable[depthStencilViewIndex].handleGeneration;
+	return DepthStencilViewHandle((generation << 24) | depthStencilViewIndex);
+}
+
+FenceHandle Device::composeFenceHandle(uint32 fenceIndex) const
+{
+	XEAssert(fenceIndex < MaxFenceCount);
+	const uint32 generation = 0; // fencesTable[fenceIndex].handleGeneration;
+	return FenceHandle((generation << 24) | fenceIndex);
+}
+
+PipelineLayoutHandle Device::composePipelineLayoutHandle(uint32 pipelineLayoutIndex) const
+{
+	XEAssert(pipelineLayoutIndex < MaxPipelineLayoutCount);
+	const uint32 generation = pipelineLayoutsTable[pipelineLayoutIndex].handleGeneration;
+	return PipelineLayoutHandle((generation << 24) | pipelineLayoutIndex);
+}
+
+PipelineHandle Device::composePipelineHandle(uint32 pipelineIndex) const
+{
+	XEAssert(pipelineIndex < MaxPipelineCount);
+	const uint32 generation = pipelinesTable[pipelineIndex].handleGeneration;
+	return PipelineHandle((generation << 24) | pipelineIndex);
+}
+
+SwapChainHandle Device::composeSwapChainHandle(uint32 swapChainIndex) const
+{
+	XEAssert(swapChainIndex < MaxSwapChainCount);
+	const uint32 generation = 0; // swapChainsTable[swapChainIndex].handleGeneration;
+	return SwapChainHandle((generation << 24) | swapChainIndex);
+}
+
+
+uint32 Device::resolveResourceHandle(ResourceHandle handle) const
+{
+	const uint32 resourceIndex = uint32(handle) & 0xFF'FF'FF;
+	XEAssert(resourceIndex < MaxResourceCount);
+	const uint8 generation = uint8(resourceIndex >> 24);
+	XAssert(generation == resourcesTable[resourceIndex].handleGeneration);
+	return resourceIndex;
+}
+
+uint32 Device::resolveShaderResourceViewHandle(ShaderResourceViewHandle handle) const
+{
+	const uint32 shaderResourceViewIndex = uint32(handle) & 0xFF'FF'FF;
+	XEAssert(shaderResourceViewIndex < MaxShaderResourceViewCount);
+	const uint8 generation = uint8(shaderResourceViewIndex >> 24);
+	XAssert(generation == shaderResourceViewsTable[shaderResourceViewIndex].handleGeneration);
+	return shaderResourceViewIndex;
+}
+
+uint32 Device::resolveRenderTargetViewHandle(RenderTargetViewHandle handle) const
+{
+	const uint32 renderTargetViewIndex = uint32(handle) & 0xFF'FF'FF;
+	XEAssert(renderTargetViewIndex < MaxRenderTargetViewCount);
+	//const uint8 generation = uint8(renderTargetViewIndex >> 24);
+	//XAssert(generation == renderTargetViewsTable[renderTargetViewIndex].handleGeneration);
+	return renderTargetViewIndex;
+}
+
+uint32 Device::resolveDepthStencilViewHandle(DepthStencilViewHandle handle) const
+{
+	const uint32 depthStencilViewIndex = uint32(handle) & 0xFF'FF'FF;
+	XEAssert(depthStencilViewIndex < MaxDepthStencilViewCount);
+	//const uint8 generation = uint8(depthStencilViewIndex >> 24);
+	//XAssert(generation == depthStencilViewsTable[depthStencilViewIndex].handleGeneration);
+	return depthStencilViewIndex;
+}
+
+uint32 Device::resolveFenceHandle(FenceHandle handle) const
+{
+	const uint32 fenceIndex = uint32(handle) & 0xFF'FF'FF;
+	XEAssert(fenceIndex < MaxFenceCount);
+	//const uint8 generation = uint8(fenceIndex >> 24);
+	//XAssert(generation == fencesTable[fenceIndex].handleGeneration);
+	return fenceIndex;
+}
+
+uint32 Device::resolvePipelineLayoutHandle(PipelineLayoutHandle handle) const
+{
+	const uint32 pipelineLayoutIndex = uint32(handle) & 0xFF'FF'FF;
+	XEAssert(pipelineLayoutIndex < MaxPipelineLayoutCount);
+	const uint8 generation = uint8(pipelineLayoutIndex >> 24);
+	XAssert(generation == pipelineLayoutsTable[pipelineLayoutIndex].handleGeneration);
+	return pipelineLayoutIndex;
+}
+
+uint32 Device::resolvePipelineHandle(PipelineHandle handle) const
+{
+	const uint32 pipelineIndex = uint32(handle) & 0xFF'FF'FF;
+	XEAssert(pipelineIndex < MaxPipelineCount);
+	const uint8 generation = uint8(pipelineIndex >> 24);
+	XAssert(generation == pipelinesTable[pipelineIndex].handleGeneration);
+	return pipelineIndex;
+}
+
+uint32 Device::resolveSwapChainHandle(SwapChainHandle handle) const
+{
+	const uint32 swapChainIndex = uint32(handle) & 0xFF'FF'FF;
+	XEAssert(swapChainIndex < MaxSwapChainCount);
+	//const uint8 generation = uint8(swapChainIndex >> 24);
+	//XAssert(generation == swapChainsTable[swapChainIndex].handleGeneration);
+	return swapChainIndex;
+}
+
+
+auto Device::getResourceByHandle(ResourceHandle handle) -> Resource& { return resourcesTable[resolveResourceHandle(handle)]; }
+auto Device::getShaderResourceViewByHandle(ShaderResourceViewHandle handle) -> ShaderResourceView& { return shaderResourceViewsTable[resolveShaderResourceViewHandle(handle)]; }
+auto Device::getPipelineLayoutByHandle(PipelineLayoutHandle handle) -> PipelineLayout& { return pipelineLayoutsTable[resolvePipelineLayoutHandle(handle)]; }
+auto Device::getPipelineByHandle(PipelineHandle handle) -> Pipeline& { return pipelinesTable[resolvePipelineHandle(handle)]; }
+auto Device::getFenceByHandle(FenceHandle handle) -> Fence& { return fencesTable[resolveFenceHandle(handle)]; }
+auto Device::getFenceByHandle(FenceHandle handle) const -> const Fence& { return fencesTable[resolveFenceHandle(handle)]; }
+auto Device::getSwapChainByHandle(SwapChainHandle handle) -> SwapChain& { return swapChainsTable[resolveSwapChainHandle(handle)]; }
+auto Device::getSwapChainByHandle(SwapChainHandle handle) const -> const SwapChain& { return swapChainsTable[resolveSwapChainHandle(handle)]; }
