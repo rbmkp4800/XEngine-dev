@@ -41,7 +41,7 @@ namespace XLib
 		MemoryTextWriter() = default;
 		~MemoryTextWriter() = default;
 
-		inline MemoryTextWriter(char* buffer, uintptr bufferSize) : buffer(buffer), bufferSize(bufferSize) {}
+		inline MemoryTextWriter(char* buffer, uint32 bufferSize) : buffer(buffer), bufferSize(bufferSize) {}
 
 		inline bool canPutChar() const { return length + 1 < bufferSize; }
 		inline bool putChar(char c);
