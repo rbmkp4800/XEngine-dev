@@ -78,7 +78,7 @@ void ShadersLoader::load(const char* packPath)
 		const PipelineRecord& pipelineRecord = pipelineRecords[pipelineIndex];
 		Pipeline& pipeline = pipelinesList[pipelineIndex];
 
-		XAssert(pipelineRecord.pipelineLayoutIndex < pipelineLayoutsList.getSize());
+		XEMasterAssert(pipelineRecord.pipelineLayoutIndex < pipelineLayoutsList.getSize());
 		const PipelineLayout& pipelineLayout = pipelineLayoutsList[pipelineRecord.pipelineLayoutIndex];
 
 		if (pipelineRecord.isGraphics)
@@ -92,7 +92,27 @@ void ShadersLoader::load(const char* packPath)
 			HAL::ObjectDataView bytecodeObjects[HAL::MaxGraphicsPipelineBytecodeObjectCount] = {};
 			uint8 bytecodeObjectCount = 0;
 
-			// TODO: Fill bytecode objects.
+			// Fill `bytecodeObjects`.
+			bool invalidBytecodeObjectIndexReached = false;
+			for (uint8 i = 0; i < countof(pipelineRecord.bytecodeObjectsIndices); i++)
+			{
+				const uint16 bytecodeObjectIndex = pipelineRecord.bytecodeObjectsIndices[i];
+				if (bytecodeObjectIndex == uint16(-1))
+				{
+					invalidBytecodeObjectIndexReached = true;
+					continue;
+				}
+
+				XEMasterAssert(!invalidBytecodeObjectIndexReached);
+				XEMasterAssert(i < HAL::MaxGraphicsPipelineBytecodeObjectCount);
+				XEMasterAssert(bytecodeObjectIndex < packHeader.bytecodeObjectCount);
+				const ObjectRecord& bytecodeObjectRecord = bytecodeObjectRecords[bytecodeObjectIndex];
+				bytecodeObjects[i].data = objectsDataBegin + bytecodeObjectRecord.offset;
+				bytecodeObjects[i].size = bytecodeObjectRecord.size;
+				bytecodeObjectCount++;
+			}
+
+			XEMasterAssert(bytecodeObjectCount > 0);
 
 			pipeline.halPipelineHandle = device.halDevice.createGraphicsPipeline(
 				pipelineLayout.halPipelineLayoutHandle,
@@ -104,6 +124,7 @@ void ShadersLoader::load(const char* packPath)
 			// TODO: Asserts everywhere.
 			// TODO: Check that all bytecode object indicies after first are invalid.
 			const uint16 computeShaderBytecodeObjectIndex = pipelineRecord.bytecodeObjectsIndices[0];
+			XEMasterAssert(computeShaderBytecodeObjectIndex < packHeader.bytecodeObjectCount);
 			const ObjectRecord& computeShaderBytecodeObjectRecord = bytecodeObjectRecords[computeShaderBytecodeObjectIndex];
 
 			HAL::ObjectDataView computeShaderBytecodeObject = {};
