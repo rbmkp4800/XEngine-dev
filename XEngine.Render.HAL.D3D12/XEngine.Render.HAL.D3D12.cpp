@@ -11,6 +11,9 @@
 
 #include "XEngine.Render.HAL.D3D12.Translation.h"
 
+extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = 700; }
+extern "C" { __declspec(dllexport) extern const char* D3D12SDKPath = ".\\D3D12\\"; }
+
 using namespace XLib;
 using namespace XLib::Platform;
 using namespace XEngine::Render::HAL;
@@ -1154,7 +1157,7 @@ void Host::CreateDevice(Device& device)
 	ID3D12Device8* d3dDevice = nullptr;
 
 	// TODO: D3D_FEATURE_LEVEL_12_2
-	D3D12CreateDevice(dxgiAdapter, D3D_FEATURE_LEVEL_12_1, IID_PPV_ARGS(&d3dDevice));
+	D3D12CreateDevice(dxgiAdapter, D3D_FEATURE_LEVEL_12_2, IID_PPV_ARGS(&d3dDevice));
 
 	device.initialize(d3dDevice);
 

@@ -67,6 +67,11 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy $(SolutionDir)External\Microsoft.Direct3D.D3D12\bin\$(Platform)\*.dll $(OutDir)D3D12\
+xcopy $(SolutionDir)External\Microsoft.Direct3D.D3D12\bin\$(Platform)\*.pdb $(OutDir)D3D12\</Command>
+      <Message>Copying D3D12 DLLs to output directory</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -84,6 +89,11 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy $(SolutionDir)External\Microsoft.Direct3D.D3D12\bin\$(Platform)\*.dll $(OutDir)D3D12\
+xcopy $(SolutionDir)External\Microsoft.Direct3D.D3D12\bin\$(Platform)\*.pdb $(OutDir)D3D12\</Command>
+      <Message>Copying D3D12 DLLs to output directory</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ProjectReference Include="..\XEngine.Core\XEngine.Core.vcxproj">

@@ -71,8 +71,9 @@
       <AdditionalDependencies>dxcompiler.lib;d3d12.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>copy $(ProjectDir)..\External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\dxcompiler.dll $(OutDir)</Command>
-      <Message>Copying dxcompiler.dll to output directory</Message>
+      <Command>copy $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.dll $(OutDir)
+copy $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.pdb $(OutDir)</Command>
+      <Message>Copying DXC DLLs to output directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -95,8 +96,9 @@
       <AdditionalDependencies>d3d12.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>copy $(ProjectDir)..\External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\dxcompiler.dll $(OutDir)</Command>
-      <Message>Copying dxcompiler.dll to output directory</Message>
+      <Command>copy $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.dll $(OutDir)
+copy $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.pdb $(OutDir)</Command>
+      <Message>Copying DXC DLLs to output directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
