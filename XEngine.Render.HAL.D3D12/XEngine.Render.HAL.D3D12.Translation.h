@@ -1,7 +1,7 @@
 #pragma once
 
 // NOTE: This file should not be included directly by HAL users.
-// Assumes that d3d12 and dxgi is included above.
+// Assumes that d3d12 and dxgi are included above.
 
 namespace XEngine::Render::HAL
 {
@@ -15,6 +15,7 @@ namespace XEngine::Render::HAL
 		}
 
 		XEMasterAssertUnreachableCode();
+		return D3D12_HEAP_TYPE_DEFAULT;
 	}
 
 	inline DXGI_FORMAT TranslateTextureFormatToDXGIFormat(TextureFormat format)
@@ -39,6 +40,7 @@ namespace XEngine::Render::HAL
 		}
 
 		XEMasterAssertUnreachableCode();
+		return DXGI_FORMAT_UNKNOWN;
 	}
 
 	inline DXGI_FORMAT TranslateTexelViewFormatToDXGIFormat(TexelViewFormat format)
@@ -61,6 +63,7 @@ namespace XEngine::Render::HAL
 		}
 
 		XEMasterAssertUnreachableCode();
+		return DXGI_FORMAT_UNKNOWN;
 	}
 
 	inline DXGI_FORMAT TranslateDepthStencilFormatToDXGIFormat(DepthStencilFormat format)
@@ -75,6 +78,7 @@ namespace XEngine::Render::HAL
 		}
 
 		XEMasterAssertUnreachableCode();
+		return DXGI_FORMAT_UNKNOWN;
 	}
 
 	inline D3D12_RESOURCE_STATES TranslateResourceStateToD3D12ResourceState(ResourceState state)

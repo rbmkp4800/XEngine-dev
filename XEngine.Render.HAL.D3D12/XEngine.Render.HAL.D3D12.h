@@ -16,9 +16,8 @@
 struct ID3D12CommandAllocator;
 struct ID3D12CommandQueue;
 struct ID3D12DescriptorHeap;
-struct ID3D12Device2;
 struct ID3D12GraphicsCommandList;
-struct IDXGIAdapter4;
+struct ID3D12Device8;
 
 namespace XEngine::Render::HAL
 {
@@ -367,7 +366,7 @@ namespace XEngine::Render::HAL
 		struct SwapChain;
 
 	private:
-		XLib::Platform::COMPtr<ID3D12Device2> d3dDevice;
+		XLib::Platform::COMPtr<ID3D12Device8> d3dDevice;
 		XLib::Platform::COMPtr<ID3D12DescriptorHeap> d3dReferenceSRVHeap;
 		XLib::Platform::COMPtr<ID3D12DescriptorHeap> d3dShaderVisbileSRVHeap;
 		XLib::Platform::COMPtr<ID3D12DescriptorHeap> d3dRTVHeap;
@@ -438,7 +437,7 @@ namespace XEngine::Render::HAL
 		static uint32 CalculateTextureSubresourceIndex(const Resource& resource, const TextureSubresource& subresource);
 
 	private:
-		void initialize(IDXGIAdapter4* dxgiAdapter);
+		void initialize(ID3D12Device8* d3dDevice);
 
 	public:
 		Device() = default;

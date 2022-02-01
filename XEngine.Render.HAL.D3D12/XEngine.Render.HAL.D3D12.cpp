@@ -3,6 +3,7 @@
 #include "D3D12Helpers.h"
 
 #include <XLib.ByteStream.h>
+#include <XLib.SystemHeapAllocator.h>
 
 #include <XEngine.Render.HAL.ObjectFormat.h>
 
@@ -10,18 +11,24 @@
 
 #include "XEngine.Render.HAL.D3D12.Translation.h"
 
+using namespace XLib;
 using namespace XLib::Platform;
 using namespace XEngine::Render::HAL;
 //using namespace XEngine::Render::HAL::Internal;
 
 static COMPtr<IDXGIFactory7> dxgiFactory;
+static COMPtr<ID3D12Debug3> d3dDebug;
 
 static inline bool ValidateGenericObjectHeader(const ObjectFormat::GenericObjectHeader* header,
 	uint64 signature, uint32 objectSize)
 {
-	XEMasterAssert(header->signature == signature);
-	XEMasterAssert(header->objectSize == objectSize);
+	if (header->signature != signature)
+		return false;
+	if (header->objectSize != objectSize)
+		return false;
 	// TODO: Check object CRC
+
+	return true;
 }
 
 //struct XEngine::Render::HAL::Internal::PipelineBindPointsLUTEntry
@@ -258,7 +265,7 @@ void CommandList::bindConstants(uint32 bindPointNameCRC,
 		}
 	}
 
-	XAssert(bindPointRecord);
+	XEAssert(bindPointRecord);
 
 	//const PipelineBindPointsLUTEntry bindPointsLUTEntry = lookupBindPointsLUT(bindPointNameCRC);
 	//XEAssert(bindPointsLUTEntry.getType() == PipelineBindPointType::Constants);
@@ -473,11 +480,10 @@ uint32 Device::CalculateTextureSubresourceIndex(const Resource& resource, const 
 	return subresource.mipLevel + (subresource.arraySlice * mipLevelCount) + (planeIndex * mipLevelCount * arraySize);
 }
 
-void Device::initialize(IDXGIAdapter4* dxgiAdapter)
+void Device::initialize(ID3D12Device8* _d3dDevice)
 {
 	XEMasterAssert(!d3dDevice);
-
-	D3D12CreateDevice(dxgiAdapter, D3D_FEATURE_LEVEL_12_1, d3dDevice.uuid(), d3dDevice.voidInitRef());
+	d3dDevice = _d3dDevice;
 
 	const D3D12_DESCRIPTOR_HEAP_DESC d3dReferenceSRVHeapDesc =
 		D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, MaxShaderResourceViewCount);
@@ -496,6 +502,31 @@ void Device::initialize(IDXGIAdapter4* dxgiAdapter)
 
 	const D3D12_COMMAND_QUEUE_DESC d3dGraphicsQueueDesc = D3D12Helpers::CommandQueueDesc(D3D12_COMMAND_LIST_TYPE_DIRECT);
 	d3dDevice->CreateCommandQueue(&d3dGraphicsQueueDesc, d3dGraphicsQueue.uuid(), d3dGraphicsQueue.voidInitRef());
+
+	// Allocate device resources tables.
+	{
+		// TODO: Take into account alignments.
+		const uintptr memoryBlockSize =
+			sizeof(Resource) * MaxResourceCount +
+			sizeof(ShaderResourceView) * MaxShaderResourceViewCount +
+			sizeof(PipelineLayout) * MaxPipelineLayoutCount +
+			sizeof(Pipeline) * MaxPipelineCount +
+			sizeof(Fence) * MaxFenceCount +
+			sizeof(SwapChain) * MaxSwapChainCount;
+
+		// TODO: Handle this memory block in proper way.
+		void* memoryBlock = SystemHeapAllocator::Allocate(memoryBlockSize);
+		memorySet(memoryBlock, 0, memoryBlockSize);
+
+		resourcesTable = (Resource*)memoryBlock;
+		shaderResourceViewsTable = (ShaderResourceView*)(resourcesTable + MaxResourceCount);
+		pipelineLayoutsTable = (PipelineLayout*)(shaderResourceViewsTable + MaxShaderResourceViewCount);
+		pipelinesTable = (Pipeline*)(pipelineLayoutsTable + MaxPipelineLayoutCount);
+		fencesTable = (Fence*)(pipelinesTable + MaxPipelineCount);
+		swapChainsTable = (SwapChain*)(fencesTable + MaxFenceCount);
+
+		XEAssert(uintptr(swapChainsTable + MaxSwapChainCount) - uintptr(memoryBlock) == memoryBlockSize);
+	}
 
 	resourcesTableAllocationMask.clear();
 	shaderResourceViewsTableAllocationMask.clear();
@@ -717,8 +748,9 @@ PipelineLayoutHandle Device::createPipelineLayout(ObjectDataView objectData)
 	const uint32 d3dRootSignatureSize = objectData.size - headerAndBindPointsLength;
 
 	XEAssert(!pipelineLayout.d3dRootSignature);
-	d3dDevice->CreateRootSignature(0, d3dRootSignatureData, d3dRootSignatureSize,
+	HRESULT hResult = d3dDevice->CreateRootSignature(0, d3dRootSignatureData, d3dRootSignatureSize,
 		IID_PPV_ARGS(&pipelineLayout.d3dRootSignature));
+	XEMasterAssert(hResult == S_OK);
 
 	return composePipelineLayoutHandle(pipelineLayoutIndex);
 }
@@ -732,7 +764,7 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 	const Device::PipelineLayout& pipelineLayout = getPipelineLayoutByHandle(pipelineLayoutHandle);
 	XEAssert(pipelineLayout.d3dRootSignature);
 
-	const sint32 pipelineIndex = pipelineLayoutsTableAllocationMask.findFirstZeroAndSet();
+	const sint32 pipelineIndex = pipelinesTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(pipelineIndex >= 0);
 
 	Pipeline& pipeline = pipelinesTable[pipelineIndex];
@@ -889,7 +921,8 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 	d3dPSOStreamDesc.pPipelineStateSubobjectStream = d3dPSOStreamWriter.getData();
 
 	XEAssert(!pipeline.d3dPipelineState);
-	d3dDevice->CreatePipelineState(&d3dPSOStreamDesc, IID_PPV_ARGS(&pipeline.d3dPipelineState));
+	HRESULT hResult = d3dDevice->CreatePipelineState(&d3dPSOStreamDesc, IID_PPV_ARGS(&pipeline.d3dPipelineState));
+	XEMasterAssert(hResult == S_OK);
 
 	return composePipelineHandle(pipelineIndex);
 }
@@ -901,7 +934,7 @@ PipelineHandle Device::createComputePipeline(PipelineLayoutHandle pipelineLayout
 	const Device::PipelineLayout& pipelineLayout = getPipelineLayoutByHandle(pipelineLayoutHandle);
 	XEAssert(pipelineLayout.d3dRootSignature);
 
-	const sint32 pipelineIndex = pipelineLayoutsTableAllocationMask.findFirstZeroAndSet();
+	const sint32 pipelineIndex = pipelinesTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(pipelineIndex >= 0);
 
 	Pipeline& pipeline = pipelinesTable[pipelineIndex];
@@ -936,7 +969,8 @@ PipelineHandle Device::createComputePipeline(PipelineLayoutHandle pipelineLayout
 	d3dPSOStreamDesc.pPipelineStateSubobjectStream = d3dPSOStreamWriter.getData();
 
 	XEAssert(!pipeline.d3dPipelineState);
-	d3dDevice->CreatePipelineState(&d3dPSOStreamDesc, IID_PPV_ARGS(&pipeline.d3dPipelineState));
+	HRESULT hResult = d3dDevice->CreatePipelineState(&d3dPSOStreamDesc, IID_PPV_ARGS(&pipeline.d3dPipelineState));
+	XEMasterAssert(hResult == S_OK);
 
 	return composePipelineHandle(pipelineIndex);
 }
@@ -1083,7 +1117,26 @@ uint16x3 Device::CalculateMipLevelSize(uint16x3 srcSize, uint8 mipLevel)
 
 void Host::CreateDevice(Device& device)
 {
+	if (!dxgiFactory.isInitialized())
+		CreateDXGIFactory1(dxgiFactory.uuid(), dxgiFactory.voidInitRef());
 
+	if (!d3dDebug.isInitialized())
+		D3D12GetDebugInterface(d3dDebug.uuid(), d3dDebug.voidInitRef());
+
+	d3dDebug->EnableDebugLayer();
+
+	COMPtr<IDXGIAdapter4> dxgiAdapter;
+	dxgiFactory->EnumAdapterByGpuPreference(0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
+		dxgiAdapter.uuid(), dxgiAdapter.voidInitRef());
+
+	ID3D12Device8* d3dDevice = nullptr;
+
+	// TODO: D3D_FEATURE_LEVEL_12_2
+	D3D12CreateDevice(dxgiAdapter, D3D_FEATURE_LEVEL_12_1, IID_PPV_ARGS(&d3dDevice));
+
+	device.initialize(d3dDevice);
+
+	d3dDevice->Release();
 }
 
 
