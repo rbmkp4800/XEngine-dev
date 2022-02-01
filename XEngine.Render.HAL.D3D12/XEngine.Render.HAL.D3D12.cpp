@@ -850,70 +850,84 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 	byte d3dPSOStreamBuffer[256]; // TODO: Proper size
 	XLib::ByteStreamWriter d3dPSOStreamWriter(d3dPSOStreamBuffer, sizeof(d3dPSOStreamBuffer));
 
-	d3dPSOStreamWriter.writeAligned(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE, sizeof(void*));
-	d3dPSOStreamWriter.writeAligned(pipelineLayout.d3dRootSignature, sizeof(void*));
+	{
+		D3D12Helpers::PipelineStateSubobjectRootSignature& d3dSubobjectRS =
+			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectRootSignature>(sizeof(void*));
+		d3dSubobjectRS.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE;
+		d3dSubobjectRS.rootSignature = pipelineLayout.d3dRootSignature;
+	}
 
 	if (d3dVS.pShaderBytecode)
 	{
-		d3dPSOStreamWriter.writeAligned(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS, sizeof(void*));
-		d3dPSOStreamWriter.writeAligned(d3dVS, sizeof(void*));
+		D3D12Helpers::PipelineStateSubobjectShader& d3dSubobjectVS =
+			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectShader>(sizeof(void*));
+		d3dSubobjectVS.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS;
+		d3dSubobjectVS.bytecode = d3dVS;
 	}
 	if (d3dAS.pShaderBytecode)
 	{
-		d3dPSOStreamWriter.writeAligned(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_AS, sizeof(void*));
-		d3dPSOStreamWriter.writeAligned(d3dAS, sizeof(void*));
+		D3D12Helpers::PipelineStateSubobjectShader& d3dSubobjectAS =
+			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectShader>(sizeof(void*));
+		d3dSubobjectAS.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_AS;
+		d3dSubobjectAS.bytecode = d3dAS;
 	}
 	if (d3dMS.pShaderBytecode)
 	{
-		d3dPSOStreamWriter.writeAligned(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_MS, sizeof(void*));
-		d3dPSOStreamWriter.writeAligned(d3dMS, sizeof(void*));
+		D3D12Helpers::PipelineStateSubobjectShader& d3dSubobjectMS =
+			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectShader>(sizeof(void*));
+		d3dSubobjectMS.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_MS;
+		d3dSubobjectMS.bytecode = d3dMS;
 	}
 	if (d3dPS.pShaderBytecode)
 	{
-		d3dPSOStreamWriter.writeAligned(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS, sizeof(void*));
-		d3dPSOStreamWriter.writeAligned(d3dPS, sizeof(void*));
+		D3D12Helpers::PipelineStateSubobjectShader& d3dSubobjectPS =
+			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectShader>(sizeof(void*));
+		d3dSubobjectPS.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS;
+		d3dSubobjectPS.bytecode = d3dPS;
 	}
 
 	{
 		// TODO: ...
-		// D3D12_BLEND_DESC d3dBlendDesc = {};
-		// d3dPSOStreamWriter.writeAligned(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_BLEND, sizeof(void*));
-		// d3dPSOStreamWriter.writeAligned(d3dBlendDesc, sizeof(void*));
+		// D3D12_BLEND_DESC& d3dBlendDesc = ...;
 	}
 
 	{
 		// TODO: ...
-		// D3D12_RASTERIZER_DESC d3dRasterizerDesc = {};
-		// d3dPSOStreamWriter.writeAligned(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER, sizeof(void*));
-		// d3dPSOStreamWriter.writeAligned(d3dRasterizerDesc, sizeof(void*));
+		// D3D12_RASTERIZER_DESC& d3dRasterizerDesc = ...;
 	}
 
 	{
-		D3D12_DEPTH_STENCIL_DESC d3dDepthStencilDesc = {};
+		D3D12Helpers::PipelineStateSubobjectDepthStencil& d3dSubobjectDS =
+			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectDepthStencil>(sizeof(void*));
+		d3dSubobjectDS.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL;
+		d3dSubobjectDS.desc = {};
+
+		D3D12_DEPTH_STENCIL_DESC& d3dDepthStencilDesc = d3dSubobjectDS.desc;
 		d3dDepthStencilDesc.DepthEnable = depthStencilDesc.enableDepthRead;
 		d3dDepthStencilDesc.DepthWriteMask = depthStencilDesc.enableDepthWrite ?
 			D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
 		d3dDepthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS; // TODO: ...
-
-		d3dPSOStreamWriter.writeAligned(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL, sizeof(void*));
-		d3dPSOStreamWriter.writeAligned(d3dDepthStencilDesc, sizeof(void*));
 	}
 
 	if (renderTargetCount > 0)
 	{
-		D3D12_RT_FORMAT_ARRAY d3dRTFormatArray = {};
+		D3D12Helpers::PipelineStateSubobjectRenderTargetFormats& d3dSubobjectRTs =
+			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectRenderTargetFormats>(sizeof(void*));
+		d3dSubobjectRTs.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RENDER_TARGET_FORMATS;
+		d3dSubobjectRTs.formats = {};
+
+		D3D12_RT_FORMAT_ARRAY& d3dRTFormatArray = d3dSubobjectRTs.formats;
 		for (uint8 i = 0; i < renderTargetCount; i++)
 			d3dRTFormatArray.RTFormats[i] = TranslateTexelViewFormatToDXGIFormat(baseObject.renderTargetFormats[i]);
 		d3dRTFormatArray.NumRenderTargets = renderTargetCount;
-
-		d3dPSOStreamWriter.writeAligned(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RENDER_TARGET_FORMATS, sizeof(void*));
-		d3dPSOStreamWriter.writeAligned(d3dRTFormatArray, sizeof(void*));
 	}
 
 	if (baseObject.depthStencilFormat != DepthStencilFormat::Undefined)
 	{
-		d3dPSOStreamWriter.writeAligned(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL_FORMAT, sizeof(void*));
-		d3dPSOStreamWriter.writeAligned(TranslateDepthStencilFormatToDXGIFormat(baseObject.depthStencilFormat), sizeof(void*));
+		D3D12Helpers::PipelineStateSubobjectDepthStencilFormat& d3dSubobjectDSFormat =
+			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectDepthStencilFormat>(sizeof(void*));
+		d3dSubobjectDSFormat.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL_FORMAT;
+		d3dSubobjectDSFormat.format = TranslateDepthStencilFormatToDXGIFormat(baseObject.depthStencilFormat);
 	}
 
 	D3D12_PIPELINE_STATE_STREAM_DESC d3dPSOStreamDesc = {};
@@ -958,11 +972,19 @@ PipelineHandle Device::createComputePipeline(PipelineLayoutHandle pipelineLayout
 	byte d3dPSOStreamBuffer[64]; // TODO: Proper size
 	XLib::ByteStreamWriter d3dPSOStreamWriter(d3dPSOStreamBuffer, sizeof(d3dPSOStreamBuffer));
 
-	d3dPSOStreamWriter.writeAligned(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE, sizeof(void*));
-	d3dPSOStreamWriter.writeAligned(pipelineLayout.d3dRootSignature, sizeof(void*));
+	{
+		D3D12Helpers::PipelineStateSubobjectRootSignature& d3dSubobjectRS =
+			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectRootSignature>(sizeof(void*));
+		d3dSubobjectRS.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE;
+		d3dSubobjectRS.rootSignature = pipelineLayout.d3dRootSignature;
+	}
 
-	d3dPSOStreamWriter.writeAligned(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_CS, sizeof(void*));
-	d3dPSOStreamWriter.writeAligned(d3dCS, sizeof(void*));
+	{
+		D3D12Helpers::PipelineStateSubobjectShader& d3dSubobjectCS =
+			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectShader>(sizeof(void*));
+		d3dSubobjectCS.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_CS;
+		d3dSubobjectCS.bytecode = d3dCS;
+	}
 
 	D3D12_PIPELINE_STATE_STREAM_DESC d3dPSOStreamDesc = {};
 	d3dPSOStreamDesc.SizeInBytes = d3dPSOStreamWriter.getLength();

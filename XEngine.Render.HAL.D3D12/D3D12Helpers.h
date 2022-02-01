@@ -2,6 +2,36 @@
 
 namespace D3D12Helpers
 {
+	struct PipelineStateSubobjectRootSignature
+	{
+		D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+		ID3D12RootSignature* rootSignature;
+	};
+
+	struct PipelineStateSubobjectShader
+	{
+		D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+		D3D12_SHADER_BYTECODE bytecode;
+	};
+
+	struct PipelineStateSubobjectDepthStencil
+	{
+		D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+		D3D12_DEPTH_STENCIL_DESC desc;
+	};
+
+	struct PipelineStateSubobjectRenderTargetFormats
+	{
+		D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+		D3D12_RT_FORMAT_ARRAY formats;
+	};
+
+	struct PipelineStateSubobjectDepthStencilFormat
+	{
+		D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+		DXGI_FORMAT format;
+	};
+
 	inline D3D12_COMMAND_QUEUE_DESC CommandQueueDesc(D3D12_COMMAND_LIST_TYPE type,
 		INT priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL,
 		D3D12_COMMAND_QUEUE_FLAGS flags = D3D12_COMMAND_QUEUE_FLAG_NONE)
