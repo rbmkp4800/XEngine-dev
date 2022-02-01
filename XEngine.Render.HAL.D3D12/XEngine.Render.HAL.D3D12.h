@@ -405,12 +405,12 @@ namespace XEngine::Render::HAL
 
 	private:
 		ResourceHandle composeResourceHandle(uint32 resourceIndex) const;
-		ShaderResourceViewHandle composeShaderResourceViewHandle(uint32 resourceViewIndex) const;
+		ShaderResourceViewHandle composeShaderResourceViewHandle(uint32 shaderResourceViewIndex) const;
 		RenderTargetViewHandle composeRenderTargetViewHandle(uint32 renderTargetIndex) const;
 		DepthStencilViewHandle composeDepthStencilViewHandle(uint32 depthStencilIndex) const;
-		FenceHandle composeFenceHandle(uint32 fenceIndex) const;
 		PipelineLayoutHandle composePipelineLayoutHandle(uint32 pipelineLayoutIndex) const;
 		PipelineHandle composePipelineHandle(uint32 pipelineIndex) const;
+		FenceHandle composeFenceHandle(uint32 fenceIndex) const;
 		SwapChainHandle composeSwapChainHandle(uint32 swapChainIndex) const;
 
 		uint32 resolveResourceHandle(ResourceHandle handle) const;
@@ -418,8 +418,8 @@ namespace XEngine::Render::HAL
 		uint32 resolveRenderTargetViewHandle(RenderTargetViewHandle handle) const;
 		uint32 resolveDepthStencilViewHandle(DepthStencilViewHandle handle) const;
 		uint32 resolvePipelineLayoutHandle(PipelineLayoutHandle handle) const;
-		uint32 resolveFenceHandle(FenceHandle handle) const;
 		uint32 resolvePipelineHandle(PipelineHandle handle) const;
+		uint32 resolveFenceHandle(FenceHandle handle) const;
 		uint32 resolveSwapChainHandle(SwapChainHandle handle) const;
 
 		DescriptorAddress composeDescriptorAddress(uint32 srvHeapDescriptorIndex) const { return DescriptorAddress(srvHeapDescriptorIndex); }

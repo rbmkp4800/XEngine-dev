@@ -1089,133 +1089,172 @@ void Host::CreateDevice(Device& device)
 
 // Handles /////////////////////////////////////////////////////////////////////////////////////////
 
+// Handle structure:
+//	bits  0..19 - entry index
+//	bits 20..27 - generation
+//	bits 28..32 - signature (should not be zero)
+
+namespace
+{
+	constexpr uint8 ResourceHandleSignature = 0x1;
+	constexpr uint8 ShaderResourceViewHandleSignature = 0x2;
+	constexpr uint8 RenderTargetViewHandleSignature = 0x3;
+	constexpr uint8 DepthStencilViewHandleSignature = 0x4;
+	constexpr uint8 PipelineLayoutHandleSignature = 0x5;
+	constexpr uint8 PipelineHandleSignature = 0x6;
+	constexpr uint8 FenceHandleSignature = 0x7;
+	constexpr uint8 SwapChainHandleSignature = 0x8;
+
+	struct DecomposedHandle
+	{
+		uint8 signature;
+		uint8 generation;
+		uint32 entryIndex;
+	};
+
+	inline uint32 ComposeHandle(uint8 signature, uint8 generation, uint32 entryIndex)
+	{
+		XEAssert((entryIndex & ~0x0F'FF'FF) == 0);
+		return (uint32(signature) << 28) | (uint32(generation) << 20) | entryIndex;
+	}
+
+	inline DecomposedHandle DecomposeHandle(uint32 handle)
+	{
+		DecomposedHandle result;
+		result.signature = uint8(handle >> 28);
+		result.generation = uint8(handle >> 20);
+		result.entryIndex = handle & 0x0F'FF'FF;
+		return result;
+	}
+}
+
 ResourceHandle Device::composeResourceHandle(uint32 resourceIndex) const
 {
 	XEAssert(resourceIndex < MaxResourceCount);
-	const uint32 generation = resourcesTable[resourceIndex].handleGeneration;
-	return ResourceHandle((generation << 24) | resourceIndex);
+	return ResourceHandle(ComposeHandle(
+		ResourceHandleSignature, resourcesTable[resourceIndex].handleGeneration, resourceIndex));
 }
 
-ShaderResourceViewHandle Device::composeShaderResourceViewHandle(uint32 resourceViewIndex) const
+ShaderResourceViewHandle Device::composeShaderResourceViewHandle(uint32 shaderResourceViewIndex) const
 {
-	XEAssert(resourceViewIndex < MaxShaderResourceViewCount);
-	const uint32 generation = shaderResourceViewsTable[resourceViewIndex].handleGeneration;
-	return ShaderResourceViewHandle((generation << 24) | resourceViewIndex);
+	XEAssert(shaderResourceViewIndex < MaxShaderResourceViewCount);
+	return ShaderResourceViewHandle(ComposeHandle(
+		ShaderResourceViewHandleSignature, shaderResourceViewsTable[shaderResourceViewIndex].handleGeneration, shaderResourceViewIndex));
 }
 
 RenderTargetViewHandle Device::composeRenderTargetViewHandle(uint32 renderTargetViewIndex) const
 {
 	XEAssert(renderTargetViewIndex < MaxRenderTargetViewCount);
-	const uint32 generation = 0; // renderTargetViewsTable[renderTargetViewIndex].handleGeneration;
-	return RenderTargetViewHandle((generation << 24) | renderTargetViewIndex);
+	// renderTargetViewsTable[renderTargetViewIndex].handleGeneration;
+	return RenderTargetViewHandle(ComposeHandle(RenderTargetViewHandleSignature, 0, renderTargetViewIndex));
 }
 
 DepthStencilViewHandle Device::composeDepthStencilViewHandle(uint32 depthStencilViewIndex) const
 {
 	XEAssert(depthStencilViewIndex < MaxDepthStencilViewCount);
-	const uint32 generation = 0; // depthStencilViewsTable[depthStencilViewIndex].handleGeneration;
-	return DepthStencilViewHandle((generation << 24) | depthStencilViewIndex);
-}
-
-FenceHandle Device::composeFenceHandle(uint32 fenceIndex) const
-{
-	XEAssert(fenceIndex < MaxFenceCount);
-	const uint32 generation = 0; // fencesTable[fenceIndex].handleGeneration;
-	return FenceHandle((generation << 24) | fenceIndex);
+	// depthStencilViewsTable[depthStencilViewIndex].handleGeneration;
+	return DepthStencilViewHandle(ComposeHandle(DepthStencilViewHandleSignature, 0, depthStencilViewIndex));
 }
 
 PipelineLayoutHandle Device::composePipelineLayoutHandle(uint32 pipelineLayoutIndex) const
 {
 	XEAssert(pipelineLayoutIndex < MaxPipelineLayoutCount);
-	const uint32 generation = pipelineLayoutsTable[pipelineLayoutIndex].handleGeneration;
-	return PipelineLayoutHandle((generation << 24) | pipelineLayoutIndex);
+	return PipelineLayoutHandle(ComposeHandle(
+		PipelineLayoutHandleSignature, pipelineLayoutsTable[pipelineLayoutIndex].handleGeneration, pipelineLayoutIndex));
 }
 
 PipelineHandle Device::composePipelineHandle(uint32 pipelineIndex) const
 {
 	XEAssert(pipelineIndex < MaxPipelineCount);
-	const uint32 generation = pipelinesTable[pipelineIndex].handleGeneration;
-	return PipelineHandle((generation << 24) | pipelineIndex);
+	return PipelineHandle(ComposeHandle(
+		PipelineHandleSignature, pipelinesTable[pipelineIndex].handleGeneration, pipelineIndex));
+}
+
+FenceHandle Device::composeFenceHandle(uint32 fenceIndex) const
+{
+	XEAssert(fenceIndex < MaxFenceCount);
+	// fencesTable[fenceIndex].handleGeneration;
+	return FenceHandle(ComposeHandle(FenceHandleSignature, 0, fenceIndex));
 }
 
 SwapChainHandle Device::composeSwapChainHandle(uint32 swapChainIndex) const
 {
 	XEAssert(swapChainIndex < MaxSwapChainCount);
-	const uint32 generation = 0; // swapChainsTable[swapChainIndex].handleGeneration;
-	return SwapChainHandle((generation << 24) | swapChainIndex);
+	// swapChainsTable[swapChainIndex].handleGeneration;
+	return SwapChainHandle(ComposeHandle(SwapChainHandleSignature, 0, swapChainIndex));
 }
 
 
 uint32 Device::resolveResourceHandle(ResourceHandle handle) const
 {
-	const uint32 resourceIndex = uint32(handle) & 0xFF'FF'FF;
-	XEAssert(resourceIndex < MaxResourceCount);
-	const uint8 generation = uint8(resourceIndex >> 24);
-	XAssert(generation == resourcesTable[resourceIndex].handleGeneration);
-	return resourceIndex;
+	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
+	XEAssert(decomposed.signature == ResourceHandleSignature);
+	XEAssert(decomposed.entryIndex < MaxResourceCount);
+	XEAssert(decomposed.generation == resourcesTable[decomposed.entryIndex].handleGeneration);
+	return decomposed.entryIndex;
 }
 
 uint32 Device::resolveShaderResourceViewHandle(ShaderResourceViewHandle handle) const
 {
-	const uint32 shaderResourceViewIndex = uint32(handle) & 0xFF'FF'FF;
-	XEAssert(shaderResourceViewIndex < MaxShaderResourceViewCount);
-	const uint8 generation = uint8(shaderResourceViewIndex >> 24);
-	XAssert(generation == shaderResourceViewsTable[shaderResourceViewIndex].handleGeneration);
-	return shaderResourceViewIndex;
+	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
+	XEAssert(decomposed.signature == ShaderResourceViewHandleSignature);
+	XEAssert(decomposed.entryIndex < MaxShaderResourceViewCount);
+	XEAssert(decomposed.generation == shaderResourceViewsTable[decomposed.entryIndex].handleGeneration);
+	return decomposed.entryIndex;
 }
 
 uint32 Device::resolveRenderTargetViewHandle(RenderTargetViewHandle handle) const
 {
-	const uint32 renderTargetViewIndex = uint32(handle) & 0xFF'FF'FF;
-	XEAssert(renderTargetViewIndex < MaxRenderTargetViewCount);
-	//const uint8 generation = uint8(renderTargetViewIndex >> 24);
-	//XAssert(generation == renderTargetViewsTable[renderTargetViewIndex].handleGeneration);
-	return renderTargetViewIndex;
+	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
+	XEAssert(decomposed.signature == RenderTargetViewHandleSignature);
+	XEAssert(decomposed.entryIndex < MaxRenderTargetViewCount);
+	//XEAssert(decomposed.generation == renderTargetViewsTable[decomposed.entryIndex].handleGeneration);
+	return decomposed.entryIndex;
 }
 
 uint32 Device::resolveDepthStencilViewHandle(DepthStencilViewHandle handle) const
 {
-	const uint32 depthStencilViewIndex = uint32(handle) & 0xFF'FF'FF;
-	XEAssert(depthStencilViewIndex < MaxDepthStencilViewCount);
-	//const uint8 generation = uint8(depthStencilViewIndex >> 24);
-	//XAssert(generation == depthStencilViewsTable[depthStencilViewIndex].handleGeneration);
-	return depthStencilViewIndex;
-}
-
-uint32 Device::resolveFenceHandle(FenceHandle handle) const
-{
-	const uint32 fenceIndex = uint32(handle) & 0xFF'FF'FF;
-	XEAssert(fenceIndex < MaxFenceCount);
-	//const uint8 generation = uint8(fenceIndex >> 24);
-	//XAssert(generation == fencesTable[fenceIndex].handleGeneration);
-	return fenceIndex;
+	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
+	XEAssert(decomposed.signature == DepthStencilViewHandleSignature);
+	XEAssert(decomposed.entryIndex < MaxDepthStencilViewCount);
+	//XEAssert(decomposed.generation == depthStencilViewsTable[decomposed.entryIndex].handleGeneration);
+	return decomposed.entryIndex;
 }
 
 uint32 Device::resolvePipelineLayoutHandle(PipelineLayoutHandle handle) const
 {
-	const uint32 pipelineLayoutIndex = uint32(handle) & 0xFF'FF'FF;
-	XEAssert(pipelineLayoutIndex < MaxPipelineLayoutCount);
-	const uint8 generation = uint8(pipelineLayoutIndex >> 24);
-	XAssert(generation == pipelineLayoutsTable[pipelineLayoutIndex].handleGeneration);
-	return pipelineLayoutIndex;
+	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
+	XEAssert(decomposed.signature == PipelineLayoutHandleSignature);
+	XEAssert(decomposed.entryIndex < MaxPipelineLayoutCount);
+	XEAssert(decomposed.generation == pipelineLayoutsTable[decomposed.entryIndex].handleGeneration);
+	return decomposed.entryIndex;
 }
 
 uint32 Device::resolvePipelineHandle(PipelineHandle handle) const
 {
-	const uint32 pipelineIndex = uint32(handle) & 0xFF'FF'FF;
-	XEAssert(pipelineIndex < MaxPipelineCount);
-	const uint8 generation = uint8(pipelineIndex >> 24);
-	XAssert(generation == pipelinesTable[pipelineIndex].handleGeneration);
-	return pipelineIndex;
+	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
+	XEAssert(decomposed.signature == PipelineHandleSignature);
+	XEAssert(decomposed.entryIndex < MaxPipelineCount);
+	XEAssert(decomposed.generation == pipelinesTable[decomposed.entryIndex].handleGeneration);
+	return decomposed.entryIndex;
+}
+
+uint32 Device::resolveFenceHandle(FenceHandle handle) const
+{
+	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
+	XEAssert(decomposed.signature == FenceHandleSignature);
+	XEAssert(decomposed.entryIndex < MaxFenceCount);
+	//XEAssert(decomposed.generation == fencesTable[decomposed.entryIndex].handleGeneration);
+	return decomposed.entryIndex;
 }
 
 uint32 Device::resolveSwapChainHandle(SwapChainHandle handle) const
 {
-	const uint32 swapChainIndex = uint32(handle) & 0xFF'FF'FF;
-	XEAssert(swapChainIndex < MaxSwapChainCount);
-	//const uint8 generation = uint8(swapChainIndex >> 24);
-	//XAssert(generation == swapChainsTable[swapChainIndex].handleGeneration);
-	return swapChainIndex;
+	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
+	XEAssert(decomposed.signature == SwapChainHandleSignature);
+	XEAssert(decomposed.entryIndex < MaxSwapChainCount);
+	//XEAssert(decomposed.generation == swapChainsTable[decomposed.entryIndex].handleGeneration);
+	return decomposed.entryIndex;
 }
 
 
