@@ -28,6 +28,8 @@ namespace XLib
 		inline char peekCharUnsafe() const { return *current; }
 		inline char getCharUnsafe() { return *current++; }
 		//inline void readChars();
+
+		inline const char* getCurrentPtr() const { return current; }
 	};
 
 	class MemoryTextWriter

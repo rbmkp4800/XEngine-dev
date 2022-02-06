@@ -20,6 +20,7 @@ namespace XLib
 		~BaseStringView() = default;
 
 		inline BaseStringView(const CharType* data, uintptr length) : data(data), length(length) {}
+		inline BaseStringView(const CharType* begin, const CharType* end) : data(begin), length(end - begin) {}
 		inline BaseStringView(const CharType* cstr);
 
 		inline const CharType& operator [] (uintptr index) const { return data[index]; }

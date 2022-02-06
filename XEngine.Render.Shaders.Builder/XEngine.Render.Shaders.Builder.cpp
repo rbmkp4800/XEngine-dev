@@ -1,5 +1,6 @@
 #include <XLib.h>
 #include <XLib.Containers.ArrayList.h>
+#include <XLib.String.h>
 #include <XLib.System.File.h>
 #include <XLib.SystemHeapAllocator.h>
 #include <XLib.Text.h>
@@ -8,6 +9,8 @@
 #include <XEngine.Render.Shaders.PackFormat.h>
 
 #include "XEngine.Render.Shaders.Builder.h"
+
+#include "PseudoCTokenizer.h"
 
 using namespace XLib;
 using namespace XEngine::Render::HAL::ShaderCompiler;
@@ -51,7 +54,30 @@ public:
 	}
 };
 
-void Builder::run(const char* indexPath, const char* packPath)
+bool Builder::loadShaderList(const char* shaderListPath)
+{
+	File shaderListFile;
+	shaderListFile.open(shaderListPath, FileAccessMode::Read, FileOpenMode::OpenExisting);
+	if (!shaderListFile.isInitialized())
+		return false;
+
+	// TODO: Check for U32 overflow.
+	const uint32 shaderListFileSize = uint32(shaderListFile.getSize());
+
+	String shaderListText;
+	shaderListText.resizeUnsafe(shaderListFileSize);
+
+	shaderListFile.read(shaderListText.getMutableData(), shaderListFileSize);
+	shaderListFile.close();
+
+	PseudoCTokenizer tokenizer(shaderListText.getData(), shaderListText.getLength());
+	//for (;;)
+	//{
+	//	...
+	//}
+}
+
+void Builder::run(const char* packPath)
 {
 	// Load ingex.
 

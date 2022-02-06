@@ -11,6 +11,7 @@
 
 #include "XEngine.Render.HAL.D3D12.Translation.h"
 
+// Microsoft.Direct3D.D3D12 v1.700.10
 extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = 700; }
 extern "C" { __declspec(dllexport) extern const char* D3D12SDKPath = ".\\D3D12\\"; }
 
@@ -850,7 +851,7 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 
 	// Compose D3D12 Pipeline State stream
 
-	byte d3dPSOStreamBuffer[256]; // TODO: Proper size
+	byte d3dPSOStreamBuffer[1024]; // TODO: Proper size
 	XLib::ByteStreamWriter d3dPSOStreamWriter(d3dPSOStreamBuffer, sizeof(d3dPSOStreamBuffer));
 
 	{

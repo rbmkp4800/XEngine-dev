@@ -102,6 +102,7 @@ copy $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.pd
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="PseudoCTokenizer.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.EntryPoint.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.PipelineLayoutsList.cpp" />
@@ -110,6 +111,7 @@ copy $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.pd
     <ClCompile Include="XEngine.Render.Shaders.Builder.SourcesCache.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="PseudoCTokenizer.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.PipelineLayoutsList.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.PipelinesList.h" />

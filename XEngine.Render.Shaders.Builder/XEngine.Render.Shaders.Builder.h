@@ -22,6 +22,7 @@ namespace XEngine::Render::Shaders
 		Builder() = default;
 		~Builder() = default;
 
-		void run(const char* indexPath, const char* packPath);
+		bool loadShaderList(const char* shaderListPath);
+		void run(const char* packPath);
 	};
 }
