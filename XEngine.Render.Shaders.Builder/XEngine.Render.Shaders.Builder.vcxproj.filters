@@ -8,6 +8,7 @@
     <ClCompile Include="XEngine.Render.Shaders.Builder.PipelineLayoutsList.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.ShadersList.cpp" />
     <ClCompile Include="PseudoCTokenizer.cpp" />
+    <ClCompile Include="XEngine.Render.Shaders.Builder.TargetDescriptionLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="XEngine.Render.Shaders.Builder.SourcesCache.h" />
@@ -16,5 +17,6 @@
     <ClInclude Include="XEngine.Render.Shaders.Builder.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.PipelineLayoutsList.h" />
     <ClInclude Include="PseudoCTokenizer.h" />
+    <ClInclude Include="XEngine.Render.Shaders.Builder.TargetDescriptionLoader.h" />
   </ItemGroup>
 </Project>

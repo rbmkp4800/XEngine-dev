@@ -68,8 +68,8 @@
       <SubSystem>Windows</SubSystem>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy $(SolutionDir)External\Microsoft.Direct3D.D3D12\bin\$(Platform)\*.dll $(OutDir)D3D12\
-xcopy $(SolutionDir)External\Microsoft.Direct3D.D3D12\bin\$(Platform)\*.pdb $(OutDir)D3D12\</Command>
+      <Command>xcopy /y $(SolutionDir)External\Microsoft.Direct3D.D3D12\bin\$(Platform)\*.dll $(OutDir)D3D12\
+xcopy /y $(SolutionDir)External\Microsoft.Direct3D.D3D12\bin\$(Platform)\*.pdb $(OutDir)D3D12\</Command>
       <Message>Copying D3D12 DLLs to output directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -90,8 +90,8 @@ xcopy $(SolutionDir)External\Microsoft.Direct3D.D3D12\bin\$(Platform)\*.pdb $(Ou
       <SubSystem>Windows</SubSystem>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy $(SolutionDir)External\Microsoft.Direct3D.D3D12\bin\$(Platform)\*.dll $(OutDir)D3D12\
-xcopy $(SolutionDir)External\Microsoft.Direct3D.D3D12\bin\$(Platform)\*.pdb $(OutDir)D3D12\</Command>
+      <Command>xcopy /y $(SolutionDir)External\Microsoft.Direct3D.D3D12\bin\$(Platform)\*.dll $(OutDir)D3D12\
+xcopy /y $(SolutionDir)External\Microsoft.Direct3D.D3D12\bin\$(Platform)\*.pdb $(OutDir)D3D12\</Command>
       <Message>Copying D3D12 DLLs to output directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>

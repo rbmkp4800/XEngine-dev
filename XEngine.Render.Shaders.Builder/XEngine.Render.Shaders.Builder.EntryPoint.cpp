@@ -47,7 +47,7 @@ int main()
 #endif
 
 	Builder builder;
-	builder.loadShaderList("..\\XEngine.Render.Shaders\\_ShaderList.txt");
+	builder.loadTargetDescription("..\\XEngine.Render.Shaders\\_TargetDescription.txt");
 	builder.run("..\\Build\\shaderpack");
 
 #if 0

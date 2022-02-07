@@ -1,0 +1,11 @@
+DeclarePipelineLayout("TestLayout") {
+	AddConstantBuffer("MyCB");
+}
+
+DeclareGraphicsPipeline("TestGfxPipeline") {
+	SetLayout("TestLayout");
+}
+
+DeclareComputePipeline("TestComputePipeline") {
+	SetLayout("TestLayout");
+}

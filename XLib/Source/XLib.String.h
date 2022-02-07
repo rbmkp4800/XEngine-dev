@@ -27,6 +27,9 @@ namespace XLib
 		inline const CharType* getData() const { return data; }
 		inline uintptr getLength() const { return length; }
 		inline bool isEmpty() const { return length == 0; }
+
+		inline const CharType* begin() const { return data; }
+		inline const CharType* end() const { return data + length; }
 	};
 
 	using StringView = BaseStringView<>;
@@ -121,8 +124,15 @@ namespace XLib
 	using InplaceString64 = InplaceString<63, uint8>;		static_assert(sizeof(InplaceString64) == 64);
 	using InplaceString256 = InplaceString<255, uint8>;		static_assert(sizeof(InplaceString256) == 256);
 	using InplaceString1024 = InplaceString<1022, uint16>;	static_assert(sizeof(InplaceString1024) == 1024);
+	using InplaceString2048 = InplaceString<2046, uint16>;	static_assert(sizeof(InplaceString2048) == 2048);
 	using InplaceString4096 = InplaceString<4094, uint16>;	static_assert(sizeof(InplaceString4096) == 4096);
 
+
+	template <typename CharType>
+	inline bool AreStringsEqual(const BaseStringView<CharType>& a, const BaseStringView<CharType>& b);
+
+	template <typename CharType>
+	inline bool AreStringsEqual(const BaseStringView<CharType>& a, const CharType* bCStr);
 
 	template <typename CharType>
 	inline sint32 CompareStrings();
@@ -219,6 +229,19 @@ namespace XLib
 		// TODO: Handle case for length == 0
 	}
 
+
+	template <typename CharType>
+	inline bool AreStringsEqual(const BaseStringView<CharType>& a, const CharType* bCStr)
+	{
+		for (uintptr i = 0; i < a.getLength(); i++)
+		{
+			if (a[i] != bCStr[i])
+				return false;
+			if (bCStr[i] == 0)
+				return false;
+		}
+		return bCStr[a.getLength()] == 0;
+	}
 
 	template <typename CharType>
 	inline uintptr GetCStrLength(const CharType* cstr)

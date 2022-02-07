@@ -54,27 +54,24 @@ public:
 	}
 };
 
-bool Builder::loadShaderList(const char* shaderListPath)
+bool Builder::loadTargetDescription(const char* targetDescriptionPath)
 {
-	File shaderListFile;
-	shaderListFile.open(shaderListPath, FileAccessMode::Read, FileOpenMode::OpenExisting);
-	if (!shaderListFile.isInitialized())
+	File targetDescriptionFile;
+	targetDescriptionFile.open(targetDescriptionPath, FileAccessMode::Read, FileOpenMode::OpenExisting);
+	if (!targetDescriptionFile.isInitialized())
 		return false;
 
 	// TODO: Check for U32 overflow.
-	const uint32 shaderListFileSize = uint32(shaderListFile.getSize());
+	const uint32 targetDescriptionFileSize = uint32(targetDescriptionFile.getSize());
 
-	String shaderListText;
-	shaderListText.resizeUnsafe(shaderListFileSize);
+	String targetDescriptionText;
+	targetDescriptionText.resizeUnsafe(targetDescriptionFileSize);
 
-	shaderListFile.read(shaderListText.getMutableData(), shaderListFileSize);
-	shaderListFile.close();
+	targetDescriptionFile.read(targetDescriptionText.getMutableData(), targetDescriptionFileSize);
+	targetDescriptionFile.close();
 
-	PseudoCTokenizer tokenizer(shaderListText.getData(), shaderListText.getLength());
-	//for (;;)
-	//{
-	//	...
-	//}
+	PseudoCTokenizer tokenizer(targetDescriptionText.getData(), targetDescriptionText.getLength());
+	
 }
 
 void Builder::run(const char* packPath)
