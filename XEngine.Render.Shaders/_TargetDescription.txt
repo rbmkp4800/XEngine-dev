@@ -1,11 +1,52 @@
-DeclarePipelineLayout("TestLayout") {
-	AddConstantBuffer("MyCB");
+PipelineLayout TestLayout
+{
+	ReadOnlyBuffer testBuffer;
 }
 
-DeclareGraphicsPipeline("TestGfxPipeline") {
-	SetLayout("TestLayout");
+GraphicsPipeline TestGfxPipeline
+{
+	SetLayout(TestLayout);
+	SetVS("test.hlsl", "TestVSMain");
+	SetRT(0, R8G8B8BA8_Unorm);
+	//SetDepthRT(D32S8);
 }
 
-DeclareComputePipeline("TestComputePipeline") {
-	SetLayout("TestLayout");
+ComputePipeline TestComputePipeline
+{
+	SetLayout(TestLayout);
+	SetCS("test.hlsl", "TestCSMain");
 }
+
+/*
+DescriptorTableLayout MyDescriptorTable {
+	ReadOnlyTextureDescriptor MyTexture;
+	ReadWriteTextureDescriptor MyRWTexture;
+}
+
+PipelineLayout TestLayout {
+			InlineConstants<4> Constants;
+	[ALL]	ConstantBuffer MyCB;
+	[MS/AS]	ReadOnlyBuffer GeomtryBuff;
+	[PS]	DescriptorTable<MyDescriptorTable> ExampleTable;
+}
+
+GraphicsPipeline TestGfxPipeline {
+	SetLayout(TestLayout);
+	SetVS("test.hlsl", "TestVSMain");
+	SetRT(0, R8G8B8BA8_Unorm);
+	SetDepthRT(D32S8);
+	Define {
+		[PS]TEST_DEFINE=0,
+		[VS]VS_TEST_DEFINE=1,
+		GLOBAL_TEST_DEFINE=0,
+	};
+}
+
+ComputePipeline TestComputePipeline {
+	SetLayout(TestLayout);
+	SetCS("testCS.hlsl", "Main");
+	Define {
+		SOME_OTHER_DEFINE,
+	}
+}
+*/

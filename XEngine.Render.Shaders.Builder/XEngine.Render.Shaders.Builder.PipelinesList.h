@@ -70,7 +70,7 @@ namespace XEngine::Render::Shaders::Builder_
 		EntriesStorageList entriesStorageList;
 
 	private:
-		Pipeline* createPipelineInternal(const char* name, const PipelineLayout& pipelineLayout,
+		Pipeline* createPipelineInternal(XLib::StringView name, const PipelineLayout& pipelineLayout,
 			const GraphicsPipelineDesc* graphicsPipelineDesc, Shader* computeShader);
 
 	public:
@@ -80,8 +80,8 @@ namespace XEngine::Render::Shaders::Builder_
 		PipelinesList() = default;
 		~PipelinesList() = default;
 
-		Pipeline* createGraphicsPipeline(const char* name, const PipelineLayout& pipelineLayout, const GraphicsPipelineDesc& pipelineDesc) { return createPipelineInternal(name, pipelineLayout, &pipelineDesc, nullptr); }
-		Pipeline* createComputePipeline(const char* name, const PipelineLayout& pipelineLayout, Shader& computeShader) { return createPipelineInternal(name, pipelineLayout, nullptr, &computeShader); }
+		Pipeline* createGraphicsPipeline(XLib::StringView name, const PipelineLayout& pipelineLayout, const GraphicsPipelineDesc& pipelineDesc) { return createPipelineInternal(name, pipelineLayout, &pipelineDesc, nullptr); }
+		Pipeline* createComputePipeline(XLib::StringView name, const PipelineLayout& pipelineLayout, Shader& computeShader) { return createPipelineInternal(name, pipelineLayout, nullptr, &computeShader); }
 
 		inline uint32 getSize() const { return entriesStorageList.getSize(); }
 

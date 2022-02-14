@@ -4,6 +4,7 @@
 #include <XLib.Containers.ArrayList.h>
 #include <XLib.Containers.IntrusiveBinaryTree.h>
 #include <XLib.NonCopyable.h>
+#include <XLib.String.h>
 
 #include <XEngine.Render.HAL.ShaderCompiler.h>
 
@@ -13,7 +14,7 @@ namespace XEngine::Render::Shaders::Builder_
 
 	struct BindPointDesc
 	{
-		const char* name;
+		XLib::StringView name;
 		HAL::PipelineBindPointType type;
 		HAL::ShaderCompiler::PipelineBindPointShaderVisibility shaderVisibility;
 		uint8 constantsSize32bitValues;
@@ -73,9 +74,9 @@ namespace XEngine::Render::Shaders::Builder_
 		~PipelineLayoutsList() = default;
 
 		// Returns null if entry with such name already exists.
-		PipelineLayout* createEntry(const char* name, const BindPointDesc* bindPoints, uint8 bindPointCount);
+		PipelineLayout* createEntry(XLib::StringView name, const BindPointDesc* bindPoints, uint8 bindPointCount);
 
-		PipelineLayout* findEntry(const char* name) const;
+		PipelineLayout* findEntry(XLib::StringView name) const;
 
 		inline uint32 getSize() const { return entriesStorageList.getSize(); }
 
