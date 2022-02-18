@@ -13,16 +13,36 @@
 #include "XEngine.Render.Shaders.Builder.SourcesCache.h"
 
 using namespace XLib;
+using namespace XEngine::Render;
 using namespace XEngine::Render::Shaders::Builder_;
 
-inline bool ReadStringLiteral(PseudoCTokenizer& tokenizer, InplaceString2048& resultString, uint16 lengthLimit)
+HAL::TexelViewFormat TargetDescriptionLoader::ParseTexelViewFormatString(StringView string)
 {
-	XAssert(lengthLimit < InplaceString2048::GetCapacity());
+	// TODO: Do this properly.
+	if (AreStringsEqual(string, "R8G8B8BA8_Unorm"))
+		return HAL::TexelViewFormat::R8G8B8A8_UNORM;
+
+	return HAL::TexelViewFormat(-1);
+}
+
+HAL::DepthStencilFormat TargetDescriptionLoader::ParseDepthStencilFormatString(StringView string)
+{
+	// TODO: Do this properly.
+	if (AreStringsEqual(string, "D32"))
+		return HAL::DepthStencilFormat::D32;
+
+	return HAL::DepthStencilFormat(-1);
 }
 
 bool TargetDescriptionLoader::matchSimpleToken(TokenType type)
 {
-
+	const Token token = tokenizer.getToken();
+	if (token.type != type)
+	{
+		reportError("expected token ..."); // TODO: Put expected token here.
+		return false;
+	}
+	return true;
 }
 
 bool TargetDescriptionLoader::parsePipelineLayoutDeclaration()
@@ -74,7 +94,7 @@ bool TargetDescriptionLoader::parsePipelineLayoutDeclaration()
 	}
 
 	PipelineLayout* pipelineLayout = pipelineLayoutsList.createEntry(
-		pipelineLayoutNameToken.string, bindPoints, bindPoints.getSize());
+		pipelineLayoutNameToken.string, bindPoints, uint8(bindPoints.getSize()));
 	
 	if (!pipelineLayout)
 	{
@@ -99,16 +119,18 @@ bool TargetDescriptionLoader::parseGraphicsPipelineDeclaration()
 
 	PipelineLayout* pipelineLayout = nullptr;
 	GraphicsPipelineDesc pipelineDesc = {};
+	uint8 setRTsMask = 0;
+	bool depthRTIsSet = false;
 
 	for (;;)
 	{
-		const Token headToken = tokenizer.getToken();
-		if (headToken.type == TokenType('}'))
+		const Token statementToken = tokenizer.getToken();
+		if (statementToken.type == TokenType('}'))
 			break;
-		if (headToken.type == PseudoCTokenizer::TokenType::Semicolon)
+		if (statementToken.type == PseudoCTokenizer::TokenType::Semicolon)
 			continue;
 
-		if (headToken.type == TokenType::Keyword_SetLayout)
+		if (statementToken.type == TokenType::Keyword_SetLayout)
 		{
 			if (pipelineLayout)
 			{
@@ -116,41 +138,129 @@ bool TargetDescriptionLoader::parseGraphicsPipelineDeclaration()
 				return false;
 			}
 
-			if (!matchSimpleToken(TokenType('(')))
+			pipelineLayout = parseSetLayoutStatement();
+			if (!pipelineLayout)
 				return false;
-
-			const Token layoutNameToken = tokenizer.getToken();
-			if (layoutNameToken.type != TokenType::Identifier)
+		}
+		else if (statementToken.type == TokenType::Keyword_SetVS)
+		{
+			if (pipelineDesc.vertexShader)
 			{
-				reportError("expected pipeline layout name");
+				reportError("vertex shader already defined");
+				return false;
+			}
+			if (!pipelineLayout)
+			{
+				reportError("pipeline layout should be defined prior to shaders");
 				return false;
 			}
 
-			pipelineLayout = pipelineLayoutsList.findEntry(layoutNameToken.string);
+			pipelineDesc.vertexShader = parseSetShaderStatement(HAL::ShaderCompiler::ShaderType::Vertex, *pipelineLayout);
+			if (!pipelineDesc.vertexShader)
+				return false;
+		}
+		else if (statementToken.type == TokenType::Keyword_SetPS)
+		{
+			if (pipelineDesc.pixelShader)
+			{
+				reportError("pixel shader already defined");
+				return false;
+			}
 			if (!pipelineLayout)
 			{
-				reportError("pipeline layout is not found");
+				reportError("pipeline layout should be defined prior to shaders");
+				return false;
+			}
+
+			pipelineDesc.pixelShader = parseSetShaderStatement(HAL::ShaderCompiler::ShaderType::Pixel, *pipelineLayout);
+			if (!pipelineDesc.pixelShader)
+				return false;
+		}
+		else if (statementToken.type == TokenType::Keyword_SetRT)
+		{
+			if (!matchSimpleToken(TokenType('(')))
+				return false;
+
+			const Token rtIndexToken = tokenizer.getToken();
+			if (rtIndexToken.type != TokenType::NumberLiteral)
+			{
+				reportError("expected render target index");
+				return false;
+			}
+			if (rtIndexToken.number < 0 || rtIndexToken.number >= HAL::MaxRenderTargetCount)
+			{
+				reportError("invalid render target index");
+				return false;
+			}
+
+			const uint8 rtIndex = uint8(rtIndexToken.number);
+
+			const bool rtIsAlreadySet = (setRTsMask & (1 << rtIndex)) != 0;
+			if (rtIsAlreadySet)
+			{
+				reportError("this render target is already set");
+				return false;
+			}
+
+			if (!matchSimpleToken(TokenType(',')))
+				return false;
+
+			const Token rtFormatToken = tokenizer.getToken();
+			if (rtFormatToken.type != TokenType::Identifier)
+			{
+				reportError("expected render target format identifier");
+				return false;
+			}
+
+			const HAL::TexelViewFormat rtFormat = ParseTexelViewFormatString(rtFormatToken.string);
+			if (!HAL::ValidateTexelViewFormatValue(rtFormat))
+			{
+				reportError("unknown format");
+				return false;
+			}
+
+			if (!HAL::ValidateTexelViewFormatForRenderTargetUsage(rtFormat))
+			{
+				reportError("this format is not supported for render target usage");
 				return false;
 			}
 
 			if (!matchSimpleToken(TokenType(')')))
 				return false;
-		}
-		else if (headToken.type == TokenType::Keyword_SetVS)
-		{
 
+			pipelineDesc.renderTargetsFormats[rtIndex] = rtFormat;
+			setRTsMask |= 1 << rtIndex;
 		}
-		else if (headToken.type == TokenType::Keyword_SetPS)
+		else if (statementToken.type == TokenType::Keyword_SetDepthRT)
 		{
+			if (depthRTIsSet)
+			{
+				reportError("depth render target is already set");
+				return false;
+			}
 
-		}
-		else if (headToken.type == TokenType::Keyword_SetRT)
-		{
+			if (!matchSimpleToken(TokenType('(')))
+				return false;
 
-		}
-		else if (headToken.type == TokenType::Keyword_SetDepthRT)
-		{
+			const Token depthRTFormatToken = tokenizer.getToken();
+			if (depthRTFormatToken.type != TokenType::Identifier)
+			{
+				reportError("expected depth render target format identifier");
+				return false;
+			}
 
+			const HAL::DepthStencilFormat depthRTFormat = ParseDepthStencilFormatString(depthRTFormatToken.string);
+			//if (!HAL::ValidateDepthStencilFormatValue(depthRTFormat))
+			//{
+			//	reportError("unknown depth render target format");
+			//	return false;
+			//}
+
+			if (!matchSimpleToken(TokenType(')')))
+				return false;
+
+			pipelineDesc.depthStencilFormat = depthRTFormat;
+			depthRTIsSet = true;
 		}
 		else
 		{
@@ -164,13 +274,170 @@ bool TargetDescriptionLoader::parseGraphicsPipelineDeclaration()
 
 	if (!pipelineLayout)
 	{
-		reportError("pipeline layout is undefined");
+		reportError("pipeline layout is not defined");
 		return false;
 	}
 
 	// TODO: More validation (shader combinations etc).
 
-	pipelinesList.createGraphicsPipeline(pipelineNameToken.string, *pipelineLayout, pipelineDesc);
+	Pipeline* pipeline = pipelinesList.createGraphicsPipeline(pipelineNameToken.string, *pipelineLayout, pipelineDesc);
+	if (!pipeline)
+	{
+		reportError("pipeline with this name already defined"); // TODO: Handle CRC collision separately.
+		return false;
+	}
+
+	return true;
+}
+
+bool TargetDescriptionLoader::parseComputePipelineDeclaration()
+{
+	const Token pipelineNameToken = tokenizer.getToken();
+	if (pipelineNameToken.type != TokenType::Identifier)
+	{
+		reportError("expected pipeline name");
+		return false;
+	}
+
+	if (!matchSimpleToken(TokenType('{')))
+		return false;
+
+	PipelineLayout* pipelineLayout = nullptr;
+	Shader* computeShader = nullptr;
+
+	for (;;)
+	{
+		const Token statementToken = tokenizer.getToken();
+		if (statementToken.type == TokenType('}'))
+			break;
+		if (statementToken.type == PseudoCTokenizer::TokenType::Semicolon)
+			continue;
+
+		if (statementToken.type == TokenType::Keyword_SetLayout)
+		{
+			if (pipelineLayout)
+			{
+				reportError("pipeline layout already defined");
+				return false;
+			}
+
+			pipelineLayout = parseSetLayoutStatement();
+			if (!pipelineLayout)
+				return false;
+		}
+		else if (statementToken.type == TokenType::Keyword_SetCS)
+		{
+			if (computeShader)
+			{
+				reportError("compute shader already defined");
+				return false;
+			}
+			if (!pipelineLayout)
+			{
+				reportError("pipeline layout should be defined prior to shaders");
+				return false;
+			}
+
+			computeShader = parseSetShaderStatement(HAL::ShaderCompiler::ShaderType::Compute, *pipelineLayout);
+			if (!computeShader)
+				return false;
+		}
+		else
+		{
+			reportError("expected compute pipeline setup statement");
+			return false;
+		}
+
+		if (!matchSimpleToken(TokenType(';')))
+			return false;
+	}
+
+	if (!pipelineLayout)
+	{
+		reportError("pipeline layout is not defined");
+		return false;
+	}
+
+	if (!computeShader)
+	{
+		reportError("compute shader is not defined");
+		return false;
+	}
+
+	Pipeline* pipeline = pipelinesList.createComputePipeline(pipelineNameToken.string, *pipelineLayout, *computeShader);
+	if (!pipeline)
+	{
+		reportError("pipeline with this name already defined"); // TODO: Handle CRC collision separately.
+		return false;
+	}
+
+	return true;
+}
+
+PipelineLayout* TargetDescriptionLoader::parseSetLayoutStatement()
+{
+	if (!matchSimpleToken(TokenType('(')))
+		return nullptr;
+
+	const Token layoutNameToken = tokenizer.getToken();
+	if (layoutNameToken.type != TokenType::Identifier)
+	{
+		reportError("expected pipeline layout name");
+		return nullptr;
+	}
+
+	if (!matchSimpleToken(TokenType(')')))
+		return nullptr;
+
+	PipelineLayout *pipelineLayout = pipelineLayoutsList.findEntry(layoutNameToken.string);
+	if (!pipelineLayout)
+	{
+		reportError("pipeline layout is not found");
+		return nullptr;
+	}
+
+	return pipelineLayout;
+}
+
+Shader* TargetDescriptionLoader::parseSetShaderStatement(
+	HAL::ShaderCompiler::ShaderType shaderType, PipelineLayout& pipelineLayout)
+{
+	if (!matchSimpleToken(TokenType('(')))
+		return nullptr;
+
+	const Token pathToken = tokenizer.getToken();
+	if (pathToken.type != TokenType::StringLiteral)
+	{
+		reportError("expected source path string literal");
+		return nullptr;
+	}
+
+	if (!matchSimpleToken(TokenType(',')))
+		return nullptr;
+
+	const Token entryPointNameToken = tokenizer.getToken();
+	if (pathToken.type != TokenType::StringLiteral)
+	{
+		reportError("expected entry point name string literal");
+		return nullptr;
+	}
+
+	if (!matchSimpleToken(TokenType(')')))
+		return nullptr;
+
+	SourceFile* source = sourcesCache.findOrCreateEntry(pathToken.string);
+	if (!source)
+	{
+		reportError("invalid source path");
+		return nullptr;
+	}
+
+	return &shadersList.findOrCreateEntry(shaderType, *source, entryPointNameToken.string, pipelineLayout);
+}
+
+void TargetDescriptionLoader::reportError(const char* message)
+{
+	TextWriteFmtStdOut(message);
 }
 
 bool TargetDescriptionLoader::parse()

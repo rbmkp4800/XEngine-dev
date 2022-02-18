@@ -11,7 +11,7 @@ namespace XEngine::Render::Shaders::Builder_
 {
 	class SourcesCache;
 
-	struct SourcesCacheEntry : public XLib::NonCopyable
+	struct SourceFile : public XLib::NonCopyable
 	{
 		friend SourcesCache;
 
@@ -32,10 +32,10 @@ namespace XEngine::Render::Shaders::Builder_
 		bool writeTimeChecked = false;
 
 	private:
-		~SourcesCacheEntry() = default;
+		~SourceFile() = default;
 
 	public:
-		inline SourcesCacheEntry(SourcesCache& parentCache) : parentCache(parentCache) {}
+		inline SourceFile(SourcesCache& parentCache) : parentCache(parentCache) {}
 
 		// Returns `InvalidTimePoint` if can't open file.
 		XLib::TimePoint checkWriteTime();
@@ -52,8 +52,8 @@ namespace XEngine::Render::Shaders::Builder_
 	private:
 		struct EntriesSearchTreeComparator;
 
-		using EntriesSearchTree = XLib::IntrusiveBinaryTree<SourcesCacheEntry, &SourcesCacheEntry::entriesSearchTreeHook, EntriesSearchTreeComparator>;
-		using EntriesStorageList = XLib::FixedLogSegmentedArrayList<SourcesCacheEntry, 5, 16>;
+		using EntriesSearchTree = XLib::IntrusiveBinaryTree<SourceFile, &SourceFile::entriesSearchTreeHook, EntriesSearchTreeComparator>;
+		using EntriesStorageList = XLib::FixedLogSegmentedArrayList<SourceFile, 5, 16>;
 
 	private:
 		EntriesSearchTree entriesSearchTree;
@@ -64,7 +64,8 @@ namespace XEngine::Render::Shaders::Builder_
 		SourcesCache() = default;
 		~SourcesCache() = default;
 
-		SourcesCacheEntry& findOrCreateEntry(const char* localPath);
+		// Returns false if `localPath` is not valid path.
+		SourceFile* findOrCreateEntry(XLib::StringView localPath);
 
 		inline void setSourcesRootPath(const char* sourcesRootPath) { this->sourcesRootPath = sourcesRootPath; }
 		inline const char* getSourcesRootPath() const { return sourcesRootPath; }
@@ -72,7 +73,7 @@ namespace XEngine::Render::Shaders::Builder_
 
 	struct SourcesCache::EntriesSearchTreeComparator abstract final
 	{
-		static inline ordering Compare(const SourcesCacheEntry& left, const SourcesCacheEntry& right) { return compare(left.localPathCRC, right.localPathCRC); }
-		static inline ordering Compare(const SourcesCacheEntry& left, uint64 right) { return compare(left.localPathCRC, right); }
+		static inline ordering Compare(const SourceFile& left, const SourceFile& right) { return compare(left.localPathCRC, right.localPathCRC); }
+		static inline ordering Compare(const SourceFile& left, uint64 right) { return compare(left.localPathCRC, right); }
 	};
 }

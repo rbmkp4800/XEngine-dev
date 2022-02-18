@@ -82,20 +82,22 @@ bool SourcesCacheEntry::retrieveText(StringView& resultText)
 	return true;
 }
 
-SourcesCacheEntry& SourcesCache::findOrCreateEntry(const char* localPath)
+SourceFile* SourcesCache::findOrCreateEntry(StringView localPath)
 {
 	XAssert(sourcesRootPath);
 
+	if (localPath.isEmpty())
+		return nullptr;
+
 	// TODO: Normalize path.
 	// TODO: Use lowercase for CRC computation.
-	const uintptr localPathLength = GetCStrLength(localPath);
-	const uint64 localPathCRC = CRC64::Compute(localPath, localPathLength);
+	const uint64 localPathCRC = CRC64::Compute(localPath.getData(), localPath.getLength());
 
 	const EntriesSearchTree::Iterator existingItemIt = entriesSearchTree.find(localPathCRC);
 	if (existingItemIt)
-		return *existingItemIt;
+		return existingItemIt;
 
-	SourcesCacheEntry& entry = entriesStorageList.emplaceBack(*this);
+	SourceFile& entry = entriesStorageList.emplaceBack(*this);
 	entry.localPath = localPath;
 	entry.localPathCRC = localPathCRC;
 

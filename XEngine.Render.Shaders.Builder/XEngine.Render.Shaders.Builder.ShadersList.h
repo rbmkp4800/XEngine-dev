@@ -21,11 +21,11 @@ namespace XEngine::Render::Shaders::Builder_
 
 	private:
 		XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
-		uint64 configurationHash = 0; // Hash of data like main source file name, pipeline layout name etc. Used as UID
+		uint64 configurationHash = 0; // Hash of data like main source file name, pipeline layout name etc. Used as UID.
 
-		SourcesCacheEntry& mainSource;
+		SourceFile& source;
+		XLib::StringView entryPointName;
 		const PipelineLayout& pipelineLayout;
-		const char* entryPointName = nullptr;
 		HAL::ShaderCompiler::ShaderType type = HAL::ShaderCompiler::ShaderType::Undefined;
 
 		HAL::ShaderCompiler::CompiledShader compiledShader;
@@ -34,7 +34,8 @@ namespace XEngine::Render::Shaders::Builder_
 		~Shader() = default;
 
 	public:
-		inline Shader(SourcesCacheEntry& mainSource, const PipelineLayout& pipelineLayout) : mainSource(mainSource), pipelineLayout(pipelineLayout) {}
+		inline Shader(SourceFile& source, XLib::StringView entryPointName, const PipelineLayout& pipelineLayout)
+			: source(source), entryPointName(entryPointName), pipelineLayout(pipelineLayout) {}
 
 		bool compile();
 
@@ -61,8 +62,8 @@ namespace XEngine::Render::Shaders::Builder_
 		ShadersList() = default;
 		~ShadersList() = default;
 
-		Shader* findOrCreateEntry(HAL::ShaderCompiler::ShaderType type,
-			SourcesCacheEntry& mainSource, const PipelineLayout& pipelineLayout);
+		Shader& findOrCreateEntry(HAL::ShaderCompiler::ShaderType type,
+			SourceFile& source, XLib::StringView entryPointName, const PipelineLayout& pipelineLayout);
 
 		inline bool isEmpty() const { return entriesStorageList.isEmpty(); }
 		inline uint32 getSize() const { return entriesStorageList.getSize(); }

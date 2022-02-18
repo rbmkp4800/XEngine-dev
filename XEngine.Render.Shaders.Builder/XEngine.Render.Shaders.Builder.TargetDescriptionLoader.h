@@ -7,6 +7,9 @@
 
 namespace XEngine::Render::Shaders::Builder_
 {
+	class PipelineLayout;
+	class Shader;
+
 	class PipelineLayoutsList;
 	class PipelinesList;
 	class ShadersList;
@@ -18,6 +21,11 @@ namespace XEngine::Render::Shaders::Builder_
 		using Tokenizer = PseudoCTokenizer;
 		using TokenType = PseudoCTokenizer::TokenType;
 		using Token = PseudoCTokenizer::Token;
+
+	private:
+		// These return not valid format on failure.
+		static HAL::TexelViewFormat ParseTexelViewFormatString(XLib::StringView string);
+		static HAL::DepthStencilFormat ParseDepthStencilFormatString(XLib::StringView string);
 
 	private:
 		Tokenizer tokenizer;
@@ -32,6 +40,8 @@ namespace XEngine::Render::Shaders::Builder_
 		bool parsePipelineLayoutDeclaration();
 		bool parseGraphicsPipelineDeclaration();
 		bool parseComputePipelineDeclaration();
+		PipelineLayout* parseSetLayoutStatement();
+		Shader* parseSetShaderStatement(HAL::ShaderCompiler::ShaderType shaderType, PipelineLayout& pipelineLayout);
 
 		void reportError(const char* message);
 

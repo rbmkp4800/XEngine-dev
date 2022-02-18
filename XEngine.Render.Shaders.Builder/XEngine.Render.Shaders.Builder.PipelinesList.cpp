@@ -26,13 +26,12 @@ bool Pipeline::compile()
 		pipelineLayout.getCompiled(), desc, compiledGraphicsPipeline);
 }
 
-Pipeline* PipelinesList::createPipelineInternal(const char* name, const PipelineLayout& pipelineLayout,
+Pipeline* PipelinesList::createPipelineInternal(StringView name, const PipelineLayout& pipelineLayout,
 	const GraphicsPipelineDesc* graphicsPipelineDesc, Shader* computeShader)
 {
 	XAssert((graphicsPipelineDesc == nullptr) != (computeShader == nullptr));
 
-	const uintptr nameLength = GetCStrLength(name);
-	const uint64 nameCRC = CRC64::Compute(name, nameLength);
+	const uint64 nameCRC = CRC64::Compute(name.getData(), name.getLength());
 
 	if (entriesSearchTree.find(nameCRC))
 		return nullptr; // Duplicate name found or CRC collision (can be handled separately).
