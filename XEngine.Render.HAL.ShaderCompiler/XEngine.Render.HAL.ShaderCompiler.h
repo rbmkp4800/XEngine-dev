@@ -2,6 +2,7 @@
 
 #include <XLib.h>
 #include <XLib.NonCopyable.h>
+#include <XLib.String.h>
 
 #include <XEngine.Render.HAL.Common.h>
 
@@ -46,7 +47,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 
 	struct PipelineBindPointDesc
 	{
-		const char* name;
+		XLib::StringView name;
 		PipelineBindPointType type;
 		PipelineBindPointShaderVisibility shaderVisibility;
 		union

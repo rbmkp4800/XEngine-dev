@@ -21,10 +21,9 @@ namespace XEngine::Render::Shaders::Builder_
 
 	private:
 		XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
-		uint64 configurationHash = 0; // Hash of data like main source file name, pipeline layout name etc. Used as UID.
 
 		SourceFile& source;
-		XLib::StringView entryPointName;
+		XLib::InplaceString64 entryPointName;
 		const PipelineLayout& pipelineLayout;
 		HAL::ShaderCompiler::ShaderType type = HAL::ShaderCompiler::ShaderType::Undefined;
 
@@ -34,8 +33,8 @@ namespace XEngine::Render::Shaders::Builder_
 		~Shader() = default;
 
 	public:
-		inline Shader(SourceFile& source, XLib::StringView entryPointName, const PipelineLayout& pipelineLayout)
-			: source(source), entryPointName(entryPointName), pipelineLayout(pipelineLayout) {}
+		inline Shader(SourceFile& source, HAL::ShaderCompiler::ShaderType type,
+			XLib::StringView entryPointName, const PipelineLayout& pipelineLayout);
 
 		bool compile();
 
@@ -47,6 +46,7 @@ namespace XEngine::Render::Shaders::Builder_
 	{
 	private:
 		struct EntriesSearchTreeComparator;
+		struct EntrySearchKey;
 
 		using EntriesSearchTree = XLib::IntrusiveBinaryTree<Shader, &Shader::searchTreeHook, EntriesSearchTreeComparator>;
 		using EntriesStorageList = XLib::FixedLogSegmentedArrayList<Shader, 5, 16>;
@@ -74,7 +74,7 @@ namespace XEngine::Render::Shaders::Builder_
 
 	struct ShadersList::EntriesSearchTreeComparator abstract final
 	{
-		static inline ordering Compare(const Shader& left, const Shader& right) { return compare(left.configurationHash, right.configurationHash); }
-		static inline ordering Compare(const Shader& left, uint64 right) { return compare(left.configurationHash, right); }
+		static ordering Compare(const Shader& left, const Shader& right);
+		static ordering Compare(const Shader& left, const EntrySearchKey& right);
 	};
 }

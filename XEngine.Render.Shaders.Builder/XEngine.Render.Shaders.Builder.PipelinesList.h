@@ -31,7 +31,7 @@ namespace XEngine::Render::Shaders::Builder_
 
 	private:
 		XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
-		const char* name = nullptr;
+		XLib::InplaceString256 name;
 		uint64 nameCRC = 0;
 
 		const PipelineLayout& pipelineLayout;
@@ -49,10 +49,11 @@ namespace XEngine::Render::Shaders::Builder_
 
 		bool compile();
 
-		inline const char* getName() const { return name; }
-		inline uint64 getNameCRC() const { return nameCRC; }
+		inline XLib::StringView getName() const { return name; }
+		//inline uint64 getNameCRC() const { return nameCRC; }
 		inline const PipelineLayout& getPipelineLayout() const { return pipelineLayout; }
 		inline bool isGraphicsPipeline() const { return isGraphics; }
+
 		inline const HAL::ShaderCompiler::CompiledShader& getCompiledCompute() const { return computeShader->getCompiled(); }
 		inline const HAL::ShaderCompiler::CompiledGraphicsPipeline& getCompiledGraphics() const { return compiledGraphicsPipeline; }
 	};

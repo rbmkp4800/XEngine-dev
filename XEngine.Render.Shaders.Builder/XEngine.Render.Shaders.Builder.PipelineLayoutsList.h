@@ -29,7 +29,7 @@ namespace XEngine::Render::Shaders::Builder_
 		PipelineLayoutsList& parentList;
 
 		XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
-		const char* name = nullptr;
+		XLib::InplaceString64 name;
 		uint64 nameCRC = 0;
 
 		uint32 bindPointsOffsetInParentStorage = 0;
@@ -45,9 +45,11 @@ namespace XEngine::Render::Shaders::Builder_
 
 		bool compile();
 
-		inline const char* getName() const { return name; }
+		inline XLib::StringView getName() const { return name; }
 		inline uint64 getNameCRC() const { return nameCRC; }
 		inline const HAL::ShaderCompiler::CompiledPipelineLayout& getCompiled() const { return compiledPipelineLayout; }
+
+		static inline ordering CompareOrdered(const PipelineLayout& left, const PipelineLayout& right) { return compare(left.nameCRC, right.nameCRC); }
 	};
 
 	class PipelineLayoutsList : public XLib::NonCopyable

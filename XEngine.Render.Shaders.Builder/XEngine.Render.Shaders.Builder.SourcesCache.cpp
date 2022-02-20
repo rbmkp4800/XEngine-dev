@@ -8,14 +8,19 @@
 using namespace XLib;
 using namespace XEngine::Render::Shaders::Builder_;
 
-enum class SourcesCacheEntry::TextState : uint8
+static inline ordering CompareStringsOrderedCaseAgnostic(const StringView& left, const StringView& right)
+{
+	
+}
+
+enum class SourceFile::TextState : uint8
 {
 	Unknown = 0,
 	Loaded,
 	CanNotOpen,
 };
 
-TimePoint SourcesCacheEntry::checkWriteTime()
+TimePoint SourceFile::checkWriteTime()
 {
 	if (writeTimeChecked)
 		return writeTime;
@@ -36,7 +41,7 @@ TimePoint SourcesCacheEntry::checkWriteTime()
 	return writeTime;
 }
 
-bool SourcesCacheEntry::retrieveText(StringView& resultText)
+bool SourceFile::retrieveText(StringView& resultText)
 {
 	resultText = {};
 

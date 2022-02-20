@@ -77,6 +77,7 @@ namespace XLib
 
 		inline CharType& operator [] (CounterType index) { return buffer[index]; }
 		inline CharType operator [] (CounterType index) const { return buffer[index]; }
+		inline operator StringView() const { return getView(); }
 	};
 
 
@@ -114,6 +115,10 @@ namespace XLib
 		inline bool isEmpty() const { return length == 0; }
 		inline bool isFull() const { return length + 1 == Capacity; }
 
+		inline CharType& operator [] (CounterType index) { return storage[index]; }
+		inline CharType operator [] (CounterType index) const { return storage[index]; }
+		inline operator StringView() const { return getView(); }
+
 		static constexpr CounterType GetCapacity() { return Capacity; }
 		static constexpr CounterType GetMaxLength() { return Capacity - 1; }
 	};
@@ -122,6 +127,7 @@ namespace XLib
 
 	using InplaceString32 = InplaceString<31, uint8>;		static_assert(sizeof(InplaceString32) == 32);
 	using InplaceString64 = InplaceString<63, uint8>;		static_assert(sizeof(InplaceString64) == 64);
+	using InplaceString128 = InplaceString<127, uint8>;		static_assert(sizeof(InplaceString128) == 128);
 	using InplaceString256 = InplaceString<255, uint8>;		static_assert(sizeof(InplaceString256) == 256);
 	using InplaceString1024 = InplaceString<1022, uint16>;	static_assert(sizeof(InplaceString1024) == 1024);
 	using InplaceString2048 = InplaceString<2046, uint16>;	static_assert(sizeof(InplaceString2048) == 2048);
@@ -135,7 +141,7 @@ namespace XLib
 	inline bool AreStringsEqual(const BaseStringView<CharType>& a, const CharType* bCStr);
 
 	template <typename CharType>
-	inline sint32 CompareStrings();
+	inline ordering CompareStringsOrdered(const BaseStringView<CharType>& left, const BaseStringView<CharType>& right);
 
 	template <typename CharType = char>
 	inline uintptr GetCStrLength(const CharType* cstr);
@@ -241,6 +247,25 @@ namespace XLib
 				return false;
 		}
 		return bCStr[a.getLength()] == 0;
+	}
+
+	template <typename CharType>
+	inline ordering CompareStringsOrdered(const BaseStringView<CharType>& left, const BaseStringView<CharType>& right)
+	{
+		const uintptr leftLength = left.getLength();
+		const uintptr rightLength = right.getLength();
+
+		for (uintptr i = 0; i < leftLength; i++)
+		{
+			if (i >= rightLength)
+				return ordering::greater;
+			if (left[i] > right[i])
+				return ordering::greater;
+			if (left[i] < right[i])
+				return ordering::less;
+		}
+
+		return leftLength == rightLength ? ordering::equivalent : ordering::less;
 	}
 
 	template <typename CharType>

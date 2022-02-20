@@ -22,8 +22,7 @@ namespace XEngine::Render::Shaders::Builder_
 		SourcesCache& parentCache;
 
 		XLib::IntrusiveBinaryTreeNodeHook entriesSearchTreeHook;
-		const char* localPath = nullptr;
-		uint64 localPathCRC = 0;
+		XLib::InplaceString128 localPath;
 
 		XLib::String text;
 		TextState textState = TextState(0);
@@ -43,8 +42,9 @@ namespace XEngine::Render::Shaders::Builder_
 		// Returns false if can't open file.
 		bool retrieveText(XLib::StringView& resultText);
 
-		inline const char* getLocalPath() const { return localPath; }
-		inline uint64 getLocalPathCRC() const { return localPathCRC; }
+		inline XLib::StringView getLocalPath() const { return localPath; }
+
+		static ordering CompareOrdered(const SourceFile& left, const SourceFile& right);
 	};
 
 	class SourcesCache : public XLib::NonCopyable
@@ -64,7 +64,6 @@ namespace XEngine::Render::Shaders::Builder_
 		SourcesCache() = default;
 		~SourcesCache() = default;
 
-		// Returns false if `localPath` is not valid path.
 		SourceFile* findOrCreateEntry(XLib::StringView localPath);
 
 		inline void setSourcesRootPath(const char* sourcesRootPath) { this->sourcesRootPath = sourcesRootPath; }
@@ -73,7 +72,7 @@ namespace XEngine::Render::Shaders::Builder_
 
 	struct SourcesCache::EntriesSearchTreeComparator abstract final
 	{
-		static inline ordering Compare(const SourceFile& left, const SourceFile& right) { return compare(left.localPathCRC, right.localPathCRC); }
-		static inline ordering Compare(const SourceFile& left, uint64 right) { return compare(left.localPathCRC, right); }
+		static ordering Compare(const SourceFile& left, const SourceFile& right);
+		static ordering Compare(const SourceFile& left, const XLib::StringView& right);
 	};
 }
