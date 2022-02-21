@@ -43,6 +43,7 @@ namespace XEngine::Render::Shaders::Builder_
 		bool retrieveText(XLib::StringView& resultText);
 
 		inline XLib::StringView getLocalPath() const { return localPath; }
+		inline const char* getLocalPathCStr() const { return localPath.getCStr(); }
 
 		static ordering CompareOrdered(const SourceFile& left, const SourceFile& right);
 	};
@@ -58,16 +59,29 @@ namespace XEngine::Render::Shaders::Builder_
 	private:
 		EntriesSearchTree entriesSearchTree;
 		EntriesStorageList entriesStorageList;
-		const char* sourcesRootPath = nullptr;
+		const char* rootPath = nullptr;
+
+	public:
+		enum class EntryCreationStatus
+		{
+			Success = 0,
+			Failure_InvalidPath,
+		};
+
+		struct EntryCreationResult
+		{
+			SourceFile* entry;
+			EntryCreationStatus status;
+		};
 
 	public:
 		SourcesCache() = default;
 		~SourcesCache() = default;
 
-		SourceFile* findOrCreateEntry(XLib::StringView localPath);
+		EntryCreationResult createEntryIfAbsent(XLib::StringView localPath);
 
-		inline void setSourcesRootPath(const char* sourcesRootPath) { this->sourcesRootPath = sourcesRootPath; }
-		inline const char* getSourcesRootPath() const { return sourcesRootPath; }
+		inline void setRootPath(const char* sourcesRootPath) { this->rootPath = sourcesRootPath; }
+		inline const char* getRootPath() const { return rootPath; }
 	};
 
 	struct SourcesCache::EntriesSearchTreeComparator abstract final

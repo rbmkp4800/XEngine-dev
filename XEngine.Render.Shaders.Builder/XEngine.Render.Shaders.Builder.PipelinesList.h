@@ -70,19 +70,29 @@ namespace XEngine::Render::Shaders::Builder_
 		EntriesSearchTree entriesSearchTree;
 		EntriesStorageList entriesStorageList;
 
-	private:
-		Pipeline* createPipelineInternal(XLib::StringView name, const PipelineLayout& pipelineLayout,
-			const GraphicsPipelineDesc* graphicsPipelineDesc, Shader* computeShader);
 
 	public:
 		using Iterator = EntriesSearchTree::Iterator;
+
+		enum class EntryCreationStatus
+		{
+			Success = 0,
+			Failure_EntryWithSuchNameAlreadyExists,
+			//Failure_EntryNameCRCCollision,
+		};
+
+		struct EntryCreationResult
+		{
+			Pipeline* entry;
+			EntryCreationStatus status;
+		};
 
 	public:
 		PipelinesList() = default;
 		~PipelinesList() = default;
 
-		Pipeline* createGraphicsPipeline(XLib::StringView name, const PipelineLayout& pipelineLayout, const GraphicsPipelineDesc& pipelineDesc) { return createPipelineInternal(name, pipelineLayout, &pipelineDesc, nullptr); }
-		Pipeline* createComputePipeline(XLib::StringView name, const PipelineLayout& pipelineLayout, Shader& computeShader) { return createPipelineInternal(name, pipelineLayout, nullptr, &computeShader); }
+		EntryCreationResult createPipeline(XLib::StringView name, const PipelineLayout& pipelineLayout,
+			const GraphicsPipelineDesc* graphicsPipelineDesc, Shader* computeShader);
 
 		inline uint32 getSize() const { return entriesStorageList.getSize(); }
 

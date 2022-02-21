@@ -58,11 +58,23 @@ namespace XEngine::Render::Shaders::Builder_
 	public:
 		using Iterator = EntriesSearchTree::Iterator;
 
+		enum class EntryCreationStatus
+		{
+			Success = 0,
+			Failure_ShaderExistsButHasOtherType,
+		};
+
+		struct EntryCreationResult
+		{
+			Shader* entry;
+			EntryCreationStatus status;
+		};
+
 	public:
 		ShadersList() = default;
 		~ShadersList() = default;
 
-		Shader& findOrCreateEntry(HAL::ShaderCompiler::ShaderType type,
+		EntryCreationResult createIfAbsent(HAL::ShaderCompiler::ShaderType type,
 			SourceFile& source, XLib::StringView entryPointName, const PipelineLayout& pipelineLayout);
 
 		inline bool isEmpty() const { return entriesStorageList.isEmpty(); }

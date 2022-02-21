@@ -26,7 +26,7 @@ TimePoint SourceFile::checkWriteTime()
 		return writeTime;
 
 	String fullPath; // TODO: Use `InplaceString1024` when ready.
-	fullPath.append(parentCache.getSourcesRootPath());
+	fullPath.append(parentCache.getRootPath());
 	fullPath.append(localPath);
 	// TODO: Assert total length
 
@@ -54,7 +54,7 @@ bool SourceFile::retrieveText(StringView& resultText)
 	}
 
 	String fullPath; // TODO: Use `InplaceString1024` when ready.
-	fullPath.append(parentCache.getSourcesRootPath());
+	fullPath.append(parentCache.getRootPath());
 	fullPath.append(localPath);
 
 	XAssert(text.isEmpty());
@@ -87,18 +87,16 @@ bool SourceFile::retrieveText(StringView& resultText)
 	return true;
 }
 
-SourceFile* SourcesCache::findOrCreateEntry(StringView localPath)
+SourcesCache::EntryCreationResult SourcesCache::createEntryIfAbsent(StringView localPath)
 {
-	XAssert(sourcesRootPath);
+	XAssert(rootPath);
 
-	if (localPath.isEmpty())
-		return nullptr;
+	if (localPath.isEmpty()) // TODO: Here should be proper check for valid relative path.
+		return EntryCreationResult { nullptr, EntryCreationStatus::Failure_InvalidPath };
 
 	// TODO: Normalize path.
-	// TODO: Use lowercase for CRC computation.
-	const uint64 localPathCRC = CRC64::Compute(localPath.getData(), localPath.getLength());
 
-	const EntriesSearchTree::Iterator existingItemIt = entriesSearchTree.find(localPathCRC);
+	const EntriesSearchTree::Iterator existingItemIt = entriesSearchTree.find();
 	if (existingItemIt)
 		return existingItemIt;
 

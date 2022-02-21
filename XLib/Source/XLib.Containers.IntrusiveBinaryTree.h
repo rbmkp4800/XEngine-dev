@@ -44,7 +44,7 @@ namespace XLib
 		~IntrusiveBinaryTree() = default;
 
 		template <typename Key>
-		inline Iterator find(const Key& key);
+		inline Iterator find(const Key& key) const;
 
 		inline Iterator insert(Node& node, Iterator* outExistingNode = nullptr);
 		inline Iterator remove(Node& node);
@@ -197,7 +197,7 @@ namespace XLib
 	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::* nodeHook), typename NodeComparator>
 	template <typename Key>
 	inline auto IntrusiveBinaryTree<Node, nodeHook, NodeComparator>::
-		find(const Key& key) -> Iterator
+		find(const Key& key) const -> Iterator
 	{
 		NodeAdapter nodeAdapter;
 		return Iterator(TreeLogic::Find(nodeAdapter, root, key));

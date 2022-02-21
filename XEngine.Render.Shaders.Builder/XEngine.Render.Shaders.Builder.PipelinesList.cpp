@@ -26,18 +26,20 @@ bool Pipeline::compile()
 		pipelineLayout.getCompiled(), desc, compiledGraphicsPipeline);
 }
 
-Pipeline* PipelinesList::createPipelineInternal(StringView name, const PipelineLayout& pipelineLayout,
-	const GraphicsPipelineDesc* graphicsPipelineDesc, Shader* computeShader)
+PipelinesList::EntryCreationResult PipelinesList::createPipeline(StringView name,
+	const PipelineLayout& pipelineLayout, const GraphicsPipelineDesc* graphicsPipelineDesc, Shader* computeShader)
 {
 	XAssert((graphicsPipelineDesc == nullptr) != (computeShader == nullptr));
 
 	const uint64 nameCRC = CRC64::Compute(name.getData(), name.getLength());
-
 	if (entriesSearchTree.find(nameCRC))
-		return nullptr; // Duplicate name found or CRC collision (can be handled separately).
+	{
+		// Duplicate name found or CRC collision. These cases should be handled separately.
+		return EntryCreationResult { nullptr, EntryCreationStatus::Failure_EntryWithSuchNameAlreadyExists };
+	}
 
 	Pipeline& pipeline = entriesStorageList.emplaceBack(pipelineLayout);
-	pipeline.name = name;
+	pipeline.name.copyFrom(name);
 	pipeline.nameCRC = nameCRC;
 	pipeline.graphicsDesc = graphicsPipelineDesc ? *graphicsPipelineDesc : GraphicsPipelineDesc {};
 	pipeline.computeShader = computeShader;
@@ -45,5 +47,5 @@ Pipeline* PipelinesList::createPipelineInternal(StringView name, const PipelineL
 
 	entriesSearchTree.insert(pipeline);
 
-	return &pipeline;
+	return EntryCreationResult { &pipeline, EntryCreationStatus::Success };
 }

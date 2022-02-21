@@ -59,6 +59,7 @@ namespace XLib
 		inline void operator = (BaseString&& that);
 
 		inline void pushBack(CharType c);
+		inline void append(StringView stringToAppend);
 		inline void append(const char* stringToAppend);
 
 		inline void resize(CounterType newLength, CharType c = '\0');
@@ -95,12 +96,12 @@ namespace XLib
 		inline InplaceString();
 		~InplaceString() = default;
 
-		inline bool copyFrom(const char* cstr, uintptr lengthLimit = uintptr(-1));
 		inline bool copyFrom(StringView string);
+		inline bool copyFrom(const char* cstr, uintptr lengthLimit = uintptr(-1));
 
 		inline void pushBack(CharType c);
-		inline bool append(const char* cstr, uintptr appendLengthLimit = uintptr(-1));
 		inline bool append(StringView string);
+		inline bool append(const char* cstr, uintptr appendLengthLimit = uintptr(-1));
 
 		inline void clear();
 		inline void truncate(CounterType newLength);
@@ -108,7 +109,7 @@ namespace XLib
 
 		inline CharType* getMutableData() { return &storage; }
 
-		inline StringView getView() const { return StringView(&storage, length); }
+		inline StringView getView() const { return StringView(storage, length); }
 		inline const CharType* getCStr() const { return storage; }
 		inline const CharType* getData() const { return storage; }
 		inline CounterType getLength() const { return length; }

@@ -15,7 +15,8 @@ bool PipelineLayout::compile()
 
 	for (uint8 i = 0; i < bindPointCount; i++)
 	{
-		const BindPointDesc& src = parentList.bindPointsStorageList[bindPointsOffsetInParentStorage + i];
+		const PipelineLayoutsList::InplaceBindPointDesc& src =
+			parentList.bindPointsStorageList[bindPointsOffsetInParentStorage + i];
 		ShaderCompiler::PipelineBindPointDesc& dst = compilerBindPointDescs[i];
 		dst.name = src.name;
 		dst.type = src.type;
@@ -27,27 +28,44 @@ bool PipelineLayout::compile()
 		compilerBindPointDescs, bindPointCount, compiledPipelineLayout);
 }
 
-PipelineLayout* PipelineLayoutsList::createEntry(const char* name, const BindPointDesc* bindPoints, uint8 bindPointCount)
+PipelineLayoutsList::EntryCreationResult PipelineLayoutsList::createEntry(
+	XLib::StringView name, const BindPointDesc* bindPoints, uint8 bindPointCount)
 {
-	XAssert(bindPointCount <= MaxPipelineBindPointCount); // TODO: Make this an error.
+	XAssert(bindPointCount <= MaxPipelineBindPointCount);
 
-	const uintptr nameLength = GetCStrLength(name);
-	const uint64 nameCRC = CRC64::Compute(name, nameLength);
-
+	const uint64 nameCRC = CRC64::Compute(name.getData(), name.getLength());
 	if (entriesSearchTree.find(nameCRC))
-		return nullptr; // Duplicate name found or CRC collision (can be handled separately).
+	{
+		// Duplicate name found or CRC collision. These cases should be handled separately.
+		return EntryCreationResult { nullptr, EntryCreationStatus::Failure_EntryWithSuchNameAlreadyExists };
+	}
 
 	const uint32 bindPointsOffset = bindPointsStorageList.getSize();
 	for (uint8 i = 0; i < bindPointCount; i++)
-		bindPointsStorageList.pushBack(bindPoints[i]);
+	{
+		const BindPointDesc& src = bindPoints[i];
+		InplaceBindPointDesc& dst = bindPointsStorageList.emplaceBack();
+
+		XAssert(src.name.getLength() <= dst.name.GetMaxLength());
+		dst.name.copyFrom(src.name);
+		dst.type = src.type;
+		dst.shaderVisibility = src.shaderVisibility;
+		dst.constantsSize32bitValues = src.constantsSize32bitValues;
+	}
 
 	PipelineLayout& pipelineLayout = entriesStorageList.emplaceBack(*this);
-	pipelineLayout.name = name;
+	pipelineLayout.name.copyFrom(name);
 	pipelineLayout.nameCRC = nameCRC;
 	pipelineLayout.bindPointsOffsetInParentStorage = bindPointsOffset;
 	pipelineLayout.bindPointCount = bindPointCount;
 
 	entriesSearchTree.insert(pipelineLayout);
 
-	return &pipelineLayout;
+	return EntryCreationResult { &pipelineLayout, EntryCreationStatus::Success };
+}
+
+PipelineLayout* PipelineLayoutsList::findEntry(XLib::StringView name) const
+{
+	const uint64 nameCRC = CRC64::Compute(name.getData(), name.getLength());
+	return entriesSearchTree.find(nameCRC);
 }

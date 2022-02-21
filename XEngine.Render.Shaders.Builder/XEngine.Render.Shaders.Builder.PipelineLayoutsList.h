@@ -46,22 +46,36 @@ namespace XEngine::Render::Shaders::Builder_
 		bool compile();
 
 		inline XLib::StringView getName() const { return name; }
-		inline uint64 getNameCRC() const { return nameCRC; }
+		//inline uint64 getNameCRC() const { return nameCRC; }
 		inline const HAL::ShaderCompiler::CompiledPipelineLayout& getCompiled() const { return compiledPipelineLayout; }
 
 		static inline ordering CompareOrdered(const PipelineLayout& left, const PipelineLayout& right) { return compare(left.nameCRC, right.nameCRC); }
 	};
+
+	// NOTE: Maximum number of bind points and maximum bind point name length should be checked by
+	// `PipelineLayoutsList::createEntry` caller using corresponding constants.
 
 	class PipelineLayoutsList : public XLib::NonCopyable
 	{
 		friend PipelineLayout;
 
 	private:
+		using InplaceBindPointNameString = XLib::InplaceString64;
+
+		struct InplaceBindPointDesc
+		{
+			InplaceBindPointNameString name;
+			HAL::PipelineBindPointType type;
+			HAL::ShaderCompiler::PipelineBindPointShaderVisibility shaderVisibility;
+			uint8 constantsSize32bitValues;
+			// DescriptorTableRef
+		};
+
 		struct EntriesSearchTreeComparator;
 
 		using EntriesSearchTree = XLib::IntrusiveBinaryTree<PipelineLayout, &PipelineLayout::searchTreeHook, EntriesSearchTreeComparator>;
 		using EntriesStorageList = XLib::FixedLogSegmentedArrayList<PipelineLayout, 4, 10>;
-		using BindPointsStorageList = XLib::ArrayList<BindPointDesc, uint32, false>;
+		using BindPointsStorageList = XLib::ArrayList<InplaceBindPointDesc, uint32, false>;
 
 	private:
 		EntriesSearchTree entriesSearchTree;
@@ -71,12 +85,27 @@ namespace XEngine::Render::Shaders::Builder_
 	public:
 		using Iterator = EntriesSearchTree::Iterator;
 
+		enum class EntryCreationStatus
+		{
+			Success = 0,
+			Failure_EntryWithSuchNameAlreadyExists,
+			//Failure_EntryNameCRCCollision,
+		};
+
+		struct EntryCreationResult
+		{
+			PipelineLayout* entry;
+			EntryCreationStatus status;
+		};
+
+		static constexpr uint8 MaxBindPointCount = HAL::MaxPipelineBindPointCount;
+		static constexpr uintptr MaxBindPointNameLength = InplaceBindPointNameString::GetMaxLength();
+
 	public:
 		PipelineLayoutsList() = default;
 		~PipelineLayoutsList() = default;
 
-		// Returns null if entry with such name already exists.
-		PipelineLayout* createEntry(XLib::StringView name, const BindPointDesc* bindPoints, uint8 bindPointCount);
+		EntryCreationResult createEntry(XLib::StringView name, const BindPointDesc* bindPoints, uint8 bindPointCount);
 
 		PipelineLayout* findEntry(XLib::StringView name) const;
 

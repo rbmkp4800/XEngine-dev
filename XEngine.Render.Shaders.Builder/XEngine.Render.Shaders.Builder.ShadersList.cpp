@@ -43,15 +43,15 @@ ordering ShadersList::EntriesSearchTreeComparator::Compare(const Shader& left, c
 
 bool Shader::compile()
 {
-	StringView source = {};
-	if (!source.retrieveText(source))
+	StringView sourceText = {};
+	if (!source.retrieveText(sourceText))
 		return false;
 
 	return ShaderCompiler::Host::CompileShader(ShaderCompiler::Platform::D3D12, pipelineLayout.getCompiled(),
-		type, source.getLocalPath(), source.getData(), uint32(source.getLength()), compiledShader);
+		type, source.getLocalPathCStr(), sourceText.getData(), uint32(sourceText.getLength()), compiledShader);
 }
 
-Shader& ShadersList::findOrCreateEntry(ShaderCompiler::ShaderType type,
+ShadersList::EntryCreationResult ShadersList::createIfAbsent(ShaderCompiler::ShaderType type,
 	SourceFile& source, XLib::StringView entryPointName, const PipelineLayout& pipelineLayout)
 {
 	// TODO: Validate shader type value.
@@ -60,12 +60,13 @@ Shader& ShadersList::findOrCreateEntry(ShaderCompiler::ShaderType type,
 	const EntriesSearchTree::Iterator existingItemIt = entriesSearchTree.find(existingEntrySearchKey);
 	if (existingItemIt)
 	{
-
-		return *existingItemIt;
+		if (existingItemIt->getType() != type)
+			EntryCreationResult { nullptr, EntryCreationStatus::Failure_ShaderExistsButHasOtherType };
+		return EntryCreationResult { existingItemIt, EntryCreationStatus::Success };
 	}
 
 	Shader& shader = entriesStorageList.emplaceBack(source, type, entryPointName, pipelineLayout);
 	entriesSearchTree.insert(shader);
 
-	return shader;
+	return EntryCreationResult { &shader, EntryCreationStatus::Success };
 }
