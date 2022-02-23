@@ -7,6 +7,20 @@ using namespace XLib;
 using namespace XEngine::Render::HAL;
 using namespace XEngine::Render::Shaders::Builder_;
 
+// Shader //////////////////////////////////////////////////////////////////////////////////////////
+
+bool Shader::compile()
+{
+	StringView sourceText = {};
+	if (!source.retrieveText(sourceText))
+		return false;
+
+	return ShaderCompiler::Host::CompileShader(ShaderCompiler::Platform::D3D12, pipelineLayout.getCompiled(),
+		type, source.getLocalPathCStr(), sourceText.getData(), uint32(sourceText.getLength()), compiledShader);
+}
+
+// ShadersList /////////////////////////////////////////////////////////////////////////////////////
+
 struct ShadersList::EntrySearchKey
 {
 	const SourceFile& source;
@@ -41,17 +55,7 @@ ordering ShadersList::EntriesSearchTreeComparator::Compare(const Shader& left, c
 	return EntrySearchKey::Compare(EntrySearchKey::Construct(left), right);
 }
 
-bool Shader::compile()
-{
-	StringView sourceText = {};
-	if (!source.retrieveText(sourceText))
-		return false;
-
-	return ShaderCompiler::Host::CompileShader(ShaderCompiler::Platform::D3D12, pipelineLayout.getCompiled(),
-		type, source.getLocalPathCStr(), sourceText.getData(), uint32(sourceText.getLength()), compiledShader);
-}
-
-ShadersList::EntryCreationResult ShadersList::createIfAbsent(ShaderCompiler::ShaderType type,
+ShadersList::EntryCreationResult ShadersList::createEntryIfAbsent(ShaderCompiler::ShaderType type,
 	SourceFile& source, XLib::StringView entryPointName, const PipelineLayout& pipelineLayout)
 {
 	// TODO: Validate shader type value.
@@ -61,7 +65,7 @@ ShadersList::EntryCreationResult ShadersList::createIfAbsent(ShaderCompiler::Sha
 	if (existingItemIt)
 	{
 		if (existingItemIt->getType() != type)
-			EntryCreationResult { nullptr, EntryCreationStatus::Failure_ShaderExistsButHasOtherType };
+			EntryCreationResult { nullptr, EntryCreationStatus::Failure_ShaderAlreadyCreatedWithOtherType };
 		return EntryCreationResult { existingItemIt, EntryCreationStatus::Success };
 	}
 

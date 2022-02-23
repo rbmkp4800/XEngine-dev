@@ -34,7 +34,7 @@ HAL::DepthStencilFormat TargetDescriptionLoader::ParseDepthStencilFormatString(S
 	return HAL::DepthStencilFormat(-1);
 }
 
-bool TargetDescriptionLoader::matchSimpleToken(TokenType type)
+bool TargetDescriptionLoader::expectSimpleToken(TokenType type)
 {
 	const Token token = tokenizer.getToken();
 	if (token.type != type)
@@ -54,7 +54,7 @@ bool TargetDescriptionLoader::parsePipelineLayoutDeclaration()
 		return false;
 	}
 
-	if (!matchSimpleToken(TokenType('{')))
+	if (!expectSimpleToken(TokenType('{')))
 		return false;
 
 	InplaceArrayList<BindPointDesc, HAL::MaxPipelineBindPointCount> bindPoints;
@@ -81,7 +81,7 @@ bool TargetDescriptionLoader::parsePipelineLayoutDeclaration()
 
 		bindPointDesc.name = bindPointNameToken.string;
 
-		if (!matchSimpleToken(TokenType(';')))
+		if (!expectSimpleToken(TokenType(';')))
 			return false;
 
 		if (bindPoints.isFull())
@@ -93,11 +93,12 @@ bool TargetDescriptionLoader::parsePipelineLayoutDeclaration()
 		bindPoints.pushBack(bindPointDesc);
 	}
 
-	PipelineLayout* pipelineLayout = pipelineLayoutsList.createEntry(
-		pipelineLayoutNameToken.string, bindPoints, uint8(bindPoints.getSize()));
+	const PipelineLayoutsList::EntryCreationResult pipelineLayoutCreationResult =
+		pipelineLayoutsList.createEntry(pipelineLayoutNameToken.string, bindPoints, uint8(bindPoints.getSize()));
 	
-	if (!pipelineLayout)
+	if (pipelineLayoutCreationResult.status != PipelineLayoutsList::EntryCreationStatus::Success)
 	{
+		// TODO: Proper error handling (CRC collsitions etc).
 		reportError("pipeline layout redefinition");
 		return false;
 	}
@@ -114,7 +115,7 @@ bool TargetDescriptionLoader::parseGraphicsPipelineDeclaration()
 		return false;
 	}
 
-	if (!matchSimpleToken(TokenType('{')))
+	if (!expectSimpleToken(TokenType('{')))
 		return false;
 
 	PipelineLayout* pipelineLayout = nullptr;
@@ -178,7 +179,7 @@ bool TargetDescriptionLoader::parseGraphicsPipelineDeclaration()
 		}
 		else if (statementToken.type == TokenType::Keyword_SetRT)
 		{
-			if (!matchSimpleToken(TokenType('(')))
+			if (!expectSimpleToken(TokenType('(')))
 				return false;
 
 			const Token rtIndexToken = tokenizer.getToken();
@@ -202,7 +203,7 @@ bool TargetDescriptionLoader::parseGraphicsPipelineDeclaration()
 				return false;
 			}
 
-			if (!matchSimpleToken(TokenType(',')))
+			if (!expectSimpleToken(TokenType(',')))
 				return false;
 
 			const Token rtFormatToken = tokenizer.getToken();
@@ -225,7 +226,7 @@ bool TargetDescriptionLoader::parseGraphicsPipelineDeclaration()
 				return false;
 			}
 
-			if (!matchSimpleToken(TokenType(')')))
+			if (!expectSimpleToken(TokenType(')')))
 				return false;
 
 			pipelineDesc.renderTargetsFormats[rtIndex] = rtFormat;
@@ -239,7 +240,7 @@ bool TargetDescriptionLoader::parseGraphicsPipelineDeclaration()
 				return false;
 			}
 
-			if (!matchSimpleToken(TokenType('(')))
+			if (!expectSimpleToken(TokenType('(')))
 				return false;
 
 			const Token depthRTFormatToken = tokenizer.getToken();
@@ -256,7 +257,7 @@ bool TargetDescriptionLoader::parseGraphicsPipelineDeclaration()
 			//	return false;
 			//}
 
-			if (!matchSimpleToken(TokenType(')')))
+			if (!expectSimpleToken(TokenType(')')))
 				return false;
 
 			pipelineDesc.depthStencilFormat = depthRTFormat;
@@ -268,7 +269,7 @@ bool TargetDescriptionLoader::parseGraphicsPipelineDeclaration()
 			return false;
 		}
 
-		if (!matchSimpleToken(TokenType(';')))
+		if (!expectSimpleToken(TokenType(';')))
 			return false;
 	}
 
@@ -280,10 +281,12 @@ bool TargetDescriptionLoader::parseGraphicsPipelineDeclaration()
 
 	// TODO: More validation (shader combinations etc).
 
-	Pipeline* pipeline = pipelinesList.createGraphicsPipeline(pipelineNameToken.string, *pipelineLayout, pipelineDesc);
-	if (!pipeline)
+	const PipelinesList::EntryCreationResult pipelineCreationResult =
+		pipelinesList.createEntry(pipelineNameToken.string, *pipelineLayout, &pipelineDesc, nullptr);
+	if (pipelineCreationResult.status != PipelinesList::EntryCreationStatus::Success)
 	{
-		reportError("pipeline with this name already defined"); // TODO: Handle CRC collision separately.
+		// TODO: Proper error handling (CRC collsitions etc).
+		reportError("pipeline with this name already defined");
 		return false;
 	}
 
@@ -299,7 +302,7 @@ bool TargetDescriptionLoader::parseComputePipelineDeclaration()
 		return false;
 	}
 
-	if (!matchSimpleToken(TokenType('{')))
+	if (!expectSimpleToken(TokenType('{')))
 		return false;
 
 	PipelineLayout* pipelineLayout = nullptr;
@@ -348,7 +351,7 @@ bool TargetDescriptionLoader::parseComputePipelineDeclaration()
 			return false;
 		}
 
-		if (!matchSimpleToken(TokenType(';')))
+		if (!expectSimpleToken(TokenType(';')))
 			return false;
 	}
 
@@ -364,10 +367,12 @@ bool TargetDescriptionLoader::parseComputePipelineDeclaration()
 		return false;
 	}
 
-	Pipeline* pipeline = pipelinesList.createComputePipeline(pipelineNameToken.string, *pipelineLayout, *computeShader);
-	if (!pipeline)
+	const PipelinesList::EntryCreationResult pipelineCreationResult =
+		pipelinesList.createEntry(pipelineNameToken.string, *pipelineLayout, nullptr, computeShader);
+	if (pipelineCreationResult.status != PipelinesList::EntryCreationStatus::Success)
 	{
-		reportError("pipeline with this name already defined"); // TODO: Handle CRC collision separately.
+		// TODO: Proper error handling (CRC collsitions etc).
+		reportError("pipeline with this name already defined");
 		return false;
 	}
 
@@ -376,7 +381,7 @@ bool TargetDescriptionLoader::parseComputePipelineDeclaration()
 
 PipelineLayout* TargetDescriptionLoader::parseSetLayoutStatement()
 {
-	if (!matchSimpleToken(TokenType('(')))
+	if (!expectSimpleToken(TokenType('(')))
 		return nullptr;
 
 	const Token layoutNameToken = tokenizer.getToken();
@@ -386,7 +391,7 @@ PipelineLayout* TargetDescriptionLoader::parseSetLayoutStatement()
 		return nullptr;
 	}
 
-	if (!matchSimpleToken(TokenType(')')))
+	if (!expectSimpleToken(TokenType(')')))
 		return nullptr;
 
 	PipelineLayout *pipelineLayout = pipelineLayoutsList.findEntry(layoutNameToken.string);
@@ -402,7 +407,7 @@ PipelineLayout* TargetDescriptionLoader::parseSetLayoutStatement()
 Shader* TargetDescriptionLoader::parseSetShaderStatement(
 	HAL::ShaderCompiler::ShaderType shaderType, PipelineLayout& pipelineLayout)
 {
-	if (!matchSimpleToken(TokenType('(')))
+	if (!expectSimpleToken(TokenType('(')))
 		return nullptr;
 
 	const Token pathToken = tokenizer.getToken();
@@ -412,7 +417,7 @@ Shader* TargetDescriptionLoader::parseSetShaderStatement(
 		return nullptr;
 	}
 
-	if (!matchSimpleToken(TokenType(',')))
+	if (!expectSimpleToken(TokenType(',')))
 		return nullptr;
 
 	const Token entryPointNameToken = tokenizer.getToken();
@@ -422,17 +427,38 @@ Shader* TargetDescriptionLoader::parseSetShaderStatement(
 		return nullptr;
 	}
 
-	if (!matchSimpleToken(TokenType(')')))
+	if (!expectSimpleToken(TokenType(')')))
 		return nullptr;
 
-	SourceFile* source = sourcesCache.findOrCreateEntry(pathToken.string);
-	if (!source)
+	const SourcesCache::EntryCreationResult sourceCreationResult = sourcesCache.createEntryIfAbsent(pathToken.string);
+
+	if (sourceCreationResult.status == SourcesCache::EntryCreationStatus::Failure_PathIsTooLong)
 	{
-		reportError("invalid source path");
+		reportError("source path is too long");
+		return nullptr;
+	}
+	else if (sourceCreationResult.status == SourcesCache::EntryCreationStatus::Failure_InvalidPath)
+	{
+		reportError("source path is invalid");
 		return nullptr;
 	}
 
-	return &shadersList.findOrCreateEntry(shaderType, *source, entryPointNameToken.string, pipelineLayout);
+	XAssert(sourceCreationResult.status == SourcesCache::EntryCreationStatus::Success);
+	XAssert(sourceCreationResult.entry);
+
+	const ShadersList::EntryCreationResult shaderCreationResult =
+		shadersList.createEntryIfAbsent(shaderType, *sourceCreationResult.entry, entryPointNameToken.string, pipelineLayout);
+
+	if (shaderCreationResult.status == ShadersList::EntryCreationStatus::Failure_ShaderAlreadyCreatedWithOtherType)
+	{
+		reportError("same shader is already defined with other type");
+		return nullptr;
+	}
+
+	XAssert(shaderCreationResult.status == ShadersList::EntryCreationStatus::Success);
+	XAssert(shaderCreationResult.entry);
+
+	return shaderCreationResult.entry;
 }
 
 void TargetDescriptionLoader::reportError(const char* message)
@@ -471,4 +497,6 @@ bool TargetDescriptionLoader::parse()
 			return false;
 		}
 	}
+
+	return true;
 }

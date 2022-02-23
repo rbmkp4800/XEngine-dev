@@ -134,6 +134,8 @@ namespace XLib
 	inline bool IsDigit(char c) { return c >= '0' && c <= '9'; }
 	inline bool IsLetterOrDigit(char c) { return IsLetter(c) || IsDigit(c); }
 
+	inline char ToUpper(char c) { return (c >= 'a' && c <= 'z') ? c - 'a' + 'A' : c; }
+
 	enum class TextReadTokenResult : uint8
 	{
 		Success = 0,

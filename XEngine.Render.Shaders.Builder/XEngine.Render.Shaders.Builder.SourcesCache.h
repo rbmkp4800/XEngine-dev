@@ -17,12 +17,13 @@ namespace XEngine::Render::Shaders::Builder_
 
 	private:
 		enum class TextState : uint8;
+		using InplaceLocalPathString = XLib::InplaceString128;
 
 	private:
 		SourcesCache& parentCache;
 
 		XLib::IntrusiveBinaryTreeNodeHook entriesSearchTreeHook;
-		XLib::InplaceString128 localPath;
+		InplaceLocalPathString localPath;
 
 		XLib::String text;
 		TextState textState = TextState(0);
@@ -51,7 +52,11 @@ namespace XEngine::Render::Shaders::Builder_
 	class SourcesCache : public XLib::NonCopyable
 	{
 	private:
-		struct EntriesSearchTreeComparator;
+		struct EntriesSearchTreeComparator abstract final
+		{
+			static ordering Compare(const SourceFile& left, const SourceFile& right);
+			static ordering Compare(const SourceFile& left, const XLib::StringView& right);
+		};
 
 		using EntriesSearchTree = XLib::IntrusiveBinaryTree<SourceFile, &SourceFile::entriesSearchTreeHook, EntriesSearchTreeComparator>;
 		using EntriesStorageList = XLib::FixedLogSegmentedArrayList<SourceFile, 5, 16>;
@@ -59,12 +64,14 @@ namespace XEngine::Render::Shaders::Builder_
 	private:
 		EntriesSearchTree entriesSearchTree;
 		EntriesStorageList entriesStorageList;
-		const char* rootPath = nullptr;
+		XLib::InplaceString512 rootPath;
+		bool initialized = false;
 
 	public:
 		enum class EntryCreationStatus
 		{
 			Success = 0,
+			Failure_PathIsTooLong,
 			Failure_InvalidPath,
 		};
 
@@ -78,15 +85,10 @@ namespace XEngine::Render::Shaders::Builder_
 		SourcesCache() = default;
 		~SourcesCache() = default;
 
+		void initialize(XLib::StringView rootPath);
+
 		EntryCreationResult createEntryIfAbsent(XLib::StringView localPath);
 
-		inline void setRootPath(const char* sourcesRootPath) { this->rootPath = sourcesRootPath; }
-		inline const char* getRootPath() const { return rootPath; }
-	};
-
-	struct SourcesCache::EntriesSearchTreeComparator abstract final
-	{
-		static ordering Compare(const SourceFile& left, const SourceFile& right);
-		static ordering Compare(const SourceFile& left, const XLib::StringView& right);
+		inline XLib::StringView getRootPath() const { return rootPath; }
 	};
 }

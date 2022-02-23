@@ -10,7 +10,7 @@
 
 #include "XEngine.Render.Shaders.Builder.h"
 
-#include "PseudoCTokenizer.h"
+#include "XEngine.Render.Shaders.Builder.TargetDescriptionLoader.h"
 
 using namespace XLib;
 using namespace XEngine::Render::HAL::ShaderCompiler;
@@ -70,15 +70,12 @@ bool Builder::loadTargetDescription(const char* targetDescriptionPath)
 	targetDescriptionFile.read(targetDescriptionText.getMutableData(), targetDescriptionFileSize);
 	targetDescriptionFile.close();
 
-	PseudoCTokenizer tokenizer(targetDescriptionText.getData(), targetDescriptionText.getLength());
-	
+	TargetDescriptionLoader loader;
 }
 
 void Builder::run(const char* packPath)
 {
-	// Load ingex.
-
-	sourcesCache.setSourcesRootPath("..\\XEngine.Render\\Shaders\\");
+	sourcesCache.initialize("..\\XEngine.Render\\Shaders\\");
 
 	BindPointDesc bp0 = {};
 	bp0.name = "name0";

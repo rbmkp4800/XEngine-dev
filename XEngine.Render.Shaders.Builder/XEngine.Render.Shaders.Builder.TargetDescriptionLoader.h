@@ -36,19 +36,21 @@ namespace XEngine::Render::Shaders::Builder_
 		SourcesCache& sourcesCache;
 
 	private:
-		bool matchSimpleToken(TokenType type);
+		bool expectSimpleToken(TokenType type);
 		bool parsePipelineLayoutDeclaration();
 		bool parseGraphicsPipelineDeclaration();
 		bool parseComputePipelineDeclaration();
+
 		PipelineLayout* parseSetLayoutStatement();
 		Shader* parseSetShaderStatement(HAL::ShaderCompiler::ShaderType shaderType, PipelineLayout& pipelineLayout);
 
 		void reportError(const char* message);
 
 	public:
-		TargetDescriptionLoader(const char* targetDescriptionPath);
+		TargetDescriptionLoader(PipelineLayoutsList& pipelineLayoutsList, PipelinesList& pipelinesList,
+			ShadersList& shadersList, SourcesCache& sourcesCache);
 		~TargetDescriptionLoader() = default;
 
-		bool parse();
+		bool load(const char* path);
 	};
 }

@@ -46,7 +46,7 @@ namespace XEngine::Render::Shaders::Builder_
 		bool compile();
 
 		inline XLib::StringView getName() const { return name; }
-		//inline uint64 getNameCRC() const { return nameCRC; }
+		inline uint64 getNameCRC() const { return nameCRC; }
 		inline const HAL::ShaderCompiler::CompiledPipelineLayout& getCompiled() const { return compiledPipelineLayout; }
 
 		static inline ordering CompareOrdered(const PipelineLayout& left, const PipelineLayout& right) { return compare(left.nameCRC, right.nameCRC); }
@@ -71,7 +71,11 @@ namespace XEngine::Render::Shaders::Builder_
 			// DescriptorTableRef
 		};
 
-		struct EntriesSearchTreeComparator;
+		struct EntriesSearchTreeComparator abstract final
+		{
+			static inline ordering Compare(const PipelineLayout& left, const PipelineLayout& right) { return compare(left.nameCRC, right.nameCRC); }
+			static inline ordering Compare(const PipelineLayout& left, uint64 right) { return compare(left.nameCRC, right); }
+		};
 
 		using EntriesSearchTree = XLib::IntrusiveBinaryTree<PipelineLayout, &PipelineLayout::searchTreeHook, EntriesSearchTreeComparator>;
 		using EntriesStorageList = XLib::FixedLogSegmentedArrayList<PipelineLayout, 4, 10>;
@@ -113,11 +117,5 @@ namespace XEngine::Render::Shaders::Builder_
 
 		inline Iterator begin() { return entriesSearchTree.begin(); }
 		inline Iterator end() { return entriesSearchTree.end(); }
-	};
-
-	struct PipelineLayoutsList::EntriesSearchTreeComparator abstract final
-	{
-		static inline ordering Compare(const PipelineLayout& left, const PipelineLayout& right) { return compare(left.nameCRC, right.nameCRC); }
-		static inline ordering Compare(const PipelineLayout& left, uint64 right) { return compare(left.nameCRC, right); }
 	};
 }

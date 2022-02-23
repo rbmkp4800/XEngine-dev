@@ -26,7 +26,7 @@ bool Pipeline::compile()
 		pipelineLayout.getCompiled(), desc, compiledGraphicsPipeline);
 }
 
-PipelinesList::EntryCreationResult PipelinesList::createPipeline(StringView name,
+PipelinesList::EntryCreationResult PipelinesList::createEntry(StringView name,
 	const PipelineLayout& pipelineLayout, const GraphicsPipelineDesc* graphicsPipelineDesc, Shader* computeShader)
 {
 	XAssert((graphicsPipelineDesc == nullptr) != (computeShader == nullptr));

@@ -59,8 +59,9 @@ namespace XLib
 		inline void operator = (BaseString&& that);
 
 		inline void pushBack(CharType c);
-		inline void append(StringView stringToAppend);
-		inline void append(const char* stringToAppend);
+		inline void append(CharType c) { pushBack(c); }
+		inline void append(StringView string);
+		inline void append(const char* cstr);
 
 		inline void resize(CounterType newLength, CharType c = '\0');
 		inline void resizeUnsafe(CounterType newLength);
@@ -70,9 +71,9 @@ namespace XLib
 
 		inline CharType* getMutableData() { return buffer; }
 
-		inline StringView getView() const { return StringView(buffer, length); }
 		inline const CharType* getCStr() const { return buffer; }
-		inline const CharType* getData() const { return buffer; }
+		inline StringView getView() const { return StringView(buffer, length); }
+		inline CharType* getData() { return buffer; }
 		inline CounterType getLength() const { return length; }
 		inline bool isEmpty() const { return length == 0; }
 
@@ -97,21 +98,22 @@ namespace XLib
 		~InplaceString() = default;
 
 		inline bool copyFrom(StringView string);
-		inline bool copyFrom(const char* cstr, uintptr lengthLimit = uintptr(-1));
+		inline bool copyFrom(const char* cstr);
 
 		inline void pushBack(CharType c);
+		inline void append(CharType c) { pushBack(c); }
 		inline bool append(StringView string);
-		inline bool append(const char* cstr, uintptr appendLengthLimit = uintptr(-1));
+		inline bool append(const char* cstr);
 
+		inline void resize(CounterType newLength, CharType c = '\0');
+		inline void resizeUnsafe(CounterType newLength);
 		inline void clear();
 		inline void truncate(CounterType newLength);
 		//inline bool recalculateLength();
 
-		inline CharType* getMutableData() { return &storage; }
-
-		inline StringView getView() const { return StringView(storage, length); }
 		inline const CharType* getCStr() const { return storage; }
-		inline const CharType* getData() const { return storage; }
+		inline StringView getView() const { return StringView(storage, length); }
+		inline CharType* getData() { return storage; }
 		inline CounterType getLength() const { return length; }
 		inline bool isEmpty() const { return length == 0; }
 		inline bool isFull() const { return length + 1 == Capacity; }
@@ -130,6 +132,7 @@ namespace XLib
 	using InplaceString64 = InplaceString<63, uint8>;		static_assert(sizeof(InplaceString64) == 64);
 	using InplaceString128 = InplaceString<127, uint8>;		static_assert(sizeof(InplaceString128) == 128);
 	using InplaceString256 = InplaceString<255, uint8>;		static_assert(sizeof(InplaceString256) == 256);
+	using InplaceString512 = InplaceString<510, uint16>;	static_assert(sizeof(InplaceString512) == 512);
 	using InplaceString1024 = InplaceString<1022, uint16>;	static_assert(sizeof(InplaceString1024) == 1024);
 	using InplaceString2048 = InplaceString<2046, uint16>;	static_assert(sizeof(InplaceString2048) == 2048);
 	using InplaceString4096 = InplaceString<4094, uint16>;	static_assert(sizeof(InplaceString4096) == 4096);
@@ -185,12 +188,12 @@ namespace XLib
 	}
 
 	template <typename CharType, typename CounterType, typename AllocatorType>
-	inline void BaseString<CharType, CounterType, AllocatorType>::append(const char* stringToAppend)
+	inline void BaseString<CharType, CounterType, AllocatorType>::append(const char* cstr)
 	{
 		// TODO: Assert for `CounterType` overflow.
-		const CounterType stringToAppendLength = CounterType(GetCStrLength(stringToAppend));
+		const CounterType stringToAppendLength = CounterType(GetCStrLength(cstr));
 		ensureCapacity(length + stringToAppendLength);
-		memoryCopy(buffer + length, stringToAppend, stringToAppendLength + 1);
+		memoryCopy(buffer + length, cstr, stringToAppendLength + 1);
 		length += stringToAppendLength;
 	}
 

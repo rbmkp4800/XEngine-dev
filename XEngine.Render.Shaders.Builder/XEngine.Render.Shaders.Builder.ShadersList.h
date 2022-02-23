@@ -45,8 +45,12 @@ namespace XEngine::Render::Shaders::Builder_
 	class ShadersList : public XLib::NonCopyable
 	{
 	private:
-		struct EntriesSearchTreeComparator;
 		struct EntrySearchKey;
+		struct EntriesSearchTreeComparator abstract final
+		{
+			static ordering Compare(const Shader& left, const Shader& right);
+			static ordering Compare(const Shader& left, const EntrySearchKey& right);
+		};
 
 		using EntriesSearchTree = XLib::IntrusiveBinaryTree<Shader, &Shader::searchTreeHook, EntriesSearchTreeComparator>;
 		using EntriesStorageList = XLib::FixedLogSegmentedArrayList<Shader, 5, 16>;
@@ -61,7 +65,7 @@ namespace XEngine::Render::Shaders::Builder_
 		enum class EntryCreationStatus
 		{
 			Success = 0,
-			Failure_ShaderExistsButHasOtherType,
+			Failure_ShaderAlreadyCreatedWithOtherType,
 		};
 
 		struct EntryCreationResult
@@ -74,7 +78,7 @@ namespace XEngine::Render::Shaders::Builder_
 		ShadersList() = default;
 		~ShadersList() = default;
 
-		EntryCreationResult createIfAbsent(HAL::ShaderCompiler::ShaderType type,
+		EntryCreationResult createEntryIfAbsent(HAL::ShaderCompiler::ShaderType type,
 			SourceFile& source, XLib::StringView entryPointName, const PipelineLayout& pipelineLayout);
 
 		inline bool isEmpty() const { return entriesStorageList.isEmpty(); }
@@ -82,11 +86,5 @@ namespace XEngine::Render::Shaders::Builder_
 
 		inline Iterator begin() { return entriesSearchTree.begin(); }
 		inline Iterator end() { return entriesSearchTree.end(); }
-	};
-
-	struct ShadersList::EntriesSearchTreeComparator abstract final
-	{
-		static ordering Compare(const Shader& left, const Shader& right);
-		static ordering Compare(const Shader& left, const EntrySearchKey& right);
 	};
 }

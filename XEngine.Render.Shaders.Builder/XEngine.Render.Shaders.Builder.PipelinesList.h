@@ -50,7 +50,7 @@ namespace XEngine::Render::Shaders::Builder_
 		bool compile();
 
 		inline XLib::StringView getName() const { return name; }
-		//inline uint64 getNameCRC() const { return nameCRC; }
+		inline uint64 getNameCRC() const { return nameCRC; }
 		inline const PipelineLayout& getPipelineLayout() const { return pipelineLayout; }
 		inline bool isGraphicsPipeline() const { return isGraphics; }
 
@@ -61,7 +61,11 @@ namespace XEngine::Render::Shaders::Builder_
 	class PipelinesList : public XLib::NonCopyable
 	{
 	private:
-		struct EntriesSearchTreeComparator;
+		struct EntriesSearchTreeComparator abstract final
+		{
+			static inline ordering Compare(const Pipeline& left, const Pipeline& right) { return compare(left.nameCRC, right.nameCRC); }
+			static inline ordering Compare(const Pipeline& left, uint64 right) { return compare(left.nameCRC, right); }
+		};
 
 		using EntriesSearchTree = XLib::IntrusiveBinaryTree<Pipeline, &Pipeline::searchTreeHook, EntriesSearchTreeComparator>;
 		using EntriesStorageList = XLib::FixedLogSegmentedArrayList<Pipeline, 5, 16>;
@@ -69,7 +73,6 @@ namespace XEngine::Render::Shaders::Builder_
 	private:
 		EntriesSearchTree entriesSearchTree;
 		EntriesStorageList entriesStorageList;
-
 
 	public:
 		using Iterator = EntriesSearchTree::Iterator;
@@ -91,18 +94,12 @@ namespace XEngine::Render::Shaders::Builder_
 		PipelinesList() = default;
 		~PipelinesList() = default;
 
-		EntryCreationResult createPipeline(XLib::StringView name, const PipelineLayout& pipelineLayout,
+		EntryCreationResult createEntry(XLib::StringView name, const PipelineLayout& pipelineLayout,
 			const GraphicsPipelineDesc* graphicsPipelineDesc, Shader* computeShader);
 
 		inline uint32 getSize() const { return entriesStorageList.getSize(); }
 
 		inline Iterator begin() { return entriesSearchTree.begin(); }
 		inline Iterator end() { return entriesSearchTree.end(); }
-	};
-
-	struct PipelinesList::EntriesSearchTreeComparator abstract final
-	{
-		static inline ordering Compare(const Pipeline& left, const Pipeline& right) { return compare(left.nameCRC, right.nameCRC); }
-		static inline ordering Compare(const Pipeline& left, uint64 right) { return compare(left.nameCRC, right); }
 	};
 }
