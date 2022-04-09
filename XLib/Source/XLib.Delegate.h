@@ -135,7 +135,7 @@ namespace XLib
 		// platform specific end ============================================================//
 
 		template <typename Class>
-		inline void construct(Class* _object, MethodPointer<Class> _method)
+		inline void initialize(Class* _object, MethodPointer<Class> _method)
 		{
 			MethodPointerConverter<sizeof(MethodPointer<Class>), Class>::Convert(_object, _method, object, method);
 		}
@@ -151,8 +151,8 @@ namespace XLib
 			*((void**)&method) = raw.method;
 		}
 
-		template <class Class> inline Delegate(Class& _object, MethodPointer<Class> _method) { construct(&_object, _method); }
-		template <class Class> inline Delegate(Class* _object, MethodPointer<Class> _method) { construct(_object, _method); }
+		template <class Class> inline Delegate(Class& _object, MethodPointer<Class> _method) { initialize(&_object, _method); }
+		template <class Class> inline Delegate(Class* _object, MethodPointer<Class> _method) { initialize(_object, _method); }
 
 		void destroy() { object = nullptr; method = nullptr; }
 

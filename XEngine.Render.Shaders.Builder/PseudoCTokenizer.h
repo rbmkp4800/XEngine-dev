@@ -26,24 +26,6 @@ public:
 		Colon = ':',
 		Semicolon = ';',
 		Equal = '=',
-
-		Keyword_PipelineLayout = 128,
-		Keyword_GraphicsPipeline,
-		Keyword_ComputePipeline,
-
-		Keyword_ReadOnlyBuffer,
-		Keyword_ReadWriteBuffer,
-		Keyword_ReadOnlyTexture,
-		Keyword_ReadWriteTexture,
-
-		Keyword_SetLayout,
-		Keyword_SetCS,
-		Keyword_SetVS,
-		Keyword_SetAS,
-		Keyword_SetMS,
-		Keyword_SetPS,
-		Keyword_SetRT,
-		Keyword_SetDepthRT,
 	};
 
 	struct Token
@@ -71,7 +53,7 @@ public:
 	PseudoCTokenizer() = default;
 	~PseudoCTokenizer() = default;
 
-	inline PseudoCTokenizer(const char* data, uintptr length = uintptr(-1)) : textReader(data, length) {}
+	void reset(const char* data, uintptr lengthLimit = uintptr(-1));
 
 	Token getToken();
 };

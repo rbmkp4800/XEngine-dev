@@ -182,9 +182,8 @@ bool Host::CompilePipelineLayout(Platform platform,
 		const uint8 rootParameterIndex = rootParameterCount;
 		rootParameterCount++;
 
-		XAssert(bindPointDesc.name);
-		const uintptr bindPointNameLength = GetCStrLength(bindPointDesc.name);
-		const uint32 bindPointNameCRC = CRC32::Compute(bindPointDesc.name, bindPointNameLength);
+		XAssert(!bindPointDesc.name.isEmpty());
+		const uint32 bindPointNameCRC = CRC32::Compute(bindPointDesc.name.getData(), bindPointDesc.name.getLength());
 
 		// HAL requires this because user can set bindpoint by CRC and zero CRC should be invalid input.
 		XAssert(bindPointNameCRC);

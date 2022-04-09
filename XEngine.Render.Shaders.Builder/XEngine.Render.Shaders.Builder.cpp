@@ -10,7 +10,7 @@
 
 #include "XEngine.Render.Shaders.Builder.h"
 
-#include "XEngine.Render.Shaders.Builder.TargetDescriptionLoader.h"
+#include "XEngine.Render.Shaders.Builder.BuildDescriptionLoader.h"
 
 using namespace XLib;
 using namespace XEngine::Render::HAL::ShaderCompiler;
@@ -54,6 +54,8 @@ public:
 	}
 };
 
+#if 0
+
 bool Builder::loadTargetDescription(const char* targetDescriptionPath)
 {
 	File targetDescriptionFile;
@@ -73,9 +75,16 @@ bool Builder::loadTargetDescription(const char* targetDescriptionPath)
 	TargetDescriptionLoader loader;
 }
 
+#endif
+
 void Builder::run(const char* packPath)
 {
-	sourcesCache.initialize("..\\XEngine.Render\\Shaders\\");
+	sourceCache.initialize("..\\XEngine.Render\\Shaders\\");
+
+	BuildDescriptionLoader descriptionLoader(pipelineLayoutList, pipelineList, shaderList, sourceCache);
+	descriptionLoader.load("..\\XEngine.Render.Shaders\\_BuildDescription.txt");
+
+#if 0
 
 	BindPointDesc bp0 = {};
 	bp0.name = "name0";
@@ -91,10 +100,11 @@ void Builder::run(const char* packPath)
 			.vertexShader = shadersList.findOrCreateEntry(ShaderType::Vertex, sourcesCache.findOrCreateEntry("UIColorVS.hlsl"), testLayout),
 			.renderTargetsFormats = { HAL::TexelViewFormat::R8G8B8A8_UNORM },
 		});
+#endif
 
 	// Compile.
 
-	for (PipelineLayout& pipelineLayout : pipelineLayoutsList)
+	for (PipelineLayout& pipelineLayout : pipelineLayoutList)
 	{
 		TextWriteFmtStdOut("Compiling pipeline layout \"", pipelineLayout.getName(), "\"\n");
 
@@ -105,7 +115,7 @@ void Builder::run(const char* packPath)
 		}
 	}
 
-	for (Shader& shader : shadersList)
+	for (Shader& shader : shaderList)
 	{
 		TextWriteFmtStdOut("Compiling shader \"", "shader.getName()", "\"\n");
 
@@ -116,7 +126,7 @@ void Builder::run(const char* packPath)
 		}
 	}
 
-	for (Pipeline& pipeline : pipelinesList)
+	for (Pipeline& pipeline : pipelineList)
 	{
 		TextWriteFmtStdOut("Compiling pipeline \"", pipeline.getName(), "\"\n");
 
@@ -145,8 +155,8 @@ void Builder::run(const char* packPath)
 
 	uint32 genericObjectsOffsetAccum = 0;
 
-	pipelineLayoutRecords.reserve(pipelineLayoutsList.getSize());
-	for (PipelineLayout& pipelineLayout : pipelineLayoutsList) // Iterating in order of name CRC increase
+	pipelineLayoutRecords.reserve(pipelineLayoutList.getSize());
+	for (PipelineLayout& pipelineLayout : pipelineLayoutList) // Iterating in order of name CRC increase
 	{
 		const Object& object = pipelineLayout.getCompiled().getObject();
 
@@ -164,8 +174,8 @@ void Builder::run(const char* packPath)
 		pipelineLayoutNameCRCToGenericObjectIdxMap.insert(pipelineLayout.getNameCRC(), objectIndex);
 	}
 
-	pipelineRecords.reserve(pipelinesList.getSize());
-	for (Pipeline& pipeline : pipelinesList) // Iterating in order of name CRC increase
+	pipelineRecords.reserve(pipelineList.getSize());
+	for (Pipeline& pipeline : pipelineList) // Iterating in order of name CRC increase
 	{
 		// TODO: Check if element does not exist
 		const uint16 pipelineLayoutIndex =

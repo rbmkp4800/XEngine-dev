@@ -3,26 +3,25 @@
 #include <XLib.h>
 #include <XLib.NonCopyable.h>
 
-#include "XEngine.Render.Shaders.Builder.PipelineLayoutsList.h"
-#include "XEngine.Render.Shaders.Builder.PipelinesList.h"
-#include "XEngine.Render.Shaders.Builder.ShadersList.h"
-#include "XEngine.Render.Shaders.Builder.SourcesCache.h"
+#include "XEngine.Render.Shaders.Builder.PipelineLayoutList.h"
+#include "XEngine.Render.Shaders.Builder.PipelineList.h"
+#include "XEngine.Render.Shaders.Builder.ShaderList.h"
+#include "XEngine.Render.Shaders.Builder.SourceCache.h"
 
 namespace XEngine::Render::Shaders
 {
 	class Builder : public XLib::NonCopyable
 	{
 	private:
-		Builder_::PipelineLayoutsList pipelineLayoutsList;
-		Builder_::PipelinesList pipelinesList;
-		Builder_::ShadersList shadersList;
-		Builder_::SourcesCache sourcesCache;
+		Builder_::PipelineLayoutList pipelineLayoutList;
+		Builder_::PipelineList pipelineList;
+		Builder_::ShaderList shaderList;
+		Builder_::SourceCache sourceCache;
 
 	public:
 		Builder() = default;
 		~Builder() = default;
 
-		bool loadTargetDescription(const char* targetDescriptionPath);
 		void run(const char* packPath);
 	};
 }

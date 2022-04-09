@@ -4,8 +4,6 @@
 #include "XLib.NonCopyable.h"
 #include "XLib.System.File.h"
 
-// TODO: Handle limited string storage in `StringWriter`.
-
 namespace XLib
 {
 	// Common text readers-writers /////////////////////////////////////////////////////////////////

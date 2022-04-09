@@ -5,18 +5,17 @@
 #include <XEngine.Render.HAL.Common.h>
 #include <XEngine.Render.HAL.ShaderCompiler.h>
 
-#include "XEngine.Render.Shaders.Builder.TargetDescriptionLoader.h"
+#include "XEngine.Render.Shaders.Builder.BuildDescriptionLoader.h"
 
-#include "XEngine.Render.Shaders.Builder.PipelineLayoutsList.h"
-#include "XEngine.Render.Shaders.Builder.PipelinesList.h"
-#include "XEngine.Render.Shaders.Builder.ShadersList.h"
-#include "XEngine.Render.Shaders.Builder.SourcesCache.h"
+#include "XEngine.Render.Shaders.Builder.PipelineLayoutList.h"
+#include "XEngine.Render.Shaders.Builder.PipelineList.h"
+#include "XEngine.Render.Shaders.Builder.ShaderList.h"
+#include "XEngine.Render.Shaders.Builder.SourceCache.h"
 
 using namespace XLib;
-using namespace XEngine::Render;
 using namespace XEngine::Render::Shaders::Builder_;
 
-HAL::TexelViewFormat TargetDescriptionLoader::ParseTexelViewFormatString(StringView string)
+auto BuildDescriptionLoader::ParseTexelViewFormatString(StringView string) -> HAL::TexelViewFormat
 {
 	// TODO: Do this properly.
 	if (AreStringsEqual(string, "R8G8B8BA8_Unorm"))
@@ -25,7 +24,7 @@ HAL::TexelViewFormat TargetDescriptionLoader::ParseTexelViewFormatString(StringV
 	return HAL::TexelViewFormat(-1);
 }
 
-HAL::DepthStencilFormat TargetDescriptionLoader::ParseDepthStencilFormatString(StringView string)
+auto BuildDescriptionLoader::ParseDepthStencilFormatString(StringView string) -> HAL::DepthStencilFormat
 {
 	// TODO: Do this properly.
 	if (AreStringsEqual(string, "D32"))
@@ -34,7 +33,7 @@ HAL::DepthStencilFormat TargetDescriptionLoader::ParseDepthStencilFormatString(S
 	return HAL::DepthStencilFormat(-1);
 }
 
-bool TargetDescriptionLoader::expectSimpleToken(TokenType type)
+bool BuildDescriptionLoader::expectSimpleToken(TokenType type)
 {
 	const Token token = tokenizer.getToken();
 	if (token.type != type)
@@ -45,7 +44,7 @@ bool TargetDescriptionLoader::expectSimpleToken(TokenType type)
 	return true;
 }
 
-bool TargetDescriptionLoader::parsePipelineLayoutDeclaration()
+bool BuildDescriptionLoader::parsePipelineLayoutDeclaration()
 {
 	const Token pipelineLayoutNameToken = tokenizer.getToken();
 	if (pipelineLayoutNameToken.type != TokenType::Identifier)
@@ -57,19 +56,19 @@ bool TargetDescriptionLoader::parsePipelineLayoutDeclaration()
 	if (!expectSimpleToken(TokenType('{')))
 		return false;
 
-	InplaceArrayList<BindPointDesc, HAL::MaxPipelineBindPointCount> bindPoints;
+	InplaceArrayList<HAL::ShaderCompiler::PipelineBindPointDesc, HAL::MaxPipelineBindPointCount> bindPoints;
 
 	for (;;)
 	{
-		const Token headToken = tokenizer.getToken();
-		if (headToken.type == TokenType('}'))
+		const Token token = tokenizer.getToken();
+		if (token.type == TokenType('}'))
 			break;
-		if (headToken.type == PseudoCTokenizer::TokenType::Semicolon)
+		if (token.type == PseudoCTokenizer::TokenType::Semicolon)
 			continue;
 
-		BindPointDesc bindPointDesc = {};
+		HAL::ShaderCompiler::PipelineBindPointDesc bindPointDesc = {};
 
-		if (headToken.type == TokenType::Keyword_ReadOnlyBuffer)
+		if (AreStringsEqual(token.string, "ReadOnlyBuffer"))
 			bindPointDesc.type = HAL::PipelineBindPointType::ReadOnlyBuffer;
 
 		const Token bindPointNameToken = tokenizer.getToken();
@@ -93,12 +92,12 @@ bool TargetDescriptionLoader::parsePipelineLayoutDeclaration()
 		bindPoints.pushBack(bindPointDesc);
 	}
 
-	const PipelineLayoutsList::EntryCreationResult pipelineLayoutCreationResult =
-		pipelineLayoutsList.createEntry(pipelineLayoutNameToken.string, bindPoints, uint8(bindPoints.getSize()));
+	const PipelineLayoutCreationResult pipelineLayoutCreationResult =
+		pipelineLayoutList.create(pipelineLayoutNameToken.string, bindPoints, uint8(bindPoints.getSize()));
 	
-	if (pipelineLayoutCreationResult.status != PipelineLayoutsList::EntryCreationStatus::Success)
+	if (pipelineLayoutCreationResult.status != PipelineLayoutCreationStatus::Success)
 	{
-		// TODO: Proper error handling (CRC collsitions etc).
+		// TODO: Proper error handling (CRC collision etc).
 		reportError("pipeline layout redefinition");
 		return false;
 	}
@@ -106,7 +105,7 @@ bool TargetDescriptionLoader::parsePipelineLayoutDeclaration()
 	return true;
 }
 
-bool TargetDescriptionLoader::parseGraphicsPipelineDeclaration()
+bool BuildDescriptionLoader::parseGraphicsPipelineDeclaration()
 {
 	const Token pipelineNameToken = tokenizer.getToken();
 	if (pipelineNameToken.type != TokenType::Identifier)
@@ -125,13 +124,13 @@ bool TargetDescriptionLoader::parseGraphicsPipelineDeclaration()
 
 	for (;;)
 	{
-		const Token statementToken = tokenizer.getToken();
-		if (statementToken.type == TokenType('}'))
+		const Token token = tokenizer.getToken();
+		if (token.type == TokenType('}'))
 			break;
-		if (statementToken.type == PseudoCTokenizer::TokenType::Semicolon)
+		if (token.type == TokenType::Semicolon)
 			continue;
 
-		if (statementToken.type == TokenType::Keyword_SetLayout)
+		if (AreStringsEqual(token.string, "SetLayout"))
 		{
 			if (pipelineLayout)
 			{
@@ -143,7 +142,7 @@ bool TargetDescriptionLoader::parseGraphicsPipelineDeclaration()
 			if (!pipelineLayout)
 				return false;
 		}
-		else if (statementToken.type == TokenType::Keyword_SetVS)
+		else if (AreStringsEqual(token.string, "SetVS"))
 		{
 			if (pipelineDesc.vertexShader)
 			{
@@ -160,7 +159,7 @@ bool TargetDescriptionLoader::parseGraphicsPipelineDeclaration()
 			if (!pipelineDesc.vertexShader)
 				return false;
 		}
-		else if (statementToken.type == TokenType::Keyword_SetPS)
+		else if (AreStringsEqual(token.string, "SetPS"))
 		{
 			if (pipelineDesc.pixelShader)
 			{
@@ -177,7 +176,7 @@ bool TargetDescriptionLoader::parseGraphicsPipelineDeclaration()
 			if (!pipelineDesc.pixelShader)
 				return false;
 		}
-		else if (statementToken.type == TokenType::Keyword_SetRT)
+		else if (AreStringsEqual(token.string, "SetRT"))
 		{
 			if (!expectSimpleToken(TokenType('(')))
 				return false;
@@ -232,7 +231,7 @@ bool TargetDescriptionLoader::parseGraphicsPipelineDeclaration()
 			pipelineDesc.renderTargetsFormats[rtIndex] = rtFormat;
 			setRTsMask |= 1 << rtIndex;
 		}
-		else if (statementToken.type == TokenType::Keyword_SetDepthRT)
+		else if (AreStringsEqual(token.string, "SetDepthRT"))
 		{
 			if (depthRTIsSet)
 			{
@@ -281,11 +280,11 @@ bool TargetDescriptionLoader::parseGraphicsPipelineDeclaration()
 
 	// TODO: More validation (shader combinations etc).
 
-	const PipelinesList::EntryCreationResult pipelineCreationResult =
-		pipelinesList.createEntry(pipelineNameToken.string, *pipelineLayout, &pipelineDesc, nullptr);
-	if (pipelineCreationResult.status != PipelinesList::EntryCreationStatus::Success)
+	const PipelineCreationResult pipelineCreationResult =
+		pipelineList.create(pipelineNameToken.string, *pipelineLayout, &pipelineDesc, nullptr);
+	if (pipelineCreationResult.status != PipelineCreationStatus::Success)
 	{
-		// TODO: Proper error handling (CRC collsitions etc).
+		// TODO: Proper error handling (CRC collision etc).
 		reportError("pipeline with this name already defined");
 		return false;
 	}
@@ -293,7 +292,7 @@ bool TargetDescriptionLoader::parseGraphicsPipelineDeclaration()
 	return true;
 }
 
-bool TargetDescriptionLoader::parseComputePipelineDeclaration()
+bool BuildDescriptionLoader::parseComputePipelineDeclaration()
 {
 	const Token pipelineNameToken = tokenizer.getToken();
 	if (pipelineNameToken.type != TokenType::Identifier)
@@ -310,13 +309,19 @@ bool TargetDescriptionLoader::parseComputePipelineDeclaration()
 
 	for (;;)
 	{
-		const Token statementToken = tokenizer.getToken();
-		if (statementToken.type == TokenType('}'))
+		const Token token = tokenizer.getToken();
+		if (token.type == TokenType('}'))
 			break;
-		if (statementToken.type == PseudoCTokenizer::TokenType::Semicolon)
+		if (token.type == TokenType::Semicolon)
 			continue;
 
-		if (statementToken.type == TokenType::Keyword_SetLayout)
+		if (token.type != TokenType::Identifier)
+		{
+			reportError("expected compute pipeline setup statement");
+			return false;
+		}
+
+		if (AreStringsEqual(token.string, "SetLayout"))
 		{
 			if (pipelineLayout)
 			{
@@ -328,7 +333,7 @@ bool TargetDescriptionLoader::parseComputePipelineDeclaration()
 			if (!pipelineLayout)
 				return false;
 		}
-		else if (statementToken.type == TokenType::Keyword_SetCS)
+		else if (AreStringsEqual(token.string, "SetCS"))
 		{
 			if (computeShader)
 			{
@@ -367,11 +372,11 @@ bool TargetDescriptionLoader::parseComputePipelineDeclaration()
 		return false;
 	}
 
-	const PipelinesList::EntryCreationResult pipelineCreationResult =
-		pipelinesList.createEntry(pipelineNameToken.string, *pipelineLayout, nullptr, computeShader);
-	if (pipelineCreationResult.status != PipelinesList::EntryCreationStatus::Success)
+	const PipelineCreationResult pipelineCreationResult =
+		pipelineList.create(pipelineNameToken.string, *pipelineLayout, nullptr, computeShader);
+	if (pipelineCreationResult.status != PipelineCreationStatus::Success)
 	{
-		// TODO: Proper error handling (CRC collsitions etc).
+		// TODO: Proper error handling (CRC collision etc).
 		reportError("pipeline with this name already defined");
 		return false;
 	}
@@ -379,7 +384,7 @@ bool TargetDescriptionLoader::parseComputePipelineDeclaration()
 	return true;
 }
 
-PipelineLayout* TargetDescriptionLoader::parseSetLayoutStatement()
+PipelineLayout* BuildDescriptionLoader::parseSetLayoutStatement()
 {
 	if (!expectSimpleToken(TokenType('(')))
 		return nullptr;
@@ -394,7 +399,7 @@ PipelineLayout* TargetDescriptionLoader::parseSetLayoutStatement()
 	if (!expectSimpleToken(TokenType(')')))
 		return nullptr;
 
-	PipelineLayout *pipelineLayout = pipelineLayoutsList.findEntry(layoutNameToken.string);
+	PipelineLayout* pipelineLayout = pipelineLayoutList.find(layoutNameToken.string);
 	if (!pipelineLayout)
 	{
 		reportError("pipeline layout is not found");
@@ -404,7 +409,7 @@ PipelineLayout* TargetDescriptionLoader::parseSetLayoutStatement()
 	return pipelineLayout;
 }
 
-Shader* TargetDescriptionLoader::parseSetShaderStatement(
+Shader* BuildDescriptionLoader::parseSetShaderStatement(
 	HAL::ShaderCompiler::ShaderType shaderType, PipelineLayout& pipelineLayout)
 {
 	if (!expectSimpleToken(TokenType('(')))
@@ -430,70 +435,107 @@ Shader* TargetDescriptionLoader::parseSetShaderStatement(
 	if (!expectSimpleToken(TokenType(')')))
 		return nullptr;
 
-	const SourcesCache::EntryCreationResult sourceCreationResult = sourcesCache.createEntryIfAbsent(pathToken.string);
+	const SourceCreationResult sourceCreationResult = sourceCache.findOrCreate(pathToken.string);
 
-	if (sourceCreationResult.status == SourcesCache::EntryCreationStatus::Failure_PathIsTooLong)
+	if (sourceCreationResult.status == SourceCreationStatus::Failure_PathIsTooLong)
 	{
 		reportError("source path is too long");
 		return nullptr;
 	}
-	else if (sourceCreationResult.status == SourcesCache::EntryCreationStatus::Failure_InvalidPath)
+	else if (sourceCreationResult.status == SourceCreationStatus::Failure_InvalidPath)
 	{
 		reportError("source path is invalid");
 		return nullptr;
 	}
 
-	XAssert(sourceCreationResult.status == SourcesCache::EntryCreationStatus::Success);
-	XAssert(sourceCreationResult.entry);
+	XAssert(sourceCreationResult.status == SourceCreationStatus::Success);
+	XAssert(sourceCreationResult.source);
 
-	const ShadersList::EntryCreationResult shaderCreationResult =
-		shadersList.createEntryIfAbsent(shaderType, *sourceCreationResult.entry, entryPointNameToken.string, pipelineLayout);
+	const ShaderCreationResult shaderCreationResult =
+		shaderList.findOrCreate(shaderType, *sourceCreationResult.source, entryPointNameToken.string, pipelineLayout);
 
-	if (shaderCreationResult.status == ShadersList::EntryCreationStatus::Failure_ShaderAlreadyCreatedWithOtherType)
+	if (shaderCreationResult.status == ShaderCreationStatus::Failure_ShaderTypeMismatch)
 	{
 		reportError("same shader is already defined with other type");
 		return nullptr;
 	}
 
-	XAssert(shaderCreationResult.status == ShadersList::EntryCreationStatus::Success);
-	XAssert(shaderCreationResult.entry);
+	XAssert(shaderCreationResult.status == ShaderCreationStatus::Success);
+	XAssert(shaderCreationResult.shader);
 
-	return shaderCreationResult.entry;
+	return shaderCreationResult.shader;
 }
 
-void TargetDescriptionLoader::reportError(const char* message)
+void BuildDescriptionLoader::reportError(const char* message)
 {
 	TextWriteFmtStdOut(message);
 }
 
-bool TargetDescriptionLoader::parse()
+BuildDescriptionLoader::BuildDescriptionLoader(
+	PipelineLayoutList& pipelineLayoutList,
+	PipelineList& pipelineList,
+	ShaderList& shaderList,
+	SourceCache& sourceCache)
+	:
+	pipelineLayoutList(pipelineLayoutList),
+	pipelineList(pipelineList),
+	shaderList(shaderList),
+	sourceCache(sourceCache)
+{}
+
+bool BuildDescriptionLoader::load(const char* pathCStr)
 {
+	String text;
+
+	// Read text from file.
+	{
+		File file;
+		file.open(pathCStr, FileAccessMode::Read, FileOpenMode::OpenExisting);
+		if (!file.isInitialized())
+			return false;
+
+		// TODO: Check for U32 overflow.
+		const uint32 fileSize = uint32(file.getSize());
+
+		text.resizeUnsafe(fileSize);
+		file.read(text.getData(), fileSize);
+		file.close();
+	}
+
+	tokenizer.reset(text.getData(), text.getLength());
+
 	for (;;)
 	{
-		PseudoCTokenizer::Token token = tokenizer.getToken();
-		if (token.type == PseudoCTokenizer::TokenType::EndOfText)
+		const Token token = tokenizer.getToken();
+		if (token.type == TokenType::EndOfText)
 			return true;
-		if (token.type == PseudoCTokenizer::TokenType::Semicolon)
+		if (token.type == TokenType::Semicolon)
 			continue;
 
-		if (token.type == PseudoCTokenizer::TokenType::Keyword_PipelineLayout)
+		if (token.type != TokenType::Identifier)
+		{
+			reportError("expected declaration");
+			return false;
+		}
+
+		if (AreStringsEqual(token.string, "PipelineLayout"))
 		{
 			if (!parsePipelineLayoutDeclaration())
 				return false;
 		}
-		else if (token.type == PseudoCTokenizer::TokenType::Keyword_GraphicsPipeline)
+		else if (AreStringsEqual(token.string, "GraphicsPipeline"))
 		{
 			if (!parseGraphicsPipelineDeclaration())
 				return false;
 		}
-		else if (token.type == PseudoCTokenizer::TokenType::Keyword_ComputePipeline)
+		else if (AreStringsEqual(token.string, "ComputePipeline"))
 		{
 			if (!parseComputePipelineDeclaration())
 				return false;
 		}
 		else
 		{
-			reportError("expected declaration");
+			reportError("unknown keyword");
 			return false;
 		}
 	}

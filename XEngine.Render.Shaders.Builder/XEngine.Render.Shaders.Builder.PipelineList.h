@@ -1,19 +1,19 @@
 #pragma once
 
 #include <XLib.h>
-#include <XLib.Containers.ArrayList.h>
 #include <XLib.Containers.IntrusiveBinaryTree.h>
 #include <XLib.NonCopyable.h>
 #include <XLib.String.h>
 
 #include <XEngine.Render.HAL.Common.h>
+#include <XEngine.Render.HAL.ShaderCompiler.h>
 
-#include "XEngine.Render.Shaders.Builder.PipelineLayoutsList.h"
-#include "XEngine.Render.Shaders.Builder.ShadersList.h"
+#include "XEngine.Render.Shaders.Builder.PipelineLayoutList.h"
+#include "XEngine.Render.Shaders.Builder.ShaderList.h"
 
 namespace XEngine::Render::Shaders::Builder_
 {
-	class PipelinesList;
+	class PipelineList;
 
 	struct GraphicsPipelineDesc
 	{
@@ -27,14 +27,15 @@ namespace XEngine::Render::Shaders::Builder_
 
 	class Pipeline : public XLib::NonCopyable
 	{
-		friend PipelinesList;
+		friend PipelineList;
 
 	private:
 		XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
-		XLib::InplaceString256 name;
+
+		XLib::StringView name;
 		uint64 nameCRC = 0;
 
-		const PipelineLayout& pipelineLayout;
+		const PipelineLayout* pipelineLayout = nullptr;
 		Shader* computeShader = nullptr;
 		GraphicsPipelineDesc graphicsDesc = {};
 		bool isGraphics = false;
@@ -42,64 +43,63 @@ namespace XEngine::Render::Shaders::Builder_
 		HAL::ShaderCompiler::CompiledGraphicsPipeline compiledGraphicsPipeline;
 
 	private:
+		Pipeline() = default;
 		~Pipeline() = default;
 
 	public:
-		inline Pipeline(const PipelineLayout& pipelineLayout) : pipelineLayout(pipelineLayout) {}
-
 		bool compile();
 
 		inline XLib::StringView getName() const { return name; }
 		inline uint64 getNameCRC() const { return nameCRC; }
-		inline const PipelineLayout& getPipelineLayout() const { return pipelineLayout; }
+		inline const PipelineLayout& getPipelineLayout() const { return *pipelineLayout; }
 		inline bool isGraphicsPipeline() const { return isGraphics; }
 
 		inline const HAL::ShaderCompiler::CompiledShader& getCompiledCompute() const { return computeShader->getCompiled(); }
 		inline const HAL::ShaderCompiler::CompiledGraphicsPipeline& getCompiledGraphics() const { return compiledGraphicsPipeline; }
 	};
 
-	class PipelinesList : public XLib::NonCopyable
+	enum class PipelineCreationStatus
+	{
+		Success = 0,
+		Failure_EntryNameDuplication,
+		//Failure_EntryNameCRCCollision,
+	};
+
+	struct PipelineCreationResult
+	{
+		PipelineCreationStatus status;
+		Pipeline* entry;
+	};
+
+	class PipelineList : public XLib::NonCopyable
 	{
 	private:
-		struct EntriesSearchTreeComparator abstract final
+		struct EntrySearchTreeComparator abstract final
 		{
 			static inline ordering Compare(const Pipeline& left, const Pipeline& right) { return compare(left.nameCRC, right.nameCRC); }
 			static inline ordering Compare(const Pipeline& left, uint64 right) { return compare(left.nameCRC, right); }
 		};
 
-		using EntriesSearchTree = XLib::IntrusiveBinaryTree<Pipeline, &Pipeline::searchTreeHook, EntriesSearchTreeComparator>;
-		using EntriesStorageList = XLib::FixedLogSegmentedArrayList<Pipeline, 5, 16>;
+		using EntrySearchTree =
+			XLib::IntrusiveBinaryTree<Pipeline, &Pipeline::searchTreeHook, EntrySearchTreeComparator>;
 
 	private:
-		EntriesSearchTree entriesSearchTree;
-		EntriesStorageList entriesStorageList;
+		EntrySearchTree entrySearchTree;
+		uint32 entryCount = 0;
 
 	public:
-		using Iterator = EntriesSearchTree::Iterator;
-
-		enum class EntryCreationStatus
-		{
-			Success = 0,
-			Failure_EntryWithSuchNameAlreadyExists,
-			//Failure_EntryNameCRCCollision,
-		};
-
-		struct EntryCreationResult
-		{
-			Pipeline* entry;
-			EntryCreationStatus status;
-		};
+		using Iterator = EntrySearchTree::Iterator;
 
 	public:
-		PipelinesList() = default;
-		~PipelinesList() = default;
+		PipelineList() = default;
+		~PipelineList() = default;
 
-		EntryCreationResult createEntry(XLib::StringView name, const PipelineLayout& pipelineLayout,
+		PipelineCreationResult create(XLib::StringView name, const PipelineLayout& pipelineLayout,
 			const GraphicsPipelineDesc* graphicsPipelineDesc, Shader* computeShader);
 
-		inline uint32 getSize() const { return entriesStorageList.getSize(); }
+		inline uint32 getSize() const { return entryCount; }
 
-		inline Iterator begin() { return entriesSearchTree.begin(); }
-		inline Iterator end() { return entriesSearchTree.end(); }
+		inline Iterator begin() { return entrySearchTree.begin(); }
+		inline Iterator end() { return entrySearchTree.end(); }
 	};
 }

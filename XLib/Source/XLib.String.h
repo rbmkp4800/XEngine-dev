@@ -69,8 +69,6 @@ namespace XLib
 		inline void compact();
 		inline void reserve(CounterType newMaxLength) { ensureCapacity(newMaxLength); }
 
-		inline CharType* getMutableData() { return buffer; }
-
 		inline const CharType* getCStr() const { return buffer; }
 		inline StringView getView() const { return StringView(buffer, length); }
 		inline CharType* getData() { return buffer; }
@@ -149,6 +147,8 @@ namespace XLib
 
 	template <typename CharType = char>
 	inline uintptr GetCStrLength(const CharType* cstr);
+
+	template <typename TextWriter, typename CharType> inline bool TextWriteFmt_HandleArg(TextWriter& writer, BaseStringView<CharType> string);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -279,5 +279,17 @@ namespace XLib
 		while (*it)
 			it++;
 		return uintptr(it - cstr);
+	}
+
+	template <typename TextWriter, typename CharType>
+	inline bool TextWriteFmt_HandleArg(TextWriter& writer, BaseStringView<CharType> string)
+	{
+		for (CharType c : string)
+		{
+			if (!writer.putChar(c))
+				return false;
+		}
+		// TODO: replace with `writer.writeChars()`.
+		return true;
 	}
 }

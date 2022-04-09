@@ -116,11 +116,7 @@ namespace XLib::Internal
 inline void* operator new (size_t, XLib::Internal::PlacementNewToken, void* block) { return block; }
 inline void operator delete (void* block, XLib::Internal::PlacementNewToken, void*) {}
 
-template <typename Type, typename ... ConstructorArgsTypes>
-inline void construct(Type& value, ConstructorArgsTypes&& ... constructorArgs)
-{
-	new (XLib::Internal::PlacementNewToken(), &value) Type(forwardRValue<ConstructorArgsTypes>(constructorArgs) ...);
-}
+#define construct(value, ...) (new (::XLib::Internal::PlacementNewToken(), &value) removeReference<decltype(value)>(__VA_ARGS__))
 
 
 // Data utils //////////////////////////////////////////////////////////////////////////////////

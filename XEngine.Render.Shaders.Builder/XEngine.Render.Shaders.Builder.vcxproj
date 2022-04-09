@@ -105,20 +105,20 @@ copy $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.pd
     <ClCompile Include="PseudoCTokenizer.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.EntryPoint.cpp" />
-    <ClCompile Include="XEngine.Render.Shaders.Builder.PipelineLayoutsList.cpp" />
-    <ClCompile Include="XEngine.Render.Shaders.Builder.PipelinesList.cpp" />
-    <ClCompile Include="XEngine.Render.Shaders.Builder.ShadersList.cpp" />
-    <ClCompile Include="XEngine.Render.Shaders.Builder.SourcesCache.cpp" />
-    <ClCompile Include="XEngine.Render.Shaders.Builder.TargetDescriptionLoader.cpp" />
+    <ClCompile Include="XEngine.Render.Shaders.Builder.PipelineLayoutList.cpp" />
+    <ClCompile Include="XEngine.Render.Shaders.Builder.PipelineList.cpp" />
+    <ClCompile Include="XEngine.Render.Shaders.Builder.ShaderList.cpp" />
+    <ClCompile Include="XEngine.Render.Shaders.Builder.SourceCache.cpp" />
+    <ClCompile Include="XEngine.Render.Shaders.Builder.BuildDescriptionLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PseudoCTokenizer.h" />
-    <ClInclude Include="XEngine.Render.Shaders.Builder.PipelineLayoutsList.h" />
+    <ClInclude Include="XEngine.Render.Shaders.Builder.PipelineLayoutList.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.h" />
-    <ClInclude Include="XEngine.Render.Shaders.Builder.PipelinesList.h" />
-    <ClInclude Include="XEngine.Render.Shaders.Builder.ShadersList.h" />
-    <ClInclude Include="XEngine.Render.Shaders.Builder.SourcesCache.h" />
-    <ClInclude Include="XEngine.Render.Shaders.Builder.TargetDescriptionLoader.h" />
+    <ClInclude Include="XEngine.Render.Shaders.Builder.PipelineList.h" />
+    <ClInclude Include="XEngine.Render.Shaders.Builder.ShaderList.h" />
+    <ClInclude Include="XEngine.Render.Shaders.Builder.SourceCache.h" />
+    <ClInclude Include="XEngine.Render.Shaders.Builder.BuildDescriptionLoader.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\XEngine.Render.HAL.Common\XEngine.Render.HAL.Common.vcxproj">

@@ -1,0 +1,86 @@
+#include <XLib.CRC.h>
+#include <XLib.String.h>
+
+#include "XEngine.Render.Shaders.Builder.ShaderList.h"
+
+using namespace XLib;
+using namespace XEngine::Render::Shaders::Builder_;
+
+bool Shader::compile()
+{
+	StringView sourceText = {};
+	if (!source->retrieveText(sourceText))
+		return false;
+
+	return HAL::ShaderCompiler::Host::CompileShader(HAL::ShaderCompiler::Platform::D3D12,
+		pipelineLayout->getCompiled(), type, source->getLocalPathCStr(),
+		sourceText.getData(), uint32(sourceText.getLength()), compiledShader);
+}
+
+struct ShaderList::EntrySearchKey
+{
+	const Source& source;
+	StringView entryPointName;
+	const PipelineLayout& pipelineLayout;
+
+	static inline EntrySearchKey Construct(const Shader& shader)
+	{
+		return EntrySearchKey { *shader.source, shader.entryPointName, *shader.pipelineLayout };
+	}
+
+	// Comparison order: source path -> entry point name -> pipeline layout
+	static inline ordering Compare(const EntrySearchKey& left, const EntrySearchKey& right)
+	{
+		const ordering sourceOrdering = Source::CompareOrdered(left.source, right.source);
+		if (sourceOrdering != ordering::equivalent)
+			return sourceOrdering;
+		const ordering entryPointOrdering = CompareStringsOrdered(left.entryPointName, right.entryPointName);
+		if (entryPointOrdering != ordering::equivalent)
+			return entryPointOrdering;
+		return PipelineLayout::CompareOrdered(left.pipelineLayout, right.pipelineLayout);
+	}
+};
+
+ordering ShaderList::EntrySearchTreeComparator::Compare(const Shader& left, const Shader& right)
+{
+	return EntrySearchKey::Compare(EntrySearchKey::Construct(left), EntrySearchKey::Construct(right));
+}
+
+ordering ShaderList::EntrySearchTreeComparator::Compare(const Shader& left, const EntrySearchKey& right)
+{
+	return EntrySearchKey::Compare(EntrySearchKey::Construct(left), right);
+}
+
+ShaderCreationResult ShaderList::findOrCreate(HAL::ShaderCompiler::ShaderType type,
+	Source& source, XLib::StringView entryPointName, const PipelineLayout& pipelineLayout)
+{
+	// TODO: Validate shader type value.
+
+	const EntrySearchKey existingEntrySearchKey { source, entryPointName, pipelineLayout };
+	const EntrySearchTree::Iterator existingItemIt = entrySearchTree.find(existingEntrySearchKey);
+	if (existingItemIt)
+	{
+		if (existingItemIt->getType() != type)
+			return ShaderCreationResult { ShaderCreationStatus::Failure_ShaderTypeMismatch };
+		return ShaderCreationResult { ShaderCreationStatus::Success, existingItemIt };
+	}
+
+	const uint32 memoryBlockSize = sizeof(Shader) + uint32(entryPointName.getLength()) + 1;
+	byte* shaderMemory = (byte*)SystemHeapAllocator::Allocate(memoryBlockSize);
+	memorySet(shaderMemory, 0, memoryBlockSize);
+
+	char* entryPointNameMemory = (char*)(shaderMemory + sizeof(Shader));
+	memoryCopy(entryPointNameMemory, entryPointName.getData(), entryPointName.getLength());
+	entryPointNameMemory[entryPointName.getLength()] = '\0';
+
+	Shader& shader = *(Shader*)shaderMemory;
+	construct(shader);
+	shader.source = &source;
+	shader.entryPointName = StringView(entryPointNameMemory, entryPointName.getLength());
+	shader.pipelineLayout = &pipelineLayout;
+	shader.type = type;
+
+	entrySearchTree.insert(shader);
+
+	return ShaderCreationResult { ShaderCreationStatus::Success };
+}
