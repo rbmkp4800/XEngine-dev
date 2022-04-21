@@ -13,7 +13,7 @@ bool PipelineLayout::compile()
 		bindPoints, bindPointCount, compiledPipelineLayout);
 }
 
-PipelineLayoutCreationResult PipelineLayoutList::create(XLib::StringView name,
+PipelineLayoutCreationResult PipelineLayoutList::create(XLib::StringViewASCII name,
 	const HAL::ShaderCompiler::PipelineBindPointDesc* bindPoints, uint8 bindPointCount)
 {
 	if (bindPointCount > HAL::MaxPipelineBindPointCount)
@@ -58,7 +58,7 @@ PipelineLayoutCreationResult PipelineLayoutList::create(XLib::StringView name,
 	{
 		const HAL::ShaderCompiler::PipelineBindPointDesc& srcBindPoint = bindPoints[i];
 		HAL::ShaderCompiler::PipelineBindPointDesc& dstBindPoint = bindPointsMemory[i];
-		const StringView& srcBindPointName = bindPoints[i].name;
+		const StringViewASCII& srcBindPointName = bindPoints[i].name;
 
 		char* bindPointNameMemory = (char*)(pipelineLayoutMemory + bindPointNamesMemOffset[i]);
 		memoryCopy(bindPointNameMemory, srcBindPointName.getData(), srcBindPointName.getLength());
@@ -81,7 +81,7 @@ PipelineLayoutCreationResult PipelineLayoutList::create(XLib::StringView name,
 	return PipelineLayoutCreationResult{ PipelineLayoutCreationStatus::Success, &pipelineLayout };
 }
 
-PipelineLayout* PipelineLayoutList::find(XLib::StringView name) const
+PipelineLayout* PipelineLayoutList::find(XLib::StringViewASCII name) const
 {
 	const uint64 nameCRC = CRC64::Compute(name.getData(), name.getLength());
 	return entrySearchTree.find(nameCRC);

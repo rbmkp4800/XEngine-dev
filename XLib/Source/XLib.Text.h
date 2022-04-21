@@ -43,13 +43,11 @@ namespace XLib
 
 		inline MemoryTextWriter(char* buffer, uint32 bufferSize) : buffer(buffer), bufferSize(bufferSize) {}
 
-		inline bool canPutChar() const { return length + 1 < bufferSize; }
-		inline bool putChar(char c);
-		//inline void writeChars();
-
-		inline void terminate();
-
 		inline uint32 getLength() const { return length; }
+
+		inline bool append(char c);
+		inline bool append(const char* chars, uintptr charCount);
+		inline bool canAppend() const { return length + 1 < bufferSize; }
 	};
 
 	class FileTextReader : public NonCopyable
@@ -96,29 +94,35 @@ namespace XLib
 		inline FileTextWriter(File& file) : file(&file) {}
 
 		inline void initialize(File& file);
-
-		inline bool canPutChar() const { return file && file->isInitialized(); }
-		inline bool putChar(char c);
-		//inline void writeChars();
 		inline void flush();
-
 		inline bool isInitialized() const { return file != nullptr; }
+
+		inline bool append(char c);
+		inline bool append(const char* chars, uintptr charCount);
+		inline bool canAppend() const { return file && file->isInitialized(); }
 	};
 
-	template <typename StringType>
-	class StringWriter : public NonCopyable
+	class TextWriterVirtualAdapterBase
+	{
+	public:
+		virtual bool append(const char* chars, uintptr charCount) = 0;
+	};
+
+	template <typename BaseTextWriter>
+	class TextWriterVirtualAdapter
 	{
 	private:
-		StringType& string;
+		BaseTextWriter& baseWriter;
 
 	public:
-		inline StringWriter(StringType& string) : string(string) {}
-		~StringWriter() = default;
+		TextWriterVirtualAdapter(BaseTextWriter& baseWriter) : baseWriter(baseWriter) {}
+		~TextWriterVirtualAdapter() = default;
 
-		inline bool canPutChar() const { return true; }
-		inline bool putChar(char c) { string.pushBack(c); return true; }
+		virtual bool append(const char* chars, uintptr charCount) override { return baseWriter.append(chars, charCount); }
 	};
 
+
+	// Std IO //////////////////////////////////////////////////////////////////////////////////////
 
 	FileTextReader& GetStdInTextReader();
 	FileTextWriter& GetStdOutTextWriter();
@@ -236,8 +240,8 @@ namespace XLib
 
 	template <typename TextReader> inline bool TextReadFmt_HandleArg(TextReader& reader, const RFmtInt& arg);
 
-	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, char c) { return writer.putChar(c); }
-	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, unsigned char c) { return writer.putChar(c); }
+	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, char c) { return writer.append(c); }
+	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, unsigned char c) { return writer.append(c); }
 	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, const char* str);
 
 	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, unsigned short int arg) { return TextWriteInt(writer, arg); }
@@ -261,20 +265,12 @@ namespace XLib
 		current(data),
 		end((length == uintptr(-1)) ? nullptr : data + length) {}
 
-	inline bool MemoryTextWriter::putChar(char c)
+	inline bool MemoryTextWriter::append(char c)
 	{
-		if (!canPutChar())
+		if (!canAppend())
 			return false;
 		buffer[length] = c;
 		length++;
-	}
-
-	inline void MemoryTextWriter::terminate()
-	{
-		if (!bufferSize)
-			return;
-		XAssert(length < bufferSize);
-		buffer[length] = '\0';
 	}
 
 	inline void FileTextReader::initialize(File& file)
@@ -288,7 +284,7 @@ namespace XLib
 		bufferedCharCount = 0;
 	}
 
-	inline bool FileTextWriter::putChar(char c)
+	inline bool FileTextWriter::append(char c)
 	{
 		// TODO: Do we need to fail if `file` is null?
 		buffer[bufferedCharCount] = c;
@@ -362,7 +358,7 @@ namespace XLib
 			{
 				// Flush selection buffer and quit.
 				for (uint32 j = 0; j < i; j++)
-					writer.putChar(selectionBuffer[j]);
+					writer.append(selectionBuffer[j]);
 
 				return false;
 			}
@@ -404,12 +400,12 @@ namespace XLib
 			selectionBuffer[(selectionStartIdx + substringLength) & selectionBufferIdxMask] = charToAdd;
 			selectionStartIdx++;
 
-			writer.putChar(charToRemove);
+			writer.append(charToRemove);
 		}
 
 		// If we are here reader is empty and substring is not found. Flush selection buffer and quit.
 		for (uint32 i = 0; i < substringLength; i++)
-			writer.putChar(selectionBuffer[(selectionStartIdx + i) & selectionBufferIdxMask]);
+			writer.append(selectionBuffer[(selectionStartIdx + i) & selectionBufferIdxMask]);
 
 		return false;
 	}
@@ -470,7 +466,7 @@ namespace XLib
 		while (charCount)
 		{
 			charCount--;
-			if (!writer.putChar(buffer[charCount]))
+			if (!writer.append(buffer[charCount]))
 				return false;
 		}
 
@@ -518,7 +514,7 @@ namespace XLib
 		char buffer[4096];
 		MemoryTextWriter bufferWriter(buffer, sizeof(buffer));
 		TextWriteFmt(bufferWriter, fmtArgs ...);
-		bufferWriter.terminate();
+		bufferWriter.append(0);
 		Debug::Output(buffer);
 	}
 
@@ -536,7 +532,7 @@ namespace XLib
 	{
 		while (*str)
 		{
-			if (!writer.putChar(*str))
+			if (!writer.append(*str))
 				return false;
 			str++;
 		}

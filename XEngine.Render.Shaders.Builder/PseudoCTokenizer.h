@@ -32,7 +32,7 @@ public:
 	{
 		union
 		{
-			XLib::StringView string;
+			XLib::StringViewASCII string;
 			sint64 number;
 			// Error error;
 		};
@@ -53,7 +53,7 @@ public:
 	PseudoCTokenizer() = default;
 	~PseudoCTokenizer() = default;
 
-	void reset(const char* data, uintptr lengthLimit = uintptr(-1));
+	void reset(const char* data, uintptr length);
 
 	Token getToken();
 };

@@ -21,8 +21,8 @@ namespace XEngine::Render::Shaders::Builder_
 		XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
 
 		const SourceCache* parentCache = nullptr;
-		XLib::StringView localPath; // Zero terminated.
-		XLib::String text;
+		XLib::StringViewASCII localPath; // Zero terminated.
+		XLib::DynamicStringASCII text;
 		TextState textState = TextState(0);
 
 		XLib::TimePoint writeTime = 0;
@@ -37,9 +37,9 @@ namespace XEngine::Render::Shaders::Builder_
 		XLib::TimePoint checkWriteTime();
 
 		// Returns false if can't open file.
-		bool retrieveText(XLib::StringView& resultText);
+		bool retrieveText(XLib::StringViewASCII& resultText);
 
-		inline XLib::StringView getLocalPath() const { return localPath; }
+		inline XLib::StringViewASCII getLocalPath() const { return localPath; }
 		inline const char* getLocalPathCStr() const { return localPath.getData(); }
 
 		static ordering CompareOrdered(const Source& left, const Source& right);
@@ -64,24 +64,24 @@ namespace XEngine::Render::Shaders::Builder_
 		struct EntriesSearchTreeComparator abstract final
 		{
 			static ordering Compare(const Source& left, const Source& right);
-			static ordering Compare(const Source& left, const XLib::StringView& right);
+			static ordering Compare(const Source& left, const XLib::StringViewASCII& right);
 		};
 
 		using EntrySearchTree = XLib::IntrusiveBinaryTree<Source, &Source::searchTreeHook, EntriesSearchTreeComparator>;
 
 	private:
 		EntrySearchTree entrySearchTree;
-		XLib::InplaceString512 rootPath;
+		XLib::InplaceStringASCIIx512 rootPath;
 		bool initialized = false;
 
 	public:
 		SourceCache() = default;
 		~SourceCache() = default;
 
-		void initialize(XLib::StringView rootPath);
+		void initialize(XLib::StringViewASCII rootPath);
 
-		SourceCreationResult findOrCreate(XLib::StringView localPath);
+		SourceCreationResult findOrCreate(XLib::StringViewASCII localPath);
 
-		inline XLib::StringView getRootPath() const { return rootPath; }
+		inline XLib::StringViewASCII getRootPath() const { return rootPath; }
 	};
 }

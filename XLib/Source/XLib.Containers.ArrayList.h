@@ -299,7 +299,11 @@ namespace XLib
 		~ArrayList()
 	{
 		if (buffer)
+		{
+			for (CounterType i = 0; i < size; i++)
+				buffer[i].~Type();
 			AllocatorBase::release(buffer);
+		}
 		buffer = nullptr;
 		capacity = 0;
 		size = 0;
@@ -343,6 +347,7 @@ namespace XLib
 
 		const CounterType elementIndex = size - 1;
 		Type element = asRValue(buffer[elementIndex]);
+		buffer[elementIndex].~Type();
 		size--;
 		return element;
 	}
@@ -389,6 +394,29 @@ namespace XLib
 
 
 	// InplaceArrayList ////////////////////////////////////////////////////////////////////////////
+
+	template <typename Type, uintptr Capacity, typename CounterType, bool IsSafe>
+	inline InplaceArrayList<Type, Capacity, CounterType, IsSafe>::
+		~InplaceArrayList()
+	{
+		for (CounterType i = 0; i < size; i++)
+			buffer[i].~Type();
+		size = 0;
+	}
+
+	template <typename Type, uintptr Capacity, typename CounterType, bool IsSafe>
+	inline auto InplaceArrayList<Type, Capacity, CounterType, IsSafe>::
+		pushBack(const Type& value) -> Type&
+	{
+		Type& result = buffer[size];
+		if constexpr (IsSafe)
+			construct(result, value);
+		else
+			result = value;
+		size++;
+
+		return result;
+	}
 
 
 	// ExpandableInplaceArrayList //////////////////////////////////////////////////////////////////

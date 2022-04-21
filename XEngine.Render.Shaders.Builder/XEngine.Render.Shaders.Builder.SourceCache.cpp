@@ -10,7 +10,7 @@
 using namespace XLib;
 using namespace XEngine::Render::Shaders::Builder_;
 
-static inline ordering CompareStringsOrderedCaseInsensitive(const StringView& left, const StringView& right)
+static inline ordering CompareStringsOrderedCaseInsensitive(const StringViewASCII& left, const StringViewASCII& right)
 {
 	const uintptr leftLength = left.getLength();
 	const uintptr rightLength = right.getLength();
@@ -31,12 +31,12 @@ static inline ordering CompareStringsOrderedCaseInsensitive(const StringView& le
 	return leftLength == rightLength ? ordering::equivalent : ordering::less;
 }
 
-static inline bool ValidateSourcePath(const StringView& path)
+static inline bool ValidateSourcePath(const StringViewASCII& path)
 {
-	if (!Path::IsRelative(path))
-		return false;
-	if (!Path::HasFileName(path))
-		return false;
+	//if (!Path::IsRelative(path.getData()))
+	//	return false;
+	//if (!Path::HasFileName(path))
+	//	return false;
 	
 	for (char c : path)
 	{
@@ -61,7 +61,9 @@ TimePoint Source::checkWriteTime()
 	if (writeTimeChecked)
 		return writeTime;
 
-	InplaceString1024 fullPath;
+	XAssert(false);
+
+	InplaceStringASCIIx1024 fullPath;
 	fullPath.append(parentCache->getRootPath());
 	fullPath.append(localPath);
 	// TODO: Assert total length
@@ -77,7 +79,7 @@ TimePoint Source::checkWriteTime()
 	return writeTime;
 }
 
-bool Source::retrieveText(StringView& resultText)
+bool Source::retrieveText(StringViewASCII& resultText)
 {
 	resultText = {};
 
@@ -91,7 +93,7 @@ bool Source::retrieveText(StringView& resultText)
 
 	XAssert(text.isEmpty());
 
-	InplaceString1024 fullPath;
+	InplaceStringASCIIx1024 fullPath;
 	fullPath.append(parentCache->getRootPath());
 	fullPath.append('/');
 	fullPath.append(localPath);
@@ -138,12 +140,12 @@ ordering SourceCache::EntriesSearchTreeComparator::Compare(const Source& left, c
 	return CompareStringsOrderedCaseInsensitive(left.localPath, right.localPath);
 }
 
-ordering SourceCache::EntriesSearchTreeComparator::Compare(const Source& left, const StringView& right)
+ordering SourceCache::EntriesSearchTreeComparator::Compare(const Source& left, const StringViewASCII& right)
 {
 	return CompareStringsOrderedCaseInsensitive(left.localPath, right);
 }
 
-void SourceCache::initialize(StringView rootPath)
+void SourceCache::initialize(StringViewASCII rootPath)
 {
 	XAssert(!initialized);
 	const bool pathStringOverflow = !this->rootPath.copyFrom(rootPath);
@@ -151,14 +153,16 @@ void SourceCache::initialize(StringView rootPath)
 	initialized = true;
 }
 
-SourceCreationResult SourceCache::findOrCreate(StringView localPath)
+SourceCreationResult SourceCache::findOrCreate(StringViewASCII localPath)
 {
 	XAssert(initialized);
 
 	// TODO: Check if path is too long.
 
-	InplaceString1024 normalizedLocalPath;
-	Path::Normalize(localPath, normalizedLocalPath);
+	InplaceStringASCIIx1024 normalizedLocalPath;
+	// TODO:
+//	Path::Normalize(localPath, normalizedLocalPath);
+	normalizedLocalPath.append(localPath);
 
 	if (!ValidateSourcePath(normalizedLocalPath))
 		return SourceCreationResult { SourceCreationStatus::Failure_InvalidPath };

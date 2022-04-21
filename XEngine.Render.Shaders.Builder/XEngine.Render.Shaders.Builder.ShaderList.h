@@ -22,7 +22,7 @@ namespace XEngine::Render::Shaders::Builder_
 		XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
 
 		Source* source = nullptr;
-		XLib::StringView entryPointName;
+		XLib::StringViewASCII entryPointName;
 		const PipelineLayout* pipelineLayout = nullptr;
 		HAL::ShaderCompiler::ShaderType type = HAL::ShaderCompiler::ShaderType::Undefined;
 
@@ -74,7 +74,7 @@ namespace XEngine::Render::Shaders::Builder_
 		~ShaderList() = default;
 
 		ShaderCreationResult findOrCreate(HAL::ShaderCompiler::ShaderType type,
-			Source& source, XLib::StringView entryPointName, const PipelineLayout& pipelineLayout);
+			Source& source, XLib::StringViewASCII entryPointName, const PipelineLayout& pipelineLayout);
 
 		inline Iterator begin() { return entrySearchTree.begin(); }
 		inline Iterator end() { return entrySearchTree.end(); }

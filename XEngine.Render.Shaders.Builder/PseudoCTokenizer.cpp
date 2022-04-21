@@ -9,6 +9,11 @@ inline auto PseudoCTokenizer::ComposeSimpleToken(TokenType type) -> Token
 	return token;
 }
 
+void PseudoCTokenizer::reset(const char* data, uintptr length)
+{
+	textReader = MemoryTextReader(data, length);
+}
+
 auto PseudoCTokenizer::getToken() -> Token
 {
 	for (;;)
@@ -26,21 +31,21 @@ auto PseudoCTokenizer::getToken() -> Token
 
 			for (;;)
 			{
-				char c = textReader.getChar();
+				char c = char(textReader.getChar());
 				if (c == '\0')
 					return ComposeSimpleToken(TokenType::Error); // Unexpected end of text.
 				if (c == '\r' || c == '\n')
 					return ComposeSimpleToken(TokenType::Error); // Unexpected new line.
 				if (c == '\\')
 				{
-					c = textReader.getChar();
+					c = char(textReader.getChar());
 					if (c == '\0')
 						return ComposeSimpleToken(TokenType::Error); // Unexpected end of text.
 				}
 				if (c == '\"')
 				{
 					Token token = {};
-					token.string = StringView(stringLiteralBegin, textReader.getCurrentPtr());
+					token.string = StringViewASCII(stringLiteralBegin, textReader.getCurrentPtr());
 					token.type = TokenType::StringLiteral;
 					return token;
 				}
@@ -53,7 +58,7 @@ auto PseudoCTokenizer::getToken() -> Token
 			textReader.getCharUnsafe();
 			for (;;)
 			{
-				char c = textReader.peekChar();
+				char c = char(textReader.peekChar());
 				if (!IsLetterOrDigit(c) && c != '_')
 				{
 					Token token = {};

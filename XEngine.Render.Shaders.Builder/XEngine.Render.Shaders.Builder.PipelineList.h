@@ -32,7 +32,7 @@ namespace XEngine::Render::Shaders::Builder_
 	private:
 		XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
 
-		XLib::StringView name;
+		XLib::StringViewASCII name;
 		uint64 nameCRC = 0;
 
 		const PipelineLayout* pipelineLayout = nullptr;
@@ -49,7 +49,7 @@ namespace XEngine::Render::Shaders::Builder_
 	public:
 		bool compile();
 
-		inline XLib::StringView getName() const { return name; }
+		inline XLib::StringViewASCII getName() const { return name; }
 		inline uint64 getNameCRC() const { return nameCRC; }
 		inline const PipelineLayout& getPipelineLayout() const { return *pipelineLayout; }
 		inline bool isGraphicsPipeline() const { return isGraphics; }
@@ -94,7 +94,7 @@ namespace XEngine::Render::Shaders::Builder_
 		PipelineList() = default;
 		~PipelineList() = default;
 
-		PipelineCreationResult create(XLib::StringView name, const PipelineLayout& pipelineLayout,
+		PipelineCreationResult create(XLib::StringViewASCII name, const PipelineLayout& pipelineLayout,
 			const GraphicsPipelineDesc* graphicsPipelineDesc, Shader* computeShader);
 
 		inline uint32 getSize() const { return entryCount; }

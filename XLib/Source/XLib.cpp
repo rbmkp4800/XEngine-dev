@@ -16,17 +16,17 @@ void memoryMove(void* destination, const void* source, uintptr size) { memmove(d
 
 Debug::FailureHandler Debug::failureHandler = Debug::DefaultFailureHandler;
 
-void Debug::Output(const char* message)
+void Debug::Output(const char* messageCStr)
 {
-	OutputDebugStringA(message);
+	::OutputDebugStringA(messageCStr);
 }
 
-void Debug::DefaultFailureHandler(const char* message)
+void Debug::DefaultFailureHandler(const char* messageCStr)
 {
-	if (message)
+	if (messageCStr)
 	{
 		if (::IsDebuggerPresent())
-			OutputDebugStringA(message);
+			::OutputDebugStringA(messageCStr);
 	}
 	::DebugBreak();
 }

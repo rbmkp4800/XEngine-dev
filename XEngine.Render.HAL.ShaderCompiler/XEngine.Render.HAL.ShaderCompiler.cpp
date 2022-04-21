@@ -305,20 +305,19 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipeli
 	shaderNameW[shaderNameLength] = L'\0';
 
 	// Patch source code substituting bindings
-	String patchedSourceString;
+	DynamicStringASCII patchedSourceString;
 	{
 		patchedSourceString.reserve(sourceLength);
 
 		MemoryTextReader sourceReader(source, sourceLength);
-		StringWriter<String> patchedSourceWriter(patchedSourceString);
 
 		for (;;)
 		{
-			const bool bindingFound = TextForwardToFirstOccurrence(sourceReader, "@binding", patchedSourceWriter);
+			const bool bindingFound = TextForwardToFirstOccurrence(sourceReader, "@binding", patchedSourceString);
 			if (!bindingFound)
 				break;
 
-			String bindPointName; // TODO: Use `InplaceString64` when ready.
+			InplaceStringASCIIx64 bindPointName;
 			TextSkipWhitespaces(sourceReader);
 			if (!TextReadCIdentifier(sourceReader, bindPointName))
 				return false;
@@ -331,7 +330,7 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipeli
 			if (!pipelineLayout.findBindPointMetadata(bindPointNameCRC, bindPointMetadata))
 				return false;
 
-			TextWriteFmt(patchedSourceWriter, ": register(",
+			TextWriteFmt(patchedSourceString, ": register(",
 				bindPointMetadata.registerType, bindPointMetadata.registerIndex, ')');
 		}
 

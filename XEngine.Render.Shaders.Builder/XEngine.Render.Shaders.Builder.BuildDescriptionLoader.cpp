@@ -15,19 +15,19 @@
 using namespace XLib;
 using namespace XEngine::Render::Shaders::Builder_;
 
-auto BuildDescriptionLoader::ParseTexelViewFormatString(StringView string) -> HAL::TexelViewFormat
+auto BuildDescriptionLoader::ParseTexelViewFormatString(StringViewASCII string) -> HAL::TexelViewFormat
 {
 	// TODO: Do this properly.
-	if (AreStringsEqual(string, "R8G8B8BA8_Unorm"))
+	if (String::IsEqual(string, "R8G8B8BA8_Unorm"))
 		return HAL::TexelViewFormat::R8G8B8A8_UNORM;
 
 	return HAL::TexelViewFormat(-1);
 }
 
-auto BuildDescriptionLoader::ParseDepthStencilFormatString(StringView string) -> HAL::DepthStencilFormat
+auto BuildDescriptionLoader::ParseDepthStencilFormatString(StringViewASCII string) -> HAL::DepthStencilFormat
 {
 	// TODO: Do this properly.
-	if (AreStringsEqual(string, "D32"))
+	if (String::IsEqual(string, "D32"))
 		return HAL::DepthStencilFormat::D32;
 
 	return HAL::DepthStencilFormat(-1);
@@ -68,7 +68,7 @@ bool BuildDescriptionLoader::parsePipelineLayoutDeclaration()
 
 		HAL::ShaderCompiler::PipelineBindPointDesc bindPointDesc = {};
 
-		if (AreStringsEqual(token.string, "ReadOnlyBuffer"))
+		if (String::IsEqual(token.string, "ReadOnlyBuffer"))
 			bindPointDesc.type = HAL::PipelineBindPointType::ReadOnlyBuffer;
 
 		const Token bindPointNameToken = tokenizer.getToken();
@@ -130,7 +130,7 @@ bool BuildDescriptionLoader::parseGraphicsPipelineDeclaration()
 		if (token.type == TokenType::Semicolon)
 			continue;
 
-		if (AreStringsEqual(token.string, "SetLayout"))
+		if (String::IsEqual(token.string, "SetLayout"))
 		{
 			if (pipelineLayout)
 			{
@@ -142,7 +142,7 @@ bool BuildDescriptionLoader::parseGraphicsPipelineDeclaration()
 			if (!pipelineLayout)
 				return false;
 		}
-		else if (AreStringsEqual(token.string, "SetVS"))
+		else if (String::IsEqual(token.string, "SetVS"))
 		{
 			if (pipelineDesc.vertexShader)
 			{
@@ -159,7 +159,7 @@ bool BuildDescriptionLoader::parseGraphicsPipelineDeclaration()
 			if (!pipelineDesc.vertexShader)
 				return false;
 		}
-		else if (AreStringsEqual(token.string, "SetPS"))
+		else if (String::IsEqual(token.string, "SetPS"))
 		{
 			if (pipelineDesc.pixelShader)
 			{
@@ -176,7 +176,7 @@ bool BuildDescriptionLoader::parseGraphicsPipelineDeclaration()
 			if (!pipelineDesc.pixelShader)
 				return false;
 		}
-		else if (AreStringsEqual(token.string, "SetRT"))
+		else if (String::IsEqual(token.string, "SetRT"))
 		{
 			if (!expectSimpleToken(TokenType('(')))
 				return false;
@@ -231,7 +231,7 @@ bool BuildDescriptionLoader::parseGraphicsPipelineDeclaration()
 			pipelineDesc.renderTargetsFormats[rtIndex] = rtFormat;
 			setRTsMask |= 1 << rtIndex;
 		}
-		else if (AreStringsEqual(token.string, "SetDepthRT"))
+		else if (String::IsEqual(token.string, "SetDepthRT"))
 		{
 			if (depthRTIsSet)
 			{
@@ -321,7 +321,7 @@ bool BuildDescriptionLoader::parseComputePipelineDeclaration()
 			return false;
 		}
 
-		if (AreStringsEqual(token.string, "SetLayout"))
+		if (String::IsEqual(token.string, "SetLayout"))
 		{
 			if (pipelineLayout)
 			{
@@ -333,7 +333,7 @@ bool BuildDescriptionLoader::parseComputePipelineDeclaration()
 			if (!pipelineLayout)
 				return false;
 		}
-		else if (AreStringsEqual(token.string, "SetCS"))
+		else if (String::IsEqual(token.string, "SetCS"))
 		{
 			if (computeShader)
 			{
@@ -485,7 +485,7 @@ BuildDescriptionLoader::BuildDescriptionLoader(
 
 bool BuildDescriptionLoader::load(const char* pathCStr)
 {
-	String text;
+	DynamicStringASCII text;
 
 	// Read text from file.
 	{
@@ -518,17 +518,17 @@ bool BuildDescriptionLoader::load(const char* pathCStr)
 			return false;
 		}
 
-		if (AreStringsEqual(token.string, "PipelineLayout"))
+		if (String::IsEqual(token.string, "PipelineLayout"))
 		{
 			if (!parsePipelineLayoutDeclaration())
 				return false;
 		}
-		else if (AreStringsEqual(token.string, "GraphicsPipeline"))
+		else if (String::IsEqual(token.string, "GraphicsPipeline"))
 		{
 			if (!parseGraphicsPipelineDeclaration())
 				return false;
 		}
-		else if (AreStringsEqual(token.string, "ComputePipeline"))
+		else if (String::IsEqual(token.string, "ComputePipeline"))
 		{
 			if (!parseComputePipelineDeclaration())
 				return false;

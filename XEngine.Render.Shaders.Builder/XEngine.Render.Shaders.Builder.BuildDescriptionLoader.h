@@ -22,8 +22,8 @@ namespace XEngine::Render::Shaders::Builder_
 
 	private:
 		// These return not valid format on failure.
-		static HAL::TexelViewFormat ParseTexelViewFormatString(XLib::StringView string);
-		static HAL::DepthStencilFormat ParseDepthStencilFormatString(XLib::StringView string);
+		static HAL::TexelViewFormat ParseTexelViewFormatString(XLib::StringViewASCII string);
+		static HAL::DepthStencilFormat ParseDepthStencilFormatString(XLib::StringViewASCII string);
 
 	private:
 		Tokenizer tokenizer;

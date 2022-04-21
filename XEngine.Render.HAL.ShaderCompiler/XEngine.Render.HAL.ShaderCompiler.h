@@ -47,7 +47,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 
 	struct PipelineBindPointDesc
 	{
-		XLib::StringView name;
+		XLib::StringViewASCII name;
 		PipelineBindPointType type;
 		PipelineBindPointShaderVisibility shaderVisibility;
 		union

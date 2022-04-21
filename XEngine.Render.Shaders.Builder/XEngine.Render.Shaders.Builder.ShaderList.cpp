@@ -8,7 +8,7 @@ using namespace XEngine::Render::Shaders::Builder_;
 
 bool Shader::compile()
 {
-	StringView sourceText = {};
+	StringViewASCII sourceText = {};
 	if (!source->retrieveText(sourceText))
 		return false;
 
@@ -20,7 +20,7 @@ bool Shader::compile()
 struct ShaderList::EntrySearchKey
 {
 	const Source& source;
-	StringView entryPointName;
+	StringViewASCII entryPointName;
 	const PipelineLayout& pipelineLayout;
 
 	static inline EntrySearchKey Construct(const Shader& shader)
@@ -34,7 +34,7 @@ struct ShaderList::EntrySearchKey
 		const ordering sourceOrdering = Source::CompareOrdered(left.source, right.source);
 		if (sourceOrdering != ordering::equivalent)
 			return sourceOrdering;
-		const ordering entryPointOrdering = CompareStringsOrdered(left.entryPointName, right.entryPointName);
+		const ordering entryPointOrdering = String::CompareOrdered(left.entryPointName, right.entryPointName);
 		if (entryPointOrdering != ordering::equivalent)
 			return entryPointOrdering;
 		return PipelineLayout::CompareOrdered(left.pipelineLayout, right.pipelineLayout);
@@ -52,7 +52,7 @@ ordering ShaderList::EntrySearchTreeComparator::Compare(const Shader& left, cons
 }
 
 ShaderCreationResult ShaderList::findOrCreate(HAL::ShaderCompiler::ShaderType type,
-	Source& source, XLib::StringView entryPointName, const PipelineLayout& pipelineLayout)
+	Source& source, XLib::StringViewASCII entryPointName, const PipelineLayout& pipelineLayout)
 {
 	// TODO: Validate shader type value.
 

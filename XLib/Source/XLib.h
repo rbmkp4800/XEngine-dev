@@ -17,7 +17,12 @@ using uint = unsigned;
 using sint = signed;
 
 using byte = uint8;
-using wchar = wchar_t;
+
+using charASCII = char;
+//using charUTF8 = char8_t;
+//using charUTF16 = char16_t;
+//using charUTF32 = char32_t;
+using wchar = wchar_t; // TODO: Remove.
 
 #ifdef _WIN64
 using uintptr = uint64;
@@ -213,12 +218,12 @@ namespace XLib
 		static FailureHandler failureHandler;
 
 	public:
-		static void Output(const char* message);
+		static void Output(const char* messageCStr);
 
-		static void DefaultFailureHandler(const char* message);
+		static void DefaultFailureHandler(const char* messageCStr);
 
 		static inline void OverrideFailureHandler(FailureHandler handler) { failureHandler = handler ? handler : DefaultFailureHandler; }
-		static inline void Fail(const char* message = nullptr) { failureHandler(message); }
+		static inline void Fail(const char* messageCStr = nullptr) { failureHandler(messageCStr); }
 	};
 }
 

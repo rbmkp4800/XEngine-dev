@@ -18,7 +18,7 @@ namespace XEngine::Render::Shaders::Builder_
 	private:
 		XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
 
-		XLib::StringView name;
+		XLib::StringViewASCII name;
 		uint64 nameCRC = 0;
 
 		HAL::ShaderCompiler::PipelineBindPointDesc* bindPoints = nullptr;
@@ -33,7 +33,7 @@ namespace XEngine::Render::Shaders::Builder_
 	public:
 		bool compile();
 
-		inline XLib::StringView getName() const { return name; }
+		inline XLib::StringViewASCII getName() const { return name; }
 		inline uint64 getNameCRC() const { return nameCRC; }
 		inline const HAL::ShaderCompiler::CompiledPipelineLayout& getCompiled() const { return compiledPipelineLayout; }
 
@@ -79,10 +79,10 @@ namespace XEngine::Render::Shaders::Builder_
 		PipelineLayoutList() = default;
 		~PipelineLayoutList() = default;
 
-		PipelineLayoutCreationResult create(XLib::StringView name,
+		PipelineLayoutCreationResult create(XLib::StringViewASCII name,
 			const HAL::ShaderCompiler::PipelineBindPointDesc* bindPoints, uint8 bindPointCount);
 
-		PipelineLayout* find(XLib::StringView name) const;
+		PipelineLayout* find(XLib::StringViewASCII name) const;
 
 		inline uint32 getSize() const { return entryCount; }
 
