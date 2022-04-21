@@ -301,7 +301,7 @@ namespace XLib
 		if (buffer)
 		{
 			for (CounterType i = 0; i < size; i++)
-				buffer[i].~Type();
+				destruct(buffer[i]);
 			AllocatorBase::release(buffer);
 		}
 		buffer = nullptr;
@@ -347,7 +347,7 @@ namespace XLib
 
 		const CounterType elementIndex = size - 1;
 		Type element = asRValue(buffer[elementIndex]);
-		buffer[elementIndex].~Type();
+		destruct(buffer[elementIndex]);
 		size--;
 		return element;
 	}
@@ -368,7 +368,7 @@ namespace XLib
 			else
 			{
 				for (CounterType i = newSize; i < size; i++)
-					buffer[i].~Type();
+					destruct(buffer[i]);
 			}
 		}
 
@@ -400,7 +400,7 @@ namespace XLib
 		~InplaceArrayList()
 	{
 		for (CounterType i = 0; i < size; i++)
-			buffer[i].~Type();
+			destruct(buffer[i]);
 		size = 0;
 	}
 

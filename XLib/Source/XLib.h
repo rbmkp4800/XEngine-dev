@@ -121,7 +121,8 @@ namespace XLib::Internal
 inline void* operator new (size_t, XLib::Internal::PlacementNewToken, void* block) { return block; }
 inline void operator delete (void* block, XLib::Internal::PlacementNewToken, void*) {}
 
-#define construct(value, ...) (new (::XLib::Internal::PlacementNewToken(), &value) removeReference<decltype(value)>(__VA_ARGS__))
+#define construct(value, ...) (new (::XLib::Internal::PlacementNewToken(), &(value)) removeReference<decltype(value)>(__VA_ARGS__))
+#define destruct(value) { using XLibDestructHelperType = removeReference<decltype(value)>; (value).~XLibDestructHelperType(); }
 
 
 // Data utils //////////////////////////////////////////////////////////////////////////////////
