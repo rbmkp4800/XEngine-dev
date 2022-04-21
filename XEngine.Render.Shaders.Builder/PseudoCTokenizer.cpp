@@ -45,7 +45,7 @@ auto PseudoCTokenizer::getToken() -> Token
 				if (c == '\"')
 				{
 					Token token = {};
-					token.string = StringViewASCII(stringLiteralBegin, textReader.getCurrentPtr());
+					token.string = StringViewASCII(stringLiteralBegin, textReader.getCurrentPtr() - 1);
 					token.type = TokenType::StringLiteral;
 					return token;
 				}

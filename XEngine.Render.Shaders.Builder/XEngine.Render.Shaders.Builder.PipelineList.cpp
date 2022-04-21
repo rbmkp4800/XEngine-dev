@@ -57,5 +57,5 @@ PipelineCreationResult PipelineList::create(StringViewASCII name, const Pipeline
 	entrySearchTree.insert(pipeline);
 	entryCount++;
 
-	return PipelineCreationResult { PipelineCreationStatus::Success, &pipeline};
+	return PipelineCreationResult { PipelineCreationStatus::Success, &pipeline };
 }

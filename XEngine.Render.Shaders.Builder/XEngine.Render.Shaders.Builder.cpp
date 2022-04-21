@@ -54,35 +54,13 @@ public:
 	}
 };
 
-#if 0
-
-bool Builder::loadTargetDescription(const char* targetDescriptionPath)
-{
-	File targetDescriptionFile;
-	targetDescriptionFile.open(targetDescriptionPath, FileAccessMode::Read, FileOpenMode::OpenExisting);
-	if (!targetDescriptionFile.isInitialized())
-		return false;
-
-	// TODO: Check for U32 overflow.
-	const uint32 targetDescriptionFileSize = uint32(targetDescriptionFile.getSize());
-
-	String targetDescriptionText;
-	targetDescriptionText.resizeUnsafe(targetDescriptionFileSize);
-
-	targetDescriptionFile.read(targetDescriptionText.getMutableData(), targetDescriptionFileSize);
-	targetDescriptionFile.close();
-
-	TargetDescriptionLoader loader;
-}
-
-#endif
-
 void Builder::run(const char* packPath)
 {
 	sourceCache.initialize("..\\XEngine.Render\\Shaders\\");
 
 	BuildDescriptionLoader descriptionLoader(pipelineLayoutList, pipelineList, shaderList, sourceCache);
-	descriptionLoader.load("..\\XEngine.Render.Shaders\\_BuildDescription.txt");
+	if (!descriptionLoader.load("..\\XEngine.Render.Shaders\\_BuildDescription.txt"))
+		return;
 
 #if 0
 
@@ -117,7 +95,14 @@ void Builder::run(const char* packPath)
 
 	for (Shader& shader : shaderList)
 	{
-		TextWriteFmtStdOut("Compiling shader \"", "shader.getName()", "\"\n");
+		InplaceStringASCIIx1024 shaderName;
+		StringViewASCII shaderTypeString = "XS"; // TODO: ...
+		TextWriteFmt(shaderName,
+			'[', shaderTypeString, ']',
+			shader.getSource().getLocalPath(), ':', shader.getEntryPointName(),
+			"(layout=", shader.getPipelineLayout().getName(), ')');
+
+		TextWriteFmtStdOut("Compiling shader \"", StringViewASCII(shaderName), "\"\n"); // TODO: Remove cast to string view.
 
 		if (!shader.compile())
 		{

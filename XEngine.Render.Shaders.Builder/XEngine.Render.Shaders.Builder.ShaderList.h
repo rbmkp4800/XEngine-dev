@@ -35,6 +35,9 @@ namespace XEngine::Render::Shaders::Builder_
 	public:
 		bool compile();
 
+		inline const Source& getSource() const { return *source; }
+		inline XLib::StringViewASCII getEntryPointName() const { return entryPointName; }
+		inline const PipelineLayout& getPipelineLayout() const { return *pipelineLayout; }
 		inline HAL::ShaderCompiler::ShaderType getType() const { return type; }
 		inline const HAL::ShaderCompiler::CompiledShader& getCompiled() const { return compiledShader; }
 	};

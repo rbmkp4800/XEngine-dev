@@ -40,7 +40,7 @@ static inline bool ValidateSourcePath(const StringViewASCII& path)
 	
 	for (char c : path)
 	{
-		if (!IsLetterOrDigit(c) && c != '_')
+		if (!IsLetterOrDigit(c) && c != '_' && c != '-' && c != '+' && c != '.' && c != '/')
 			return false;
 	}
 
@@ -167,9 +167,8 @@ SourceCreationResult SourceCache::findOrCreate(StringViewASCII localPath)
 	if (!ValidateSourcePath(normalizedLocalPath))
 		return SourceCreationResult { SourceCreationStatus::Failure_InvalidPath };
 
-	const EntrySearchTree::Iterator existingItemIt = entrySearchTree.find(normalizedLocalPath);
-	if (existingItemIt)
-		return SourceCreationResult { SourceCreationStatus::Success, existingItemIt };
+	if (Source* existingSource = entrySearchTree.find(normalizedLocalPath))
+		return SourceCreationResult { SourceCreationStatus::Success, existingSource };
 
 	const uint32 memoryBlockSize = sizeof(Source) + uint32(normalizedLocalPath.getLength()) + 1;
 	byte* sourceMemory = (byte*)SystemHeapAllocator::Allocate(memoryBlockSize);

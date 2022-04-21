@@ -78,7 +78,7 @@ PipelineLayoutCreationResult PipelineLayoutList::create(XLib::StringViewASCII na
 	entrySearchTree.insert(pipelineLayout);
 	entryCount++;
 
-	return PipelineLayoutCreationResult{ PipelineLayoutCreationStatus::Success, &pipelineLayout };
+	return PipelineLayoutCreationResult { PipelineLayoutCreationStatus::Success, &pipelineLayout };
 }
 
 PipelineLayout* PipelineLayoutList::find(XLib::StringViewASCII name) const

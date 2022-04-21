@@ -468,7 +468,7 @@ Shader* BuildDescriptionLoader::parseSetShaderStatement(
 
 void BuildDescriptionLoader::reportError(const char* message)
 {
-	TextWriteFmtStdOut(message);
+	TextWriteFmtStdOut(message, '\n');
 }
 
 BuildDescriptionLoader::BuildDescriptionLoader(

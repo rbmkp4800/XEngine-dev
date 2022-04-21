@@ -56,13 +56,12 @@ ShaderCreationResult ShaderList::findOrCreate(HAL::ShaderCompiler::ShaderType ty
 {
 	// TODO: Validate shader type value.
 
-	const EntrySearchKey existingEntrySearchKey { source, entryPointName, pipelineLayout };
-	const EntrySearchTree::Iterator existingItemIt = entrySearchTree.find(existingEntrySearchKey);
-	if (existingItemIt)
+	const EntrySearchKey existingShaderSearchKey { source, entryPointName, pipelineLayout };
+	if (Shader* existingShader = entrySearchTree.find(existingShaderSearchKey))
 	{
-		if (existingItemIt->getType() != type)
+		if (existingShader->getType() != type)
 			return ShaderCreationResult { ShaderCreationStatus::Failure_ShaderTypeMismatch };
-		return ShaderCreationResult { ShaderCreationStatus::Success, existingItemIt };
+		return ShaderCreationResult { ShaderCreationStatus::Success, existingShader };
 	}
 
 	const uint32 memoryBlockSize = sizeof(Shader) + uint32(entryPointName.getLength()) + 1;
@@ -82,5 +81,5 @@ ShaderCreationResult ShaderList::findOrCreate(HAL::ShaderCompiler::ShaderType ty
 
 	entrySearchTree.insert(shader);
 
-	return ShaderCreationResult { ShaderCreationStatus::Success };
+	return ShaderCreationResult { ShaderCreationStatus::Success, &shader };
 }
