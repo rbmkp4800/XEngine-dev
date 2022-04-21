@@ -32,6 +32,7 @@ namespace XEngine::Render::Shaders::Builder_
 		PipelineList& pipelineList;
 		ShaderList& shaderList;
 		SourceCache& sourceCache;
+		const char* path = nullptr;
 
 	private:
 		bool expectSimpleToken(TokenType type);
@@ -42,7 +43,7 @@ namespace XEngine::Render::Shaders::Builder_
 		PipelineLayout* parseSetLayoutStatement();
 		Shader* parseSetShaderStatement(HAL::ShaderCompiler::ShaderType shaderType, PipelineLayout& pipelineLayout);
 
-		void reportError(const char* message);
+		void reportError(const char* message, const Token& token);
 
 	public:
 		BuildDescriptionLoader(

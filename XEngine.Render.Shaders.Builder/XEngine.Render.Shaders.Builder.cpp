@@ -56,10 +56,10 @@ public:
 
 void Builder::run(const char* packPath)
 {
-	sourceCache.initialize("..\\XEngine.Render\\Shaders\\");
+	sourceCache.initialize("../XEngine.Render.Shaders/");
 
 	BuildDescriptionLoader descriptionLoader(pipelineLayoutList, pipelineList, shaderList, sourceCache);
-	if (!descriptionLoader.load("..\\XEngine.Render.Shaders\\_BuildDescription.txt"))
+	if (!descriptionLoader.load("../XEngine.Render.Shaders/_BuildDescription.txt"))
 		return;
 
 #if 0
@@ -106,7 +106,7 @@ void Builder::run(const char* packPath)
 
 		if (!shader.compile())
 		{
-			TextWriteFmtStdOut("Failed to compile shader \"", "shader.getName()", "\"\n");
+			TextWriteFmtStdOut("Failed to compile shader \"", StringViewASCII(shaderName), "\"\n");
 			return;
 		}
 	}

@@ -38,7 +38,7 @@ bool BuildDescriptionLoader::expectSimpleToken(TokenType type)
 	const Token token = tokenizer.getToken();
 	if (token.type != type)
 	{
-		reportError("expected token ..."); // TODO: Put expected token here.
+		reportError("expected token ...", token); // TODO: Put expected token here.
 		return false;
 	}
 	return true;
@@ -49,7 +49,7 @@ bool BuildDescriptionLoader::parsePipelineLayoutDeclaration()
 	const Token pipelineLayoutNameToken = tokenizer.getToken();
 	if (pipelineLayoutNameToken.type != TokenType::Identifier)
 	{
-		reportError("expected pipeline layout name");
+		reportError("expected pipeline layout name", pipelineLayoutNameToken);
 		return false;
 	}
 
@@ -70,11 +70,16 @@ bool BuildDescriptionLoader::parsePipelineLayoutDeclaration()
 
 		if (String::IsEqual(token.string, "ReadOnlyBuffer"))
 			bindPointDesc.type = HAL::PipelineBindPointType::ReadOnlyBuffer;
+		else
+		{
+			reportError("unknown bind point type", token);
+			return false;
+		}
 
 		const Token bindPointNameToken = tokenizer.getToken();
 		if (bindPointNameToken.type != TokenType::Identifier)
 		{
-			reportError("expected bind point name");
+			reportError("expected bind point name", bindPointNameToken);
 			return false;
 		}
 
@@ -85,7 +90,7 @@ bool BuildDescriptionLoader::parsePipelineLayoutDeclaration()
 
 		if (bindPoints.isFull())
 		{
-			reportError("too many bind points");
+			reportError("too many bind points", token);
 			return false;
 		}
 
@@ -98,7 +103,7 @@ bool BuildDescriptionLoader::parsePipelineLayoutDeclaration()
 	if (pipelineLayoutCreationResult.status != PipelineLayoutCreationStatus::Success)
 	{
 		// TODO: Proper error handling (CRC collision etc).
-		reportError("pipeline layout redefinition");
+		reportError("pipeline layout redefinition", pipelineLayoutNameToken);
 		return false;
 	}
 
@@ -110,7 +115,7 @@ bool BuildDescriptionLoader::parseGraphicsPipelineDeclaration()
 	const Token pipelineNameToken = tokenizer.getToken();
 	if (pipelineNameToken.type != TokenType::Identifier)
 	{
-		reportError("expected pipeline name");
+		reportError("expected pipeline name", pipelineNameToken);
 		return false;
 	}
 
@@ -134,7 +139,7 @@ bool BuildDescriptionLoader::parseGraphicsPipelineDeclaration()
 		{
 			if (pipelineLayout)
 			{
-				reportError("pipeline layout already defined");
+				reportError("pipeline layout already defined", token);
 				return false;
 			}
 
@@ -146,12 +151,12 @@ bool BuildDescriptionLoader::parseGraphicsPipelineDeclaration()
 		{
 			if (pipelineDesc.vertexShader)
 			{
-				reportError("vertex shader already defined");
+				reportError("vertex shader already defined", token);
 				return false;
 			}
 			if (!pipelineLayout)
 			{
-				reportError("pipeline layout should be defined prior to shaders");
+				reportError("pipeline layout should be defined prior to shaders", token);
 				return false;
 			}
 
@@ -163,12 +168,12 @@ bool BuildDescriptionLoader::parseGraphicsPipelineDeclaration()
 		{
 			if (pipelineDesc.pixelShader)
 			{
-				reportError("pixel shader already defined");
+				reportError("pixel shader already defined", token);
 				return false;
 			}
 			if (!pipelineLayout)
 			{
-				reportError("pipeline layout should be defined prior to shaders");
+				reportError("pipeline layout should be defined prior to shaders", token);
 				return false;
 			}
 
@@ -184,12 +189,12 @@ bool BuildDescriptionLoader::parseGraphicsPipelineDeclaration()
 			const Token rtIndexToken = tokenizer.getToken();
 			if (rtIndexToken.type != TokenType::NumberLiteral)
 			{
-				reportError("expected render target index");
+				reportError("expected render target index", rtIndexToken);
 				return false;
 			}
 			if (rtIndexToken.number < 0 || rtIndexToken.number >= HAL::MaxRenderTargetCount)
 			{
-				reportError("invalid render target index");
+				reportError("invalid render target index", rtIndexToken);
 				return false;
 			}
 
@@ -198,7 +203,7 @@ bool BuildDescriptionLoader::parseGraphicsPipelineDeclaration()
 			const bool rtIsAlreadySet = (setRTsMask & (1 << rtIndex)) != 0;
 			if (rtIsAlreadySet)
 			{
-				reportError("this render target is already set");
+				reportError("this render target is already set", rtIndexToken);
 				return false;
 			}
 
@@ -208,20 +213,20 @@ bool BuildDescriptionLoader::parseGraphicsPipelineDeclaration()
 			const Token rtFormatToken = tokenizer.getToken();
 			if (rtFormatToken.type != TokenType::Identifier)
 			{
-				reportError("expected render target format identifier");
+				reportError("expected render target format identifier", rtFormatToken);
 				return false;
 			}
 
 			const HAL::TexelViewFormat rtFormat = ParseTexelViewFormatString(rtFormatToken.string);
 			if (!HAL::ValidateTexelViewFormatValue(rtFormat))
 			{
-				reportError("unknown format");
+				reportError("unknown format", rtFormatToken);
 				return false;
 			}
 
 			if (!HAL::ValidateTexelViewFormatForRenderTargetUsage(rtFormat))
 			{
-				reportError("this format is not supported for render target usage");
+				reportError("this format is not supported for render target usage", rtFormatToken);
 				return false;
 			}
 
@@ -235,7 +240,7 @@ bool BuildDescriptionLoader::parseGraphicsPipelineDeclaration()
 		{
 			if (depthRTIsSet)
 			{
-				reportError("depth render target is already set");
+				reportError("depth render target is already set", token);
 				return false;
 			}
 
@@ -245,7 +250,7 @@ bool BuildDescriptionLoader::parseGraphicsPipelineDeclaration()
 			const Token depthRTFormatToken = tokenizer.getToken();
 			if (depthRTFormatToken.type != TokenType::Identifier)
 			{
-				reportError("expected depth render target format identifier");
+				reportError("expected depth render target format identifier", depthRTFormatToken);
 				return false;
 			}
 
@@ -264,7 +269,7 @@ bool BuildDescriptionLoader::parseGraphicsPipelineDeclaration()
 		}
 		else
 		{
-			reportError("expected graphics pipeline setup statement");
+			reportError("unknown graphics pipeline setup statement", token);
 			return false;
 		}
 
@@ -274,7 +279,7 @@ bool BuildDescriptionLoader::parseGraphicsPipelineDeclaration()
 
 	if (!pipelineLayout)
 	{
-		reportError("pipeline layout is not defined");
+		reportError("pipeline layout is not defined", pipelineNameToken);
 		return false;
 	}
 
@@ -285,7 +290,7 @@ bool BuildDescriptionLoader::parseGraphicsPipelineDeclaration()
 	if (pipelineCreationResult.status != PipelineCreationStatus::Success)
 	{
 		// TODO: Proper error handling (CRC collision etc).
-		reportError("pipeline with this name already defined");
+		reportError("pipeline with this name already defined", pipelineNameToken);
 		return false;
 	}
 
@@ -297,7 +302,7 @@ bool BuildDescriptionLoader::parseComputePipelineDeclaration()
 	const Token pipelineNameToken = tokenizer.getToken();
 	if (pipelineNameToken.type != TokenType::Identifier)
 	{
-		reportError("expected pipeline name");
+		reportError("expected pipeline name", pipelineNameToken);
 		return false;
 	}
 
@@ -317,7 +322,7 @@ bool BuildDescriptionLoader::parseComputePipelineDeclaration()
 
 		if (token.type != TokenType::Identifier)
 		{
-			reportError("expected compute pipeline setup statement");
+			reportError("expected compute pipeline setup statement", token);
 			return false;
 		}
 
@@ -325,7 +330,7 @@ bool BuildDescriptionLoader::parseComputePipelineDeclaration()
 		{
 			if (pipelineLayout)
 			{
-				reportError("pipeline layout already defined");
+				reportError("pipeline layout already defined", token);
 				return false;
 			}
 
@@ -337,12 +342,12 @@ bool BuildDescriptionLoader::parseComputePipelineDeclaration()
 		{
 			if (computeShader)
 			{
-				reportError("compute shader already defined");
+				reportError("compute shader already defined", token);
 				return false;
 			}
 			if (!pipelineLayout)
 			{
-				reportError("pipeline layout should be defined prior to shaders");
+				reportError("pipeline layout should be defined prior to shaders", token);
 				return false;
 			}
 
@@ -352,7 +357,7 @@ bool BuildDescriptionLoader::parseComputePipelineDeclaration()
 		}
 		else
 		{
-			reportError("expected compute pipeline setup statement");
+			reportError("unknown compute pipeline setup statement", token);
 			return false;
 		}
 
@@ -362,13 +367,13 @@ bool BuildDescriptionLoader::parseComputePipelineDeclaration()
 
 	if (!pipelineLayout)
 	{
-		reportError("pipeline layout is not defined");
+		reportError("pipeline layout is not defined", pipelineNameToken);
 		return false;
 	}
 
 	if (!computeShader)
 	{
-		reportError("compute shader is not defined");
+		reportError("compute shader is not defined", pipelineNameToken);
 		return false;
 	}
 
@@ -377,7 +382,7 @@ bool BuildDescriptionLoader::parseComputePipelineDeclaration()
 	if (pipelineCreationResult.status != PipelineCreationStatus::Success)
 	{
 		// TODO: Proper error handling (CRC collision etc).
-		reportError("pipeline with this name already defined");
+		reportError("pipeline with this name already defined", pipelineNameToken);
 		return false;
 	}
 
@@ -392,7 +397,7 @@ PipelineLayout* BuildDescriptionLoader::parseSetLayoutStatement()
 	const Token layoutNameToken = tokenizer.getToken();
 	if (layoutNameToken.type != TokenType::Identifier)
 	{
-		reportError("expected pipeline layout name");
+		reportError("expected pipeline layout name", layoutNameToken);
 		return nullptr;
 	}
 
@@ -402,7 +407,7 @@ PipelineLayout* BuildDescriptionLoader::parseSetLayoutStatement()
 	PipelineLayout* pipelineLayout = pipelineLayoutList.find(layoutNameToken.string);
 	if (!pipelineLayout)
 	{
-		reportError("pipeline layout is not found");
+		reportError("pipeline layout is not found", layoutNameToken);
 		return nullptr;
 	}
 
@@ -418,7 +423,7 @@ Shader* BuildDescriptionLoader::parseSetShaderStatement(
 	const Token pathToken = tokenizer.getToken();
 	if (pathToken.type != TokenType::StringLiteral)
 	{
-		reportError("expected source path string literal");
+		reportError("expected source path string literal", pathToken);
 		return nullptr;
 	}
 
@@ -426,9 +431,9 @@ Shader* BuildDescriptionLoader::parseSetShaderStatement(
 		return nullptr;
 
 	const Token entryPointNameToken = tokenizer.getToken();
-	if (pathToken.type != TokenType::StringLiteral)
+	if (entryPointNameToken.type != TokenType::StringLiteral)
 	{
-		reportError("expected entry point name string literal");
+		reportError("expected entry point name string literal", entryPointNameToken);
 		return nullptr;
 	}
 
@@ -439,12 +444,12 @@ Shader* BuildDescriptionLoader::parseSetShaderStatement(
 
 	if (sourceCreationResult.status == SourceCreationStatus::Failure_PathIsTooLong)
 	{
-		reportError("source path is too long");
+		reportError("source path is too long", pathToken);
 		return nullptr;
 	}
 	else if (sourceCreationResult.status == SourceCreationStatus::Failure_InvalidPath)
 	{
-		reportError("source path is invalid");
+		reportError("source path is invalid", pathToken);
 		return nullptr;
 	}
 
@@ -456,7 +461,7 @@ Shader* BuildDescriptionLoader::parseSetShaderStatement(
 
 	if (shaderCreationResult.status == ShaderCreationStatus::Failure_ShaderTypeMismatch)
 	{
-		reportError("same shader is already defined with other type");
+		reportError("same shader is already defined with other type", pathToken);
 		return nullptr;
 	}
 
@@ -466,9 +471,9 @@ Shader* BuildDescriptionLoader::parseSetShaderStatement(
 	return shaderCreationResult.shader;
 }
 
-void BuildDescriptionLoader::reportError(const char* message)
+void BuildDescriptionLoader::reportError(const char* message, const Token& token)
 {
-	TextWriteFmtStdOut(message, '\n');
+	TextWriteFmtStdOut(path, ':', token.line + 1, ':', token.offset + 1, ": ", message, '\n');
 }
 
 BuildDescriptionLoader::BuildDescriptionLoader(
@@ -485,6 +490,8 @@ BuildDescriptionLoader::BuildDescriptionLoader(
 
 bool BuildDescriptionLoader::load(const char* pathCStr)
 {
+	path = pathCStr;
+
 	DynamicStringASCII text;
 
 	// Read text from file.
@@ -514,7 +521,7 @@ bool BuildDescriptionLoader::load(const char* pathCStr)
 
 		if (token.type != TokenType::Identifier)
 		{
-			reportError("expected declaration");
+			reportError("expected declaration", token);
 			return false;
 		}
 
@@ -535,7 +542,7 @@ bool BuildDescriptionLoader::load(const char* pathCStr)
 		}
 		else
 		{
-			reportError("unknown keyword");
+			reportError("unknown keyword", token);
 			return false;
 		}
 	}
