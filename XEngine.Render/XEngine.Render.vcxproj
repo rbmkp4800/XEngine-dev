@@ -130,6 +130,7 @@
     <ClInclude Include="XEngine.Render.Scene.h" />
     <ClInclude Include="XEngine.Render.GBuffer.h" />
     <ClInclude Include="XEngine.Render.Device.TextureHeap.h" />
+    <ClInclude Include="XEngine.Render.Scheduler.h" />
     <ClInclude Include="XEngine.Render.Target.h" />
   </ItemGroup>
   <ItemGroup>

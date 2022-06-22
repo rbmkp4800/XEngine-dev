@@ -24,6 +24,7 @@ namespace XEngine::Render::HAL
 	class Device;
 	class Host;
 
+	enum class MemoryBlockHandle : uint32;
 	enum class ResourceHandle : uint32;
 	enum class ShaderResourceViewHandle : uint32;
 	enum class RenderTargetViewHandle : uint32;
@@ -39,6 +40,7 @@ namespace XEngine::Render::HAL
 
 	using DescriptorAddress = uint32;
 
+	static constexpr MemoryBlockHandle ZeroMemoryBlockHandle = MemoryBlockHandle(0);
 	static constexpr ResourceHandle ZeroResourceHandle = ResourceHandle(0);
 	static constexpr ShaderResourceViewHandle ZeroShaderResourceViewHandle = ShaderResourceViewHandle(0);
 	static constexpr RenderTargetViewHandle ZeroRenderTargetViewHandle = RenderTargetViewHandle(0);
@@ -48,19 +50,18 @@ namespace XEngine::Render::HAL
 	static constexpr FenceHandle ZeroFenceHandle = FenceHandle(0);
 	static constexpr SwapChainHandle ZeroSwapChainHandle = SwapChainHandle(0);
 
+	enum class MemoryType : uint8
+	{
+		GPULocal = 0,
+		GPUReadCPUWrite,
+		GPUWriteCPURead,
+	};
+
 	enum class ResourceType : uint8
 	{
 		Undefined = 0,
 		Buffer,
 		Texture,
-	};
-
-	enum class BufferMemoryType : uint8
-	{
-		Undefined = 0,
-		Local,
-		Upload,
-		Readback,
 	};
 
 	struct BufferCreationFlags
@@ -442,6 +443,9 @@ namespace XEngine::Render::HAL
 	public:
 		Device() = default;
 		~Device() = default;
+
+		MemoryBlockHandle allocateMemory(uint64 size, MemoryType memoryType = MemoryType::GPULocal);
+		void releaseMemory(MemoryBlockHandle memory);
 
 		ResourceHandle createBuffer(uint64 size, BufferMemoryType memoryType, BufferCreationFlags flags);
 		void destroyBuffer(ResourceHandle handle);

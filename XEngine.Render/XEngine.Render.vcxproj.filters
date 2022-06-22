@@ -27,6 +27,7 @@
     <ClInclude Include="XEngine.Render.Target.h" />
     <ClInclude Include="XEngine.Render.CustomDrawBatch.h" />
     <ClInclude Include="XEngine.Render.Device.ShadersLoader.h" />
+    <ClInclude Include="XEngine.Render.Scheduler.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="XEngine.Render.Device.BufferHeap.cpp" />
