@@ -16,9 +16,8 @@ namespace XEngine::Render::HAL
 		ConstantBuffer,
 		ReadOnlyBuffer,
 		ReadWriteBuffer,
-		//Descriptor,
-		//DescriptorBundle,
-		//DescriptorArray,
+		DescriptorSet,
+		DescriptorArray,
 	};
 
 	enum class DescriptorType : uint8
@@ -26,8 +25,8 @@ namespace XEngine::Render::HAL
 		Undefined = 0,
 		ReadOnlyBuffer,
 		ReadWriteBuffer,
-		ReadOnlyTexture2D,
-		ReadWriteTexture2D,
+		ReadOnlyTexture,
+		ReadWriteTexture,
 		RaytracingAccelerationStructure,
 	};
 

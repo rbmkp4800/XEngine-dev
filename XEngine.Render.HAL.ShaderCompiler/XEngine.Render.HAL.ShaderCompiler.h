@@ -6,11 +6,9 @@
 
 #include <XEngine.Render.HAL.Common.h>
 
-namespace XEngine::Render::HAL::ObjectFormat { struct PipelineBindPointRecord; }
-
 namespace XEngine::Render::HAL::ShaderCompiler
 {
-	class CompiledDescriptorBundleLayout;
+	class CompiledDescriptorSetLayout;
 	class CompiledPipelineLayout;
 	class CompiledShaderLibrary;
 	class CompiledShader;
@@ -21,9 +19,9 @@ namespace XEngine::Render::HAL::ShaderCompiler
 	{
 		Undefined = 0,
 		D3D12,
-		//D3D12X,
-		//AGC,
-		//Vulkan,
+		Vulkan,
+		//Scarlett,
+		//Prospero,
 	};
 
 	enum class ShaderType : uint8
@@ -53,7 +51,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		union
 		{
 			uint8 constantsSize32bitValues;
-			const CompiledDescriptorBundleLayout* descriptorBundleLayout;
+			const CompiledDescriptorSetLayout* descriptorSetLayout;
 		};
 	};
 
@@ -133,7 +131,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		static Object Create(uint32 size);
 	};
 
-	class CompiledDescriptorBundleLayout : public XLib::NonCopyable
+	class CompiledDescriptorSetLayout : public XLib::NonCopyable
 	{
 		friend Host;
 
@@ -141,10 +139,10 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		Object object;
 
 	public:
-		CompiledDescriptorBundleLayout() = default;
-		~CompiledDescriptorBundleLayout() = default;
+		CompiledDescriptorSetLayout() = default;
+		~CompiledDescriptorSetLayout() = default;
 
-		inline void destroy() { this->~CompiledDescriptorBundleLayout(); }
+		inline void destroy() { this->~CompiledDescriptorSetLayout(); }
 
 		inline bool isInitialized() const { return object.isValid(); }
 		inline const Object& getObject() const { return object; }
@@ -234,14 +232,14 @@ namespace XEngine::Render::HAL::ShaderCompiler
 	class Host abstract final
 	{
 	public:
-		static bool CompileDescriptorBundleLayout(Platform platform,
+		static bool CompileDescriptorSetLayout(Platform platform,
 			const DescriptorBindPointDesc* bindPoints, uint8 bindPointCount,
-			CompiledDescriptorBundleLayout& result);
+			CompiledDescriptorSetLayout& result);
 
 		static bool CompilePipelineLayout(Platform platform,
 			const PipelineBindPointDesc* bindPoints, uint8 bindPointCount, CompiledPipelineLayout& result);
 
-		static bool CompileCompiledShaderLibrary(Platform platform,
+		static bool CompileShaderLibrary(Platform platform,
 			const CompiledPipelineLayout& pipelineLayout, const char* source, uint32 sourceLength,
 			const Define* defines, uint16 defineCount, CompiledShaderLibrary& result);
 
