@@ -47,6 +47,12 @@ static inline bool ValidateGenericObjectHeader(const ObjectFormat::GenericObject
 //};
 
 
+struct Device::MemoryBlock
+{
+	ID3D12Heap* d3dHeap;
+	uint8 handleGeneration;
+};
+
 struct Device::Resource
 {
 	ID3D12Resource2* d3dResource;
@@ -481,7 +487,7 @@ uint32 Device::CalculateTextureSubresourceIndex(const Resource& resource, const 
 	return subresource.mipLevel + (subresource.arraySlice * mipLevelCount) + (planeIndex * mipLevelCount * arraySize);
 }
 
-void Device::initialize(ID3D12Device8* _d3dDevice)
+void Device::initialize(ID3D12Device10* _d3dDevice)
 {
 	XEMasterAssert(!d3dDevice);
 	d3dDevice = _d3dDevice;
@@ -504,10 +510,11 @@ void Device::initialize(ID3D12Device8* _d3dDevice)
 	const D3D12_COMMAND_QUEUE_DESC d3dGraphicsQueueDesc = D3D12Helpers::CommandQueueDesc(D3D12_COMMAND_LIST_TYPE_DIRECT);
 	d3dDevice->CreateCommandQueue(&d3dGraphicsQueueDesc, d3dGraphicsQueue.uuid(), d3dGraphicsQueue.voidInitRef());
 
-	// Allocate device resources tables.
+	// Allocate object tables.
 	{
 		// TODO: Take into account alignments.
-		constexpr uintptr memoryBlockSize =
+		constexpr uintptr objectTablesMemorySize =
+			sizeof(MemoryBlock) * MaxMemoryBlockCount +
 			sizeof(Resource) * MaxResourceCount +
 			sizeof(ResourceView) * MaxResourceViewCount +
 			sizeof(PipelineLayout) * MaxPipelineLayoutCount +
@@ -515,20 +522,23 @@ void Device::initialize(ID3D12Device8* _d3dDevice)
 			sizeof(Fence) * MaxFenceCount +
 			sizeof(SwapChain) * MaxSwapChainCount;
 
-		// TODO: Handle this memory block in proper way.
-		void* memoryBlock = SystemHeapAllocator::Allocate(memoryBlockSize);
-		memorySet(memoryBlock, 0, memoryBlockSize);
+		// TODO: Handle this memory in proper way.
+		void* objectTablesMemory = SystemHeapAllocator::Allocate(objectTablesMemorySize);
+		memorySet(objectTablesMemory, 0, objectTablesMemorySize);
 
-		resourcesTable = (Resource*)memoryBlock;
+		memoryBlocksTable = (MemoryBlock*)objectTablesMemory;
+		resourcesTable = (Resource*)(memoryBlocksTable + MaxMemoryBlockCount);
 		resourceViewsTable = (ResourceView*)(resourcesTable + MaxResourceCount);
 		pipelineLayoutsTable = (PipelineLayout*)(resourceViewsTable + MaxResourceViewCount);
 		pipelinesTable = (Pipeline*)(pipelineLayoutsTable + MaxPipelineLayoutCount);
 		fencesTable = (Fence*)(pipelinesTable + MaxPipelineCount);
 		swapChainsTable = (SwapChain*)(fencesTable + MaxFenceCount);
+		void* objectTablesMemoryEnd = swapChainsTable + MaxSwapChainCount;
 
-		XEAssert(uintptr(memoryBlock) + memoryBlockSize == uintptr(swapChainsTable + MaxSwapChainCount));
+		XEAssert(uintptr(objectTablesMemory) + objectTablesMemorySize == uintptr(objectTablesMemoryEnd));
 	}
 
+	memoryBlocksTableAllocationMask.clear();
 	resourcesTableAllocationMask.clear();
 	resourceViewsTableAllocationMask.clear();
 	renderTargetViewsTableAllocationMask.clear();
@@ -550,8 +560,35 @@ void Device::initialize(ID3D12Device8* _d3dDevice)
 	srvDescriptorSize = uint16(d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
 }
 
-ResourceHandle Device::createBuffer(uint64 size, BufferMemoryType memoryType, BufferCreationFlags flags)
+MemoryBlockHandle Device::allocateMemory(uint64 size, MemoryType memoryType)
 {
+	const sint32 memoryBlockIndex = memoryBlocksTableAllocationMask.findFirstZeroAndSet();
+	XEMasterAssert(memoryBlockIndex >= 0);
+
+	MemoryBlock& memoryBlock = memoryBlocksTable[memoryBlockIndex];
+	XEAssert(!memoryBlock.d3dHeap);
+
+	const D3D12_HEAP_TYPE d3dHeapType = TranslateMemoryTypeToD3D12HeapType(memoryType);
+
+	D3D12_HEAP_DESC d3dHeapDesc = {};
+	d3dHeapDesc.SizeInBytes = size;
+	d3dHeapDesc.Properties = D3D12Helpers::HeapProperties(d3dHeapType);
+	d3dHeapDesc.Alignment = 0;
+	d3dHeapDesc.Flags = D3D12_HEAP_FLAG_CREATE_NOT_ZEROED | D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES;
+	// TODO: Check D3D12_RESOURCE_HEAP_TIER_2 during starup. We need it for `D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES`.
+	// TODO: Check if we need `D3D12_HEAP_FLAG_ALLOW_SHADER_ATOMICS`.
+
+	d3dDevice->CreateHeap(&d3dHeapDesc, IID_PPV_ARGS(&memoryBlock.d3dHeap));
+
+	return composeMemoryBlockHandle(memoryBlockIndex);
+}
+
+ResourceHandle Device::createBuffer(uint64 size, BufferFlags flags,
+	MemoryBlockHandle memoryBlockHandle, uint64 memoryBlockOffset)
+{
+	const MemoryBlock& memoryBlock = getMemoryBlockByHandle(memoryBlockHandle);
+	XEAssert(memoryBlock.d3dHeap);
+
 	const sint32 resourceIndex = resourcesTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(resourceIndex >= 0);
 
@@ -561,17 +598,15 @@ ResourceHandle Device::createBuffer(uint64 size, BufferMemoryType memoryType, Bu
 	resource.type = ResourceType::Buffer;
 	resource.internalOwnership = false;
 
-	const D3D12_HEAP_TYPE d3dHeapType = TranslateBufferMemoryTypeToD3D12HeapType(memoryType);
-	const D3D12_HEAP_PROPERTIES d3dHeapProps = D3D12Helpers::HeapProperties(d3dHeapType);
-
 	D3D12_RESOURCE_FLAGS d3dResourceFlags = D3D12_RESOURCE_FLAG_NONE;
 	if (flags.allowShaderWrite)
 		d3dResourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
-	const D3D12_RESOURCE_DESC d3dResourceDesc = D3D12Helpers::ResourceDescForBuffer(size);
+	const D3D12_RESOURCE_DESC1 d3dResourceDesc = D3D12Helpers::ResourceDesc1ForBuffer(size);
 
-	d3dDevice->CreateCommittedResource(&d3dHeapProps, D3D12_HEAP_FLAG_NONE,
-		&d3dResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+	// TODO: Check that resource fits into memory block.
+	d3dDevice->CreatePlacedResource2(memoryBlock.d3dHeap, memoryBlockOffset,
+		&d3dResourceDesc, D3D12_BARRIER_LAYOUT_UNDEFINED, nullptr, 0, nullptr,
 		IID_PPV_ARGS(&resource.d3dResource));
 
 	return composeResourceHandle(resourceIndex);
@@ -1103,6 +1138,11 @@ void Device::submitFenceSignal(DeviceQueue queue, FenceHandle fenceHandle, uint6
 	d3dGraphicsQueue->Signal(getFenceByHandle(fenceHandle).d3dFence, value);
 }
 
+void Device::submitFenceWait(DeviceQueue queue, FenceHandle fenceHandle, uint64 value)
+{
+	d3dGraphicsQueue->Wait(getFenceByHandle(fenceHandle).d3dFence, value);
+}
+
 void Device::submitFlip(SwapChainHandle swapChainHandle)
 {
 	getSwapChainByHandle(swapChainHandle).dxgiSwapChain->Present(1, 0);
@@ -1137,7 +1177,7 @@ void Host::CreateDevice(Device& device)
 	dxgiFactory->EnumAdapterByGpuPreference(0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
 		dxgiAdapter.uuid(), dxgiAdapter.voidInitRef());
 
-	ID3D12Device8* d3dDevice = nullptr;
+	ID3D12Device10* d3dDevice = nullptr;
 
 	// TODO: D3D_FEATURE_LEVEL_12_2
 	D3D12CreateDevice(dxgiAdapter, D3D_FEATURE_LEVEL_12_2, IID_PPV_ARGS(&d3dDevice));
@@ -1172,14 +1212,15 @@ uint16x3 Host::CalculateMipLevelSize(uint16x3 srcSize, uint8 mipLevel)
 
 namespace
 {
-	constexpr uint8 ResourceHandleSignature = 0x1;
-	constexpr uint8 ResourceViewHandleSignature = 0x2;
-	constexpr uint8 RenderTargetViewHandleSignature = 0x3;
-	constexpr uint8 DepthStencilViewHandleSignature = 0x4;
-	constexpr uint8 PipelineLayoutHandleSignature = 0x5;
-	constexpr uint8 PipelineHandleSignature = 0x6;
-	constexpr uint8 FenceHandleSignature = 0x7;
-	constexpr uint8 SwapChainHandleSignature = 0x8;
+	constexpr uint8 MemoryBlockHandleSignature = 0x1;
+	constexpr uint8 ResourceHandleSignature = 0x2;
+	constexpr uint8 ResourceViewHandleSignature = 0x3;
+	constexpr uint8 RenderTargetViewHandleSignature = 0x4;
+	constexpr uint8 DepthStencilViewHandleSignature = 0x5;
+	constexpr uint8 PipelineLayoutHandleSignature = 0x6;
+	constexpr uint8 PipelineHandleSignature = 0x7;
+	constexpr uint8 FenceHandleSignature = 0x8;
+	constexpr uint8 SwapChainHandleSignature = 0x9;
 
 	struct DecomposedHandle
 	{
@@ -1202,6 +1243,13 @@ namespace
 		result.entryIndex = handle & 0x0F'FF'FF;
 		return result;
 	}
+}
+
+MemoryBlockHandle Device::composeMemoryBlockHandle(uint32 memoryBlockIndex) const
+{
+	XEAssert(memoryBlockIndex < MaxMemoryBlockCount);
+	return MemoryBlockHandle(ComposeHandle(
+		MemoryBlockHandleSignature, memoryBlocksTable[memoryBlockIndex].handleGeneration, memoryBlockIndex));
 }
 
 ResourceHandle Device::composeResourceHandle(uint32 resourceIndex) const

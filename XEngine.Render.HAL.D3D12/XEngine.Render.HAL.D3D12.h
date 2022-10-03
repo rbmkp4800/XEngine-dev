@@ -17,7 +17,7 @@ struct ID3D12CommandAllocator;
 struct ID3D12CommandQueue;
 struct ID3D12DescriptorHeap;
 struct ID3D12GraphicsCommandList;
-struct ID3D12Device8;
+struct ID3D12Device10;
 
 namespace XEngine::Render::HAL
 {
@@ -354,6 +354,7 @@ namespace XEngine::Render::HAL
 		friend Host;
 
 	private:
+		static constexpr uint32 MaxMemoryBlockCount = 1024;
 		static constexpr uint32 MaxResourceCount = 1024;
 		static constexpr uint32 MaxResourceViewCount = 1024;
 		static constexpr uint32 MaxResourceDescriptorCount = 4096;
@@ -365,6 +366,7 @@ namespace XEngine::Render::HAL
 		static constexpr uint32 MaxSwapChainCount = 4;
 		static constexpr uint32 SwapChainTextureCount = 2;
 
+		struct MemoryBlock;
 		struct Resource;
 		struct ResourceView;
 		struct PipelineLayout;
@@ -373,7 +375,7 @@ namespace XEngine::Render::HAL
 		struct SwapChain;
 
 	private:
-		XLib::Platform::COMPtr<ID3D12Device8> d3dDevice;
+		XLib::Platform::COMPtr<ID3D12Device10> d3dDevice;
 		XLib::Platform::COMPtr<ID3D12DescriptorHeap> d3dReferenceSRVHeap;
 		XLib::Platform::COMPtr<ID3D12DescriptorHeap> d3dShaderVisbileSRVHeap;
 		XLib::Platform::COMPtr<ID3D12DescriptorHeap> d3dRTVHeap;
@@ -382,6 +384,7 @@ namespace XEngine::Render::HAL
 		XLib::Platform::COMPtr<ID3D12CommandQueue> d3dAsyncComputeQueue;
 		XLib::Platform::COMPtr<ID3D12CommandQueue> d3dAsyncCopyQueue;
 
+		MemoryBlock* memoryBlocksTable = nullptr;
 		Resource* resourcesTable = nullptr;
 		ResourceView* resourceViewsTable = nullptr;
 		PipelineLayout* pipelineLayoutsTable = nullptr;
@@ -389,6 +392,7 @@ namespace XEngine::Render::HAL
 		Fence* fencesTable = nullptr;
 		SwapChain* swapChainsTable = nullptr;
 
+		XLib::InplaceBitArray<MaxMemoryBlockCount> memoryBlocksTableAllocationMask;
 		XLib::InplaceBitArray<MaxResourceCount> resourcesTableAllocationMask;
 		XLib::InplaceBitArray<MaxResourceViewCount> resourceViewsTableAllocationMask;
 		XLib::InplaceBitArray<MaxRenderTargetViewCount> renderTargetViewsTableAllocationMask;
@@ -410,6 +414,7 @@ namespace XEngine::Render::HAL
 		uint16 dsvDescriptorSize = 0;
 
 	private:
+		MemoryBlockHandle composeMemoryBlockHandle(uint32 memoryBlockIndex) const;
 		ResourceHandle composeResourceHandle(uint32 resourceIndex) const;
 		ResourceViewHandle composeResourceViewHandle(uint32 resourceViewIndex) const;
 		RenderTargetViewHandle composeRenderTargetViewHandle(uint32 renderTargetIndex) const;
@@ -419,6 +424,7 @@ namespace XEngine::Render::HAL
 		FenceHandle composeFenceHandle(uint32 fenceIndex) const;
 		SwapChainHandle composeSwapChainHandle(uint32 swapChainIndex) const;
 
+		uint32 resolveMemoryBlockHandle(MemoryBlockHandle handle) const;
 		uint32 resolveResourceHandle(ResourceHandle handle) const;
 		uint32 resolveResourceViewHandle(ResourceViewHandle handle) const;
 		uint32 resolveRenderTargetViewHandle(RenderTargetViewHandle handle) const;
@@ -431,6 +437,7 @@ namespace XEngine::Render::HAL
 		DescriptorAddress composeDescriptorAddress(uint32 srvHeapDescriptorIndex) const { return DescriptorAddress(srvHeapDescriptorIndex); }
 		uint32 resolveDescriptorAddress(DescriptorAddress address) const { return uint32(address); }
 
+		MemoryBlock& getMemoryBlockByHandle(MemoryBlockHandle handle);
 		Resource& getResourceByHandle(ResourceHandle handle);
 		ResourceView& getResourceViewByHandle(ResourceViewHandle handle);
 		PipelineLayout& getPipelineLayoutByHandle(PipelineLayoutHandle handle);
@@ -444,7 +451,7 @@ namespace XEngine::Render::HAL
 		static uint32 CalculateTextureSubresourceIndex(const Resource& resource, const TextureSubresource& subresource);
 
 	private:
-		void initialize(ID3D12Device8* d3dDevice);
+		void initialize(ID3D12Device10* d3dDevice);
 
 	public:
 		Device() = default;
@@ -457,10 +464,10 @@ namespace XEngine::Render::HAL
 			TextureFormat format, uint8 mipLevelCount, TextureFlags flags);
 
 		ResourceHandle createBuffer(uint64 size, BufferFlags flags,
-			MemoryBlockHandle memoryBlock, uint64 memoryBlockOffset);
+			MemoryBlockHandle memoryBlockHandle, uint64 memoryBlockOffset);
 		ResourceHandle createTexture(TextureType type, uint16x3 size,
 			TextureFormat format, uint8 mipLevelCount, TextureFlags flags,
-			MemoryBlockHandle memoryBlock, uint64 memoryBlockOffset);
+			MemoryBlockHandle memoryBlockHandle, uint64 memoryBlockOffset);
 
 		ResourceHandle createPartiallyResidentBuffer(uint64 size, BufferFlags flags);
 		ResourceHandle createPartiallyResidentTexture(TextureType type, uint16x3 size,

@@ -96,10 +96,10 @@ namespace D3D12Helpers
 		return barrier;
 	}
 
-	inline D3D12_RESOURCE_DESC ResourceDescForBuffer(UINT64 size,
+	inline D3D12_RESOURCE_DESC1 ResourceDesc1ForBuffer(UINT64 size,
 		D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE)
 	{
-		D3D12_RESOURCE_DESC desc = {};
+		D3D12_RESOURCE_DESC1 desc = {};
 		desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
 		desc.Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
 		desc.Width = size;
