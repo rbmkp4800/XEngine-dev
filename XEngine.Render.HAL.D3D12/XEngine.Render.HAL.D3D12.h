@@ -153,6 +153,53 @@ namespace XEngine::Render::HAL
 		uint16 arraySlice;
 	};
 
+	struct TextureSubresourceRange
+	{
+		uint8 baseMipLevel;
+		uint8 mipLevelCount;
+		uint16 baseArraySlice;
+		uint16 arraySliceCount;
+		// TextureAspectMask aspectMask;
+	};
+
+	enum class TextureLayout : uint8
+	{
+		Undefined = 0,
+		Common,
+		CopySource,
+		CopyDest,
+		ShaderReadOnly,
+		ShaderReadWrite,
+		RenderTarget,
+		DepthStencilReadOnly,
+		DepthStencilReadWrite,
+	};
+
+	struct BarrierSyncMask
+	{
+		bool copy : 1;
+		bool computeShading : 1;
+		bool inputAssembler : 1;
+		bool geometryShading : 1;
+		bool pixelShading : 1;
+		bool renderTarget : 1;
+		bool depthStencil : 1;
+	};
+
+	struct BarrierAccessMask
+	{
+		bool copySource : 1;
+		bool copyDest : 1;
+		bool vertexBufer : 1;
+		bool indexBuffer : 1;
+		bool constantBuffer : 1;
+		bool shaderReadOnly : 1;
+		bool shaderReadWrite : 1;
+		bool renderTarget : 1;
+		bool depthStencilReadOnly : 1;
+		bool depthStencilReadWrite : 1;
+	};
+
 	enum class CopyBufferTextureDirection : uint8
 	{
 		BufferToTexture,
@@ -282,6 +329,16 @@ namespace XEngine::Render::HAL
 		void drawIndexed();
 		void dispatchMesh();
 		void dispatch(uint32 groupCountX, uint32 groupCountY = 1, uint32 groupCountZ = 1);
+
+		void bufferMemoryBarrier(ResourceHandle bufferHandle,
+			BarrierSyncMask syncBefore, BarrierSyncMask syncAfter,
+			BarrierAccessMask accessBefore, BarrierAccessMask accessAfter);
+		void textureMemoryBarrier(ResourceHandle textureHandle,
+			BarrierSyncMask syncBefore, BarrierSyncMask syncAfter,
+			BarrierAccessMask accessBefore, BarrierAccessMask accessAfter,
+			TextureLayout layoutBefore, TextureLayout layoutAfter,
+			const TextureSubresourceRange* subresourceRange = nullptr);
+		//void globalMemoryBarrier();
 
 		void copyBuffer(ResourceHandle dstBufferHandle, uint64 dstOffset, ResourceHandle srcBufferHandle, uint64 srcOffset, uint64 size);
 		void copyTexture(ResourceHandle dstTextureHandle, TextureSubresource dstSubresource, uint16x3 dstOffset,

@@ -342,6 +342,22 @@ void CommandList::dispatch(uint32 groupCountX, uint32 groupCountY, uint32 groupC
 	d3dCommandList->Dispatch(groupCountX, groupCountY, groupCountZ);
 }
 
+void CommandList::bufferMemoryBarrier(ResourceHandle bufferHandle,
+	BarrierSyncMask syncBefore, BarrierSyncMask syncAfter,
+	BarrierAccessMask accessBefore, BarrierAccessMask accessAfter)
+{
+
+}
+
+void CommandList::textureMemoryBarrier(ResourceHandle textureHandle,
+	BarrierSyncMask syncBefore, BarrierSyncMask syncAfter,
+	BarrierAccessMask accessBefore, BarrierAccessMask accessAfter,
+	TextureLayout layoutBefore, TextureLayout layoutAfter,
+	const TextureSubresourceRange* subresourceRange)
+{
+
+}
+
 void CommandList::copyBuffer(ResourceHandle dstBufferHandle, uint64 dstOffset,
 	ResourceHandle srcBufferHandle, uint64 srcOffset, uint64 size)
 {
