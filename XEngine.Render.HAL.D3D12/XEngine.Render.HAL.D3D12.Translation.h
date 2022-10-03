@@ -5,13 +5,13 @@
 
 namespace XEngine::Render::HAL
 {
-	inline D3D12_HEAP_TYPE TranslateBufferMemoryTypeToD3D12HeapType(BufferMemoryType type)
+	inline D3D12_HEAP_TYPE TranslateMemoryTypeToD3D12HeapType(MemoryType type)
 	{
 		switch (type)
 		{
-			case BufferMemoryType::Local:		return D3D12_HEAP_TYPE_DEFAULT;
-			case BufferMemoryType::Upload:		return D3D12_HEAP_TYPE_UPLOAD;
-			case BufferMemoryType::Readback:	return D3D12_HEAP_TYPE_READBACK;
+			case MemoryType::DeviceLocal:			return D3D12_HEAP_TYPE_DEFAULT;
+			case MemoryType::DeviceReadHostWrite:	return D3D12_HEAP_TYPE_UPLOAD;
+			case MemoryType::DeviceWriteHostRead:	return D3D12_HEAP_TYPE_READBACK;
 		}
 
 		XEMasterAssertUnreachableCode();
