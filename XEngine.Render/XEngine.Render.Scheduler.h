@@ -11,45 +11,44 @@ namespace XEngine::Render::Scheduler
 	class Pipeline;
 	class Pass;
 
-	using TransientTextureHandle = uint32;
-	using TransientBufferHandle = uint32;
+	enum class TransientBufferHandle			: uint32 {};
+	enum class TransientTextureHandle			: uint32 {};
+	enum class TransientBufferViewHandle		: uint32 {};
+	enum class TransientTextureViewHandle		: uint32 {};
+	enum class TransientRenderTargetViewHandle	: uint32 {};
+	enum class TransientDepthStencilViewHandle	: uint32 {};
 
-	using TransientTextureViewHandle = uint32;
-	using TransientBufferViewHandle = uint32;
-	using TransientRenderTargetViewHandle = uint32;
-	using TransientDepthStencilViewHandle = uint32;
-
-	using PassCPUExecutorFunc = void(*)();
-
-	enum class TextureAccessMode : uint8
-	{
-		Undefined = 0,
-		Read,
-		Write,
-		ReadWrite,
-		RenderTarget,
-		ReadOnlyDepthStencil,
-		ReadWriteDepthStencil,
-	};
+	using PassCPUExecutorFunc = void(*)(HAL::CommandList& commandList, const void* context, uint32 contextSize);
 
 	enum class BufferAccessMode : uint8
 	{
 		Undefined = 0,
-		Read,
-		Write,
-		ReadWrite,
+		ShaderRead,
+		ShaderWrite,
+		ShaderReadWrite,
+	};
+
+	enum class TextureAccessMode : uint8
+	{
+		Undefined = 0,
+		ShaderRead,
+		ShaderWrite,
+		ShaderReadWrite,
+		RenderTarget,
+		DepthStencilReadOnly,
+		DepthStencilReadWrite,
 	};
 
 	enum class PassDependencyType : uint8
 	{
 		Undefined = 0,
-		TransientTexture,
 		TransientBuffer,
-		VirtualCPUResource,
-		ExternalTexture,
+		TransientTexture,
 		ExternalBuffer,
-		ExternalGPUExecutionKickOffSignal,
+		ExternalTexture,
 		ExternalCPUExecutionKickOffSignal,
+		ExternalGPUExecutionKickOffSignal,
+		//VirtualCPUResource,
 	};
 
 	struct PassDependencyDesc
@@ -57,11 +56,12 @@ namespace XEngine::Render::Scheduler
 		PassDependencyType type;
 	};
 
-	enum class PassGPUUsageType : uint8
+	enum class PassDeviceWorkloadType : uint8
 	{
 		None = 0,
 		Graphics,
 		Compute,
+		Copy,
 	};
 
 	class Pipeline : public XLib::NonCopyable
@@ -70,20 +70,20 @@ namespace XEngine::Render::Scheduler
 		Pipeline() = default;
 		~Pipeline() = default;
 
-		TransientTextureHandle createTransientTexture(HAL::TextureType type, uint16x3 size, HAL::TextureFormat format);
 		TransientBufferHandle createTransientBuffer(uint64 size);
+		TransientTextureHandle createTransientTexture(HAL::TextureType type, uint16x3 size, HAL::TextureFormat format);
 
-		TransientTextureViewHandle createTransientTextureView(TransientTextureHandle texture);
 		TransientBufferViewHandle createTransientBufferView(TransientBufferHandle buffer);
+		TransientTextureViewHandle createTransientTextureView(TransientTextureHandle texture);
 		TransientRenderTargetViewHandle createTransientRenderTargetView(TransientTextureHandle texture);
 		TransientDepthStencilViewHandle createTransientDepthStencilView(TransientTextureHandle texture);
 
 		void createVirtualCPUResource();
 
-		void registerExternalTexture(HAL::ResourceHandle texture);
 		void registerExternalBuffer(HAL::ResourceHandle buffer);
+		void registerExternalTexture(HAL::ResourceHandle texture);
 
-		void createPass(PassGPUUsageType gpuUsageType, const PassDependencyDesc* dependencies, uint32 dependecyCount,
+		void addPass(PassDeviceWorkloadType deviceWorkloadType, const PassDependencyDesc* dependencies, uint32 dependecyCount,
 			PassCPUExecutorFunc cpuExecutorFunc, const void* cpuExecutorContext, uint32 cpuExecutorContextSize);
 
 		void compileDependenciesGraph();
@@ -99,6 +99,6 @@ namespace XEngine::Render::Scheduler
 		Scheduler() = default;
 		~Scheduler() = default;
 
-		void submit(Pipeline& pipeline, HAL::MemoryBlockHandle transientMemoryBlock, uint64 transientMemoryOffset);
+		void submit(Pipeline& pipeline, HAL::MemoryBlockHandle transientMemory, uint64 transientMemoryOffset, uint64 transientMemorySize);
 	};
 }
