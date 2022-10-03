@@ -81,43 +81,6 @@ namespace XEngine::Render::HAL
 		return DXGI_FORMAT_UNKNOWN;
 	}
 
-	inline D3D12_RESOURCE_STATES TranslateResourceStateToD3D12ResourceState(ResourceState state)
-	{
-		if (state.isMutable())
-		{
-			switch (state.getMutable())
-			{
-				case ResourceMutableState::RenderTarget:	return D3D12_RESOURCE_STATE_RENDER_TARGET;
-				case ResourceMutableState::DepthWrite:		return D3D12_RESOURCE_STATE_DEPTH_WRITE;
-				case ResourceMutableState::ShaderReadWrite:	return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-				case ResourceMutableState::CopyDestination:	return D3D12_RESOURCE_STATE_COPY_DEST;
-			}
-			return D3D12_RESOURCE_STATE_COMMON;
-		}
-		else
-		{
-			const ResourceImmutableState immutableState = state.getImmutable();
-			D3D12_RESOURCE_STATES d3dResultStates = D3D12_RESOURCE_STATES(0);
-			if (immutableState.vertexBuffer)
-				d3dResultStates |= D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-			if (immutableState.indexBuffer)
-				d3dResultStates |= D3D12_RESOURCE_STATE_INDEX_BUFFER;
-			if (immutableState.constantBuffer)
-				d3dResultStates |= D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-			if (immutableState.pixelShaderRead)
-				d3dResultStates |= D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-			if (immutableState.nonPixelShaderRead)
-				d3dResultStates |= D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-			if (immutableState.depthRead)
-				d3dResultStates |= D3D12_RESOURCE_STATE_DEPTH_READ;
-			if (immutableState.indirectArgument)
-				d3dResultStates |= D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
-			if (immutableState.copySource)
-				d3dResultStates |= D3D12_RESOURCE_STATE_COPY_SOURCE;
-			return d3dResultStates;
-		}
-	}
-
 	inline D3D12_BOX D3D12BoxFromOffsetAndSize(uint16x3 offset, uint16x3 size)
 	{
 		D3D12_BOX result = {};

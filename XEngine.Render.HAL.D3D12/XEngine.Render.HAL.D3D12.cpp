@@ -342,25 +342,6 @@ void CommandList::dispatch(uint32 groupCountX, uint32 groupCountY, uint32 groupC
 	d3dCommandList->Dispatch(groupCountX, groupCountY, groupCountZ);
 }
 
-void CommandList::resourceBarrierStateTransition(ResourceHandle resourceHandle,
-	ResourceState stateBefore, ResourceState stateAfter, const TextureSubresource* textureSubresource)
-{
-	XEAssert(state == State::Recording);
-
-	const Device::Resource& resource = device->getResourceByHandle(resourceHandle);
-	XEAssert(resource.d3dResource);
-
-	const uint32 subresourceIndex = textureSubresource ?
-		Device::CalculateTextureSubresourceIndex(resource, *textureSubresource) :
-		D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-
-	const D3D12_RESOURCE_BARRIER d3dBarrier =
-		D3D12Helpers::ResourceBarrierTransition(resource.d3dResource, subresourceIndex,
-			TranslateResourceStateToD3D12ResourceState(stateBefore),
-			TranslateResourceStateToD3D12ResourceState(stateAfter));
-	d3dCommandList->ResourceBarrier(1, &d3dBarrier);
-}
-
 void CommandList::copyBuffer(ResourceHandle dstBufferHandle, uint64 dstOffset,
 	ResourceHandle srcBufferHandle, uint64 srcOffset, uint64 size)
 {

@@ -153,54 +153,6 @@ namespace XEngine::Render::HAL
 		uint16 arraySlice;
 	};
 
-	struct ResourceImmutableState
-	{
-		bool vertexBuffer : 1;
-		bool indexBuffer : 1;
-		bool constantBuffer : 1;
-		bool pixelShaderRead : 1;
-		bool nonPixelShaderRead : 1;
-		bool depthRead : 1;
-		bool indirectArgument : 1;
-		bool copySource : 1;
-	};
-
-	enum class ResourceMutableState : uint8
-	{
-		None = 0,
-		RenderTarget,
-		DepthWrite,
-		ShaderReadWrite,
-		CopyDestination,
-	};
-
-	class ResourceState
-	{
-		static_assert(sizeof(ResourceImmutableState) <= sizeof(uint16));
-		static_assert(sizeof(ResourceMutableState) <= sizeof(uint16));
-
-	private:
-		static constexpr uint16 MutableFlag = 0x8000;
-
-	private:
-		union
-		{
-			uint16 rawState = 0;
-			ResourceImmutableState immutableState;
-			ResourceMutableState mutableState;
-		};
-
-	public:
-		ResourceState() = default;
-
-		inline ResourceState(ResourceImmutableState immutableState);
-		inline ResourceState(ResourceMutableState mutableState);
-
-		inline bool isMutable() const { return (rawState & MutableFlag) != 0; }
-		inline ResourceImmutableState getImmutable() const { XEAssert(!isMutable()); return immutableState; }
-		inline ResourceMutableState getMutable() const { XEAssert(isMutable()); return mutableState; }
-	};
-
 	enum class CopyBufferTextureDirection : uint8
 	{
 		BufferToTexture,
@@ -330,11 +282,6 @@ namespace XEngine::Render::HAL
 		void drawIndexed();
 		void dispatchMesh();
 		void dispatch(uint32 groupCountX, uint32 groupCountY = 1, uint32 groupCountZ = 1);
-
-		void resourceBarrierStateTransition(ResourceHandle resourceHandle,
-			ResourceState stateBefore, ResourceState stateAfter,
-			const TextureSubresource* textureSubresource = nullptr);
-		void resourceBarrierReadWrite(ResourceHandle resourceHandle, const TextureSubresource* textureSubresource = nullptr);
 
 		void copyBuffer(ResourceHandle dstBufferHandle, uint64 dstOffset, ResourceHandle srcBufferHandle, uint64 srcOffset, uint64 size);
 		void copyTexture(ResourceHandle dstTextureHandle, TextureSubresource dstSubresource, uint16x3 dstOffset,
