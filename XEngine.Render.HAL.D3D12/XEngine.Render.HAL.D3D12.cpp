@@ -71,10 +71,10 @@ struct Device::Resource
 	};
 };
 
-struct Device::ShaderResourceView
+struct Device::ResourceView
 {
 	ResourceHandle resourceHandle;
-	ShaderResourceViewType type;
+	ResourceViewType type;
 	uint8 handleGeneration;
 };
 
@@ -397,7 +397,7 @@ void CommandList::copyTexture(ResourceHandle dstTextureHandle, TextureSubresourc
 	const D3D12_BOX d3dSrcBox = srcRegion ?
 		D3D12BoxFromOffsetAndSize(srcRegion->offset, srcRegion->size) :
 		D3D12BoxFromOffsetAndSize(uint16x3(0, 0, 0),
-			Device::CalculateMipLevelSize(srcTexture.texture.size, srcSubresource.mipLevel));
+			Host::CalculateMipLevelSize(srcTexture.texture.size, srcSubresource.mipLevel));
 
 	// TODO: Add texture subresource bounds validation.
 
@@ -418,7 +418,7 @@ void CommandList::copyBufferTexture(CopyBufferTextureDirection direction,
 	XEAssert(texture.type == ResourceType::Texture && texture.d3dResource);
 
 	uint16x3 textureRegionSize = textureRegion ?
-		textureRegion->size : Device::CalculateMipLevelSize(texture.texture.size, textureSubresource.mipLevel);
+		textureRegion->size : Host::CalculateMipLevelSize(texture.texture.size, textureSubresource.mipLevel);
 
 	D3D12_TEXTURE_COPY_LOCATION d3dBufferLocation = {};
 	d3dBufferLocation.pResource = buffer.d3dResource;
@@ -451,7 +451,7 @@ void CommandList::copyBufferTexture(CopyBufferTextureDirection direction,
 		d3dSrcBox = textureRegion ?
 			D3D12BoxFromOffsetAndSize(textureRegion->offset, textureRegion->size) :
 			D3D12BoxFromOffsetAndSize(uint16x3(0, 0, 0),
-				Device::CalculateMipLevelSize(texture.texture.size, textureSubresource.mipLevel));
+				Host::CalculateMipLevelSize(texture.texture.size, textureSubresource.mipLevel));
 		p_d3dSrcBox = &d3dSrcBox;
 	}
 
@@ -490,7 +490,7 @@ void Device::initialize(ID3D12Device8* _d3dDevice)
 	d3dDevice = _d3dDevice;
 
 	const D3D12_DESCRIPTOR_HEAP_DESC d3dReferenceSRVHeapDesc =
-		D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, MaxShaderResourceViewCount);
+		D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, MaxResourceViewCount);
 	const D3D12_DESCRIPTOR_HEAP_DESC d3dShaderVisbileSRVHeapDesc =
 		D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
 			MaxResourceDescriptorCount, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
@@ -510,9 +510,9 @@ void Device::initialize(ID3D12Device8* _d3dDevice)
 	// Allocate device resources tables.
 	{
 		// TODO: Take into account alignments.
-		const uintptr memoryBlockSize =
+		constexpr uintptr memoryBlockSize =
 			sizeof(Resource) * MaxResourceCount +
-			sizeof(ShaderResourceView) * MaxShaderResourceViewCount +
+			sizeof(ResourceView) * MaxResourceViewCount +
 			sizeof(PipelineLayout) * MaxPipelineLayoutCount +
 			sizeof(Pipeline) * MaxPipelineCount +
 			sizeof(Fence) * MaxFenceCount +
@@ -523,17 +523,17 @@ void Device::initialize(ID3D12Device8* _d3dDevice)
 		memorySet(memoryBlock, 0, memoryBlockSize);
 
 		resourcesTable = (Resource*)memoryBlock;
-		shaderResourceViewsTable = (ShaderResourceView*)(resourcesTable + MaxResourceCount);
-		pipelineLayoutsTable = (PipelineLayout*)(shaderResourceViewsTable + MaxShaderResourceViewCount);
+		resourceViewsTable = (ResourceView*)(resourcesTable + MaxResourceCount);
+		pipelineLayoutsTable = (PipelineLayout*)(resourceViewsTable + MaxResourceViewCount);
 		pipelinesTable = (Pipeline*)(pipelineLayoutsTable + MaxPipelineLayoutCount);
 		fencesTable = (Fence*)(pipelinesTable + MaxPipelineCount);
 		swapChainsTable = (SwapChain*)(fencesTable + MaxFenceCount);
 
-		XEAssert(uintptr(swapChainsTable + MaxSwapChainCount) - uintptr(memoryBlock) == memoryBlockSize);
+		XEAssert(uintptr(memoryBlock) + memoryBlockSize == uintptr(swapChainsTable + MaxSwapChainCount));
 	}
 
 	resourcesTableAllocationMask.clear();
-	shaderResourceViewsTableAllocationMask.clear();
+	resourceViewsTableAllocationMask.clear();
 	renderTargetViewsTableAllocationMask.clear();
 	depthStencilViewsTableAllocationMask.clear();
 	pipelineLayoutsTableAllocationMask.clear();
@@ -614,27 +614,27 @@ ResourceHandle Device::createTexture(TextureType type, uint16x3 size,
 	return composeResourceHandle(resourceIndex);
 }
 
-ShaderResourceViewHandle Device::createShaderResourceView(ResourceHandle resourceHandle, const ShaderResourceViewDesc& viewDesc)
+ResourceViewHandle Device::createResourceView(ResourceHandle resourceHandle, const ResourceViewDesc& viewDesc)
 {
 	const Resource& resource = getResourceByHandle(resourceHandle);
 	XEAssert(resource.d3dResource);
 
 	const D3D12_RESOURCE_DESC d3dResourceDesc = resource.d3dResource->GetDesc();
 
-	const sint32 viewIndex = shaderResourceViewsTableAllocationMask.findFirstZeroAndSet();
+	const sint32 viewIndex = resourceViewsTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(viewIndex >= 0);
 
-	ShaderResourceView& shaderResourceView = shaderResourceViewsTable[viewIndex];
-	XEAssert(shaderResourceView.type == ShaderResourceViewType::Undefined);
-	shaderResourceView.resourceHandle = resourceHandle;
-	shaderResourceView.type = viewDesc.type;
+	ResourceView& resourceView = resourceViewsTable[viewIndex];
+	XEAssert(resourceView.type == ResourceViewType::Undefined);
+	resourceView.resourceHandle = resourceHandle;
+	resourceView.type = viewDesc.type;
 
 	bool useSRV = false;
 	bool useUAV = false;
 	D3D12_SHADER_RESOURCE_VIEW_DESC d3dSRVDesc = {};
 	D3D12_UNORDERED_ACCESS_VIEW_DESC d3dUAVDesc = {};
 
-	if (viewDesc.type == ShaderResourceViewType::ReadOnlyTexture2D)
+	if (viewDesc.type == ResourceViewType::ReadOnlyTexture2D)
 	{
 		XEAssert(resource.type == ResourceType::Texture);
 		d3dSRVDesc = D3D12Helpers::ShaderResourceViewDescForTexture2D(d3dResourceDesc.Format,
@@ -643,7 +643,7 @@ ShaderResourceViewHandle Device::createShaderResourceView(ResourceHandle resourc
 			viewDesc.readOnlyTexture2D.plane);
 		useSRV = true;
 	}
-	else if (viewDesc.type == ShaderResourceViewType::ReadWriteTexture2D)
+	else if (viewDesc.type == ResourceViewType::ReadWriteTexture2D)
 	{
 		XEAssert(resource.type == ResourceType::Texture);
 		//d3dUAVDesc = D3D12Helpers::UnorderedAccessViewDescForTexture2D(...);
@@ -658,7 +658,7 @@ ShaderResourceViewHandle Device::createShaderResourceView(ResourceHandle resourc
 	if (useSRV)
 		d3dDevice->CreateUnorderedAccessView(resource.d3dResource, nullptr, &d3dUAVDesc, D3D12_CPU_DESCRIPTOR_HANDLE{ descriptorPtr });
 
-	return composeShaderResourceViewHandle(viewIndex);
+	return composeResourceViewHandle(viewIndex);
 }
 
 RenderTargetViewHandle Device::createRenderTargetView(ResourceHandle textureHandle)
@@ -1074,9 +1074,9 @@ SwapChainHandle Device::createSwapChain(uint16 width, uint16 height, void* hWnd)
 	return composeSwapChainHandle(swapChainIndex);
 }
 
-void Device::writeDescriptor(DescriptorAddress descriptorAddress, ShaderResourceViewHandle srvHandle)
+void Device::writeDescriptor(DescriptorAddress descriptorAddress, ResourceViewHandle srvHandle)
 {
-	const uint32 sourceDescriptorIndex = resolveShaderResourceViewHandle(srvHandle);
+	const uint32 sourceDescriptorIndex = resolveResourceViewHandle(srvHandle);
 	const uint32 destDescriptorIndex = resolveDescriptorAddress(descriptorAddress);
 
 	const uint64 sourcePtr = referenceSRVHeapStartPtr + sourceDescriptorIndex * srvDescriptorSize;
@@ -1087,7 +1087,7 @@ void Device::writeDescriptor(DescriptorAddress descriptorAddress, ShaderResource
 		D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 }
 
-void Device::submitGraphics(CommandList& commandList, const FenceSignalDesc* fenceSignals, uint32 fenceSignalCount)
+void Device::submitWorkload(DeviceQueue queue, CommandList& commandList)
 {
 	XEAssert(commandList.state != CommandList::State::Executing);
 
@@ -1099,12 +1099,11 @@ void Device::submitGraphics(CommandList& commandList, const FenceSignalDesc* fen
 
 	ID3D12CommandList* d3dCommandListsToExecute[] = { commandList.d3dCommandList };
 	d3dGraphicsQueue->ExecuteCommandLists(1, d3dCommandListsToExecute);
+}
 
-	for (uint32 i = 0; i < fenceSignalCount; i++)
-	{
-		const Fence& fence = getFenceByHandle(fenceSignals[i].fenceHandle);
-		d3dGraphicsQueue->Signal(fence.d3dFence, fenceSignals[i].value);
-	}
+void Device::submitFenceSignal(DeviceQueue queue, FenceHandle fenceHandle, uint64 value)
+{
+	d3dGraphicsQueue->Signal(getFenceByHandle(fenceHandle).d3dFence, value);
 }
 
 void Device::submitFlip(SwapChainHandle swapChainHandle)
@@ -1124,20 +1123,6 @@ ResourceHandle Device::getSwapChainTexture(SwapChainHandle swapChainHandle, uint
 	return swapChain.textures[textureIndex];
 }
 
-uint16x3 Device::CalculateMipLevelSize(uint16x3 srcSize, uint8 mipLevel)
-{
-	uint16x3 size = srcSize;
-	size.x >>= mipLevel;
-	size.y >>= mipLevel;
-	size.z >>= mipLevel;
-	if (size == uint16x3(0, 0, 0))
-		return uint16x3(0, 0, 0);
-
-	size.x = max<uint16>(size.x, 1);
-	size.y = max<uint16>(size.y, 1);
-	size.z = max<uint16>(size.z, 1);
-	return size;
-}
 
 // Host ////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1165,6 +1150,21 @@ void Host::CreateDevice(Device& device)
 	d3dDevice->Release();
 }
 
+uint16x3 Host::CalculateMipLevelSize(uint16x3 srcSize, uint8 mipLevel)
+{
+	uint16x3 size = srcSize;
+	size.x >>= mipLevel;
+	size.y >>= mipLevel;
+	size.z >>= mipLevel;
+	if (size == uint16x3(0, 0, 0))
+		return uint16x3(0, 0, 0);
+
+	size.x = max<uint16>(size.x, 1);
+	size.y = max<uint16>(size.y, 1);
+	size.z = max<uint16>(size.z, 1);
+	return size;
+}
+
 
 // Handles /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1176,7 +1176,7 @@ void Host::CreateDevice(Device& device)
 namespace
 {
 	constexpr uint8 ResourceHandleSignature = 0x1;
-	constexpr uint8 ShaderResourceViewHandleSignature = 0x2;
+	constexpr uint8 ResourceViewHandleSignature = 0x2;
 	constexpr uint8 RenderTargetViewHandleSignature = 0x3;
 	constexpr uint8 DepthStencilViewHandleSignature = 0x4;
 	constexpr uint8 PipelineLayoutHandleSignature = 0x5;
@@ -1214,11 +1214,11 @@ ResourceHandle Device::composeResourceHandle(uint32 resourceIndex) const
 		ResourceHandleSignature, resourcesTable[resourceIndex].handleGeneration, resourceIndex));
 }
 
-ShaderResourceViewHandle Device::composeShaderResourceViewHandle(uint32 shaderResourceViewIndex) const
+ResourceViewHandle Device::composeResourceViewHandle(uint32 resourceViewIndex) const
 {
-	XEAssert(shaderResourceViewIndex < MaxShaderResourceViewCount);
-	return ShaderResourceViewHandle(ComposeHandle(
-		ShaderResourceViewHandleSignature, shaderResourceViewsTable[shaderResourceViewIndex].handleGeneration, shaderResourceViewIndex));
+	XEAssert(resourceViewIndex < MaxResourceViewCount);
+	return ResourceViewHandle(ComposeHandle(
+		ResourceViewHandleSignature, resourceViewsTable[resourceViewIndex].handleGeneration, resourceViewIndex));
 }
 
 RenderTargetViewHandle Device::composeRenderTargetViewHandle(uint32 renderTargetViewIndex) const
@@ -1273,12 +1273,12 @@ uint32 Device::resolveResourceHandle(ResourceHandle handle) const
 	return decomposed.entryIndex;
 }
 
-uint32 Device::resolveShaderResourceViewHandle(ShaderResourceViewHandle handle) const
+uint32 Device::resolveResourceViewHandle(ResourceViewHandle handle) const
 {
 	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
-	XEAssert(decomposed.signature == ShaderResourceViewHandleSignature);
-	XEAssert(decomposed.entryIndex < MaxShaderResourceViewCount);
-	XEAssert(decomposed.generation == shaderResourceViewsTable[decomposed.entryIndex].handleGeneration);
+	XEAssert(decomposed.signature == ResourceViewHandleSignature);
+	XEAssert(decomposed.entryIndex < MaxResourceViewCount);
+	XEAssert(decomposed.generation == resourceViewsTable[decomposed.entryIndex].handleGeneration);
 	return decomposed.entryIndex;
 }
 
@@ -1338,7 +1338,7 @@ uint32 Device::resolveSwapChainHandle(SwapChainHandle handle) const
 
 
 auto Device::getResourceByHandle(ResourceHandle handle) -> Resource& { return resourcesTable[resolveResourceHandle(handle)]; }
-auto Device::getShaderResourceViewByHandle(ShaderResourceViewHandle handle) -> ShaderResourceView& { return shaderResourceViewsTable[resolveShaderResourceViewHandle(handle)]; }
+auto Device::getResourceViewByHandle(ResourceViewHandle handle) -> ResourceView& { return resourceViewsTable[resolveResourceViewHandle(handle)]; }
 auto Device::getPipelineLayoutByHandle(PipelineLayoutHandle handle) -> PipelineLayout& { return pipelineLayoutsTable[resolvePipelineLayoutHandle(handle)]; }
 auto Device::getPipelineByHandle(PipelineHandle handle) -> Pipeline& { return pipelinesTable[resolvePipelineHandle(handle)]; }
 auto Device::getFenceByHandle(FenceHandle handle) -> Fence& { return fencesTable[resolveFenceHandle(handle)]; }

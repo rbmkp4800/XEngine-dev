@@ -24,17 +24,17 @@ namespace XEngine::Render::HAL
 	class Device;
 	class Host;
 
-	enum class MemoryBlockHandle : uint32;
-	enum class ResourceHandle : uint32;
-	enum class ShaderResourceViewHandle : uint32;
-	enum class RenderTargetViewHandle : uint32;
-	enum class DepthStencilViewHandle : uint32;
-	enum class DescriptorTableLayoutHandle : uint32;
-	enum class DescriptorTableHandle : uint32;
-	enum class PipelineLayoutHandle : uint32;
-	enum class PipelineHandle : uint32;
-	enum class FenceHandle : uint32;
-	enum class SwapChainHandle : uint32;
+	enum class MemoryBlockHandle			: uint32 {};
+	enum class ResourceHandle				: uint32 {};
+	enum class ResourceViewHandle			: uint32 {};
+	enum class RenderTargetViewHandle		: uint32 {};
+	enum class DepthStencilViewHandle		: uint32 {};
+	enum class DescriptorSetLayoutHandle	: uint32 {};
+	enum class DescriptorSetHandle			: uint32 {};
+	enum class PipelineLayoutHandle			: uint32 {};
+	enum class PipelineHandle				: uint32 {};
+	enum class FenceHandle					: uint32 {};
+	enum class SwapChainHandle				: uint32 {};
 
 	//enum class PipelineBindPointId : uint32;
 
@@ -42,7 +42,7 @@ namespace XEngine::Render::HAL
 
 	static constexpr MemoryBlockHandle ZeroMemoryBlockHandle = MemoryBlockHandle(0);
 	static constexpr ResourceHandle ZeroResourceHandle = ResourceHandle(0);
-	static constexpr ShaderResourceViewHandle ZeroShaderResourceViewHandle = ShaderResourceViewHandle(0);
+	static constexpr ResourceViewHandle ZeroResourceViewHandle = ResourceViewHandle(0);
 	static constexpr RenderTargetViewHandle ZeroRenderTargetViewHandle = RenderTargetViewHandle(0);
 	static constexpr DepthStencilViewHandle ZeroDepthStencilViewHandle = DepthStencilViewHandle(0);
 	static constexpr PipelineLayoutHandle ZeroPipelineLayoutHandle = PipelineLayoutHandle(0);
@@ -50,11 +50,25 @@ namespace XEngine::Render::HAL
 	static constexpr FenceHandle ZeroFenceHandle = FenceHandle(0);
 	static constexpr SwapChainHandle ZeroSwapChainHandle = SwapChainHandle(0);
 
+	enum class DeviceQueue : uint8
+	{
+		Undefined = 0,
+		Main,
+		AsyncCompute,
+		AsyncCopy,
+	};
+
 	enum class MemoryType : uint8
 	{
-		GPULocal = 0,
-		GPUReadCPUWrite,
-		GPUWriteCPURead,
+		DeviceLocal = 0,
+		DeviceReadHostWrite,
+		DeviceWriteHostRead,
+	};
+
+	struct ResourceAllocationInfo
+	{
+		uint64 size;
+		uint64 alignment;
 	};
 
 	enum class ResourceType : uint8
@@ -64,7 +78,7 @@ namespace XEngine::Render::HAL
 		Texture,
 	};
 
-	struct BufferCreationFlags
+	struct BufferFlags
 	{
 		bool allowShaderWrite : 1;
 	};
@@ -78,27 +92,27 @@ namespace XEngine::Render::HAL
 		Texture3D,
 	};
 
-	struct TextureCreationFlags
+	struct TextureFlags
 	{
 		bool allowRenderTarget : 1;
 		bool allowDepthStencil : 1;
 		bool allowShaderWrite : 1;
 	};
 
-	enum class ShaderResourceViewType : uint8
+	enum class ResourceViewType : uint8
 	{
 		Undefined = 0,
-		ReadOnlyBuffer,
-		ReadWriteBuffer,
-		//ReadOnlyTexelBuffer,
-		//ReadWriteTexelBuffer,
-		ReadOnlyTexture1D,
-		ReadWriteTexture1D,
-		ReadOnlyTexture2D,
-		ReadWriteTexture2D,
-		ReadOnlyTexture3D,
-		ReadWriteTexture3D,
-		ReadOnlyTextureCube,
+		BufferReadOnly,
+		BufferReadWrite,
+		TexelBufferReadOnly,
+		TexelBufferReadWrite,
+		Texture1DReadOnly,
+		Texture1DReadWrite,
+		Texture2DReadOnly,
+		Texture2DReadWrite,
+		Texture3DReadOnly,
+		Texture3DReadWrite,
+		TextureCubeReadOnly,
 		RaytracingAccelerationStructure,
 	};
 
@@ -199,20 +213,21 @@ namespace XEngine::Render::HAL
 		uint16x3 size;
 	};
 
-	struct ShaderResourceViewDesc
+	struct ResourceViewDesc
 	{
-		ShaderResourceViewType type;
+		ResourceViewType type;
+
 		union
 		{
 			struct
 			{
 
-			} readOnlyBuffer;
+			} bufferReadOnly;
 
 			struct
 			{
 
-			} readWriteBuffer;
+			} bufferReadWrite;
 
 			struct
 			{
@@ -220,14 +235,14 @@ namespace XEngine::Render::HAL
 				uint8 startMipIndex;
 				uint8 mipLevelCount;
 				uint8 plane;
-			} readOnlyTexture2D;
+			} texture2DReadOnly;
 
 			struct
 			{
 				TexelViewFormat format;
 				uint8 mipIndex;
 				uint8 plane;
-			} readWriteTexture2D;
+			} texture2DReadWrite;
 		};
 	};
 
@@ -263,17 +278,6 @@ namespace XEngine::Render::HAL
 		float32 depthMin;
 		float32 depthMax;
 	};
-
-	struct FenceSignalDesc
-	{
-		FenceHandle fenceHandle;
-		uint64 value;
-	};
-
-	//namespace Internal
-	//{
-	//	struct PipelineBindPointsLUTEntry;
-	//}
 
 	class CommandList : public XLib::NonCopyable
 	{
@@ -319,14 +323,12 @@ namespace XEngine::Render::HAL
 
 		void bindConstants(uint32 bindPointNameCRC, const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0);
 		void bindBuffer(uint32 bindPointNameCRC, BufferBindType bindType, ResourceHandle bufferHandle, uint32 offset = 0);
-		void bindDescriptor(uint32 bindPointNameCRC, DescriptorAddress address);
-		void bindDescriptorTable(uint32 bindPointNameCRC, DescriptorTableHandle bundleHandle);
+		void bindDescriptorSet(uint32 bindPointNameCRC, DescriptorSetHandle descriptorSetHandle);
 		void bindDescriptorArray(uint32 bindPointNameCRC, DescriptorAddress arrayStartAddress);
 
 		void drawNonIndexed(uint32 vertexCount, uint32 startVertexIndex = 0);
 		void drawIndexed();
-		void drawMesh();
-
+		void dispatchMesh();
 		void dispatch(uint32 groupCountX, uint32 groupCountY = 1, uint32 groupCountZ = 1);
 
 		void resourceBarrierStateTransition(ResourceHandle resourceHandle,
@@ -349,7 +351,7 @@ namespace XEngine::Render::HAL
 
 	private:
 		static constexpr uint32 MaxResourceCount = 1024;
-		static constexpr uint32 MaxShaderResourceViewCount = 1024;
+		static constexpr uint32 MaxResourceViewCount = 1024;
 		static constexpr uint32 MaxResourceDescriptorCount = 4096;
 		static constexpr uint32 MaxRenderTargetViewCount = 64;
 		static constexpr uint32 MaxDepthStencilViewCount = 64;
@@ -360,7 +362,7 @@ namespace XEngine::Render::HAL
 		static constexpr uint32 SwapChainTextureCount = 2;
 
 		struct Resource;
-		struct ShaderResourceView;
+		struct ResourceView;
 		struct PipelineLayout;
 		struct Pipeline;
 		struct Fence;
@@ -377,14 +379,14 @@ namespace XEngine::Render::HAL
 		XLib::Platform::COMPtr<ID3D12CommandQueue> d3dAsyncCopyQueue;
 
 		Resource* resourcesTable = nullptr;
-		ShaderResourceView* shaderResourceViewsTable = nullptr;
+		ResourceView* resourceViewsTable = nullptr;
 		PipelineLayout* pipelineLayoutsTable = nullptr;
 		Pipeline* pipelinesTable = nullptr;
 		Fence* fencesTable = nullptr;
 		SwapChain* swapChainsTable = nullptr;
 
 		XLib::InplaceBitArray<MaxResourceCount> resourcesTableAllocationMask;
-		XLib::InplaceBitArray<MaxShaderResourceViewCount> shaderResourceViewsTableAllocationMask;
+		XLib::InplaceBitArray<MaxResourceViewCount> resourceViewsTableAllocationMask;
 		XLib::InplaceBitArray<MaxRenderTargetViewCount> renderTargetViewsTableAllocationMask;
 		XLib::InplaceBitArray<MaxDepthStencilViewCount> depthStencilViewsTableAllocationMask;
 		XLib::InplaceBitArray<MaxPipelineLayoutCount> pipelineLayoutsTableAllocationMask;
@@ -405,7 +407,7 @@ namespace XEngine::Render::HAL
 
 	private:
 		ResourceHandle composeResourceHandle(uint32 resourceIndex) const;
-		ShaderResourceViewHandle composeShaderResourceViewHandle(uint32 shaderResourceViewIndex) const;
+		ResourceViewHandle composeResourceViewHandle(uint32 resourceViewIndex) const;
 		RenderTargetViewHandle composeRenderTargetViewHandle(uint32 renderTargetIndex) const;
 		DepthStencilViewHandle composeDepthStencilViewHandle(uint32 depthStencilIndex) const;
 		PipelineLayoutHandle composePipelineLayoutHandle(uint32 pipelineLayoutIndex) const;
@@ -414,7 +416,7 @@ namespace XEngine::Render::HAL
 		SwapChainHandle composeSwapChainHandle(uint32 swapChainIndex) const;
 
 		uint32 resolveResourceHandle(ResourceHandle handle) const;
-		uint32 resolveShaderResourceViewHandle(ShaderResourceViewHandle handle) const;
+		uint32 resolveResourceViewHandle(ResourceViewHandle handle) const;
 		uint32 resolveRenderTargetViewHandle(RenderTargetViewHandle handle) const;
 		uint32 resolveDepthStencilViewHandle(DepthStencilViewHandle handle) const;
 		uint32 resolvePipelineLayoutHandle(PipelineLayoutHandle handle) const;
@@ -426,7 +428,7 @@ namespace XEngine::Render::HAL
 		uint32 resolveDescriptorAddress(DescriptorAddress address) const { return uint32(address); }
 
 		Resource& getResourceByHandle(ResourceHandle handle);
-		ShaderResourceView& getShaderResourceViewByHandle(ShaderResourceViewHandle handle);
+		ResourceView& getResourceViewByHandle(ResourceViewHandle handle);
 		PipelineLayout& getPipelineLayoutByHandle(PipelineLayoutHandle handle);
 		Pipeline& getPipelineByHandle(PipelineHandle handle);
 		Fence& getFenceByHandle(FenceHandle handle);
@@ -444,17 +446,26 @@ namespace XEngine::Render::HAL
 		Device() = default;
 		~Device() = default;
 
-		MemoryBlockHandle allocateMemory(uint64 size, MemoryType memoryType = MemoryType::GPULocal);
+		MemoryBlockHandle allocateMemory(uint64 size, MemoryType memoryType = MemoryType::DeviceLocal);
 		void releaseMemory(MemoryBlockHandle memory);
 
-		ResourceHandle createBuffer(uint64 size, BufferMemoryType memoryType, BufferCreationFlags flags);
-		void destroyBuffer(ResourceHandle handle);
+		ResourceAllocationInfo getTextureAllocationInfo(TextureType type, uint16x3 size,
+			TextureFormat format, uint8 mipLevelCount, TextureFlags flags);
 
-		ResourceHandle createTexture(TextureType type, uint16x3 size, TextureFormat format, TextureCreationFlags flags = {}, uint8 mipLevelCount = 0);
-		void destroyTexture(ResourceHandle handle);
+		ResourceHandle createBuffer(uint64 size, BufferFlags flags,
+			MemoryBlockHandle memoryBlock, uint64 memoryBlockOffset);
+		ResourceHandle createTexture(TextureType type, uint16x3 size,
+			TextureFormat format, uint8 mipLevelCount, TextureFlags flags,
+			MemoryBlockHandle memoryBlock, uint64 memoryBlockOffset);
 
-		ShaderResourceViewHandle createShaderResourceView(ResourceHandle resourceHandle, const ShaderResourceViewDesc& viewDesc);
-		void destroyShaderResourceView(ShaderResourceViewHandle handle);
+		ResourceHandle createPartiallyResidentBuffer(uint64 size, BufferFlags flags);
+		ResourceHandle createPartiallyResidentTexture(TextureType type, uint16x3 size,
+			TextureFormat format, uint8 mipLevelCount, TextureFlags flags);
+
+		void destroyResource(ResourceHandle handle);
+
+		ResourceViewHandle createResourceView(ResourceHandle resourceHandle, const ResourceViewDesc& viewDesc);
+		void destroyResourceView(ResourceViewHandle handle);
 
 		RenderTargetViewHandle createRenderTargetView(ResourceHandle textureHandle);
 		void destroyRenderTargetView(RenderTargetViewHandle handle);
@@ -465,11 +476,11 @@ namespace XEngine::Render::HAL
 		DescriptorAddress allocateDescriptors(uint32 count = 1);
 		void releaseDescriptors(DescriptorAddress address);
 
-		DescriptorTableLayoutHandle createDescriptorTableLayout(ObjectDataView objectData);
-		void destroyDescriptorTableLayout(DescriptorTableLayoutHandle handle);
+		DescriptorSetLayoutHandle createDescriptorSetLayout(ObjectDataView objectData);
+		void destroyDescriptorSetLayout(DescriptorSetLayoutHandle handle);
 
-		DescriptorTableHandle createDescriptorTable(DescriptorTableLayoutHandle layoutHandle);
-		void destroyDescriptorTable(DescriptorTableHandle handle);
+		DescriptorSetHandle createDescriptorSet(DescriptorSetLayoutHandle layoutHandle);
+		void destroyDescriptorSet(DescriptorSetHandle handle);
 
 		PipelineLayoutHandle createPipelineLayout(ObjectDataView objectData);
 		void destroyPipelineLayout(PipelineLayoutHandle handle);
@@ -489,34 +500,29 @@ namespace XEngine::Render::HAL
 		void createCommandList(CommandList& commandList, CommandListType type);
 		void destroyCommandList(CommandList& commandList);
 
-		void writeDescriptor(DescriptorAddress descriptorAddress, ShaderResourceViewHandle srvHandle);
-		void writeTableDescriptor(DescriptorTableHandle bundle, uint32 bindPointNameCRC, ShaderResourceViewHandle srvHandle);
+		void writeDescriptor(DescriptorAddress descriptorAddress, ResourceViewHandle resourceViewHandle);
+		void writeDescriptor(DescriptorSetHandle descriptorSet, uint32 bindPointNameCRC, ResourceViewHandle resourceViewHandle);
+
+		void submitWorkload(DeviceQueue queue, CommandList& commandList);
+		void submitFenceSignal(DeviceQueue queue, FenceHandle fenceHandle, uint64 value);
+		void submitFenceWait(DeviceQueue queue, FenceHandle fenceHandle, uint64 value);
+		void submitFlip(SwapChainHandle swapChainHandle);
+		void submitPartiallyResidentResourcesRemap();
+
+		void* mapHostVisibleMemoryBlock(MemoryBlockHandle hostVisibleMemoryBlock);
+		void unmapHostVisibleMemoryBlock(MemoryBlockHandle hostVisibleMemoryBlock);
 
 		//PipelineBindPointId getPipelineBindPointId(PipelineLayoutHandle pipelineLayoutHandle, uint64 bindPointNameCRC) const;
-
-		void submitGraphics(CommandList& commandList, const FenceSignalDesc* fenceSignals = nullptr, uint32 fenceSignalCount = 0);
-		void submitAsyncCompute(CommandList& commandList, const FenceSignalDesc* fenceSignals = nullptr, uint32 fenceSignalCount = 0);
-		void submitAsyncCopy(CommandList& commandList, const FenceSignalDesc* fenceSignals = nullptr, uint32 fenceSignalCount = 0);
-		void submitFlip(SwapChainHandle swapChainHandle);
-
-		inline void submitGraphics(CommandList& commandList, const FenceSignalDesc& fenceSignal) { submitGraphics(commandList, &fenceSignal, 1); }
-		inline void submitAsyncCompute(CommandList& commandList, const FenceSignalDesc& fenceSignal) { submitAsyncCompute(commandList, &fenceSignal, 1); }
-		inline void submitAsyncCopy(CommandList& commandList, const FenceSignalDesc& fenceSignal) { submitAsyncCopy(commandList, &fenceSignal, 1); }
-
-		void* getUploadBufferCPUPtr(ResourceHandle uploadBufferHandle);
-		DescriptorAddress getDescriptorTableStartAddress(DescriptorTableHandle bundleHandle) const;
-		uint64 getFenceValue(FenceHandle fenceHandle) const;
 		ResourceHandle getSwapChainTexture(SwapChainHandle swapChainHandle, uint32 textureIndex) const;
+		uint64 getFenceValue(FenceHandle fenceHandle) const;
 
 		const char* getName() const;
-
-	public:
-		static uint16x3 CalculateMipLevelSize(uint16x3 srcSize, uint8 mipLevel);
 	};
 
 	class Host abstract final
 	{
 	public:
 		static void CreateDevice(Device& device);
+		static uint16x3 CalculateMipLevelSize(uint16x3 srcSize, uint8 mipLevel);
 	};
 }
