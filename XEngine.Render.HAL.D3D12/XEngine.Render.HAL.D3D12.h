@@ -388,23 +388,23 @@ namespace XEngine::Render::HAL
 		XLib::Platform::COMPtr<ID3D12CommandQueue> d3dAsyncComputeQueue;
 		XLib::Platform::COMPtr<ID3D12CommandQueue> d3dAsyncCopyQueue;
 
-		MemoryBlock* memoryBlocksTable = nullptr;
-		Resource* resourcesTable = nullptr;
-		ResourceView* resourceViewsTable = nullptr;
-		PipelineLayout* pipelineLayoutsTable = nullptr;
-		Pipeline* pipelinesTable = nullptr;
-		Fence* fencesTable = nullptr;
-		SwapChain* swapChainsTable = nullptr;
+		MemoryBlock* memoryBlockTable = nullptr;
+		Resource* resourceTable = nullptr;
+		ResourceView* resourceViewTable = nullptr;
+		PipelineLayout* pipelineLayoutTable = nullptr;
+		Pipeline* pipelineTable = nullptr;
+		Fence* fenceTable = nullptr;
+		SwapChain* swapChainTable = nullptr;
 
-		XLib::InplaceBitArray<MaxMemoryBlockCount> memoryBlocksTableAllocationMask;
-		XLib::InplaceBitArray<MaxResourceCount> resourcesTableAllocationMask;
-		XLib::InplaceBitArray<MaxResourceViewCount> resourceViewsTableAllocationMask;
-		XLib::InplaceBitArray<MaxRenderTargetViewCount> renderTargetViewsTableAllocationMask;
-		XLib::InplaceBitArray<MaxDepthStencilViewCount> depthStencilViewsTableAllocationMask;
-		XLib::InplaceBitArray<MaxPipelineLayoutCount> pipelineLayoutsTableAllocationMask;
-		XLib::InplaceBitArray<MaxPipelineCount> pipelinesTableAllocationMask;
-		XLib::InplaceBitArray<MaxFenceCount> fencesTableAllocationMask;
-		XLib::InplaceBitArray<MaxSwapChainCount> swapChainsTableAllocationMask;
+		XLib::InplaceBitArray<MaxMemoryBlockCount> memoryBlockTableAllocationMask;
+		XLib::InplaceBitArray<MaxResourceCount> resourceTableAllocationMask;
+		XLib::InplaceBitArray<MaxResourceViewCount> resourceViewTableAllocationMask;
+		XLib::InplaceBitArray<MaxRenderTargetViewCount> renderTargetViewTableAllocationMask;
+		XLib::InplaceBitArray<MaxDepthStencilViewCount> depthStencilViewTableAllocationMask;
+		XLib::InplaceBitArray<MaxPipelineLayoutCount> pipelineLayoutTableAllocationMask;
+		XLib::InplaceBitArray<MaxPipelineCount> pipelineTableAllocationMask;
+		XLib::InplaceBitArray<MaxFenceCount> fenceTableAllocationMask;
+		XLib::InplaceBitArray<MaxSwapChainCount> swapChainTableAllocationMask;
 		uint32 allocatedResourceDescriptorCount = 0;
 
 		uint64 referenceSRVHeapStartPtr = 0;

@@ -590,27 +590,27 @@ void Device::initialize(ID3D12Device10* _d3dDevice)
 		void* objectTablesMemory = SystemHeapAllocator::Allocate(objectTablesMemorySize);
 		memorySet(objectTablesMemory, 0, objectTablesMemorySize);
 
-		memoryBlocksTable = (MemoryBlock*)objectTablesMemory;
-		resourcesTable = (Resource*)(memoryBlocksTable + MaxMemoryBlockCount);
-		resourceViewsTable = (ResourceView*)(resourcesTable + MaxResourceCount);
-		pipelineLayoutsTable = (PipelineLayout*)(resourceViewsTable + MaxResourceViewCount);
-		pipelinesTable = (Pipeline*)(pipelineLayoutsTable + MaxPipelineLayoutCount);
-		fencesTable = (Fence*)(pipelinesTable + MaxPipelineCount);
-		swapChainsTable = (SwapChain*)(fencesTable + MaxFenceCount);
-		void* objectTablesMemoryEnd = swapChainsTable + MaxSwapChainCount;
+		memoryBlockTable = (MemoryBlock*)objectTablesMemory;
+		resourceTable = (Resource*)(memoryBlockTable + MaxMemoryBlockCount);
+		resourceViewTable = (ResourceView*)(resourceTable + MaxResourceCount);
+		pipelineLayoutTable = (PipelineLayout*)(resourceViewTable + MaxResourceViewCount);
+		pipelineTable = (Pipeline*)(pipelineLayoutTable + MaxPipelineLayoutCount);
+		fenceTable = (Fence*)(pipelineTable + MaxPipelineCount);
+		swapChainTable = (SwapChain*)(fenceTable + MaxFenceCount);
+		void* objectTablesMemoryEnd = swapChainTable + MaxSwapChainCount;
 
 		XEAssert(uintptr(objectTablesMemory) + objectTablesMemorySize == uintptr(objectTablesMemoryEnd));
 	}
 
-	memoryBlocksTableAllocationMask.clear();
-	resourcesTableAllocationMask.clear();
-	resourceViewsTableAllocationMask.clear();
-	renderTargetViewsTableAllocationMask.clear();
-	depthStencilViewsTableAllocationMask.clear();
-	pipelineLayoutsTableAllocationMask.clear();
-	pipelinesTableAllocationMask.clear();
-	fencesTableAllocationMask.clear();
-	swapChainsTableAllocationMask.clear();
+	memoryBlockTableAllocationMask.clear();
+	resourceTableAllocationMask.clear();
+	resourceViewTableAllocationMask.clear();
+	renderTargetViewTableAllocationMask.clear();
+	depthStencilViewTableAllocationMask.clear();
+	pipelineLayoutTableAllocationMask.clear();
+	pipelineTableAllocationMask.clear();
+	fenceTableAllocationMask.clear();
+	swapChainTableAllocationMask.clear();
 	allocatedResourceDescriptorCount = 0;
 
 	referenceSRVHeapStartPtr = d3dReferenceSRVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
@@ -626,10 +626,10 @@ void Device::initialize(ID3D12Device10* _d3dDevice)
 
 MemoryBlockHandle Device::allocateMemory(uint64 size, MemoryType memoryType)
 {
-	const sint32 memoryBlockIndex = memoryBlocksTableAllocationMask.findFirstZeroAndSet();
+	const sint32 memoryBlockIndex = memoryBlockTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(memoryBlockIndex >= 0);
 
-	MemoryBlock& memoryBlock = memoryBlocksTable[memoryBlockIndex];
+	MemoryBlock& memoryBlock = memoryBlockTable[memoryBlockIndex];
 	XEAssert(!memoryBlock.d3dHeap);
 
 	const D3D12_HEAP_TYPE d3dHeapType = TranslateMemoryTypeToD3D12HeapType(memoryType);
@@ -653,10 +653,10 @@ ResourceHandle Device::createBuffer(uint64 size, BufferFlags flags,
 	const MemoryBlock& memoryBlock = getMemoryBlockByHandle(memoryBlockHandle);
 	XEAssert(memoryBlock.d3dHeap);
 
-	const sint32 resourceIndex = resourcesTableAllocationMask.findFirstZeroAndSet();
+	const sint32 resourceIndex = resourceTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(resourceIndex >= 0);
 
-	Resource& resource = resourcesTable[resourceIndex];
+	Resource& resource = resourceTable[resourceIndex];
 	XEAssert(resource.type == ResourceType::Undefined);
 	XEAssert(!resource.d3dResource);
 	resource.type = ResourceType::Buffer;
@@ -684,10 +684,10 @@ ResourceHandle Device::createTexture(TextureType type, uint16x3 size,
 	const MemoryBlock& memoryBlock = getMemoryBlockByHandle(memoryBlockHandle);
 	XEAssert(memoryBlock.d3dHeap);
 
-	const sint32 resourceIndex = resourcesTableAllocationMask.findFirstZeroAndSet();
+	const sint32 resourceIndex = resourceTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(resourceIndex >= 0);
 
-	Resource& resource = resourcesTable[resourceIndex];
+	Resource& resource = resourceTable[resourceIndex];
 	XEAssert(resource.type == ResourceType::Undefined);
 	XEAssert(!resource.d3dResource);
 	resource.type = ResourceType::Texture;
@@ -725,10 +725,10 @@ ResourceViewHandle Device::createResourceView(ResourceHandle resourceHandle, con
 
 	const D3D12_RESOURCE_DESC d3dResourceDesc = resource.d3dResource->GetDesc();
 
-	const sint32 viewIndex = resourceViewsTableAllocationMask.findFirstZeroAndSet();
+	const sint32 viewIndex = resourceViewTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(viewIndex >= 0);
 
-	ResourceView& resourceView = resourceViewsTable[viewIndex];
+	ResourceView& resourceView = resourceViewTable[viewIndex];
 	XEAssert(resourceView.type == ResourceViewType::Undefined);
 	resourceView.resourceHandle = resourceHandle;
 	resourceView.type = viewDesc.type;
@@ -771,7 +771,7 @@ RenderTargetViewHandle Device::createRenderTargetView(ResourceHandle textureHand
 	XEAssert(resource.type == ResourceType::Texture);
 	XEAssert(resource.d3dResource);
 
-	const sint32 viewIndex = renderTargetViewsTableAllocationMask.findFirstZeroAndSet();
+	const sint32 viewIndex = renderTargetViewTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(viewIndex >= 0);
 
 	const uint64 descriptorPtr = rtvHeapStartPtr + rtvDescriptorSize * viewIndex;
@@ -786,7 +786,7 @@ DepthStencilViewHandle Device::createDepthStencilView(ResourceHandle textureHand
 	XEAssert(resource.type == ResourceType::Texture);
 	XEAssert(resource.d3dResource);
 
-	const sint32 viewIndex = depthStencilViewsTableAllocationMask.findFirstZeroAndSet();
+	const sint32 viewIndex = depthStencilViewTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(viewIndex >= 0);
 
 	const uint64 descriptorPtr = dsvHeapStartPtr + dsvDescriptorSize * viewIndex;
@@ -808,10 +808,10 @@ PipelineLayoutHandle Device::createPipelineLayout(ObjectDataView objectData)
 {
 	using namespace ObjectFormat;
 
-	const sint32 pipelineLayoutIndex = pipelineLayoutsTableAllocationMask.findFirstZeroAndSet();
+	const sint32 pipelineLayoutIndex = pipelineLayoutTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(pipelineLayoutIndex >= 0);
 
-	PipelineLayout& pipelineLayout = pipelineLayoutsTable[pipelineLayoutIndex];
+	PipelineLayout& pipelineLayout = pipelineLayoutTable[pipelineLayoutIndex];
 
 	const byte* objectDataBytes = (const byte*)objectData.data;
 
@@ -872,10 +872,10 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 	const Device::PipelineLayout& pipelineLayout = getPipelineLayoutByHandle(pipelineLayoutHandle);
 	XEAssert(pipelineLayout.d3dRootSignature);
 
-	const sint32 pipelineIndex = pipelinesTableAllocationMask.findFirstZeroAndSet();
+	const sint32 pipelineIndex = pipelineTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(pipelineIndex >= 0);
 
-	Pipeline& pipeline = pipelinesTable[pipelineIndex];
+	Pipeline& pipeline = pipelineTable[pipelineIndex];
 	pipeline.pipelineLayoutHandle = pipelineLayoutHandle;
 	pipeline.type = PipelineType::Graphics;
 
@@ -1056,10 +1056,10 @@ PipelineHandle Device::createComputePipeline(PipelineLayoutHandle pipelineLayout
 	const Device::PipelineLayout& pipelineLayout = getPipelineLayoutByHandle(pipelineLayoutHandle);
 	XEAssert(pipelineLayout.d3dRootSignature);
 
-	const sint32 pipelineIndex = pipelinesTableAllocationMask.findFirstZeroAndSet();
+	const sint32 pipelineIndex = pipelineTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(pipelineIndex >= 0);
 
-	Pipeline& pipeline = pipelinesTable[pipelineIndex];
+	Pipeline& pipeline = pipelineTable[pipelineIndex];
 	pipeline.pipelineLayoutHandle = pipelineLayoutHandle;
 	pipeline.type = PipelineType::Compute;
 
@@ -1107,10 +1107,10 @@ PipelineHandle Device::createComputePipeline(PipelineLayoutHandle pipelineLayout
 
 FenceHandle Device::createFence(uint64 initialValue)
 {
-	const sint32 fenceIndex = fencesTableAllocationMask.findFirstZeroAndSet();
+	const sint32 fenceIndex = fenceTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(fenceIndex >= 0);
 
-	Fence& fence = fencesTable[fenceIndex];
+	Fence& fence = fenceTable[fenceIndex];
 	XEAssert(!fence.d3dFence);
 	d3dDevice->CreateFence(initialValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence.d3dFence));
 
@@ -1132,10 +1132,10 @@ void Device::createCommandList(CommandList& commandList, CommandListType type)
 
 SwapChainHandle Device::createSwapChain(uint16 width, uint16 height, void* hWnd)
 {
-	const sint32 swapChainIndex = swapChainsTableAllocationMask.findFirstZeroAndSet();
+	const sint32 swapChainIndex = swapChainTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(swapChainIndex >= 0);
 
-	SwapChain& swapChain = swapChainsTable[swapChainIndex];
+	SwapChain& swapChain = swapChainTable[swapChainIndex];
 	XEAssert(!swapChain.dxgiSwapChain);
 
 	DXGI_SWAP_CHAIN_DESC1 dxgiSwapChainDesc = {};
@@ -1161,10 +1161,10 @@ SwapChainHandle Device::createSwapChain(uint16 width, uint16 height, void* hWnd)
 	// Allocate resources for textures
 	for (uint32 i = 0; i < SwapChainTextureCount; i++)
 	{
-		const sint32 resourceIndex = resourcesTableAllocationMask.findFirstZeroAndSet();
+		const sint32 resourceIndex = resourceTableAllocationMask.findFirstZeroAndSet();
 		XEMasterAssert(resourceIndex >= 0);
 
-		Resource& resource = resourcesTable[resourceIndex];
+		Resource& resource = resourceTable[resourceIndex];
 		XEAssert(resource.type == ResourceType::Undefined);
 		XEAssert(!resource.d3dResource);
 		resource.type = ResourceType::Texture;
@@ -1321,34 +1321,34 @@ MemoryBlockHandle Device::composeMemoryBlockHandle(uint32 memoryBlockIndex) cons
 {
 	XEAssert(memoryBlockIndex < MaxMemoryBlockCount);
 	return MemoryBlockHandle(ComposeHandle(
-		MemoryBlockHandleSignature, memoryBlocksTable[memoryBlockIndex].handleGeneration, memoryBlockIndex));
+		MemoryBlockHandleSignature, memoryBlockTable[memoryBlockIndex].handleGeneration, memoryBlockIndex));
 }
 
 ResourceHandle Device::composeResourceHandle(uint32 resourceIndex) const
 {
 	XEAssert(resourceIndex < MaxResourceCount);
 	return ResourceHandle(ComposeHandle(
-		ResourceHandleSignature, resourcesTable[resourceIndex].handleGeneration, resourceIndex));
+		ResourceHandleSignature, resourceTable[resourceIndex].handleGeneration, resourceIndex));
 }
 
 ResourceViewHandle Device::composeResourceViewHandle(uint32 resourceViewIndex) const
 {
 	XEAssert(resourceViewIndex < MaxResourceViewCount);
 	return ResourceViewHandle(ComposeHandle(
-		ResourceViewHandleSignature, resourceViewsTable[resourceViewIndex].handleGeneration, resourceViewIndex));
+		ResourceViewHandleSignature, resourceViewTable[resourceViewIndex].handleGeneration, resourceViewIndex));
 }
 
 RenderTargetViewHandle Device::composeRenderTargetViewHandle(uint32 renderTargetViewIndex) const
 {
 	XEAssert(renderTargetViewIndex < MaxRenderTargetViewCount);
-	// renderTargetViewsTable[renderTargetViewIndex].handleGeneration;
+	// renderTargetViewTable[renderTargetViewIndex].handleGeneration;
 	return RenderTargetViewHandle(ComposeHandle(RenderTargetViewHandleSignature, 0, renderTargetViewIndex));
 }
 
 DepthStencilViewHandle Device::composeDepthStencilViewHandle(uint32 depthStencilViewIndex) const
 {
 	XEAssert(depthStencilViewIndex < MaxDepthStencilViewCount);
-	// depthStencilViewsTable[depthStencilViewIndex].handleGeneration;
+	// depthStencilViewTable[depthStencilViewIndex].handleGeneration;
 	return DepthStencilViewHandle(ComposeHandle(DepthStencilViewHandleSignature, 0, depthStencilViewIndex));
 }
 
@@ -1356,27 +1356,27 @@ PipelineLayoutHandle Device::composePipelineLayoutHandle(uint32 pipelineLayoutIn
 {
 	XEAssert(pipelineLayoutIndex < MaxPipelineLayoutCount);
 	return PipelineLayoutHandle(ComposeHandle(
-		PipelineLayoutHandleSignature, pipelineLayoutsTable[pipelineLayoutIndex].handleGeneration, pipelineLayoutIndex));
+		PipelineLayoutHandleSignature, pipelineLayoutTable[pipelineLayoutIndex].handleGeneration, pipelineLayoutIndex));
 }
 
 PipelineHandle Device::composePipelineHandle(uint32 pipelineIndex) const
 {
 	XEAssert(pipelineIndex < MaxPipelineCount);
 	return PipelineHandle(ComposeHandle(
-		PipelineHandleSignature, pipelinesTable[pipelineIndex].handleGeneration, pipelineIndex));
+		PipelineHandleSignature, pipelineTable[pipelineIndex].handleGeneration, pipelineIndex));
 }
 
 FenceHandle Device::composeFenceHandle(uint32 fenceIndex) const
 {
 	XEAssert(fenceIndex < MaxFenceCount);
-	// fencesTable[fenceIndex].handleGeneration;
+	// fenceTable[fenceIndex].handleGeneration;
 	return FenceHandle(ComposeHandle(FenceHandleSignature, 0, fenceIndex));
 }
 
 SwapChainHandle Device::composeSwapChainHandle(uint32 swapChainIndex) const
 {
 	XEAssert(swapChainIndex < MaxSwapChainCount);
-	// swapChainsTable[swapChainIndex].handleGeneration;
+	// swapChainTable[swapChainIndex].handleGeneration;
 	return SwapChainHandle(ComposeHandle(SwapChainHandleSignature, 0, swapChainIndex));
 }
 
@@ -1386,7 +1386,7 @@ uint32 Device::resolveResourceHandle(ResourceHandle handle) const
 	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
 	XEAssert(decomposed.signature == ResourceHandleSignature);
 	XEAssert(decomposed.entryIndex < MaxResourceCount);
-	XEAssert(decomposed.generation == resourcesTable[decomposed.entryIndex].handleGeneration);
+	XEAssert(decomposed.generation == resourceTable[decomposed.entryIndex].handleGeneration);
 	return decomposed.entryIndex;
 }
 
@@ -1395,7 +1395,7 @@ uint32 Device::resolveResourceViewHandle(ResourceViewHandle handle) const
 	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
 	XEAssert(decomposed.signature == ResourceViewHandleSignature);
 	XEAssert(decomposed.entryIndex < MaxResourceViewCount);
-	XEAssert(decomposed.generation == resourceViewsTable[decomposed.entryIndex].handleGeneration);
+	XEAssert(decomposed.generation == resourceViewTable[decomposed.entryIndex].handleGeneration);
 	return decomposed.entryIndex;
 }
 
@@ -1404,7 +1404,7 @@ uint32 Device::resolveRenderTargetViewHandle(RenderTargetViewHandle handle) cons
 	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
 	XEAssert(decomposed.signature == RenderTargetViewHandleSignature);
 	XEAssert(decomposed.entryIndex < MaxRenderTargetViewCount);
-	//XEAssert(decomposed.generation == renderTargetViewsTable[decomposed.entryIndex].handleGeneration);
+	//XEAssert(decomposed.generation == renderTargetViewTable[decomposed.entryIndex].handleGeneration);
 	return decomposed.entryIndex;
 }
 
@@ -1413,7 +1413,7 @@ uint32 Device::resolveDepthStencilViewHandle(DepthStencilViewHandle handle) cons
 	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
 	XEAssert(decomposed.signature == DepthStencilViewHandleSignature);
 	XEAssert(decomposed.entryIndex < MaxDepthStencilViewCount);
-	//XEAssert(decomposed.generation == depthStencilViewsTable[decomposed.entryIndex].handleGeneration);
+	//XEAssert(decomposed.generation == depthStencilViewTable[decomposed.entryIndex].handleGeneration);
 	return decomposed.entryIndex;
 }
 
@@ -1422,7 +1422,7 @@ uint32 Device::resolvePipelineLayoutHandle(PipelineLayoutHandle handle) const
 	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
 	XEAssert(decomposed.signature == PipelineLayoutHandleSignature);
 	XEAssert(decomposed.entryIndex < MaxPipelineLayoutCount);
-	XEAssert(decomposed.generation == pipelineLayoutsTable[decomposed.entryIndex].handleGeneration);
+	XEAssert(decomposed.generation == pipelineLayoutTable[decomposed.entryIndex].handleGeneration);
 	return decomposed.entryIndex;
 }
 
@@ -1431,7 +1431,7 @@ uint32 Device::resolvePipelineHandle(PipelineHandle handle) const
 	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
 	XEAssert(decomposed.signature == PipelineHandleSignature);
 	XEAssert(decomposed.entryIndex < MaxPipelineCount);
-	XEAssert(decomposed.generation == pipelinesTable[decomposed.entryIndex].handleGeneration);
+	XEAssert(decomposed.generation == pipelineTable[decomposed.entryIndex].handleGeneration);
 	return decomposed.entryIndex;
 }
 
@@ -1440,7 +1440,7 @@ uint32 Device::resolveFenceHandle(FenceHandle handle) const
 	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
 	XEAssert(decomposed.signature == FenceHandleSignature);
 	XEAssert(decomposed.entryIndex < MaxFenceCount);
-	//XEAssert(decomposed.generation == fencesTable[decomposed.entryIndex].handleGeneration);
+	//XEAssert(decomposed.generation == fenceTable[decomposed.entryIndex].handleGeneration);
 	return decomposed.entryIndex;
 }
 
@@ -1449,16 +1449,16 @@ uint32 Device::resolveSwapChainHandle(SwapChainHandle handle) const
 	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
 	XEAssert(decomposed.signature == SwapChainHandleSignature);
 	XEAssert(decomposed.entryIndex < MaxSwapChainCount);
-	//XEAssert(decomposed.generation == swapChainsTable[decomposed.entryIndex].handleGeneration);
+	//XEAssert(decomposed.generation == swapChainTable[decomposed.entryIndex].handleGeneration);
 	return decomposed.entryIndex;
 }
 
 
-auto Device::getResourceByHandle(ResourceHandle handle) -> Resource& { return resourcesTable[resolveResourceHandle(handle)]; }
-auto Device::getResourceViewByHandle(ResourceViewHandle handle) -> ResourceView& { return resourceViewsTable[resolveResourceViewHandle(handle)]; }
-auto Device::getPipelineLayoutByHandle(PipelineLayoutHandle handle) -> PipelineLayout& { return pipelineLayoutsTable[resolvePipelineLayoutHandle(handle)]; }
-auto Device::getPipelineByHandle(PipelineHandle handle) -> Pipeline& { return pipelinesTable[resolvePipelineHandle(handle)]; }
-auto Device::getFenceByHandle(FenceHandle handle) -> Fence& { return fencesTable[resolveFenceHandle(handle)]; }
-auto Device::getFenceByHandle(FenceHandle handle) const -> const Fence& { return fencesTable[resolveFenceHandle(handle)]; }
-auto Device::getSwapChainByHandle(SwapChainHandle handle) -> SwapChain& { return swapChainsTable[resolveSwapChainHandle(handle)]; }
-auto Device::getSwapChainByHandle(SwapChainHandle handle) const -> const SwapChain& { return swapChainsTable[resolveSwapChainHandle(handle)]; }
+auto Device::getResourceByHandle(ResourceHandle handle) -> Resource& { return resourceTable[resolveResourceHandle(handle)]; }
+auto Device::getResourceViewByHandle(ResourceViewHandle handle) -> ResourceView& { return resourceViewTable[resolveResourceViewHandle(handle)]; }
+auto Device::getPipelineLayoutByHandle(PipelineLayoutHandle handle) -> PipelineLayout& { return pipelineLayoutTable[resolvePipelineLayoutHandle(handle)]; }
+auto Device::getPipelineByHandle(PipelineHandle handle) -> Pipeline& { return pipelineTable[resolvePipelineHandle(handle)]; }
+auto Device::getFenceByHandle(FenceHandle handle) -> Fence& { return fenceTable[resolveFenceHandle(handle)]; }
+auto Device::getFenceByHandle(FenceHandle handle) const -> const Fence& { return fenceTable[resolveFenceHandle(handle)]; }
+auto Device::getSwapChainByHandle(SwapChainHandle handle) -> SwapChain& { return swapChainTable[resolveSwapChainHandle(handle)]; }
+auto Device::getSwapChainByHandle(SwapChainHandle handle) const -> const SwapChain& { return swapChainTable[resolveSwapChainHandle(handle)]; }
