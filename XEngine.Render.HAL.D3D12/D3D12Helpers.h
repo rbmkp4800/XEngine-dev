@@ -100,10 +100,10 @@ namespace D3D12Helpers
 		return desc;
 	}
 
-	inline D3D12_RESOURCE_DESC ResourceDescForTexture2D(UINT width, UINT heigth, UINT16 mipLevels,
+	inline D3D12_RESOURCE_DESC1 ResourceDesc1ForTexture2D(UINT width, UINT heigth, UINT16 mipLevels,
 		DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE)
 	{
-		D3D12_RESOURCE_DESC desc = {};
+		D3D12_RESOURCE_DESC1 desc = {};
 		desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 		desc.Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
 		desc.Width = width;

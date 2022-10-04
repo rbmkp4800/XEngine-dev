@@ -669,6 +669,7 @@ ResourceHandle Device::createBuffer(uint64 size, BufferFlags flags,
 	const D3D12_RESOURCE_DESC1 d3dResourceDesc = D3D12Helpers::ResourceDesc1ForBuffer(size);
 
 	// TODO: Check that resource fits into memory block.
+	// TODO: Check alignment.
 	d3dDevice->CreatePlacedResource2(memoryBlock.d3dHeap, memoryBlockOffset,
 		&d3dResourceDesc, D3D12_BARRIER_LAYOUT_UNDEFINED, nullptr, 0, nullptr,
 		IID_PPV_ARGS(&resource.d3dResource));
@@ -677,8 +678,12 @@ ResourceHandle Device::createBuffer(uint64 size, BufferFlags flags,
 }
 
 ResourceHandle Device::createTexture(TextureType type, uint16x3 size,
-	TextureFormat format, TextureCreationFlags flags, uint8 mipLevelCount)
+	TextureFormat format, uint8 mipLevelCount, TextureFlags flags,
+	MemoryBlockHandle memoryBlockHandle, uint64 memoryBlockOffset)
 {
+	const MemoryBlock& memoryBlock = getMemoryBlockByHandle(memoryBlockHandle);
+	XEAssert(memoryBlock.d3dHeap);
+
 	const sint32 resourceIndex = resourcesTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(resourceIndex >= 0);
 
@@ -700,11 +705,14 @@ ResourceHandle Device::createTexture(TextureType type, uint16x3 size,
 		d3dResourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
 	// TODO: Check if `mipLevelCount` is not greater than max possible level count for this resource.
-	const D3D12_RESOURCE_DESC d3dResourceDesc =
-		D3D12Helpers::ResourceDescForTexture2D(size.x, size.y, mipLevelCount, dxgiFormat, d3dResourceFlags);
+	const D3D12_RESOURCE_DESC1 d3dResourceDesc =
+		D3D12Helpers::ResourceDesc1ForTexture2D(size.x, size.y, mipLevelCount, dxgiFormat, d3dResourceFlags);
 
-	d3dDevice->CreateCommittedResource(&d3dHeapProps, D3D12_HEAP_FLAG_NONE,
-		&d3dResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+	// TODO: Check that resource fits into memory block.
+	// TODO: Check alignment.
+	// TODO: Handle initial layout properly.
+	d3dDevice->CreatePlacedResource2(memoryBlock.d3dHeap, memoryBlockOffset,
+		&d3dResourceDesc, D3D12_BARRIER_LAYOUT_COMMON, nullptr, 0, nullptr,
 		IID_PPV_ARGS(&resource.d3dResource));
 
 	return composeResourceHandle(resourceIndex);
