@@ -16,7 +16,7 @@
 struct ID3D12CommandAllocator;
 struct ID3D12CommandQueue;
 struct ID3D12DescriptorHeap;
-struct ID3D12GraphicsCommandList;
+struct ID3D12GraphicsCommandList7;
 struct ID3D12Device10;
 
 namespace XEngine::Render::HAL
@@ -165,7 +165,8 @@ namespace XEngine::Render::HAL
 	enum class TextureLayout : uint8
 	{
 		Undefined = 0,
-		Common,
+		AnyAccess,
+		Present,
 		CopySource,
 		CopyDest,
 		ShaderReadOnly,
@@ -177,13 +178,16 @@ namespace XEngine::Render::HAL
 
 	struct BarrierSyncMask
 	{
+		bool all : 1;
 		bool copy : 1;
+		bool allShading : 1;
 		bool computeShading : 1;
-		bool inputAssembler : 1;
-		bool geometryShading : 1;
-		bool pixelShading : 1;
-		bool renderTarget : 1;
-		bool depthStencil : 1;
+		bool graphicsAll : 1;
+		bool graphicsGeometryInput : 1;
+		bool graphicsGeometryShading : 1;
+		bool graphicsPixelShading : 1;
+		bool graphicsRenderTarget : 1;
+		bool graphicsDepthStencil : 1;
 	};
 
 	struct BarrierAccessMask
@@ -287,7 +291,7 @@ namespace XEngine::Render::HAL
 
 	private:
 		Device* device = nullptr;
-		ID3D12GraphicsCommandList* d3dCommandList = nullptr;
+		ID3D12GraphicsCommandList7* d3dCommandList = nullptr;
 		ID3D12CommandAllocator* d3dCommandAllocator = nullptr;
 		CommandListType type = CommandListType::Undefined;
 

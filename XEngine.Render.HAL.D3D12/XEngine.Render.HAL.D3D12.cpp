@@ -352,7 +352,26 @@ void CommandList::bufferMemoryBarrier(ResourceHandle bufferHandle,
 	BarrierSyncMask syncBefore, BarrierSyncMask syncAfter,
 	BarrierAccessMask accessBefore, BarrierAccessMask accessAfter)
 {
+	XEAssert(state == State::Recording);
 
+	const Device::Resource& buffer = device->getResourceByHandle(bufferHandle);
+	XEAssert(buffer.type == ResourceType::Buffer && buffer.d3dResource);
+
+	D3D12_BUFFER_BARRIER d3dBufferBarrier = {};
+	d3dBufferBarrier.SyncBefore = TranslateBarrierSyncMaskToD3D12BarrierSync(syncBefore);
+	d3dBufferBarrier.SyncAfter  = TranslateBarrierSyncMaskToD3D12BarrierSync(syncAfter);
+	d3dBufferBarrier.AccessBefore = TranslateBarrierAccessMaskToD3D12BarrierAccess(accessBefore);
+	d3dBufferBarrier.AccessAfter  = TranslateBarrierAccessMaskToD3D12BarrierAccess(accessAfter);
+	d3dBufferBarrier.pResource = buffer.d3dResource;
+	d3dBufferBarrier.Offset = 0; // D3D12 does not allow to apply barrier to buffer portion :(
+	d3dBufferBarrier.Size = UINT64(-1);
+
+	D3D12_BARRIER_GROUP d3dBarrierGroup = {};
+	d3dBarrierGroup.Type = D3D12_BARRIER_TYPE_BUFFER;
+	d3dBarrierGroup.NumBarriers = 1;
+	d3dBarrierGroup.pBufferBarriers = &d3dBufferBarrier;
+
+	d3dCommandList->Barrier(1, &d3dBarrierGroup);
 }
 
 void CommandList::textureMemoryBarrier(ResourceHandle textureHandle,
@@ -361,7 +380,52 @@ void CommandList::textureMemoryBarrier(ResourceHandle textureHandle,
 	TextureLayout layoutBefore, TextureLayout layoutAfter,
 	const TextureSubresourceRange* subresourceRange)
 {
+	XEAssert(state == State::Recording);
 
+	const Device::Resource& texture = device->getResourceByHandle(textureHandle);
+	XEAssert(texture.type == ResourceType::Texture && texture.d3dResource);
+
+	D3D12_TEXTURE_BARRIER d3dTextureBarrier = {};
+	d3dTextureBarrier.SyncBefore = TranslateBarrierSyncMaskToD3D12BarrierSync(syncBefore);
+	d3dTextureBarrier.SyncAfter  = TranslateBarrierSyncMaskToD3D12BarrierSync(syncAfter);
+	d3dTextureBarrier.AccessBefore = TranslateBarrierAccessMaskToD3D12BarrierAccess(accessBefore);
+	d3dTextureBarrier.AccessAfter  = TranslateBarrierAccessMaskToD3D12BarrierAccess(accessAfter);
+	d3dTextureBarrier.LayoutBefore = TranslateTextureLayoutToD3D12BarrierLayout(layoutBefore);
+	d3dTextureBarrier.LayoutAfter  = TranslateTextureLayoutToD3D12BarrierLayout(layoutAfter);
+	d3dTextureBarrier.pResource = texture.d3dResource;
+
+	if (subresourceRange)
+	{
+		// TODO: Validate `subresourceRange`.
+		// TODO: Create shortcuts like "zero `subresourceRange->mipLevelCount` means all mips".
+
+		XEAssert(subresourceRange->mipLevelCount > 0);
+		// NOTE: `IndexOrFirstMipLevel` will be considered subresource index if `NumMipLevels` is zero.
+
+		d3dTextureBarrier.Subresources.IndexOrFirstMipLevel = subresourceRange->baseMipLevel;
+		d3dTextureBarrier.Subresources.NumMipLevels = subresourceRange->mipLevelCount;
+		d3dTextureBarrier.Subresources.FirstArraySlice = subresourceRange->baseArraySlice;
+		d3dTextureBarrier.Subresources.NumArraySlices = subresourceRange->arraySliceCount;
+		d3dTextureBarrier.Subresources.FirstPlane = 0;
+		d3dTextureBarrier.Subresources.NumPlanes = 1; // TODO: Handle this properly.
+	}
+	else
+	{
+		d3dTextureBarrier.Subresources.IndexOrFirstMipLevel = 0;
+		d3dTextureBarrier.Subresources.NumMipLevels = texture.texture.mipLevelCount;
+		d3dTextureBarrier.Subresources.FirstArraySlice = 0;
+		d3dTextureBarrier.Subresources.NumArraySlices =
+			(texture.texture.type == TextureType::Texture2DArray) ? texture.texture.size.z : 1;
+		d3dTextureBarrier.Subresources.FirstPlane = 0;
+		d3dTextureBarrier.Subresources.NumPlanes = 1; // TODO: Handle this properly.
+	}
+
+	D3D12_BARRIER_GROUP d3dBarrierGroup = {};
+	d3dBarrierGroup.Type = D3D12_BARRIER_TYPE_TEXTURE;
+	d3dBarrierGroup.NumBarriers = 1;
+	d3dBarrierGroup.pTextureBarriers = &d3dTextureBarrier;
+
+	d3dCommandList->Barrier(1, &d3dBarrierGroup);
 }
 
 void CommandList::copyBuffer(ResourceHandle dstBufferHandle, uint64 dstOffset,
