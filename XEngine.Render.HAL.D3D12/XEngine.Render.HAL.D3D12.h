@@ -102,17 +102,17 @@ namespace XEngine::Render::HAL
 	enum class ResourceViewType : uint8
 	{
 		Undefined = 0,
-		BufferReadOnly,
-		BufferReadWrite,
-		TexelBufferReadOnly,
-		TexelBufferReadWrite,
-		Texture1DReadOnly,
-		Texture1DReadWrite,
-		Texture2DReadOnly,
-		Texture2DReadWrite,
-		Texture3DReadOnly,
-		Texture3DReadWrite,
-		TextureCubeReadOnly,
+		ReadOnlyBuffer,
+		ReadWriteBuffer,
+		ReadOnlyTexelBuffer,
+		ReadWriteTexelBuffer,
+		ReadOnlyTexture1D,
+		ReadWriteTexture1D,
+		ReadOnlyTexture2D,
+		ReadWriteTexture2D,
+		ReadOnlyTexture3D,
+		ReadWriteTexture3D,
+		ReadOnlyTextureCube,
 		RaytracingAccelerationStructure,
 	};
 
@@ -225,12 +225,12 @@ namespace XEngine::Render::HAL
 			struct
 			{
 
-			} bufferReadOnly;
+			} readOnlyBuffer;
 
 			struct
 			{
 
-			} bufferReadWrite;
+			} readWriteBuffer;
 
 			struct
 			{
@@ -238,14 +238,14 @@ namespace XEngine::Render::HAL
 				uint8 startMipIndex;
 				uint8 mipLevelCount;
 				uint8 plane;
-			} texture2DReadOnly;
+			} readOnlyTexture2D;
 
 			struct
 			{
 				TexelViewFormat format;
 				uint8 mipIndex;
 				uint8 plane;
-			} texture2DReadWrite;
+			} readWriteTexture2D;
 		};
 	};
 
