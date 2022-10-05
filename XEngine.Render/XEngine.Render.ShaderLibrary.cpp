@@ -40,6 +40,8 @@ ShaderLibrary::~ShaderLibrary()
 
 void ShaderLibrary::load(const char* packPath)
 {
+	// TODO: Refactor this method.
+
 	HAL::Device& halDevice = Host::GetDevice();
 
 	using namespace Shaders::PackFormat;
@@ -64,7 +66,7 @@ void ShaderLibrary::load(const char* packPath)
 		sizeof(PipelineRecord) * packHeader.pipelineCount +
 		sizeof(ObjectRecord) * packHeader.bytecodeObjectCount;
 	XEMasterAssert(packHeader.objectsBaseOffset == objectsBaseOffsetCheck);
-	XEMasterAssert(packFileSize > packHeader.objectsBaseOffset);
+	XEMasterAssert(packHeader.objectsBaseOffset < packFileSize);
 
 	pipelineLayoutCount = packHeader.pipelineLayoutCount;
 	pipelineCount = packHeader.pipelineCount;
@@ -83,14 +85,20 @@ void ShaderLibrary::load(const char* packPath)
 		XEAssert(uintptr(tablesMemory) + tablesMemorySize == uintptr(tablesMemoryEnd));
 	}
 
-	const uint32 packSizeWithoutHeader = uint32(packFileSize) - sizeof(PackHeader);
-	byte* packData = (byte*)SystemHeapAllocator::Allocate(packSizeWithoutHeader);
+	byte* packData = (byte*)SystemHeapAllocator::Allocate(packFileSize);
 
-	packFile.read(packData, packSizeWithoutHeader);
-	const PipelineLayoutRecord* pipelineLayoutRecords = (PipelineLayoutRecord*)packData;
+	memoryCopy(packData, &packHeader, sizeof(PackHeader)); // Pack header is already read.
+	packFile.read(packData + sizeof(PackHeader), packFileSize - sizeof(PackHeader));
+
+	const PipelineLayoutRecord* pipelineLayoutRecords = (PipelineLayoutRecord*)(packData + sizeof(PackHeader));
 	const PipelineRecord* pipelineRecords = (PipelineRecord*)(pipelineLayoutRecords + packHeader.pipelineLayoutCount);
 	const ObjectRecord* bytecodeObjectRecords = (ObjectRecord*)(pipelineRecords + packHeader.pipelineCount);
 	const byte* objectsDataBegin = (byte*)(bytecodeObjectRecords + packHeader.bytecodeObjectCount);
+	XEAssert(uintptr(objectsDataBegin) == uintptr(packData) + objectsBaseOffsetCheck);
+
+	byte* packDataEnd = packData + packFileSize;
+	XEAssert(objectsDataBegin < packDataEnd);
+	const uint64 objectsDataSize = packDataEnd - objectsDataBegin;
 
 	uint64 prevNameCRC = 0;
 
@@ -122,7 +130,8 @@ void ShaderLibrary::load(const char* packPath)
 
 		if (pipelineRecord.isGraphics)
 		{
-			// TODO: Check `pipelineRecord.graphicsBaseObject`.
+			XEMasterAssert(
+				pipelineRecord.graphicsBaseObject.offset + pipelineRecord.graphicsBaseObject.size <= objectsDataSize);
 
 			HAL::ObjectDataView graphicsBaseObject = {};
 			graphicsBaseObject.data = objectsDataBegin + pipelineRecord.graphicsBaseObject.offset;
@@ -146,6 +155,9 @@ void ShaderLibrary::load(const char* packPath)
 				XEMasterAssert(i < HAL::MaxGraphicsPipelineBytecodeObjectCount);
 				XEMasterAssert(bytecodeObjectIndex < packHeader.bytecodeObjectCount);
 				const ObjectRecord& bytecodeObjectRecord = bytecodeObjectRecords[bytecodeObjectIndex];
+
+				XEMasterAssert(bytecodeObjectRecord.offset + bytecodeObjectRecord.size <= objectsDataSize);
+
 				bytecodeObjects[i].data = objectsDataBegin + bytecodeObjectRecord.offset;
 				bytecodeObjects[i].size = bytecodeObjectRecord.size;
 				bytecodeObjectCount++;
@@ -162,16 +174,18 @@ void ShaderLibrary::load(const char* packPath)
 		{
 			// TODO: Asserts everywhere.
 			// TODO: Check that all bytecode object indicies after first are invalid.
-			const uint16 computeShaderBytecodeObjectIndex = pipelineRecord.bytecodeObjectsIndices[0];
-			XEMasterAssert(computeShaderBytecodeObjectIndex < packHeader.bytecodeObjectCount);
-			const ObjectRecord& computeShaderBytecodeObjectRecord = bytecodeObjectRecords[computeShaderBytecodeObjectIndex];
+			const uint16 computeShaderObjectIndex = pipelineRecord.bytecodeObjectsIndices[0];
+			XEMasterAssert(computeShaderObjectIndex < packHeader.bytecodeObjectCount);
+			const ObjectRecord& computeShaderObjectRecord = bytecodeObjectRecords[computeShaderObjectIndex];
 
-			HAL::ObjectDataView computeShaderBytecodeObject = {};
-			computeShaderBytecodeObject.data = objectsDataBegin + computeShaderBytecodeObjectRecord.size;
-			computeShaderBytecodeObject.size = computeShaderBytecodeObjectRecord.size;
+			XEMasterAssert(computeShaderObjectRecord.offset + computeShaderObjectRecord.size <= objectsDataSize);
+
+			HAL::ObjectDataView computeShaderObject = {};
+			computeShaderObject.data = objectsDataBegin + computeShaderObjectRecord.offset;
+			computeShaderObject.size = computeShaderObjectRecord.size;
 
 			pipeline.halPipeline = halDevice.createComputePipeline(
-				pipelineLayout.halPipelineLayout, computeShaderBytecodeObject);
+				pipelineLayout.halPipelineLayout, computeShaderObject);
 		}
 
 		pipeline.nameCRC = pipelineRecord.nameCRC;
