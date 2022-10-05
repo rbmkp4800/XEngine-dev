@@ -71,7 +71,7 @@ namespace XEngine::Render::Scheduler
 		~Pipeline() = default;
 
 		TransientBufferHandle createTransientBuffer(uint64 size);
-		TransientTextureHandle createTransientTexture(HAL::TextureType type, uint16x3 size, HAL::TextureFormat format);
+		TransientTextureHandle createTransientTexture(HAL::TextureDimension dimension, uint16x3 size, HAL::TextureFormat format);
 
 		TransientBufferViewHandle createTransientBufferView(TransientBufferHandle buffer);
 		TransientTextureViewHandle createTransientTextureView(TransientTextureHandle texture);

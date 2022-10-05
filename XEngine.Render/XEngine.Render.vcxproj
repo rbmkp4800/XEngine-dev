@@ -47,11 +47,13 @@
     <OutDir>$(SolutionDir)Build\</OutDir>
     <IntDir>$(SolutionDir)Build.Intermediate\$(PlatformName).$(Configuration)\$(ProjectName)\</IntDir>
     <TargetName>$(ProjectName)_$(PlatformName).$(Configuration)</TargetName>
+    <PublicIncludeDirectories>$(ProjectDir);$(PublicIncludeDirectories)</PublicIncludeDirectories>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)Build\</OutDir>
     <IntDir>$(SolutionDir)Build.Intermediate\$(PlatformName).$(Configuration)\$(ProjectName)\</IntDir>
     <TargetName>$(ProjectName)_$(PlatformName).$(Configuration)</TargetName>
+    <PublicIncludeDirectories>$(ProjectDir);$(PublicIncludeDirectories)</PublicIncludeDirectories>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -98,6 +100,14 @@
     <ProjectReference Include="..\XLib\XLib.vcxproj">
       <Project>{df81a513-72e3-4b74-b866-97f3bb61d45f}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="XEngine.Render.h" />
+    <ClInclude Include="XEngine.Render.Scheduler.h" />
+    <ClInclude Include="XEngine.Render.ShaderLibrary.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="XEngine.Render.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
