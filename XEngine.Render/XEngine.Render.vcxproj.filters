@@ -7,5 +7,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="XEngine.Render.cpp" />
+    <ClCompile Include="XEngine.Render.ShaderLibrary.cpp" />
   </ItemGroup>
 </Project>

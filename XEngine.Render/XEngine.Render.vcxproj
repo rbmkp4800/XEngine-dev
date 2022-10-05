@@ -94,6 +94,9 @@
     <ProjectReference Include="..\XEngine.Render.HAL.D3D12\XEngine.Render.HAL.D3D12.vcxproj">
       <Project>{1ed495b0-b69b-4409-83fc-587f590eab29}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\XEngine.Render.Shaders.PackFormat\XEngine.Render.Shaders.PackFormat.vcxproj">
+      <Project>{e41c3648-b10a-4c33-a052-d98f8ed51ab0}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\XEngine.Render.Shaders\XEngine.Render.Shaders.vcxproj">
       <Project>{e6af7fdc-1839-4501-96b6-389ab9cafddb}</Project>
     </ProjectReference>
@@ -108,6 +111,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="XEngine.Render.cpp" />
+    <ClCompile Include="XEngine.Render.ShaderLibrary.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
