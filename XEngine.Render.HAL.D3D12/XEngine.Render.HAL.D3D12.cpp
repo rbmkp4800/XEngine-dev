@@ -35,6 +35,55 @@ static inline bool ValidateGenericObjectHeader(const ObjectFormat::GenericObject
 	return true;
 }
 
+namespace
+{
+	// DeviceQueueSyncPoint structure:
+	//	Fence counter	0x ....'XXXX'XXXX'XXXX
+	//	Queue ID		0x ...X'....'....'....
+	//	Checksum		0x .XX.'....'....'....
+	//	Signature		0x X...'....'....'....
+
+	// TODO: Finish implementation: poper queue encoding/decoding, checksums.
+
+	constexpr uint64 DeviceQueueSyncPointSignatureMask			= 0xF000'0000'0000'0000;
+	constexpr uint64 DeviceQueueSyncPointFenceCounterValueMask	= 0x0000'FFFF'FFFF'FFFF;
+	constexpr uint64 DeviceQueueSyncPointSignature				= 0xA000'0000'0000'0000;
+
+	struct DecomposedDeviceQueueSyncPoint
+	{
+		DeviceQueue queue;
+		uint64 queueFenceCounterValue;
+	};
+
+	inline DeviceQueueSyncPoint ComposeDeviceQueueSyncPoint(DeviceQueue queue, uint64 queueFenceCounterValue)
+	{
+		XEAssert((queueFenceCounterValue & ~DeviceQueueSyncPointFenceCounterValueMask) == 0);
+		return DeviceQueueSyncPoint(DeviceQueueSyncPointSignature | queueFenceCounterValue);
+	}
+
+	inline DecomposedDeviceQueueSyncPoint DecomposeDeviceQueueSyncPoint(DeviceQueueSyncPoint syncPoint)
+	{
+		XEAssert((uint64(syncPoint) & DeviceQueueSyncPointSignatureMask) == DeviceQueueSyncPointSignature);
+		DecomposedDeviceQueueSyncPoint result = {};
+		result.queue = DeviceQueue::Main;
+		result.queueFenceCounterValue = uint64(syncPoint) & DeviceQueueSyncPointFenceCounterValueMask;
+		return result;
+	}
+
+	inline uint64 GetDeviceQueueSyncPointFenceNextCounterValue(uint64 currentValue)
+	{
+		XEAssert((currentValue & ~DeviceQueueSyncPointFenceCounterValueMask) == 0);
+		return (currentValue + 1) & DeviceQueueSyncPointFenceCounterValueMask;
+	}
+
+	inline bool IsDeviceQueueSyncPointFenceCounterValueReached(uint64 currentValue, uint64 targetValue)
+	{
+		XEAssert((currentValue & ~DeviceQueueSyncPointFenceCounterValueMask) == 0);
+		XEAssert((targetValue & ~DeviceQueueSyncPointFenceCounterValueMask) == 0);
+		return (currentValue - targetValue) < (DeviceQueueSyncPointFenceCounterValueMask >> 1);
+	}
+}
+
 //struct XEngine::Render::HAL::Internal::PipelineBindPointsLUTEntry
 //{
 //	uint32 data;
@@ -140,7 +189,13 @@ CommandList::~CommandList()
 
 void CommandList::begin()
 {
-	XEAssert(state == State::Idle);
+	XEAssert(state == State::Idle || state == State::Executing);
+
+	if (state == State::Executing)
+	{
+		XEMasterAssert(device->isQueueSyncPointReached(executionEndSyncPoint));
+		state = State::Idle;
+	}
 
 	d3dCommandAllocator->Reset();
 	d3dCommandList->Reset(d3dCommandAllocator, nullptr);
@@ -579,6 +634,9 @@ void Device::initialize(ID3D12Device10* _d3dDevice)
 
 	const D3D12_COMMAND_QUEUE_DESC d3dGraphicsQueueDesc = D3D12Helpers::CommandQueueDesc(D3D12_COMMAND_LIST_TYPE_DIRECT);
 	d3dDevice->CreateCommandQueue(&d3dGraphicsQueueDesc, d3dGraphicsQueue.uuid(), d3dGraphicsQueue.voidInitRef());
+
+	d3dDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, d3dGraphicsQueueSyncPointFence.uuid(), d3dGraphicsQueueSyncPointFence.voidInitRef());
+	graphicsQueueSyncPointFenceValue = 0;
 
 	// Allocate object tables.
 	{
@@ -1135,7 +1193,9 @@ void Device::createCommandList(CommandList& commandList, CommandListType type)
 		IID_PPV_ARGS(&commandList.d3dCommandList));
 	commandList.d3dCommandList->Close();
 
+	commandList.device = this;
 	commandList.state = CommandList::State::Idle;
+	commandList.executionEndSyncPoint = DeviceQueueSyncPoint::Zero;
 }
 
 SwapChainHandle Device::createSwapChain(uint16 width, uint16 height, void* hWnd)
@@ -1201,31 +1261,58 @@ void Device::writeDescriptor(DescriptorAddress descriptorAddress, ResourceViewHa
 
 void Device::submitWorkload(DeviceQueue queue, CommandList& commandList)
 {
+	XEAssert(queue == DeviceQueue::Main); // Not implemented.
 	XEAssert(commandList.state == CommandList::State::Recording);
 
 	commandList.d3dCommandList->Close();
 
+	const uint64 newGraphicsQueueSyncPointFenceValue = GetDeviceQueueSyncPointFenceNextCounterValue(graphicsQueueSyncPointFenceValue);
+
 	commandList.state = CommandList::State::Executing;
+	commandList.executionEndSyncPoint = ComposeDeviceQueueSyncPoint(queue, newGraphicsQueueSyncPointFenceValue);
 	commandList.currentPipelineType = PipelineType::Undefined;
 	commandList.currentPipelineLayoutHandle = ZeroPipelineLayoutHandle;
 
 	ID3D12CommandList* d3dCommandListsToExecute[] = { commandList.d3dCommandList };
 	d3dGraphicsQueue->ExecuteCommandLists(1, d3dCommandListsToExecute);
+
+	graphicsQueueSyncPointFenceValue = newGraphicsQueueSyncPointFenceValue;
+	d3dGraphicsQueue->Signal(d3dGraphicsQueueSyncPointFence, graphicsQueueSyncPointFenceValue);
 }
 
 void Device::submitFenceSignal(DeviceQueue queue, FenceHandle fenceHandle, uint64 value)
 {
+	XEAssert(queue == DeviceQueue::Main); // Not implemented.
 	d3dGraphicsQueue->Signal(getFenceByHandle(fenceHandle).d3dFence, value);
 }
 
 void Device::submitFenceWait(DeviceQueue queue, FenceHandle fenceHandle, uint64 value)
 {
+	XEAssert(queue == DeviceQueue::Main); // Not implemented.
 	d3dGraphicsQueue->Wait(getFenceByHandle(fenceHandle).d3dFence, value);
 }
 
 void Device::submitFlip(SwapChainHandle swapChainHandle)
 {
 	getSwapChainByHandle(swapChainHandle).dxgiSwapChain->Present(1, 0);
+
+	graphicsQueueSyncPointFenceValue = GetDeviceQueueSyncPointFenceNextCounterValue(graphicsQueueSyncPointFenceValue);
+	d3dGraphicsQueue->Signal(d3dGraphicsQueueSyncPointFence, graphicsQueueSyncPointFenceValue);
+}
+
+DeviceQueueSyncPoint Device::getEndOfQueueSyncPoint(DeviceQueue queue) const
+{
+	XEAssert(queue == DeviceQueue::Main); // Not implemented.
+	return ComposeDeviceQueueSyncPoint(DeviceQueue::Main, graphicsQueueSyncPointFenceValue);
+}
+
+bool Device::isQueueSyncPointReached(DeviceQueueSyncPoint syncPoint) // const
+{
+	DecomposedDeviceQueueSyncPoint decomposedSyncPoint = DecomposeDeviceQueueSyncPoint(syncPoint);
+	XEAssert(decomposedSyncPoint.queue == DeviceQueue::Main); // Not implemented.
+
+	const uint64 currentFenceCounterValue = d3dGraphicsQueueSyncPointFence->GetCompletedValue();
+	return IsDeviceQueueSyncPointFenceCounterValueReached(currentFenceCounterValue, decomposedSyncPoint.queueFenceCounterValue);
 }
 
 uint64 Device::getFenceValue(FenceHandle fenceHandle) const
@@ -1317,7 +1404,7 @@ namespace
 
 	inline DecomposedHandle DecomposeHandle(uint32 handle)
 	{
-		DecomposedHandle result;
+		DecomposedHandle result = {};
 		result.signature = uint8(handle >> 28);
 		result.generation = uint8(handle >> 20);
 		result.entryIndex = handle & 0x0F'FF'FF;

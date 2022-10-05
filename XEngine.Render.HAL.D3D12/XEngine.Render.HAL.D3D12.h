@@ -18,6 +18,7 @@ struct ID3D12CommandQueue;
 struct ID3D12DescriptorHeap;
 struct ID3D12GraphicsCommandList7;
 struct ID3D12Device10;
+struct ID3D12Fence;
 
 namespace XEngine::Render::HAL
 {
@@ -35,6 +36,8 @@ namespace XEngine::Render::HAL
 	enum class PipelineHandle				: uint32 {};
 	enum class FenceHandle					: uint32 {};
 	enum class SwapChainHandle				: uint32 {};
+
+	enum class DeviceQueueSyncPoint : uint64 { Zero = 0 };
 
 	//enum class PipelineBindPointId : uint32;
 
@@ -299,6 +302,7 @@ namespace XEngine::Render::HAL
 		CommandListType type = CommandListType::Undefined;
 
 		State state = State(0);
+		DeviceQueueSyncPoint executionEndSyncPoint = DeviceQueueSyncPoint::Zero;
 		PipelineType currentPipelineType = PipelineType::Undefined;
 		PipelineLayoutHandle currentPipelineLayoutHandle = ZeroPipelineLayoutHandle;
 		//Internal::PipelineBindPointsLUTEntry* pipelineBindPointsLUTShortcut = nullptr;
@@ -383,13 +387,22 @@ namespace XEngine::Render::HAL
 
 	private:
 		XLib::Platform::COMPtr<ID3D12Device10> d3dDevice;
+
 		XLib::Platform::COMPtr<ID3D12DescriptorHeap> d3dReferenceSRVHeap;
 		XLib::Platform::COMPtr<ID3D12DescriptorHeap> d3dShaderVisbileSRVHeap;
 		XLib::Platform::COMPtr<ID3D12DescriptorHeap> d3dRTVHeap;
 		XLib::Platform::COMPtr<ID3D12DescriptorHeap> d3dDSVHeap;
+
 		XLib::Platform::COMPtr<ID3D12CommandQueue> d3dGraphicsQueue;
-		XLib::Platform::COMPtr<ID3D12CommandQueue> d3dAsyncComputeQueue;
-		XLib::Platform::COMPtr<ID3D12CommandQueue> d3dAsyncCopyQueue;
+		//XLib::Platform::COMPtr<ID3D12CommandQueue> d3dAsyncComputeQueue;
+		//XLib::Platform::COMPtr<ID3D12CommandQueue> d3dAsyncCopyQueue;
+
+		XLib::Platform::COMPtr<ID3D12Fence> d3dGraphicsQueueSyncPointFence;
+		//XLib::Platform::COMPtr<ID3D12Fence> d3dAsyncComputeQueueFence;
+		//XLib::Platform::COMPtr<ID3D12Fence> d3dAsyncCopyQueueFence;
+		uint64 graphicsQueueSyncPointFenceValue = 0;
+		//uint64 asyncComputeQueueFenceValue = 0;
+		//uint64 asyncCopyQueueFenceValue = 0;
 
 		MemoryBlock* memoryBlockTable = nullptr;
 		Resource* resourceTable = nullptr;
@@ -522,10 +535,14 @@ namespace XEngine::Render::HAL
 		void writeDescriptor(DescriptorSetHandle descriptorSet, uint32 bindPointNameCRC, ResourceViewHandle resourceViewHandle);
 
 		void submitWorkload(DeviceQueue queue, CommandList& commandList);
+		void submitSyncPointWait(DeviceQueue queue, DeviceQueueSyncPoint syncPoint);
 		void submitFenceSignal(DeviceQueue queue, FenceHandle fenceHandle, uint64 value);
 		void submitFenceWait(DeviceQueue queue, FenceHandle fenceHandle, uint64 value);
 		void submitFlip(SwapChainHandle swapChainHandle);
 		void submitPartiallyResidentResourcesRemap();
+
+		DeviceQueueSyncPoint getEndOfQueueSyncPoint(DeviceQueue queue) const;
+		bool isQueueSyncPointReached(DeviceQueueSyncPoint syncPoint); // const
 
 		void* mapHostVisibleMemoryBlock(MemoryBlockHandle hostVisibleMemoryBlock);
 		void unmapHostVisibleMemoryBlock(MemoryBlockHandle hostVisibleMemoryBlock);
