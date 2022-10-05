@@ -21,10 +21,10 @@ namespace XEngine::Render
 		ShaderLibrary() = default;
 		~ShaderLibrary();
 
-		bool load(const char* packPath);
-		bool reload(const char* packPath);
+		void load(const char* packPath);
+		void reload(const char* packPath);
 
-		HAL::PipelineLayoutHandle getPipelineLayout(uint64 nameCRC);
-		HAL::PipelineHandle getPipeline(uint64 nameCRC);
+		HAL::PipelineLayoutHandle getPipelineLayout(uint64 nameCRC) const;
+		HAL::PipelineHandle getPipeline(uint64 nameCRC) const;
 	};
 }
