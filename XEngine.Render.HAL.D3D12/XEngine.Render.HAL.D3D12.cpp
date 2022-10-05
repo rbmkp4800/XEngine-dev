@@ -133,6 +133,11 @@ enum class CommandList::State : uint8
 	//return lutEntry;
 //}
 
+CommandList::~CommandList()
+{
+	XEAssertUnreachableCode(); // Not implemented.
+}
+
 void CommandList::begin()
 {
 	XEAssert(state == State::Idle);
@@ -300,6 +305,7 @@ void CommandList::bindBuffer(uint32 bindPointNameCRC,
 	//XEAssertImply(bindType == BufferBindType::ReadOnly, bindPointsLUTEntry.getType() == PipelineBindPointType::ReadOnlyBuffer);
 	//XEAssertImply(bindType == BufferBindType::ReadWrite, bindPointsLUTEntry.getType() == PipelineBindPointType::ReadWriteBuffer);
 	//const uint32 rootParameterIndex = bindPointsLUTEntry.getRootParameterIndex();
+	XEAssertUnreachableCode(); // Not implemented.
 	const uint32 rootParameterIndex = 0;
 
 	const Device::Resource& resource = device->getResourceByHandle(bufferHandle);
@@ -1144,7 +1150,7 @@ SwapChainHandle Device::createSwapChain(uint16 width, uint16 height, void* hWnd)
 	dxgiSwapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 	dxgiSwapChainDesc.Stereo = FALSE;
 	dxgiSwapChainDesc.SampleDesc.Count = 1;
-	dxgiSwapChainDesc.SampleDesc.Quality = 1;
+	dxgiSwapChainDesc.SampleDesc.Quality = 0;
 	dxgiSwapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	dxgiSwapChainDesc.BufferCount = SwapChainTextureCount;
 	dxgiSwapChainDesc.Scaling = DXGI_SCALING_STRETCH;
@@ -1193,7 +1199,7 @@ void Device::writeDescriptor(DescriptorAddress descriptorAddress, ResourceViewHa
 
 void Device::submitWorkload(DeviceQueue queue, CommandList& commandList)
 {
-	XEAssert(commandList.state != CommandList::State::Executing);
+	XEAssert(commandList.state == CommandList::State::Recording);
 
 	commandList.d3dCommandList->Close();
 
@@ -1238,7 +1244,7 @@ ResourceHandle Device::getSwapChainTexture(SwapChainHandle swapChainHandle, uint
 void Host::CreateDevice(Device& device)
 {
 	if (!dxgiFactory.isInitialized())
-		CreateDXGIFactory1(dxgiFactory.uuid(), dxgiFactory.voidInitRef());
+		CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, dxgiFactory.uuid(), dxgiFactory.voidInitRef());
 
 	if (!d3dDebug.isInitialized())
 		D3D12GetDebugInterface(d3dDebug.uuid(), d3dDebug.voidInitRef());
@@ -1381,6 +1387,15 @@ SwapChainHandle Device::composeSwapChainHandle(uint32 swapChainIndex) const
 }
 
 
+uint32 Device::resolveMemoryBlockHandle(MemoryBlockHandle handle) const
+{
+	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
+	XEAssert(decomposed.signature == MemoryBlockHandleSignature);
+	XEAssert(decomposed.entryIndex < MaxMemoryBlockCount);
+	XEAssert(decomposed.generation == resourceTable[decomposed.entryIndex].handleGeneration);
+	return decomposed.entryIndex;
+}
+
 uint32 Device::resolveResourceHandle(ResourceHandle handle) const
 {
 	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
@@ -1454,6 +1469,7 @@ uint32 Device::resolveSwapChainHandle(SwapChainHandle handle) const
 }
 
 
+auto Device::getMemoryBlockByHandle(MemoryBlockHandle handle) -> MemoryBlock& { return memoryBlockTable[resolveMemoryBlockHandle(handle)]; }
 auto Device::getResourceByHandle(ResourceHandle handle) -> Resource& { return resourceTable[resolveResourceHandle(handle)]; }
 auto Device::getResourceViewByHandle(ResourceViewHandle handle) -> ResourceView& { return resourceViewTable[resolveResourceViewHandle(handle)]; }
 auto Device::getPipelineLayoutByHandle(PipelineLayoutHandle handle) -> PipelineLayout& { return pipelineLayoutTable[resolvePipelineLayoutHandle(handle)]; }

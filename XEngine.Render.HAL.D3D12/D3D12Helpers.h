@@ -91,7 +91,7 @@ namespace D3D12Helpers
 		desc.Width = size;
 		desc.Height = 1;
 		desc.DepthOrArraySize = 1;
-		desc.MipLevels = 0;
+		desc.MipLevels = 1;
 		desc.Format = DXGI_FORMAT_UNKNOWN;
 		desc.SampleDesc.Count = 1;
 		desc.SampleDesc.Quality = 0;
