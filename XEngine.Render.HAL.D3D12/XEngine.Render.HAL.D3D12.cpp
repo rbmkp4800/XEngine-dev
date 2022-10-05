@@ -160,7 +160,7 @@ struct Device::Fence
 struct Device::SwapChain
 {
 	IDXGISwapChain4* dxgiSwapChain;
-	ResourceHandle textures[SwapChainTextureCount];
+	ResourceHandle backBuffers[SwapChainBackBufferCount];
 };
 
 
@@ -1214,7 +1214,7 @@ SwapChainHandle Device::createSwapChain(uint16 width, uint16 height, void* hWnd)
 	dxgiSwapChainDesc.SampleDesc.Count = 1;
 	dxgiSwapChainDesc.SampleDesc.Quality = 0;
 	dxgiSwapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	dxgiSwapChainDesc.BufferCount = SwapChainTextureCount;
+	dxgiSwapChainDesc.BufferCount = SwapChainBackBufferCount;
 	dxgiSwapChainDesc.Scaling = DXGI_SCALING_STRETCH;
 	dxgiSwapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	dxgiSwapChainDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
@@ -1227,7 +1227,7 @@ SwapChainHandle Device::createSwapChain(uint16 width, uint16 height, void* hWnd)
 	dxgiSwapChain1->QueryInterface(IID_PPV_ARGS(&swapChain.dxgiSwapChain));
 
 	// Allocate resources for textures
-	for (uint32 i = 0; i < SwapChainTextureCount; i++)
+	for (uint32 i = 0; i < SwapChainBackBufferCount; i++)
 	{
 		const sint32 resourceIndex = resourceTableAllocationMask.findFirstZeroAndSet();
 		XEMasterAssert(resourceIndex >= 0);
@@ -1240,7 +1240,7 @@ SwapChainHandle Device::createSwapChain(uint16 width, uint16 height, void* hWnd)
 
 		dxgiSwapChain1->GetBuffer(i, IID_PPV_ARGS(&resource.d3dResource));
 		
-		swapChain.textures[i] = composeResourceHandle(resourceIndex);
+		swapChain.backBuffers[i] = composeResourceHandle(resourceIndex);
 	}
 
 	return composeSwapChainHandle(swapChainIndex);
@@ -1320,13 +1320,21 @@ uint64 Device::getFenceValue(FenceHandle fenceHandle) const
 	return getFenceByHandle(fenceHandle).d3dFence->GetCompletedValue();
 }
 
-ResourceHandle Device::getSwapChainTexture(SwapChainHandle swapChainHandle, uint32 textureIndex) const
+ResourceHandle Device::getSwapChainBackBuffer(SwapChainHandle swapChainHandle, uint32 backBufferIndex) const
 {
 	const SwapChain& swapChain = getSwapChainByHandle(swapChainHandle);
-	XEAssert(textureIndex < countof(swapChain.textures));
-	return swapChain.textures[textureIndex];
+	XEAssert(backBufferIndex < countof(swapChain.backBuffers));
+	return swapChain.backBuffers[backBufferIndex];
 }
 
+uint32 Device::getSwapChainCurrentBackBufferIndex(SwapChainHandle swapChainHandle) const
+{
+	const SwapChain& swapChain = getSwapChainByHandle(swapChainHandle);
+	XEAssert(swapChain.dxgiSwapChain);
+	const uint32 backBufferIndex = swapChain.dxgiSwapChain->GetCurrentBackBufferIndex();
+	XEAssert(backBufferIndex < countof(swapChain.backBuffers));
+	return backBufferIndex;
+}
 
 // Host ////////////////////////////////////////////////////////////////////////////////////////////
 

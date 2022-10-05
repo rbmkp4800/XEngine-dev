@@ -375,7 +375,7 @@ namespace XEngine::Render::HAL
 		static constexpr uint32 MaxPipelineCount = 1024;
 		static constexpr uint32 MaxFenceCount = 64;
 		static constexpr uint32 MaxSwapChainCount = 4;
-		static constexpr uint32 SwapChainTextureCount = 2;
+		static constexpr uint32 SwapChainBackBufferCount = 2;
 
 		struct MemoryBlock;
 		struct Resource;
@@ -548,8 +548,10 @@ namespace XEngine::Render::HAL
 		void unmapHostVisibleMemoryBlock(MemoryBlockHandle hostVisibleMemoryBlock);
 
 		//PipelineBindPointId getPipelineBindPointId(PipelineLayoutHandle pipelineLayoutHandle, uint64 bindPointNameCRC) const;
-		ResourceHandle getSwapChainTexture(SwapChainHandle swapChainHandle, uint32 textureIndex) const;
 		uint64 getFenceValue(FenceHandle fenceHandle) const;
+
+		ResourceHandle getSwapChainBackBuffer(SwapChainHandle swapChainHandle, uint32 backBufferIndex) const;
+		uint32 getSwapChainCurrentBackBufferIndex(SwapChainHandle swapChainHandle) const;
 
 		const char* getName() const;
 	};
