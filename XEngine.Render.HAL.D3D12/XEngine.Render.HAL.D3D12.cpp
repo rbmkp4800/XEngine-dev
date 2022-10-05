@@ -12,7 +12,7 @@
 #include "XEngine.Render.HAL.D3D12.Translation.h"
 
 // Microsoft.Direct3D.D3D12 v1.700.10
-extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = 700; }
+extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = D3D12_PREVIEW_SDK_VERSION; }
 extern "C" { __declspec(dllexport) extern const char* D3D12SDKPath = ".\\D3D12\\"; }
 
 using namespace XLib;
@@ -116,7 +116,7 @@ struct Device::Resource
 			uint16x3 size;
 			TextureDimension dimension;
 			TextureFormat format;
-			uint8 mipLevelCount;
+			uint8 mipLevelCount; // TODO: Move this to `size.z`
 		} texture;
 
 		struct
@@ -187,7 +187,7 @@ CommandList::~CommandList()
 	XEAssertUnreachableCode(); // Not implemented.
 }
 
-void CommandList::begin()
+void CommandList::open()
 {
 	XEAssert(state == State::Idle || state == State::Executing);
 
@@ -1237,6 +1237,10 @@ SwapChainHandle Device::createSwapChain(uint16 width, uint16 height, void* hWnd)
 		XEAssert(!resource.d3dResource);
 		resource.type = ResourceType::Texture;
 		resource.internalOwnership = true;
+		resource.texture.size = uint16x3(width, height, 1);
+		resource.texture.dimension = TextureDimension::Texture2D;
+		resource.texture.format = TextureFormat::R8G8B8A8;
+		resource.texture.mipLevelCount = 1;
 
 		dxgiSwapChain1->GetBuffer(i, IID_PPV_ARGS(&resource.d3dResource));
 		

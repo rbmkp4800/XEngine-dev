@@ -314,7 +314,8 @@ namespace XEngine::Render::HAL
 		CommandList() = default;
 		~CommandList();
 
-		void begin();
+		void open();
+		void close();
 
 		void clearRenderTarget(RenderTargetViewHandle rtv, const float32* color);
 		void clearDepthStencil(DepthStencilViewHandle dsv, bool clearDepth, bool clearStencil, float32 depth, uint8 stencil);
