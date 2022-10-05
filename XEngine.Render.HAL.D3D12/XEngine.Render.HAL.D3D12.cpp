@@ -65,7 +65,7 @@ struct Device::Resource
 		struct
 		{
 			uint16x3 size;
-			TextureType type;
+			TextureDimension dimension;
 			TextureFormat format;
 			uint8 mipLevelCount;
 		} texture;
@@ -421,7 +421,7 @@ void CommandList::textureMemoryBarrier(ResourceHandle textureHandle,
 		d3dTextureBarrier.Subresources.NumMipLevels = texture.texture.mipLevelCount;
 		d3dTextureBarrier.Subresources.FirstArraySlice = 0;
 		d3dTextureBarrier.Subresources.NumArraySlices =
-			(texture.texture.type == TextureType::Texture2DArray) ? texture.texture.size.z : 1;
+			(texture.texture.dimension == TextureDimension::Texture2DArray) ? texture.texture.size.z : 1; // TODO: Other dim arrays
 		d3dTextureBarrier.Subresources.FirstPlane = 0;
 		d3dTextureBarrier.Subresources.NumPlanes = 1; // TODO: Handle this properly.
 	}
@@ -539,7 +539,7 @@ uint32 Device::CalculateTextureSubresourceIndex(const Resource& resource, const 
 {
 	XEAssert(resource.type == ResourceType::Texture);
 	XEAssert(subresource.mipLevel < resource.texture.mipLevelCount);
-	XEAssert(imply(subresource.arraySlice > 0, resource.texture.type == TextureType::Texture2DArray));
+	XEAssert(imply(subresource.arraySlice > 0, resource.texture.dimension == TextureDimension::Texture2DArray)); // TODO: Other dim arrays
 	XEAssert(subresource.arraySlice < resource.texture.size.z);
 
 	const TextureFormat format = resource.texture.format;
@@ -683,7 +683,7 @@ ResourceHandle Device::createBuffer(uint64 size, BufferFlags flags,
 	return composeResourceHandle(resourceIndex);
 }
 
-ResourceHandle Device::createTexture(TextureType type, uint16x3 size,
+ResourceHandle Device::createTexture(TextureDimension dimension, uint16x3 size,
 	TextureFormat format, uint8 mipLevelCount, TextureFlags flags,
 	MemoryBlockHandle memoryBlockHandle, uint64 memoryBlockOffset)
 {
@@ -709,6 +709,8 @@ ResourceHandle Device::createTexture(TextureType type, uint16x3 size,
 		d3dResourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 	if (flags.allowShaderWrite)
 		d3dResourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+	XEAssert(dimension == TextureDimension::Texture2D); // Not implemented.
 
 	// TODO: Check if `mipLevelCount` is not greater than max possible level count for this resource.
 	const D3D12_RESOURCE_DESC1 d3dResourceDesc =

@@ -83,13 +83,16 @@ namespace XEngine::Render::HAL
 		bool allowShaderWrite : 1;
 	};
 
-	enum class TextureType : uint8
+	enum class TextureDimension : uint8
 	{
 		Undefined = 0,
 		Texture1D,
+		Texture1DArray,
 		Texture2D,
 		Texture2DArray,
 		Texture3D,
+		TextureCube,
+		TextureCubeArray,
 	};
 
 	struct TextureFlags
@@ -464,17 +467,17 @@ namespace XEngine::Render::HAL
 		MemoryBlockHandle allocateMemory(uint64 size, MemoryType memoryType = MemoryType::DeviceLocal);
 		void releaseMemory(MemoryBlockHandle memory);
 
-		ResourceAllocationInfo getTextureAllocationInfo(TextureType type, uint16x3 size,
+		ResourceAllocationInfo getTextureAllocationInfo(TextureDimension dimension, uint16x3 size,
 			TextureFormat format, uint8 mipLevelCount, TextureFlags flags);
 
 		ResourceHandle createBuffer(uint64 size, BufferFlags flags,
 			MemoryBlockHandle memoryBlockHandle, uint64 memoryBlockOffset);
-		ResourceHandle createTexture(TextureType type, uint16x3 size,
+		ResourceHandle createTexture(TextureDimension dimension, uint16x3 size,
 			TextureFormat format, uint8 mipLevelCount, TextureFlags flags,
 			MemoryBlockHandle memoryBlockHandle, uint64 memoryBlockOffset);
 
 		ResourceHandle createPartiallyResidentBuffer(uint64 size, BufferFlags flags);
-		ResourceHandle createPartiallyResidentTexture(TextureType type, uint16x3 size,
+		ResourceHandle createPartiallyResidentTexture(TextureDimension dimension, uint16x3 size,
 			TextureFormat format, uint8 mipLevelCount, TextureFlags flags);
 
 		void destroyResource(ResourceHandle handle);
