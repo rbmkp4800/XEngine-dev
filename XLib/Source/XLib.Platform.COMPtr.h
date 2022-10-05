@@ -61,7 +61,9 @@ namespace XLib::Platform
 		inline Type*const* operator & () { return &ptr; }
 
 		inline Type* operator -> () { return ptr; }
+		inline Type* operator -> () const { return ptr; }
 		inline operator Type* () { return ptr; }
+		inline operator Type* () const { return ptr; }
 		inline void operator = (Type* value)
 		{
 			destroy();

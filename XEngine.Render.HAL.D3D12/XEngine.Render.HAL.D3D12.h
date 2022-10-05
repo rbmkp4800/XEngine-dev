@@ -542,7 +542,7 @@ namespace XEngine::Render::HAL
 		void submitPartiallyResidentResourcesRemap();
 
 		DeviceQueueSyncPoint getEndOfQueueSyncPoint(DeviceQueue queue) const;
-		bool isQueueSyncPointReached(DeviceQueueSyncPoint syncPoint); // const
+		bool isQueueSyncPointReached(DeviceQueueSyncPoint syncPoint) const;
 
 		void* mapHostVisibleMemoryBlock(MemoryBlockHandle hostVisibleMemoryBlock);
 		void unmapHostVisibleMemoryBlock(MemoryBlockHandle hostVisibleMemoryBlock);

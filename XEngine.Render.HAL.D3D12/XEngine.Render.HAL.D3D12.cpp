@@ -1306,7 +1306,7 @@ DeviceQueueSyncPoint Device::getEndOfQueueSyncPoint(DeviceQueue queue) const
 	return ComposeDeviceQueueSyncPoint(DeviceQueue::Main, graphicsQueueSyncPointFenceValue);
 }
 
-bool Device::isQueueSyncPointReached(DeviceQueueSyncPoint syncPoint) // const
+bool Device::isQueueSyncPointReached(DeviceQueueSyncPoint syncPoint) const
 {
 	DecomposedDeviceQueueSyncPoint decomposedSyncPoint = DecomposeDeviceQueueSyncPoint(syncPoint);
 	XEAssert(decomposedSyncPoint.queue == DeviceQueue::Main); // Not implemented.
