@@ -22,7 +22,7 @@ namespace XEngine::Render::Shaders::Builder_
 		XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
 
 		Source* source = nullptr;
-		XLib::StringViewASCII entryPointName;
+		const char* entryPointName = nullptr;
 		const PipelineLayout* pipelineLayout = nullptr;
 		HAL::ShaderCompiler::ShaderType type = HAL::ShaderCompiler::ShaderType::Undefined;
 
@@ -36,7 +36,7 @@ namespace XEngine::Render::Shaders::Builder_
 		bool compile();
 
 		inline const Source& getSource() const { return *source; }
-		inline XLib::StringViewASCII getEntryPointName() const { return entryPointName; }
+		inline const char* getEntryPointName() const { return entryPointName; }
 		inline const PipelineLayout& getPipelineLayout() const { return *pipelineLayout; }
 		inline HAL::ShaderCompiler::ShaderType getType() const { return type; }
 		inline const HAL::ShaderCompiler::CompiledShader& getCompiled() const { return compiledShader; }

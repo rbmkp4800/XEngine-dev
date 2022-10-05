@@ -292,17 +292,23 @@ bool Host::CompilePipelineLayout(Platform platform,
 }
 
 bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipelineLayout,
-	ShaderType shaderType, const char* shaderName, const char* source, uint32 sourceLength, CompiledShader& result)
+	const char* source, uint32 sourceLength, ShaderType shaderType, const char* displayedShaderFilename,
+	const char* entryPointName, CompiledShader& result)
 {
 	result.destroy();
 
 	XAssert(pipelineLayout.isInitialized());
 
-	// TODO: Tidy this when more conver utils is ready.
+	// TODO: Tidy this when more convert utils is ready.
 	wchar shaderNameW[64];
-	const uintptr shaderNameLength = TextConvertASCIIToWide(shaderName, shaderNameW, countof(shaderNameW) - 1);
+	const uintptr shaderNameLength = TextConvertASCIIToWide(displayedShaderFilename, shaderNameW, countof(shaderNameW) - 1);
 	XAssert(shaderNameLength < countof(shaderNameW));
 	shaderNameW[shaderNameLength] = L'\0';
+
+	wchar entryPointNameW[64];
+	const uintptr entryPointNameLength = TextConvertASCIIToWide(entryPointName, entryPointNameW, countof(entryPointNameW) - 1);
+	XAssert(entryPointNameLength < countof(entryPointNameW));
+	entryPointNameW[entryPointNameLength] = L'\0';
 
 	// Patch source code substituting bindings
 	DynamicStringASCII patchedSourceString;
@@ -365,6 +371,10 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipeli
 		}
 		XAssert(dxcProfile);
 		dxcArgsList.pushBack(dxcProfile);
+
+		// TODO: Push this as single string ("-Emain" instead of "-E", "main").
+		dxcArgsList.pushBack(L"-E");
+		dxcArgsList.pushBack(entryPointNameW);
 	}
 
 	ComPtr<IDxcResult> dxcResult;

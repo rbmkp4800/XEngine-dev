@@ -13,8 +13,8 @@ bool Shader::compile()
 		return false;
 
 	return HAL::ShaderCompiler::Host::CompileShader(HAL::ShaderCompiler::Platform::D3D12,
-		pipelineLayout->getCompiled(), type, source->getLocalPathCStr(),
-		sourceText.getData(), uint32(sourceText.getLength()), compiledShader);
+		pipelineLayout->getCompiled(), sourceText.getData(), uint32(sourceText.getLength()),
+		type, source->getLocalPathCStr(), entryPointName, compiledShader);
 }
 
 struct ShaderList::EntrySearchKey
@@ -75,7 +75,7 @@ ShaderCreationResult ShaderList::findOrCreate(HAL::ShaderCompiler::ShaderType ty
 	Shader& shader = *(Shader*)shaderMemory;
 	construct(shader);
 	shader.source = &source;
-	shader.entryPointName = StringView(entryPointNameMemory, entryPointName.getLength());
+	shader.entryPointName = entryPointNameMemory;
 	shader.pipelineLayout = &pipelineLayout;
 	shader.type = type;
 
