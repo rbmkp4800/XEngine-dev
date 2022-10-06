@@ -14,10 +14,28 @@ namespace D3D12Helpers
 		D3D12_SHADER_BYTECODE bytecode;
 	};
 
+	struct PipelineStateSubobjectRasterizer
+	{
+		D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+		D3D12_RASTERIZER_DESC desc;
+	};
+
 	struct PipelineStateSubobjectDepthStencil
 	{
 		D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
 		D3D12_DEPTH_STENCIL_DESC desc;
+	};
+
+	struct PipelineStateSubobjectInputLayout
+	{
+		D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+		D3D12_INPUT_LAYOUT_DESC desc;
+	};
+
+	struct PipelineStateSubobjectPrimitiveTopology
+	{
+		D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+		D3D12_PRIMITIVE_TOPOLOGY_TYPE topology;
 	};
 
 	struct PipelineStateSubobjectRenderTargetFormats

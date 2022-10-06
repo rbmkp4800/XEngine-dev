@@ -200,6 +200,9 @@ void CommandList::open()
 	d3dCommandAllocator->Reset();
 	d3dCommandList->Reset(d3dCommandAllocator, nullptr);
 
+	// TODO: Primitive topologies support.
+	d3dCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
 	state = State::Recording;
 }
 
@@ -283,12 +286,14 @@ void CommandList::setPipelineType(PipelineType pipelineType)
 	if (currentPipelineType == pipelineType)
 		return;
 
+	currentPipelineType = pipelineType;
 	currentPipelineLayoutHandle = ZeroPipelineLayoutHandle;
 }
 
 void CommandList::setPipelineLayout(PipelineLayoutHandle pipelineLayoutHandle)
 {
 	XEAssert(state == State::Recording);
+	XEAssert(pipelineLayoutHandle != ZeroPipelineLayoutHandle);
 
 	if (currentPipelineLayoutHandle == pipelineLayoutHandle)
 		return;
@@ -395,11 +400,12 @@ void CommandList::bindBuffer(uint32 bindPointNameCRC,
 		XEAssertUnreachableCode();
 }
 
-void CommandList::drawNonIndexed(uint32 vertexCount, uint32 startVertexIndex)
+void CommandList::draw(uint32 vertexCount, uint32 vertexOffset)
 {
 	XEAssert(state == State::Recording);
 	XEAssert(currentPipelineType == PipelineType::Graphics);
-	d3dCommandList->DrawInstanced(vertexCount, 1, startVertexIndex, 0);
+	// TODO: Check that pipeline is actually bound.
+	d3dCommandList->DrawInstanced(vertexCount, 1, vertexOffset, 0);
 }
 
 void CommandList::dispatch(uint32 groupCountX, uint32 groupCountY, uint32 groupCountZ)
@@ -1024,6 +1030,7 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 	byte d3dPSOStreamBuffer[1024]; // TODO: Proper size
 	XLib::ByteStreamWriter d3dPSOStreamWriter(d3dPSOStreamBuffer, sizeof(d3dPSOStreamBuffer));
 
+	// Root signagure
 	{
 		D3D12Helpers::PipelineStateSubobjectRootSignature& d3dSubobjectRS =
 			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectRootSignature>(sizeof(void*));
@@ -1031,6 +1038,7 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 		d3dSubobjectRS.rootSignature = pipelineLayout.d3dRootSignature;
 	}
 
+	// Shaders
 	if (d3dVS.pShaderBytecode)
 	{
 		D3D12Helpers::PipelineStateSubobjectShader& d3dSubobjectVS =
@@ -1060,16 +1068,7 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 		d3dSubobjectPS.bytecode = d3dPS;
 	}
 
-	{
-		// TODO: ...
-		// D3D12_BLEND_DESC& d3dBlendDesc = ...;
-	}
-
-	{
-		// TODO: ...
-		// D3D12_RASTERIZER_DESC& d3dRasterizerDesc = ...;
-	}
-
+	// Depth stencil
 	{
 		D3D12Helpers::PipelineStateSubobjectDepthStencil& d3dSubobjectDS =
 			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectDepthStencil>(sizeof(void*));
@@ -1083,6 +1082,16 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 		d3dDepthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS; // TODO: ...
 	}
 
+	// Primitive topology
+	{
+		D3D12Helpers::PipelineStateSubobjectPrimitiveTopology& d3dSubobjectPT =
+			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectPrimitiveTopology>(sizeof(void*));
+		d3dSubobjectPT.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PRIMITIVE_TOPOLOGY;
+		// TODO: Primitive topologies support.
+		d3dSubobjectPT.topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	}
+
+	// Render target formats
 	if (renderTargetCount > 0)
 	{
 		D3D12Helpers::PipelineStateSubobjectRenderTargetFormats& d3dSubobjectRTs =
@@ -1096,6 +1105,7 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 		d3dRTFormatArray.NumRenderTargets = renderTargetCount;
 	}
 
+	// Depth stencil format
 	if (baseObject.depthStencilFormat != DepthStencilFormat::Undefined)
 	{
 		D3D12Helpers::PipelineStateSubobjectDepthStencilFormat& d3dSubobjectDSFormat =
@@ -1134,7 +1144,8 @@ PipelineHandle Device::createComputePipeline(PipelineLayoutHandle pipelineLayout
 	XEMasterAssert(computeShaderObjectData.size > sizeof(PipelineBytecodeObjectHeader));
 	const PipelineBytecodeObjectHeader& header = *(const PipelineBytecodeObjectHeader*)objectDataBytes;
 
-	XEMasterAssert(ValidateGenericObjectHeader(&header.generic, PipelineBytecodeObjectSignature, computeShaderObjectData.size));
+	XEMasterAssert(ValidateGenericObjectHeader(&header.generic,
+		PipelineBytecodeObjectSignature, computeShaderObjectData.size));
 	XEMasterAssert(header.pipelineLayoutSourceHash == pipelineLayout.sourceHash);
 
 	D3D12_SHADER_BYTECODE d3dCS = {};

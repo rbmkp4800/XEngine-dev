@@ -337,8 +337,8 @@ namespace XEngine::Render::HAL
 		void bindDescriptorSet(uint32 bindPointNameCRC, DescriptorSetHandle descriptorSetHandle);
 		void bindDescriptorArray(uint32 bindPointNameCRC, DescriptorAddress arrayStartAddress);
 
-		void drawNonIndexed(uint32 vertexCount, uint32 startVertexIndex = 0);
-		void drawIndexed();
+		void draw(uint32 vertexCount, uint32 vertexOffset = 0);
+		void drawIndexed(uint32 indexCount, uint32 indexOffset = 0, uint32 vertexOffset = 0);
 		void dispatchMesh();
 		void dispatch(uint32 groupCountX, uint32 groupCountY = 1, uint32 groupCountZ = 1);
 
