@@ -8,6 +8,9 @@
 
 #include <XEngine.Render.HAL.Common.h>
 
+// TODO: Check that viewport and scissor are set when rendering.
+// TODO: Check that scissor rect is not larget than render target.
+
 #define XEAssert(cond) XAssert(cond)
 #define XEAssertUnreachableCode() XAssertUnreachableCode()
 #define XEMasterAssert(cond) XAssert(cond)
@@ -278,16 +281,6 @@ namespace XEngine::Render::HAL
 
 	};
 
-	struct Viewport
-	{
-		float32 top;
-		float32 left;
-		float32 right;
-		float32 bottom;
-		float32 depthMin;
-		float32 depthMax;
-	};
-
 	class CommandList : public XLib::NonCopyable
 	{
 		friend Device;
@@ -321,8 +314,8 @@ namespace XEngine::Render::HAL
 		void clearDepthStencil(DepthStencilViewHandle dsv, bool clearDepth, bool clearStencil, float32 depth, uint8 stencil);
 
 		void setRenderTargets(uint8 rtvCount, const RenderTargetViewHandle* rtvs, DepthStencilViewHandle dsv = ZeroDepthStencilViewHandle);
-		void setViewport(const Viewport& viewport);
-		void setScissor();
+		void setViewport(float32 left, float32 top, float32 right, float32 bottom, float32 minDepth = 0.0f, float32 maxDepth = 1.0f);
+		void setScissor(uint32 left, uint32 top, uint32 right, uint32 bottom);
 
 		inline void setRenderTarget(RenderTargetViewHandle rtv, DepthStencilViewHandle dsv = ZeroDepthStencilViewHandle) { setRenderTargets(1, &rtv, dsv); }
 

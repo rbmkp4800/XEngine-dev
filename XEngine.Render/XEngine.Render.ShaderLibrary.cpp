@@ -10,6 +10,8 @@
 using namespace XLib;
 using namespace XEngine::Render;
 
+// TODO: Implement proper search for `getPipelineLayout` and `getPipeline`.
+
 struct ShaderLibrary::PipelineLayout
 {
 	uint64 nameCRC;
@@ -196,4 +198,24 @@ void ShaderLibrary::load(const char* packPath)
 	}
 
 	SystemHeapAllocator::Release(packData);
+}
+
+HAL::PipelineLayoutHandle ShaderLibrary::getPipelineLayout(uint64 nameCRC) const
+{
+	for (uint32 i = 0; i < pipelineLayoutCount; i++)
+	{
+		if (pipelineLayoutTable[i].nameCRC == nameCRC)
+			return pipelineLayoutTable[i].halPipelineLayout;
+	}
+	XEMasterAssertUnreachableCode();
+}
+
+HAL::PipelineHandle ShaderLibrary::getPipeline(uint64 nameCRC) const
+{
+	for (uint32 i = 0; i < pipelineCount; i++)
+	{
+		if (pipelineTable[i].nameCRC == nameCRC)
+			return pipelineTable[i].halPipeline;
+	}
+	XEMasterAssertUnreachableCode();
 }

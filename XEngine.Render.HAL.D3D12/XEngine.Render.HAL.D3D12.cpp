@@ -265,19 +265,20 @@ void CommandList::setRenderTargets(uint8 rtvCount, const RenderTargetViewHandle*
 		useDSV ? &d3dDSVDescriptorPtr : nullptr);
 }
 
-void CommandList::setViewport(const Viewport& viewport)
+void CommandList::setViewport(float32 left, float32 top, float32 right, float32 bottom, float32 minDepth, float32 maxDepth)
 {
 	XEAssert(state == State::Recording);
 
-	D3D12_VIEWPORT d3dViewport = {};
-	d3dViewport.TopLeftX = viewport.left;
-	d3dViewport.TopLeftY = viewport.top;
-	d3dViewport.Width = viewport.right - viewport.left;
-	d3dViewport.Height = viewport.bottom - viewport.top;
-	d3dViewport.MinDepth = viewport.depthMin;
-	d3dViewport.MaxDepth = viewport.depthMax;
-
+	const D3D12_VIEWPORT d3dViewport = { left, top, right - left, bottom - top, minDepth, maxDepth };
 	d3dCommandList->RSSetViewports(1, &d3dViewport);
+}
+
+void CommandList::setScissor(uint32 left, uint32 top, uint32 right, uint32 bottom)
+{
+	XEAssert(state == State::Recording);
+
+	const D3D12_RECT d3dRect = { left, top, right, bottom };
+	d3dCommandList->RSSetScissorRects(1, &d3dRect);
 }
 
 void CommandList::setPipelineType(PipelineType pipelineType)
