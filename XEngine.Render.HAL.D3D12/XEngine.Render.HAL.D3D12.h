@@ -66,7 +66,8 @@ namespace XEngine::Render::HAL
 
 	enum class MemoryType : uint8
 	{
-		DeviceLocal = 0,
+		Undefined = 0,
+		DeviceLocal,
 		DeviceReadHostWrite,
 		DeviceWriteHostRead,
 	};
@@ -84,11 +85,6 @@ namespace XEngine::Render::HAL
 		Texture,
 	};
 
-	struct BufferFlags
-	{
-		bool allowShaderWrite : 1;
-	};
-
 	enum class TextureDimension : uint8
 	{
 		Undefined = 0,
@@ -101,12 +97,23 @@ namespace XEngine::Render::HAL
 		TextureCubeArray,
 	};
 
-	struct TextureFlags
+	enum class BufferFlags : uint8
 	{
-		bool allowRenderTarget : 1;
-		bool allowDepthStencil : 1;
-		bool allowShaderWrite : 1;
+		AllowShaderWrite = 0x01,
+		// AllowRaytracingAccelerationStructure
 	};
+
+	XDefineUnumFlagOperators(BufferFlags, uint8)
+
+	enum class TextureFlags : uint8
+	{
+		None = 0,
+		AllowRenderTarget	= 0x01,
+		AllowDepthStencil	= 0x02,
+		AllowShaderWrite	= 0x04,
+	};
+
+	XDefineUnumFlagOperators(TextureFlags, uint8)
 
 	enum class ResourceViewType : uint8
 	{
@@ -168,49 +175,66 @@ namespace XEngine::Render::HAL
 		uint8 mipLevelCount;
 		uint16 baseArraySlice;
 		uint16 arraySliceCount;
-		// TextureAspectMask aspectMask;
+		// TextureAspects aspects;
 	};
+
+	enum class BarrierSync : uint16
+	{
+		None = 0,
+		Copy									= 0x0001,
+		ComputeShading							= 0x0002,
+		GraphicsGeometryShading					= 0x0004,
+		GraphicsPixelShading					= 0x0008,
+		GraphicsRenderTarget					= 0x0010,
+		GraphicsDepthStencil					= 0x0020,
+		RaytracingAccelerationStructureBuild	= 0x0040,
+		RaytracingAccelerationStructureCopy		= 0x0080,
+		// Resolve,
+		// ExecuteIndirect,
+		// Predication,
+
+		AllShading = ComputeShading | GraphicsGeometryShading | GraphicsPixelShading,
+		AllGraphics = GraphicsGeometryShading | GraphicsPixelShading | GraphicsRenderTarget | GraphicsDepthStencil,
+		All = Copy | ComputeShading | AllGraphics | RaytracingAccelerationStructureBuild | RaytracingAccelerationStructureCopy,
+	};
+
+	XDefineUnumFlagOperators(BarrierSync, uint16)
+
+	enum class BarrierAccess : uint16
+	{
+		None = 0,
+		Any										= 0x0001, // exclusive flag. TODO: Excludes raytracing for D3D12.
+		CopySource								= 0x0002,
+		CopyDest								= 0x0004,
+		GeometryInput							= 0x0008,
+		ConstantBuffer							= 0x0010,
+		ShaderRead								= 0x0020,
+		ShaderReadWrite							= 0x0040,
+		RenderTarget							= 0x0080,
+		DepthStencilRead						= 0x0100,
+		DepthStencilReadWrite					= 0x0200,
+		RaytracingAccelerationStructureRead		= 0x0400,
+		RaytracingAccelerationStructureWrite	= 0x0800,
+		// Resolve,
+		// IndirectAndirect,
+		// Predication,
+	};
+
+	XDefineUnumFlagOperators(BarrierAccess, uint16)
 
 	enum class TextureLayout : uint8
 	{
 		Undefined = 0,
-		AnyAccess,
 		Present,
 		CopySource,
 		CopyDest,
-		ShaderReadOnly,
+		ShaderReadAndCopySource,
+		ShaderReadAndCopySourceDest,
+		ShaderRead,
 		ShaderReadWrite,
 		RenderTarget,
-		DepthStencilReadOnly,
+		DepthStencilRead,
 		DepthStencilReadWrite,
-	};
-
-	struct BarrierSyncMask
-	{
-		bool all : 1;
-		bool copy : 1;
-		bool allShading : 1;
-		bool computeShading : 1;
-		bool graphicsAll : 1;
-		bool graphicsGeometryInput : 1;
-		bool graphicsGeometryShading : 1;
-		bool graphicsPixelShading : 1;
-		bool graphicsRenderTarget : 1;
-		bool graphicsDepthStencil : 1;
-	};
-
-	struct BarrierAccessMask
-	{
-		bool copySource : 1;
-		bool copyDest : 1;
-		bool vertexBufer : 1;
-		bool indexBuffer : 1;
-		bool constantBuffer : 1;
-		bool shaderReadOnly : 1;
-		bool shaderReadWrite : 1;
-		bool renderTarget : 1;
-		bool depthStencilReadOnly : 1;
-		bool depthStencilReadWrite : 1;
 	};
 
 	enum class CopyBufferTextureDirection : uint8
@@ -336,11 +360,11 @@ namespace XEngine::Render::HAL
 		void dispatch(uint32 groupCountX, uint32 groupCountY = 1, uint32 groupCountZ = 1);
 
 		void bufferMemoryBarrier(ResourceHandle bufferHandle,
-			BarrierSyncMask syncBefore, BarrierSyncMask syncAfter,
-			BarrierAccessMask accessBefore, BarrierAccessMask accessAfter);
+			BarrierSync syncBefore, BarrierSync syncAfter,
+			BarrierAccess accessBefore, BarrierAccess accessAfter);
 		void textureMemoryBarrier(ResourceHandle textureHandle,
-			BarrierSyncMask syncBefore, BarrierSyncMask syncAfter,
-			BarrierAccessMask accessBefore, BarrierAccessMask accessAfter,
+			BarrierSync syncBefore, BarrierSync syncAfter,
+			BarrierAccess accessBefore, BarrierAccess accessAfter,
 			TextureLayout layoutBefore, TextureLayout layoutAfter,
 			const TextureSubresourceRange* subresourceRange = nullptr);
 		//void globalMemoryBarrier();
