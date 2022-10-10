@@ -59,7 +59,7 @@ void Builder::run(const char* packPath)
 	sourceCache.initialize("../XEngine.Render.Shaders/");
 
 	BuildDescriptionLoader descriptionLoader(pipelineLayoutList, pipelineList, shaderList, sourceCache);
-	if (!descriptionLoader.load("../XEngine.Render.Shaders/_BuildDescription.txt"))
+	if (!descriptionLoader.load("../XEngine.Render.Shaders/.LibraryIndex.txt"))
 		return;
 
 #if 0

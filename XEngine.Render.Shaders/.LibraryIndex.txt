@@ -6,7 +6,8 @@ PipelineLayout TestLayout
 GraphicsPipeline TestGfxPipeline
 {
 	SetLayout(TestLayout);
-	SetVS("test.hlsl", "TestVSMain");
+	SetVS("TestGraphics.hlsl", "MainVS");
+	SetPS("TestGraphics.hlsl", "MainPS");
 	SetRT(0, R8G8B8BA8_Unorm);
 	//SetDepthRT(D32S8);
 }
@@ -14,7 +15,7 @@ GraphicsPipeline TestGfxPipeline
 ComputePipeline TestComputePipeline
 {
 	SetLayout(TestLayout);
-	SetCS("test.hlsl", "TestCSMain");
+	SetCS("TestCompute.hlsl", "MainCS");
 }
 
 /*
