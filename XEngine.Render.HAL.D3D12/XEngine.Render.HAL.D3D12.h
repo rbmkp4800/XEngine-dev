@@ -103,7 +103,7 @@ namespace XEngine::Render::HAL
 		// AllowRaytracingAccelerationStructure
 	};
 
-	XDefineUnumFlagOperators(BufferFlags, uint8)
+	XDefineEnumFlagOperators(BufferFlags, uint8)
 
 	enum class TextureFlags : uint8
 	{
@@ -113,7 +113,7 @@ namespace XEngine::Render::HAL
 		AllowShaderWrite	= 0x04,
 	};
 
-	XDefineUnumFlagOperators(TextureFlags, uint8)
+	XDefineEnumFlagOperators(TextureFlags, uint8)
 
 	enum class ResourceViewType : uint8
 	{
@@ -190,20 +190,19 @@ namespace XEngine::Render::HAL
 		RaytracingAccelerationStructureBuild	= 0x0040,
 		RaytracingAccelerationStructureCopy		= 0x0080,
 		// Resolve,
-		// ExecuteIndirect,
-		// Predication,
+		// IndirectArgument,
 
 		AllShading = ComputeShading | GraphicsGeometryShading | GraphicsPixelShading,
 		AllGraphics = GraphicsGeometryShading | GraphicsPixelShading | GraphicsRenderTarget | GraphicsDepthStencil,
 		All = Copy | ComputeShading | AllGraphics | RaytracingAccelerationStructureBuild | RaytracingAccelerationStructureCopy,
 	};
 
-	XDefineUnumFlagOperators(BarrierSync, uint16)
+	XDefineEnumFlagOperators(BarrierSync, uint16)
 
 	enum class BarrierAccess : uint16
 	{
 		None = 0,
-		Any										= 0x0001, // exclusive flag. TODO: Excludes raytracing for D3D12.
+		Any										= 0x0001, // This flag can't be combined with others.
 		CopySource								= 0x0002,
 		CopyDest								= 0x0004,
 		GeometryInput							= 0x0008,
@@ -213,14 +212,13 @@ namespace XEngine::Render::HAL
 		RenderTarget							= 0x0080,
 		DepthStencilRead						= 0x0100,
 		DepthStencilReadWrite					= 0x0200,
-		RaytracingAccelerationStructureRead		= 0x0400,
+		RaytracingAccelerationStructureRead		= 0x0400, // RTAS accesses are exclusive for RT-enabled buffers (for now).
 		RaytracingAccelerationStructureWrite	= 0x0800,
 		// Resolve,
-		// IndirectAndirect,
-		// Predication,
+		// IndirectArgument,
 	};
 
-	XDefineUnumFlagOperators(BarrierAccess, uint16)
+	XDefineEnumFlagOperators(BarrierAccess, uint16)
 
 	enum class TextureLayout : uint8
 	{
@@ -375,6 +373,8 @@ namespace XEngine::Render::HAL
 		void copyBufferTexture(CopyBufferTextureDirection direction,
 			ResourceHandle bufferHandle, uint64 bufferOffset, uint32 bufferRowPitch,
 			ResourceHandle textureHandle, TextureSubresource textureSubresource, const TextureRegion* textureRegion = nullptr);
+
+		void initializeTextureMetadata(ResourceHandle textureHandle, const TextureSubresourceRange* subresourceRange = nullptr);
 	};
 
 	class Device : public XLib::NonCopyable

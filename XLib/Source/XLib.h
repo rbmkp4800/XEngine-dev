@@ -230,3 +230,13 @@ namespace XLib
 
 #define XAssert(expression) do { if (!(expression)) { XLib::Debug::Fail("Assertion failed: `" #expression "`\n"); } } while (false)
 #define XAssertUnreachableCode() { XLib::Debug::Fail("Assertion failed: unreachable code reached\n"); }
+
+
+#define XDefineEnumFlagOperators(T, IntT) \
+	inline constexpr T operator & (T a, T b) { return T(IntT(a) & IntT(b)); }	\
+	inline constexpr T operator | (T a, T b) { return T(IntT(a) | IntT(b)); }	\
+	inline constexpr T operator ^ (T a, T b) { return T(IntT(a) ^ IntT(b)); }	\
+	inline constexpr T& operator &= (T &a, T b) { ((IntT&)a) &= IntT(b); return a; }	\
+	inline constexpr T& operator |= (T &a, T b) { ((IntT&)a) |= IntT(b); return a; }	\
+	inline constexpr T& operator ^= (T &a, T b) { ((IntT&)a) ^= IntT(b); return a; }	\
+	inline constexpr T operator ~ (T a) { return T(~IntT(a)); }

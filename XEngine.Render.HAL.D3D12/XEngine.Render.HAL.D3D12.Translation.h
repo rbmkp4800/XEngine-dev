@@ -81,27 +81,7 @@ namespace XEngine::Render::HAL
 		return D3D12_HEAP_TYPE_DEFAULT;
 	}
 
-	inline D3D12_BARRIER_LAYOUT TranslateTextureLayoutToD3D12BarrierLayout(TextureLayout textureLayout)
-	{
-		switch (textureLayout)
-		{
-			case TextureLayout::Present:					return D3D12_BARRIER_LAYOUT_PRESENT;
-			case TextureLayout::CopySource:					return D3D12_BARRIER_LAYOUT_COPY_SOURCE;
-			case TextureLayout::CopyDest:					return D3D12_BARRIER_LAYOUT_COPY_DEST;
-			case TextureLayout::ShaderReadAndCopySource:	return D3D12_BARRIER_LAYOUT_GENERIC_READ;
-			case TextureLayout::ShaderReadAndCopySourceDest:return D3D12_BARRIER_LAYOUT_COMMON;
-			case TextureLayout::ShaderRead:					return D3D12_BARRIER_LAYOUT_SHADER_RESOURCE;
-			case TextureLayout::ShaderReadWrite:			return D3D12_BARRIER_LAYOUT_UNORDERED_ACCESS;
-			case TextureLayout::RenderTarget:				return D3D12_BARRIER_LAYOUT_RENDER_TARGET;
-			case TextureLayout::DepthStencilRead:			return D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_READ;
-			case TextureLayout::DepthStencilReadWrite:		return D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE;
-		}
-
-		// TODO: Maybe we want to use `D3D12_BARRIER_LAYOUT_DIRECT_QUEUE_*` and `D3D12_BARRIER_LAYOUT_COMPUTE_QUEUE_*` ?
-
-		XEMasterAssertUnreachableCode();
-		return D3D12_BARRIER_LAYOUT_UNDEFINED;
-	}
+#if USE_ENHANCED_BARRIERS
 
 	inline D3D12_BARRIER_SYNC TranslateBarrierSyncToD3D12BarrierSync(BarrierSync sync)
 	{
@@ -176,6 +156,85 @@ namespace XEngine::Render::HAL
 
 		return d3dBarrierAccess;
 	}
+
+	inline D3D12_BARRIER_LAYOUT TranslateTextureLayoutToD3D12BarrierLayout(TextureLayout textureLayout)
+	{
+		switch (textureLayout)
+		{
+			case TextureLayout::Undefined:					return D3D12_BARRIER_LAYOUT_UNDEFINED;
+			case TextureLayout::Present:					return D3D12_BARRIER_LAYOUT_PRESENT;
+			case TextureLayout::CopySource:					return D3D12_BARRIER_LAYOUT_COPY_SOURCE;
+			case TextureLayout::CopyDest:					return D3D12_BARRIER_LAYOUT_COPY_DEST;
+			case TextureLayout::ShaderReadAndCopySource:	return D3D12_BARRIER_LAYOUT_GENERIC_READ;
+			case TextureLayout::ShaderReadAndCopySourceDest:return D3D12_BARRIER_LAYOUT_COMMON;
+			case TextureLayout::ShaderRead:					return D3D12_BARRIER_LAYOUT_SHADER_RESOURCE;
+			case TextureLayout::ShaderReadWrite:			return D3D12_BARRIER_LAYOUT_UNORDERED_ACCESS;
+			case TextureLayout::RenderTarget:				return D3D12_BARRIER_LAYOUT_RENDER_TARGET;
+			case TextureLayout::DepthStencilRead:			return D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_READ;
+			case TextureLayout::DepthStencilReadWrite:		return D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE;
+		}
+
+		// TODO: Maybe we want to use `D3D12_BARRIER_LAYOUT_DIRECT_QUEUE_*` and `D3D12_BARRIER_LAYOUT_COMPUTE_QUEUE_*` ?
+
+		XEMasterAssertUnreachableCode();
+		return D3D12_BARRIER_LAYOUT_UNDEFINED;
+	}
+
+#else
+
+	inline D3D12_RESOURCE_STATES TranslateBarrierAccessToD3D12ResourceStates(BarrierAccess access)
+	{
+		if (access == BarrierAccess::Any)
+			return D3D12_RESOURCE_STATE_COMMON;
+
+		D3D12_RESOURCE_STATES d3dResourceStates = D3D12_RESOURCE_STATES(0);
+
+		// Read accesses.
+		if ((access & BarrierAccess::CopySource) != BarrierAccess(0))
+			d3dResourceStates |= D3D12_RESOURCE_STATE_COPY_SOURCE;
+		if ((access & BarrierAccess::GeometryInput) != BarrierAccess(0))
+			d3dResourceStates |= D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER | D3D12_RESOURCE_STATE_INDEX_BUFFER;
+		if ((access & BarrierAccess::ConstantBuffer) != BarrierAccess(0))
+			d3dResourceStates |= D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+		if ((access & BarrierAccess::ShaderRead) != BarrierAccess(0))
+			d3dResourceStates |= D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+		if ((access & BarrierAccess::DepthStencilRead) != BarrierAccess(0))
+			d3dResourceStates |= D3D12_RESOURCE_STATE_DEPTH_READ;
+
+		// Write accesses.
+		// NOTE: We enforce one-writer-at-a-time policy for legacy barriers.
+		uint32 writeAccessCount = 0;
+		if ((access & BarrierAccess::CopyDest) != BarrierAccess(0))
+		{
+			d3dResourceStates |= D3D12_RESOURCE_STATE_COPY_DEST;
+			writeAccessCount++;
+		}
+		if ((access & BarrierAccess::ShaderReadWrite) != BarrierAccess(0))
+		{
+			d3dResourceStates |= D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+			writeAccessCount++;
+		}
+		if ((access & BarrierAccess::RenderTarget) != BarrierAccess(0))
+		{
+			d3dResourceStates |= D3D12_RESOURCE_STATE_RENDER_TARGET;
+			writeAccessCount++;
+		}
+		if ((access & BarrierAccess::DepthStencilReadWrite) != BarrierAccess(0))
+		{
+			d3dResourceStates |= D3D12_RESOURCE_STATE_DEPTH_WRITE;
+			writeAccessCount++;
+		}
+		XEAssert(writeAccessCount <= 1);
+
+		if ((access & BarrierAccess::RaytracingAccelerationStructureRead) != BarrierAccess(0))
+			XEAssertUnreachableCode(); // Not implemented.
+		if ((access & BarrierAccess::RaytracingAccelerationStructureWrite) != BarrierAccess(0))
+			XEAssertUnreachableCode(); // Not implemented.
+
+		return d3dResourceStates;
+	}
+
+#endif
 
 	inline D3D12_BOX D3D12BoxFromOffsetAndSize(uint16x3 offset, uint16x3 size)
 	{

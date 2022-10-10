@@ -1,3 +1,5 @@
+#define USE_ENHANCED_BARRIERS 0
+
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include "D3D12Helpers.h"
@@ -37,44 +39,67 @@ static inline bool ValidateGenericObjectHeader(const ObjectFormat::GenericObject
 
 namespace // Barriers validation
 {
-	inline bool ValidateBarrierAccess(BarrierAccess access)
+	inline bool ValidateBarrierAccess(BarrierAccess access, ResourceType resourceType)
 	{
-		//const bool hasAnyAccessSet = (access & BarrierAccess::Any) != BarrierAccess(0);
-		//if (!imply(hasAnyAccessSet, access == BarrierAccess::Any))
-		//	return false; seems not needed...
-		// TODO: Maybe check that we have no more then one write access?
-		return true;
+		// Check if `BarrierAccess::Any` is exclusive.
+		if ((access & BarrierAccess::Any) != BarrierAccess(0))
+			return access == BarrierAccess::Any;
+
+		// TODO: Decide if we need to check one-writer-at-a-time policy
+
+		constexpr BarrierAccess bufferCompatibleAccess =
+			BarrierAccess::CopySource | BarrierAccess::CopyDest |
+			BarrierAccess::GeometryInput | BarrierAccess::ConstantBuffer |
+			BarrierAccess::ShaderRead | BarrierAccess::ShaderReadWrite;
+
+		constexpr BarrierAccess textureCompatibleAccess =
+			BarrierAccess::CopySource | BarrierAccess::CopyDest |
+			BarrierAccess::ShaderRead | BarrierAccess::ShaderReadWrite |
+			BarrierAccess::RenderTarget |
+			BarrierAccess::DepthStencilRead | BarrierAccess::DepthStencilReadWrite;
+
+		const BarrierAccess compatibleAccess =
+			resourceType == ResourceType::Buffer ? bufferCompatibleAccess : textureCompatibleAccess;
+
+		return (access & ~compatibleAccess) == BarrierAccess(0);
 	}
 
 	inline bool ValidateBarrierAccessAndTextureLayoutCompatibility(BarrierAccess access, TextureLayout layout)
 	{
-		access = access & ~BarrierAccess::Any;
+		// Layout can be `Undefined` if access is `None`.
+		const bool isAccessNone = (access == BarrierAccess::None);
+		const bool isLayoutUndefined = (layout == TextureLayout::Undefined);
+		if (isAccessNone || isLayoutUndefined)
+			return isAccessNone;
 
-		BarrierAccess compatibeAccess = BarrierAccess::None;
+		BarrierAccess compatibleAccess = BarrierAccess::None;
 		switch (layout)
 		{
-			case TextureLayout::Present:						compatibeAccess = BarrierAccess::CopySource | BarrierAccess::ShaderRead; break;
-			case TextureLayout::CopySource:						compatibeAccess = BarrierAccess::CopySource; break;
-			case TextureLayout::CopyDest:						compatibeAccess = BarrierAccess::CopyDest; break;
-			case TextureLayout::ShaderReadAndCopySource:		compatibeAccess = BarrierAccess::ShaderRead | BarrierAccess::CopySource; break;
-			case TextureLayout::ShaderReadAndCopySourceDest:	compatibeAccess = BarrierAccess::ShaderRead | BarrierAccess::CopySource | BarrierAccess::CopyDest; break;
-			case TextureLayout::ShaderRead:						compatibeAccess = BarrierAccess::ShaderRead; break;
-			case TextureLayout::ShaderReadWrite:				compatibeAccess = BarrierAccess::ShaderReadWrite; break;
-			case TextureLayout::RenderTarget:					compatibeAccess = BarrierAccess::RenderTarget; break;
-			case TextureLayout::DepthStencilRead:				compatibeAccess = BarrierAccess::DepthStencilRead; break;
-			case TextureLayout::DepthStencilReadWrite:			compatibeAccess = BarrierAccess::DepthStencilReadWrite; break;
+			case TextureLayout::Present:						compatibleAccess = BarrierAccess::CopySource | BarrierAccess::ShaderRead; break;
+			case TextureLayout::CopySource:						compatibleAccess = BarrierAccess::CopySource; break;
+			case TextureLayout::CopyDest:						compatibleAccess = BarrierAccess::CopyDest; break;
+			case TextureLayout::ShaderReadAndCopySource:		compatibleAccess = BarrierAccess::ShaderRead | BarrierAccess::CopySource; break;
+			case TextureLayout::ShaderReadAndCopySourceDest:	compatibleAccess = BarrierAccess::ShaderRead | BarrierAccess::CopySource | BarrierAccess::CopyDest; break;
+			case TextureLayout::ShaderRead:						compatibleAccess = BarrierAccess::ShaderRead; break;
+			case TextureLayout::ShaderReadWrite:				compatibleAccess = BarrierAccess::ShaderReadWrite; break;
+			case TextureLayout::RenderTarget:					compatibleAccess = BarrierAccess::RenderTarget; break;
+			case TextureLayout::DepthStencilRead:				compatibleAccess = BarrierAccess::DepthStencilRead; break;
+			case TextureLayout::DepthStencilReadWrite:			compatibleAccess = BarrierAccess::DepthStencilReadWrite; break;
 			default:
 				return false;
 		}
 
 		// There should be no incompatible access.
-		return (access & ~compatibeAccess) == BarrierAccess(0);
+		return (access & ~compatibleAccess) == BarrierAccess(0);
 	}
 
 	inline bool ValidateBarrierSyncAndAccessCompatibility(BarrierSync sync, BarrierAccess access)
 	{
-		if (sync == BarrierSync::None)
-			return (access == BarrierAccess::None);
+		// Sync can be `None` if and only if access is `None`.
+		const bool isSyncNone = (sync == BarrierSync::None);
+		const bool isAccessNone = (access == BarrierAccess::None);
+		if (isSyncNone || isAccessNone)
+			return isSyncNone && isAccessNone;
 
 		auto has = [](BarrierAccess a, BarrierAccess b) -> bool { return (a & b) != BarrierAccess(0); };
 
@@ -97,6 +122,56 @@ namespace // Barriers validation
 		return (sync & compatibleSync) != BarrierSync(0);
 	}
 }
+
+#if !USE_ENHANCED_BARRIERS
+
+namespace // Legacy barriers utils
+{
+	void ApplyLegacyD3D12Barrier(ID3D12GraphicsCommandList* d3dCommandList,
+		ID3D12Resource* d3dResource, UINT subresourceIndex,
+		BarrierAccess accessBefore, BarrierAccess accessAfter,
+		TextureLayout layoutBefore = TextureLayout::Undefined, TextureLayout layoutAfter = TextureLayout::Undefined)
+	{
+		const bool isLayoutBeforeUndefined = (layoutBefore == TextureLayout::Undefined);
+		const bool isLayoutAfterUndefined = (layoutAfter == TextureLayout::Undefined);
+
+		if (isLayoutBeforeUndefined || isLayoutAfterUndefined)
+		{
+			// Resource aliasing barrier.
+			D3D12_RESOURCE_BARRIER d3dResourceBarrier = {};
+			d3dResourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
+			d3dResourceBarrier.Aliasing.pResourceBefore = isLayoutBeforeUndefined ? nullptr : d3dResource;
+			d3dResourceBarrier.Aliasing.pResourceAfter = isLayoutAfterUndefined ? nullptr : d3dResource;
+			d3dCommandList->ResourceBarrier(1, &d3dResourceBarrier);
+		}
+
+		{
+			// Resource transition barrier.
+			D3D12_RESOURCE_BARRIER d3dResourceBarrier = {};
+			d3dResourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+			d3dResourceBarrier.Transition.pResource = d3dResource;
+			d3dResourceBarrier.Transition.Subresource = subresourceIndex;
+			d3dResourceBarrier.Transition.StateBefore = TranslateBarrierAccessToD3D12ResourceStates(accessBefore);
+			d3dResourceBarrier.Transition.StateAfter = TranslateBarrierAccessToD3D12ResourceStates(accessAfter);
+			d3dCommandList->ResourceBarrier(1, &d3dResourceBarrier);
+		}
+
+		constexpr BarrierAccess uavBarrierAccessMask = BarrierAccess::ShaderReadWrite |
+			BarrierAccess::RaytracingAccelerationStructureRead | BarrierAccess::RaytracingAccelerationStructureWrite;
+
+		if ((accessBefore & uavBarrierAccessMask) != BarrierAccess(0) &&
+			(accessAfter & uavBarrierAccessMask) != BarrierAccess(0))
+		{
+			// Resource UAV barrier.
+			D3D12_RESOURCE_BARRIER d3dResourceBarrier = {};
+			d3dResourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+			d3dResourceBarrier.UAV.pResource = d3dResource;
+			d3dCommandList->ResourceBarrier(1, &d3dResourceBarrier);
+		}
+	}
+}
+
+#endif
 
 namespace // Device queue sync points
 {
@@ -485,13 +560,16 @@ void CommandList::bufferMemoryBarrier(ResourceHandle bufferHandle,
 {
 	XEAssert(state == State::Recording);
 
-	XEAssert(ValidateBarrierAccess(accessBefore));
-	XEAssert(ValidateBarrierAccess(accessAfter));
+	XEAssert(accessBefore != BarrierAccess::None || accessAfter != BarrierAccess::None);
+	XEAssert(ValidateBarrierAccess(accessBefore, ResourceType::Buffer));
+	XEAssert(ValidateBarrierAccess(accessAfter, ResourceType::Buffer));
 	XEAssert(ValidateBarrierSyncAndAccessCompatibility(syncBefore, accessBefore));
 	XEAssert(ValidateBarrierSyncAndAccessCompatibility(syncAfter, accessAfter));
 
 	const Device::Resource& buffer = device->getResourceByHandle(bufferHandle);
 	XEAssert(buffer.type == ResourceType::Buffer && buffer.d3dResource);
+
+#if USE_ENHANCED_BARRIERS
 
 	D3D12_BUFFER_BARRIER d3dBufferBarrier = {};
 	d3dBufferBarrier.SyncBefore = TranslateBarrierSyncToD3D12BarrierSync(syncBefore);
@@ -508,6 +586,13 @@ void CommandList::bufferMemoryBarrier(ResourceHandle bufferHandle,
 	d3dBarrierGroup.pBufferBarriers = &d3dBufferBarrier;
 
 	d3dCommandList->Barrier(1, &d3dBarrierGroup);
+
+#else
+
+	ApplyLegacyD3D12Barrier(d3dCommandList,
+		buffer.d3dResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, accessBefore, accessAfter);
+
+#endif
 }
 
 void CommandList::textureMemoryBarrier(ResourceHandle textureHandle,
@@ -518,8 +603,9 @@ void CommandList::textureMemoryBarrier(ResourceHandle textureHandle,
 {
 	XEAssert(state == State::Recording);
 
-	XEAssert(ValidateBarrierAccess(accessBefore));
-	XEAssert(ValidateBarrierAccess(accessAfter));
+	XEAssert(accessBefore != BarrierAccess::None || accessAfter != BarrierAccess::None);
+	XEAssert(ValidateBarrierAccess(accessBefore, ResourceType::Texture));
+	XEAssert(ValidateBarrierAccess(accessAfter, ResourceType::Texture));
 	XEAssert(ValidateBarrierSyncAndAccessCompatibility(syncBefore, accessBefore));
 	XEAssert(ValidateBarrierSyncAndAccessCompatibility(syncAfter, accessAfter));
 	XEAssert(ValidateBarrierAccessAndTextureLayoutCompatibility(accessBefore, layoutBefore));
@@ -527,6 +613,8 @@ void CommandList::textureMemoryBarrier(ResourceHandle textureHandle,
 
 	const Device::Resource& texture = device->getResourceByHandle(textureHandle);
 	XEAssert(texture.type == ResourceType::Texture && texture.d3dResource);
+
+#if USE_ENHANCED_BARRIERS
 
 	D3D12_TEXTURE_BARRIER d3dTextureBarrier = {};
 	d3dTextureBarrier.SyncBefore = TranslateBarrierSyncToD3D12BarrierSync(syncBefore);
@@ -569,6 +657,16 @@ void CommandList::textureMemoryBarrier(ResourceHandle textureHandle,
 	d3dBarrierGroup.pTextureBarriers = &d3dTextureBarrier;
 
 	d3dCommandList->Barrier(1, &d3dBarrierGroup);
+
+#else
+
+	XEAssert(!subresourceRange); // Not implemented.
+
+	ApplyLegacyD3D12Barrier(d3dCommandList,
+		texture.d3dResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+		accessBefore, accessAfter, layoutBefore, layoutAfter);
+
+#endif
 }
 
 void CommandList::copyBuffer(ResourceHandle dstBufferHandle, uint64 dstOffset,
@@ -816,9 +914,16 @@ ResourceHandle Device::createBuffer(uint64 size, BufferFlags flags,
 
 	// TODO: Check that resource fits into memory block.
 	// TODO: Check alignment.
+
+#if USE_ENHANCED_BARRIERS
 	d3dDevice->CreatePlacedResource2(memoryBlock.d3dHeap, memoryBlockOffset,
 		&d3dResourceDesc, D3D12_BARRIER_LAYOUT_UNDEFINED, nullptr, 0, nullptr,
 		IID_PPV_ARGS(&resource.d3dResource));
+#else
+	d3dDevice->CreatePlacedResource1(memoryBlock.d3dHeap, memoryBlockOffset,
+		&d3dResourceDesc, D3D12_RESOURCE_STATE_COMMON, nullptr,
+		IID_PPV_ARGS(&resource.d3dResource));
+#endif
 
 	return composeResourceHandle(resourceIndex);
 }
@@ -859,9 +964,16 @@ ResourceHandle Device::createTexture(TextureDimension dimension, uint16x3 size,
 	// TODO: Check that resource fits into memory block.
 	// TODO: Check alignment.
 	// TODO: Handle initial layout properly.
+
+#if USE_ENHANCED_BARRIERS
 	d3dDevice->CreatePlacedResource2(memoryBlock.d3dHeap, memoryBlockOffset,
 		&d3dResourceDesc, D3D12_BARRIER_LAYOUT_COMMON, nullptr, 0, nullptr,
 		IID_PPV_ARGS(&resource.d3dResource));
+#else
+	d3dDevice->CreatePlacedResource1(memoryBlock.d3dHeap, memoryBlockOffset,
+		&d3dResourceDesc, D3D12_RESOURCE_STATE_COMMON, nullptr,
+		IID_PPV_ARGS(&resource.d3dResource));
+#endif
 
 	return composeResourceHandle(resourceIndex);
 }
