@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.31019.35
+# Visual Studio Version 17
+VisualStudioVersion = 17.2.32616.157
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XLib", "XLib\XLib.vcxproj", "{DF81A513-72E3-4B74-B866-97F3BB61D45F}"
 EndProject
@@ -14,8 +14,6 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.Shaders", "XEngine.Render.Shaders\XEngine.Render.Shaders.vcxproj", "{E6AF7FDC-1839-4501-96B6-389AB9CAFDDB}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.Shaders.Builder", "XEngine.Render.Shaders.Builder\XEngine.Render.Shaders.Builder.vcxproj", "{981D9FCB-69BD-47D9-8033-15F5B4621A85}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Base", "XEngine.Base\XEngine.Base.vcxproj", "{276891E4-C661-4502-B581-781EFB8098D6}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.MaterialShaderCompiler", "XEngine.Render.MaterialShaderCompiler\XEngine.Render.MaterialShaderCompiler.vcxproj", "{6664E1B3-7DCD-4210-9D6C-F4D218AED043}"
 EndProject
@@ -34,6 +32,8 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.Shaders.PackFormat", "XEngine.Render.Shaders.PackFormat\XEngine.Render.Shaders.PackFormat.vcxproj", "{E41C3648-B10A-4C33-A052-D98F8ED51AB0}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XUI", "XUI\XUI.vcxproj", "{41B7A650-F2DA-4859-94E6-008619E2D88B}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Common", "XEngine.Common\XEngine.Common.vcxproj", "{276891E4-C661-4502-B581-781EFB8098D6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -65,10 +65,6 @@ Global
 		{981D9FCB-69BD-47D9-8033-15F5B4621A85}.Debug|x64.Build.0 = Debug|x64
 		{981D9FCB-69BD-47D9-8033-15F5B4621A85}.Release|x64.ActiveCfg = Release|x64
 		{981D9FCB-69BD-47D9-8033-15F5B4621A85}.Release|x64.Build.0 = Release|x64
-		{276891E4-C661-4502-B581-781EFB8098D6}.Debug|x64.ActiveCfg = Debug|x64
-		{276891E4-C661-4502-B581-781EFB8098D6}.Debug|x64.Build.0 = Debug|x64
-		{276891E4-C661-4502-B581-781EFB8098D6}.Release|x64.ActiveCfg = Release|x64
-		{276891E4-C661-4502-B581-781EFB8098D6}.Release|x64.Build.0 = Release|x64
 		{6664E1B3-7DCD-4210-9D6C-F4D218AED043}.Debug|x64.ActiveCfg = Debug|x64
 		{6664E1B3-7DCD-4210-9D6C-F4D218AED043}.Debug|x64.Build.0 = Debug|x64
 		{6664E1B3-7DCD-4210-9D6C-F4D218AED043}.Release|x64.ActiveCfg = Release|x64
@@ -105,6 +101,10 @@ Global
 		{41B7A650-F2DA-4859-94E6-008619E2D88B}.Debug|x64.Build.0 = Debug|x64
 		{41B7A650-F2DA-4859-94E6-008619E2D88B}.Release|x64.ActiveCfg = Release|x64
 		{41B7A650-F2DA-4859-94E6-008619E2D88B}.Release|x64.Build.0 = Release|x64
+		{276891E4-C661-4502-B581-781EFB8098D6}.Debug|x64.ActiveCfg = Debug|x64
+		{276891E4-C661-4502-B581-781EFB8098D6}.Debug|x64.Build.0 = Debug|x64
+		{276891E4-C661-4502-B581-781EFB8098D6}.Release|x64.ActiveCfg = Release|x64
+		{276891E4-C661-4502-B581-781EFB8098D6}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
