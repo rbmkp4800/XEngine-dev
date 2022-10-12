@@ -51,10 +51,12 @@ namespace XEngine
 		{
 			uint64 crc = initialValue;
 
-			const char* current = (const char*)string;
-			const char* end = current + lengthLimit;
-			for (; current < end && *current != '\0'; current++)
-				crc = (crc >> 8) ^ CRC64Table[uint8(crc) ^ uint8(*current)];
+			for (uintptr i = 0; i < lengthLimit; i++)
+			{
+				if (!string[i])
+					break;
+				crc = (crc >> 8) ^ CRC64Table[uint8(crc) ^ uint8(string[i])];
+			}
 
 			return crc;
 		}
