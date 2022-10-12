@@ -234,6 +234,9 @@ namespace XLib
 	{
 		XAssert(direction == 0 || direction == 1);
 
+		if (rootNode == ZeroNodeRef)
+			return ZeroNodeRef;
+
 		NodeRef currentNode = rootNode;
 		for (;;)
 		{
