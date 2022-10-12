@@ -35,6 +35,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XUI", "XUI\XUI.vcxproj", "{
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Common", "XEngine.Common\XEngine.Common.vcxproj", "{276891E4-C661-4502-B581-781EFB8098D6}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.XStringHash", "XEngine.XStringHash\XEngine.XStringHash.vcxproj", "{CA640875-7C04-42BA-B081-8DAC82C9F48D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -105,6 +107,10 @@ Global
 		{276891E4-C661-4502-B581-781EFB8098D6}.Debug|x64.Build.0 = Debug|x64
 		{276891E4-C661-4502-B581-781EFB8098D6}.Release|x64.ActiveCfg = Release|x64
 		{276891E4-C661-4502-B581-781EFB8098D6}.Release|x64.Build.0 = Release|x64
+		{CA640875-7C04-42BA-B081-8DAC82C9F48D}.Debug|x64.ActiveCfg = Debug|x64
+		{CA640875-7C04-42BA-B081-8DAC82C9F48D}.Debug|x64.Build.0 = Debug|x64
+		{CA640875-7C04-42BA-B081-8DAC82C9F48D}.Release|x64.ActiveCfg = Release|x64
+		{CA640875-7C04-42BA-B081-8DAC82C9F48D}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

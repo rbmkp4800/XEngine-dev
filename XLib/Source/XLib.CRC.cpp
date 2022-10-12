@@ -179,7 +179,7 @@ uint32 CRC32::Compute(const void* data, uintptr size, uint32 seed)
 	const uint8* current = (const uint8*)data;
 	const uint8* end = current + size;
 	for (; current < end; current++)
-		crc = (crc >> 8) ^ CRC32Table[uint8(crc ^ *current)];
+		crc = (crc >> 8) ^ CRC32Table[uint8(crc) ^ *current];
 
 	return crc ^ 0xFFFF'FFFF;
 }
@@ -191,7 +191,7 @@ uint64 CRC64::Compute(const void* data, uintptr size, uint64 seed)
 	const uint8* current = (const uint8*)data;
 	const uint8* end = current + size;
 	for (; current < end; current++)
-		crc = (crc >> 8) ^ CRC64Table[uint8(crc ^ *current)];
+		crc = (crc >> 8) ^ CRC64Table[uint8(crc) ^ *current];
 
 	return crc ^ 0xFFFF'FFFF'FFFF'FFFF;
 }
