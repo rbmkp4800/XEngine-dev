@@ -11,6 +11,7 @@
 #include <XLib.Text.h>
 
 #include <XEngine.Render.HAL.ObjectFormat.h>
+#include <XEngine.XStringHash.h>
 
 #include "XEngine.Render.HAL.ShaderCompiler.h"
 
@@ -34,12 +35,9 @@ static inline PipelineBytecodeObjectType TranslateShaderTypeToPipelineBytecodeOb
 	return PipelineBytecodeObjectType::Undefined;
 }
 
-static inline ObjectHash CalculateObjectHash(const void* data, uint32 size)
+static inline ObjectLongHash ComputeObjectLongHash(const void* data, uint32 size)
 {
-	ObjectHash result = {};
-	result.a = CRC64::Compute(data, size, 0xD2D6'86F0'85FF'DA5Dull);
-	result.b = CRC64::Compute(data, size, 0x632F'54B8'E9F8'FC2Dull);
-	return result;
+	return ObjectLongHash(CRC64::Compute(data, size));
 }
 
 void Object::fillGenericHeaderAndFinalize(uint64 signature)
@@ -52,12 +50,12 @@ void Object::fillGenericHeaderAndFinalize(uint64 signature)
 	GenericObjectHeader& header = *(GenericObjectHeader*)data;
 	header.signature = signature;
 	header.objectSize = block->dataSize;
-	header.objectCRC = 0;
+	header.objectCRC32 = 0;
 
 	const uint32 crc = CRC32::Compute(data, block->dataSize);
-	header.objectCRC = crc;
+	header.objectCRC32 = crc;
 
-	block->hash = CalculateObjectHash(block + 1, block->dataSize);
+	block->longHash = ComputeObjectLongHash(block + 1, block->dataSize);
 	block->finalized = true;
 }
 
@@ -76,7 +74,7 @@ void Object::finalize()
 {
 	XAssert(block && !block->finalized);
 
-	block->hash = CalculateObjectHash(block + 1, block->dataSize);
+	block->longHash = ComputeObjectLongHash(block + 1, block->dataSize);
 	block->finalized = true;
 
 	// TODO: Check object header itself
@@ -92,7 +90,7 @@ Object Object::clone() const
 	return newObject;
 }
 
-uint32 Object::getCRC() const
+uint32 Object::getCRC32() const
 {
 	XAssert(block);
 	XAssert(block->finalized);
@@ -101,7 +99,7 @@ uint32 Object::getCRC() const
 	XAssert(block->dataSize >= sizeof(GenericObjectHeader));
 	GenericObjectHeader& header = *(GenericObjectHeader*)data;
 
-	return header.objectCRC;
+	return header.objectCRC32;
 }
 
 Object Object::Create(uint32 size)
@@ -111,19 +109,19 @@ Object Object::Create(uint32 size)
 	object.block = (BlockHeader*)SystemHeapAllocator::Allocate(sizeof(BlockHeader) + size);
 	object.block->referenceCount = 1;
 	object.block->dataSize = size;
-	object.block->hash = {};
+	object.block->longHash = 0;
 	object.block->finalized = false;
 	return object;
 }
 
-bool CompiledPipelineLayout::findBindPointMetadata(uint32 bindPointNameCRC, BindPointMetadata& result) const
+bool CompiledPipelineLayout::findBindPointMetadata(uint32 bindPointNameXSH, BindPointMetadata& result) const
 {
 	const PipelineLayoutObjectHeader& header = *(PipelineLayoutObjectHeader*)object.getData();
 	const PipelineBindPointRecord* bindPointRecords = (PipelineBindPointRecord*)(&header + 1);
 
 	for (uint8 i = 0; i < header.bindPointCount; i++)
 	{
-		if (bindPointRecords[i].nameCRC == bindPointNameCRC)
+		if (bindPointRecords[i].nameXSH == bindPointNameXSH)
 		{
 			result = bindPointsMetadata[i];
 			return true;
@@ -183,12 +181,12 @@ bool Host::CompilePipelineLayout(Platform platform,
 		rootParameterCount++;
 
 		XAssert(!bindPointDesc.name.isEmpty());
-		const uint32 bindPointNameCRC = CRC32::Compute(bindPointDesc.name.getData(), bindPointDesc.name.getLength());
+		const uint32 bindPointNameXSH = uint32(XStringHash::Compute(bindPointDesc.name));
 
-		// HAL requires this because user can set bindpoint by CRC and zero CRC should be invalid input.
-		XAssert(bindPointNameCRC);
+		// HAL requires this because user can set bindpoint by name hash and zero hash should be invalid input.
+		XAssert(bindPointNameXSH);
 
-		objectBindPointRecord.nameCRC = bindPointNameCRC;
+		objectBindPointRecord.nameXSH = bindPointNameXSH;
 		objectBindPointRecord.type = bindPointDesc.type;
 		objectBindPointRecord.rootParameterIndex = rootParameterIndex;
 		if (bindPointDesc.type == PipelineBindPointType::Constants)
@@ -331,9 +329,9 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipeli
 			if (sourceReader.getChar() != ')')
 				return false;
 
-			const uint32 bindPointNameCRC = CRC32::Compute(bindPointName.getData(), bindPointName.getLength());
+			const uint32 bindPointNameXSH = uint32(XStringHash::Compute(bindPointName.getData()));
 			CompiledPipelineLayout::BindPointMetadata bindPointMetadata = {};
-			if (!pipelineLayout.findBindPointMetadata(bindPointNameCRC, bindPointMetadata))
+			if (!pipelineLayout.findBindPointMetadata(bindPointNameXSH, bindPointMetadata))
 				return false;
 
 			TextWriteFmt(patchedSourceString, ": register(",
@@ -460,11 +458,11 @@ bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayo
 	//XAssert(ValidateDepthStencilFormatValue(desc.depthStencilFormat));
 
 	Object bytecodeObjects[MaxGraphicsPipelineBytecodeObjectCount];
-	uint32 bytecodeObjectsCRCs[MaxGraphicsPipelineBytecodeObjectCount] = {};
+	uint32 bytecodeObjectsCRC32s[MaxGraphicsPipelineBytecodeObjectCount] = {};
 	uint8 bytecodeObjectCount = 0;
 	{
 		auto pushBytecodeObject =
-			[&bytecodeObjects, &bytecodeObjectsCRCs, &bytecodeObjectCount](const CompiledShader* shader) -> void
+			[&bytecodeObjects, &bytecodeObjectsCRC32s, &bytecodeObjectCount](const CompiledShader* shader) -> void
 		{
 			if (!shader)
 				return;
@@ -472,7 +470,7 @@ bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayo
 			const Object& object = shader->getObject();
 			XAssert(object.isValid());
 			bytecodeObjects[bytecodeObjectCount] = object.clone();
-			bytecodeObjectsCRCs[bytecodeObjectCount] = object.getCRC();
+			bytecodeObjectsCRC32s[bytecodeObjectCount] = object.getCRC32();
 			bytecodeObjectCount++;
 			XAssert(bytecodeObjectCount <= MaxGraphicsPipelineBytecodeObjectCount);
 		};
@@ -491,7 +489,7 @@ bool Host::CompileGraphicsPipeline(Platform platform, const CompiledPipelineLayo
 		baseObject.generic = {}; // Will be filled later
 		baseObject.pipelineLayoutSourceHash = pipelineLayout.getSourceHash();
 
-		memoryCopy(baseObject.bytecodeObjectsCRCs, bytecodeObjectsCRCs, sizeof(uint32) * bytecodeObjectCount);
+		memoryCopy(baseObject.bytecodeObjectsCRC32s, bytecodeObjectsCRC32s, sizeof(uint32) * bytecodeObjectCount);
 
 		memoryCopy(baseObject.renderTargetFormats, desc.renderTargetsFormats, sizeof(TexelViewFormat) * MaxRenderTargetCount);
 		baseObject.depthStencilFormat = desc.depthStencilFormat;

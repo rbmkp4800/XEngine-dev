@@ -32,7 +32,7 @@ static inline bool ValidateGenericObjectHeader(const ObjectFormat::GenericObject
 		return false;
 	if (header->objectSize != objectSize)
 		return false;
-	// TODO: Check object CRC
+	// TODO: Check object CRC32.
 
 	return true;
 }
@@ -226,7 +226,7 @@ namespace // Device queue sync points
 //{
 //	uint32 data;
 //
-//	inline bool isNameCRCMatching(uint32 nameCRC) const;
+//	inline bool isNameXSHMatching(uint32 nameXSH) const;
 //	inline PipelineBindPointType getType() const;
 //
 //	inline uint8 getRootParameterIndex() const;
@@ -312,11 +312,11 @@ enum class CommandList::State : uint8
 	Executing,
 };
 
-//inline PipelineBindPointsLUTEntry CommandList::lookupBindPointsLUT(uint32 bindPointNameCRC) const
+//inline PipelineBindPointsLUTEntry CommandList::lookupBindPointsLUT(uint32 bindPointNameXSH) const
 //{
 	//const uint32 lutIndex = (bindPointNameHash >> bindPointsLUTKeyShift) & bindPointsLUTKeyAndMask;
 	//const PipelineBindPointsLUTEntry lutEntry = bindPointsLUT[lutIndex];
-	//XEAssert(lutEntry.isNameCRCMatching(bindPointNameCRC));
+	//XEAssert(lutEntry.isNameXSHMatching(bindPointNameXSH));
 	//return lutEntry;
 //}
 
@@ -461,7 +461,7 @@ void CommandList::setPipeline(PipelineHandle pipelineHandle)
 	d3dCommandList->SetPipelineState(pipeline.d3dPipelineState);
 }
 
-void CommandList::bindConstants(uint32 bindPointNameCRC,
+void CommandList::bindConstants(uint64 bindPointNameXSH,
 	const void* data, uint32 size32bitValues, uint32 offset32bitValues)
 {
 	XEAssert(state == State::Recording);
@@ -472,7 +472,7 @@ void CommandList::bindConstants(uint32 bindPointNameCRC,
 	const ObjectFormat::PipelineBindPointRecord* bindPointRecord = nullptr;
 	for (uint8 i = 0; i < pipelineLayout.bindPointCount; i++)
 	{
-		if (pipelineLayout.bindPoints[i].nameCRC == bindPointNameCRC)
+		if (pipelineLayout.bindPoints[i].nameXSH == bindPointNameXSH)
 		{
 			bindPointRecord = &pipelineLayout.bindPoints[i];
 			break;
@@ -481,7 +481,7 @@ void CommandList::bindConstants(uint32 bindPointNameCRC,
 
 	XEAssert(bindPointRecord);
 
-	//const PipelineBindPointsLUTEntry bindPointsLUTEntry = lookupBindPointsLUT(bindPointNameCRC);
+	//const PipelineBindPointsLUTEntry bindPointsLUTEntry = lookupBindPointsLUT(bindPointNameXSH);
 	//XEAssert(bindPointsLUTEntry.getType() == PipelineBindPointType::Constants);
 	//XEAssert(offset32bitValues + size32bitValues <= bindPointsLUTEntry.getConstantsSize32bitValues());
 	const uint32 rootParameterIndex = bindPointRecord->rootParameterIndex; //bindPointsLUTEntry.getRootParameterIndex();
@@ -494,12 +494,12 @@ void CommandList::bindConstants(uint32 bindPointNameCRC,
 		XEAssertUnreachableCode();
 }
 
-void CommandList::bindBuffer(uint32 bindPointNameCRC,
+void CommandList::bindBuffer(uint64 bindPointNameXSH,
 	BufferBindType bindType, ResourceHandle bufferHandle, uint32 offset)
 {
 	XEAssert(state == State::Recording);
 
-	//const PipelineBindPointsLUTEntry bindPointsLUTEntry = lookupBindPointsLUT(bindPointNameCRC);
+	//const PipelineBindPointsLUTEntry bindPointsLUTEntry = lookupBindPointsLUT(bindPointNameXSH);
 	//XEAssertImply(bindType == BufferBindType::Constant, bindPointsLUTEntry.getType() == PipelineBindPointType::ConstantBuffer);
 	//XEAssertImply(bindType == BufferBindType::ReadOnly, bindPointsLUTEntry.getType() == PipelineBindPointType::ReadOnlyBuffer);
 	//XEAssertImply(bindType == BufferBindType::ReadWrite, bindPointsLUTEntry.getType() == PipelineBindPointType::ReadWriteBuffer);
@@ -1099,8 +1099,8 @@ PipelineLayoutHandle Device::createPipelineLayout(ObjectDataView objectData)
 	for (uint8 i = 0; i < header.bindPointCount; i++)
 	{
 		const PipelineBindPointRecord& bindPoint = bindPoints[i];
-		XEMasterAssert(bindPoint.nameCRC);
-		//const uint8 lutIndex = (bindPoint.nameCRC >> bindPointsLUTKeyShift) & bindPointsLUTKeyAndMask;
+		XEMasterAssert(bindPoint.nameXSH);
+		//const uint8 lutIndex = (bindPoint.nameXSH >> bindPointsLUTKeyShift) & bindPointsLUTKeyAndMask;
 
 		//XEMasterAssert(!pipelineLayout.bindPointsLUT[lutIndex]); // Check collision
 		//pipelineLayout.bindPointsLUT[lutIndex] = ...;
@@ -1183,7 +1183,7 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 
 		XEMasterAssert(ValidateGenericObjectHeader(&bytecodeObjectHeader.generic,
 			PipelineBytecodeObjectSignature, bytecodeObjectData.size));
-		XEMasterAssert(baseObject.bytecodeObjectsCRCs[i] == bytecodeObjectHeader.generic.objectCRC);
+		XEMasterAssert(baseObject.bytecodeObjectsCRC32s[i] == bytecodeObjectHeader.generic.objectCRC32);
 		XEMasterAssert(expectedBytecodeObjectTypes[i] == bytecodeObjectHeader.objectType);
 		XEMasterAssert(baseObject.pipelineLayoutSourceHash == bytecodeObjectHeader.pipelineLayoutSourceHash);
 

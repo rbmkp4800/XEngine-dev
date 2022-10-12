@@ -19,7 +19,7 @@ namespace XEngine::Render::HAL::ObjectFormat
 	{
 		uint64 signature;
 		uint32 objectSize;
-		uint32 objectCRC;
+		uint32 objectCRC32; // CRC-32/zlib
 	};
 
 	struct PipelineLayoutObjectHeader
@@ -34,7 +34,7 @@ namespace XEngine::Render::HAL::ObjectFormat
 
 	struct PipelineBindPointRecord
 	{
-		uint32 nameCRC;
+		uint32 nameXSH;
 		PipelineBindPointType type;
 		uint8 rootParameterIndex;
 		uint8 constantsSize32bitValues;
@@ -54,7 +54,7 @@ namespace XEngine::Render::HAL::ObjectFormat
 		GenericObjectHeader generic;
 
 		uint32 pipelineLayoutSourceHash;
-		uint32 bytecodeObjectsCRCs[MaxGraphicsPipelineBytecodeObjectCount];
+		uint32 bytecodeObjectsCRC32s[MaxGraphicsPipelineBytecodeObjectCount];
 
 		TexelViewFormat renderTargetFormats[MaxRenderTargetCount];
 		DepthStencilFormat depthStencilFormat;

@@ -1,5 +1,6 @@
-#include <XLib.CRC.h>
 #include <XLib.String.h>
+
+#include <XEngine.XStringHash.h>
 
 #include "XEngine.Render.Shaders.Builder.PipelineList.h"
 
@@ -30,10 +31,10 @@ PipelineCreationResult PipelineList::create(StringViewASCII name, const Pipeline
 {
 	XAssert((graphicsPipelineDesc == nullptr) != (computeShader == nullptr));
 
-	const uint64 nameCRC = CRC64::Compute(name.getData(), name.getLength());
-	if (entrySearchTree.find(nameCRC))
+	const uint64 nameXSH = XStringHash::Compute(name);
+	if (entrySearchTree.find(nameXSH))
 	{
-		// Duplicate name found or CRC collision. These cases should be handled separately.
+		// Duplicate name found or hash collision. These cases should be handled separately.
 		return PipelineCreationResult { PipelineCreationStatus::Failure_EntryNameDuplication };
 	}
 
@@ -48,7 +49,7 @@ PipelineCreationResult PipelineList::create(StringViewASCII name, const Pipeline
 	Pipeline& pipeline = *(Pipeline*)pipelineMemory;
 	construct(pipeline);
 	pipeline.name = StringView(nameMemory, name.getLength());
-	pipeline.nameCRC = nameCRC;
+	pipeline.nameXSH = nameXSH;
 	pipeline.pipelineLayout = &pipelineLayout;
 	pipeline.graphicsDesc = graphicsPipelineDesc ? *graphicsPipelineDesc : GraphicsPipelineDesc {};
 	pipeline.computeShader = computeShader;

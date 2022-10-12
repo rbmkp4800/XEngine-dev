@@ -24,7 +24,7 @@ namespace XEngine::Render
 		void load(const char* packPath);
 		void reload(const char* packPath);
 
-		HAL::PipelineLayoutHandle getPipelineLayout(uint64 nameCRC) const;
-		HAL::PipelineHandle getPipeline(uint64 nameCRC) const;
+		HAL::PipelineLayoutHandle getPipelineLayout(uint64 nameXSH) const;
+		HAL::PipelineHandle getPipeline(uint64 nameXSH) const;
 	};
 }

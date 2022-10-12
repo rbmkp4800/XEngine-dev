@@ -19,7 +19,7 @@ namespace XEngine::Render::Shaders::Builder_
 		XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
 
 		XLib::StringViewASCII name;
-		uint64 nameCRC = 0;
+		uint64 nameXSH = 0;
 
 		HAL::ShaderCompiler::PipelineBindPointDesc* bindPoints = nullptr;
 		uint8 bindPointCount = 0;
@@ -34,10 +34,10 @@ namespace XEngine::Render::Shaders::Builder_
 		bool compile();
 
 		inline XLib::StringViewASCII getName() const { return name; }
-		inline uint64 getNameCRC() const { return nameCRC; }
+		inline uint64 getNameXSH() const { return nameXSH; }
 		inline const HAL::ShaderCompiler::CompiledPipelineLayout& getCompiled() const { return compiledPipelineLayout; }
 
-		static inline ordering CompareOrdered(const PipelineLayout& left, const PipelineLayout& right) { return compare(left.nameCRC, right.nameCRC); }
+		static inline ordering CompareOrdered(const PipelineLayout& left, const PipelineLayout& right) { return compare(left.nameXSH, right.nameXSH); }
 	};
 
 	enum class PipelineLayoutCreationStatus
@@ -45,7 +45,7 @@ namespace XEngine::Render::Shaders::Builder_
 		Success = 0,
 		Failure_TooManyBindPoints,
 		Failure_EntryNameDuplication,
-		//Failure_EntryNameCRCCollision,
+		//Failure_EntryNameHashCollision,
 	};
 
 	struct PipelineLayoutCreationResult
@@ -61,8 +61,8 @@ namespace XEngine::Render::Shaders::Builder_
 	private:
 		struct EntrySearchTreeComparator abstract final
 		{
-			static inline ordering Compare(const PipelineLayout& left, const PipelineLayout& right) { return compare(left.nameCRC, right.nameCRC); }
-			static inline ordering Compare(const PipelineLayout& left, uint64 right) { return compare(left.nameCRC, right); }
+			static inline ordering Compare(const PipelineLayout& left, const PipelineLayout& right) { return compare(left.nameXSH, right.nameXSH); }
+			static inline ordering Compare(const PipelineLayout& left, uint64 right) { return compare(left.nameXSH, right); }
 		};
 
 		using EntrySearchTree =

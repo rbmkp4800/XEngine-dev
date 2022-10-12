@@ -1,4 +1,3 @@
-#include <XLib.CRC.h>
 #include <XLib.String.h>
 
 #include "XEngine.Render.Shaders.Builder.ShaderList.h"

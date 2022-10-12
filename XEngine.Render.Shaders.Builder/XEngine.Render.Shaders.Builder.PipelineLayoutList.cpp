@@ -1,6 +1,7 @@
-#include <XLib.CRC.h>
 #include <XLib.String.h>
 #include <XLib.SystemHeapAllocator.h>
+
+#include <XEngine.XStringHash.h>
 
 #include "XEngine.Render.Shaders.Builder.PipelineLayoutList.h"
 
@@ -19,10 +20,10 @@ PipelineLayoutCreationResult PipelineLayoutList::create(XLib::StringViewASCII na
 	if (bindPointCount > HAL::MaxPipelineBindPointCount)
 		return PipelineLayoutCreationResult { PipelineLayoutCreationStatus::Failure_TooManyBindPoints };
 
-	const uint64 nameCRC = CRC64::Compute(name.getData(), name.getLength());
-	if (entrySearchTree.find(nameCRC))
+	const uint64 nameXSH = XStringHash::Compute(name);
+	if (entrySearchTree.find(nameXSH))
 	{
-		// Duplicate name found or CRC collision. These cases should be handled separately.
+		// Duplicate name found or hash collision. These cases should be handled separately.
 		return PipelineLayoutCreationResult { PipelineLayoutCreationStatus::Failure_EntryNameDuplication };
 	}
 
@@ -71,7 +72,7 @@ PipelineLayoutCreationResult PipelineLayoutList::create(XLib::StringViewASCII na
 	PipelineLayout& pipelineLayout = *(PipelineLayout*)pipelineLayoutMemory;
 	construct(pipelineLayout);
 	pipelineLayout.name = StringView(nameMemory, name.getLength());
-	pipelineLayout.nameCRC = nameCRC;
+	pipelineLayout.nameXSH = nameXSH;
 	pipelineLayout.bindPoints = bindPointsMemory;
 	pipelineLayout.bindPointCount = bindPointCount;
 
@@ -83,6 +84,5 @@ PipelineLayoutCreationResult PipelineLayoutList::create(XLib::StringViewASCII na
 
 PipelineLayout* PipelineLayoutList::find(XLib::StringViewASCII name) const
 {
-	const uint64 nameCRC = CRC64::Compute(name.getData(), name.getLength());
-	return entrySearchTree.find(nameCRC);
+	return entrySearchTree.find(XStringHash::Compute(name));
 }

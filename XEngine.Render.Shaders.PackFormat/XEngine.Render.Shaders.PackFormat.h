@@ -23,19 +23,19 @@ namespace XEngine::Render::Shaders::PackFormat
 	{
 		uint32 offset;
 		uint32 size;
-		uint32 crc;
+		uint32 crc32; // CRC-32/zlib
 	};
 
 	struct PipelineLayoutRecord // 20 bytes
 	{
-		uint64 nameCRC;
+		uint64 nameXSH;
 		ObjectRecord object;
 	};
 
 	struct PipelineRecord // 32 bytes
 	{
 		// 0..7
-		uint64 nameCRC;
+		uint64 nameXSH;
 
 		// 8..9
 		struct

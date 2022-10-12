@@ -6,6 +6,8 @@
 
 #include <XEngine.Render.HAL.Common.h>
 
+// TODO: Use SHA1/SHA256 for ObjectLongHash. CRC64 is used for now.
+
 namespace XEngine::Render::HAL::ShaderCompiler
 {
 	class CompiledDescriptorSetLayout;
@@ -78,13 +80,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		DepthStencilFormat depthStencilFormat;
 	};
 
-	struct ObjectHash
-	{
-		uint64 a;
-		uint64 b;
-	};
-
-	inline bool operator == (const ObjectHash& left, const ObjectHash& right) { return left.a == right.a && left.b == right.b; }
+	using ObjectLongHash = uint64;
 
 	class Object : public XLib::NonCopyable
 	{
@@ -95,7 +91,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		{
 			volatile uint32 referenceCount;
 			uint32 dataSize;
-			ObjectHash hash;
+			ObjectLongHash longHash;
 			bool finalized;
 		};
 
@@ -117,12 +113,12 @@ namespace XEngine::Render::HAL::ShaderCompiler
 
 		void finalize();
 		Object clone() const;
-		uint32 getCRC() const;
+		uint32 getCRC32() const;
 
 		inline void* getMutableData() { XAssert(block && !block->finalized); return block + 1; }
 		inline const void* getData() const { XAssert(block && block->finalized); return block + 1; }
 		inline uint32 getSize() const { XAssert(block); return block->dataSize; }
-		inline ObjectHash getHash() const { XAssert(block && block->finalized); return block->hash; }
+		inline ObjectLongHash getLongHash() const { XAssert(block && block->finalized); return block->longHash; }
 
 		inline bool isInitialized() const { return block != nullptr; }
 		inline bool isValid() const { return block ? block->finalized : false; }
@@ -164,7 +160,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		BindPointMetadata bindPointsMetadata[MaxPipelineBindPointCount] = {};
 
 	private:
-		bool findBindPointMetadata(uint32 bindPointNameCRC, BindPointMetadata& result) const;
+		bool findBindPointMetadata(uint32 bindPointNameXSH, BindPointMetadata& result) const;
 		uint32 getSourceHash() const;
 
 	public:

@@ -102,7 +102,7 @@ bool BuildDescriptionLoader::parsePipelineLayoutDeclaration()
 	
 	if (pipelineLayoutCreationResult.status != PipelineLayoutCreationStatus::Success)
 	{
-		// TODO: Proper error handling (CRC collision etc).
+		// TODO: Proper error handling (hash collision etc).
 		reportError("pipeline layout redefinition", pipelineLayoutNameToken);
 		return false;
 	}
@@ -289,7 +289,7 @@ bool BuildDescriptionLoader::parseGraphicsPipelineDeclaration()
 		pipelineList.create(pipelineNameToken.string, *pipelineLayout, &pipelineDesc, nullptr);
 	if (pipelineCreationResult.status != PipelineCreationStatus::Success)
 	{
-		// TODO: Proper error handling (CRC collision etc).
+		// TODO: Proper error handling (hash collision etc).
 		reportError("pipeline with this name already defined", pipelineNameToken);
 		return false;
 	}
@@ -381,7 +381,7 @@ bool BuildDescriptionLoader::parseComputePipelineDeclaration()
 		pipelineList.create(pipelineNameToken.string, *pipelineLayout, nullptr, computeShader);
 	if (pipelineCreationResult.status != PipelineCreationStatus::Success)
 	{
-		// TODO: Proper error handling (CRC collision etc).
+		// TODO: Proper error handling (hash collision etc).
 		reportError("pipeline with this name already defined", pipelineNameToken);
 		return false;
 	}

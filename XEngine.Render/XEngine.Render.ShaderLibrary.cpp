@@ -14,13 +14,13 @@ using namespace XEngine::Render;
 
 struct ShaderLibrary::PipelineLayout
 {
-	uint64 nameCRC;
+	uint64 nameXSH;
 	HAL::PipelineLayoutHandle halPipelineLayout;
 };
 
 struct ShaderLibrary::Pipeline
 {
-	uint64 nameCRC;
+	uint64 nameXSH;
 	HAL::PipelineHandle halPipeline;
 };
 
@@ -102,7 +102,7 @@ void ShaderLibrary::load(const char* packPath)
 	XEAssert(objectsDataBegin < packDataEnd);
 	const uint64 objectsDataSize = packDataEnd - objectsDataBegin;
 
-	uint64 prevNameCRC = 0;
+	uint64 prevNameXSH = 0;
 
 	for (uint16 pipelineLayoutIndex = 0; pipelineLayoutIndex < packHeader.pipelineLayoutCount; pipelineLayoutIndex++)
 	{
@@ -114,13 +114,13 @@ void ShaderLibrary::load(const char* packPath)
 		pipelineLayoutObject.size = pipelineLayoutRecord.object.size;
 
 		pipelineLayout.halPipelineLayout = halDevice.createPipelineLayout(pipelineLayoutObject);
-		pipelineLayout.nameCRC = pipelineLayoutRecord.nameCRC;
+		pipelineLayout.nameXSH = pipelineLayoutRecord.nameXSH;
 
-		XEMasterAssert(prevNameCRC < pipelineLayout.nameCRC); // Check order.
-		prevNameCRC = pipelineLayout.nameCRC;
+		XEMasterAssert(prevNameXSH < pipelineLayout.nameXSH); // Check order.
+		prevNameXSH = pipelineLayout.nameXSH;
 	}
 
-	prevNameCRC = 0;
+	prevNameXSH = 0;
 
 	for (uint16 pipelineIndex = 0; pipelineIndex < packHeader.pipelineCount; pipelineIndex++)
 	{
@@ -190,31 +190,31 @@ void ShaderLibrary::load(const char* packPath)
 				pipelineLayout.halPipelineLayout, computeShaderObject);
 		}
 
-		pipeline.nameCRC = pipelineRecord.nameCRC;
+		pipeline.nameXSH = pipelineRecord.nameXSH;
 
 		// Check ordering of pipelines.
-		XEMasterAssert(prevNameCRC < pipeline.nameCRC);
-		prevNameCRC = pipeline.nameCRC;
+		XEMasterAssert(prevNameXSH < pipeline.nameXSH);
+		prevNameXSH = pipeline.nameXSH;
 	}
 
 	SystemHeapAllocator::Release(packData);
 }
 
-HAL::PipelineLayoutHandle ShaderLibrary::getPipelineLayout(uint64 nameCRC) const
+HAL::PipelineLayoutHandle ShaderLibrary::getPipelineLayout(uint64 nameXSH) const
 {
 	for (uint32 i = 0; i < pipelineLayoutCount; i++)
 	{
-		if (pipelineLayoutTable[i].nameCRC == nameCRC)
+		if (pipelineLayoutTable[i].nameXSH == nameXSH)
 			return pipelineLayoutTable[i].halPipelineLayout;
 	}
 	XEMasterAssertUnreachableCode();
 }
 
-HAL::PipelineHandle ShaderLibrary::getPipeline(uint64 nameCRC) const
+HAL::PipelineHandle ShaderLibrary::getPipeline(uint64 nameXSH) const
 {
 	for (uint32 i = 0; i < pipelineCount; i++)
 	{
-		if (pipelineTable[i].nameCRC == nameCRC)
+		if (pipelineTable[i].nameXSH == nameXSH)
 			return pipelineTable[i].halPipeline;
 	}
 	XEMasterAssertUnreachableCode();

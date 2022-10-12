@@ -135,53 +135,53 @@ void Builder::run(const char* packPath)
 	ArrayList<Object, uint16> genericObjects;
 	ArrayList<Object, uint16> bytecodeObjects;
 
-	Map<uint64, uint16> pipelineLayoutNameCRCToGenericObjectIdxMap;
-	Map<ObjectHash, uint16> bytecodeObjectHashToIdxMap;
+	Map<uint64, uint16> pipelineLayoutNameXSHToGenericObjectIdxMap;
+	Map<ObjectLongHash, uint16> bytecodeObjectLongHashToIdxMap; // Used for objects deduplication.
 
 	uint32 genericObjectsOffsetAccum = 0;
 
 	pipelineLayoutRecords.reserve(pipelineLayoutList.getSize());
-	for (PipelineLayout& pipelineLayout : pipelineLayoutList) // Iterating in order of name CRC increase
+	for (PipelineLayout& pipelineLayout : pipelineLayoutList) // Iterating in order of name hash increase
 	{
 		const Object& object = pipelineLayout.getCompiled().getObject();
 
 		PipelineLayoutRecord& record = pipelineLayoutRecords.pushBack(PipelineLayoutRecord{});
-		record.nameCRC = pipelineLayout.getNameCRC();
+		record.nameXSH = pipelineLayout.getNameXSH();
 
 		record.object.offset = genericObjectsOffsetAccum;
 		record.object.size = object.getSize();
-		record.object.crc = object.getCRC();
+		record.object.crc32 = object.getCRC32();
 		genericObjectsOffsetAccum += object.getSize();
 
 		const uint16 objectIndex = genericObjects.getSize();
 		genericObjects.emplaceBack(object.clone());
 
-		pipelineLayoutNameCRCToGenericObjectIdxMap.insert(pipelineLayout.getNameCRC(), objectIndex);
+		pipelineLayoutNameXSHToGenericObjectIdxMap.insert(pipelineLayout.getNameXSH(), objectIndex);
 	}
 
 	pipelineRecords.reserve(pipelineList.getSize());
-	for (Pipeline& pipeline : pipelineList) // Iterating in order of name CRC increase
+	for (Pipeline& pipeline : pipelineList) // Iterating in order of name hash increase
 	{
 		// TODO: Check if element does not exist
 		const uint16 pipelineLayoutIndex =
-			*pipelineLayoutNameCRCToGenericObjectIdxMap.find(pipeline.getPipelineLayout().getNameCRC());
+			*pipelineLayoutNameXSHToGenericObjectIdxMap.find(pipeline.getPipelineLayout().getNameXSH());
 
 		const bool isGraphics = pipeline.isGraphicsPipeline();
 
 		PipelineRecord& pipelineRecord = pipelineRecords.pushBack(PipelineRecord{});
-		pipelineRecord.nameCRC = pipeline.getNameCRC();
+		pipelineRecord.nameXSH = pipeline.getNameXSH();
 		pipelineRecord.pipelineLayoutIndex = pipelineLayoutIndex;
 		pipelineRecord.isGraphics = isGraphics;
 
-		auto deduplicateBytecodeObject = [&bytecodeObjectHashToIdxMap, &bytecodeObjects](const Object& object) -> uint16
+		auto deduplicateBytecodeObject = [&bytecodeObjectLongHashToIdxMap, &bytecodeObjects](const Object& object) -> uint16
 		{
-			const uint16* existingObjectIndexIt = bytecodeObjectHashToIdxMap.find(object.getHash());
+			const uint16* existingObjectIndexIt = bytecodeObjectLongHashToIdxMap.find(object.getLongHash());
 			if (existingObjectIndexIt)
 				return *existingObjectIndexIt;
 			
 			const uint16 objectIndex = bytecodeObjects.getSize();
 			bytecodeObjects.emplaceBack(object.clone());
-			bytecodeObjectHashToIdxMap.insert(object.getHash(), objectIndex);
+			bytecodeObjectLongHashToIdxMap.insert(object.getLongHash(), objectIndex);
 			return objectIndex;
 		};
 
@@ -197,7 +197,7 @@ void Builder::run(const char* packPath)
 
 				pipelineRecord.graphicsBaseObject.offset = genericObjectsOffsetAccum;
 				pipelineRecord.graphicsBaseObject.size = baseObject.getSize();
-				pipelineRecord.graphicsBaseObject.crc = baseObject.getCRC();
+				pipelineRecord.graphicsBaseObject.crc32 = baseObject.getCRC32();
 				genericObjectsOffsetAccum += baseObject.getSize();
 
 				genericObjects.emplaceBack(baseObject.clone());
@@ -230,7 +230,7 @@ void Builder::run(const char* packPath)
 		ObjectRecord& record = bytecodeObjectRecords.pushBack(ObjectRecord{});
 		record.offset = bytecodeObjectOffsetAccum + bytecodeObjectsBaseOffset;
 		record.size = object.getSize();
-		record.crc = object.getCRC();
+		record.crc32 = object.getCRC32();
 		bytecodeObjectOffsetAccum += object.getSize();
 	}
 
