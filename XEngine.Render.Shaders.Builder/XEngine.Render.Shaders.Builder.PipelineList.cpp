@@ -18,9 +18,21 @@ bool Pipeline::compile()
 	desc.meshShader = graphicsDesc.meshShader ? &graphicsDesc.meshShader->getCompiled() : nullptr;
 	desc.pixelShader = graphicsDesc.pixelShader ? &graphicsDesc.pixelShader->getCompiled() : nullptr;
 
+	if (desc.vertexShader)
+		XAssert(desc.vertexShader->isInitialized());
+	if (desc.amplificationShader)
+		XAssert(desc.amplificationShader->isInitialized());
+	if (desc.meshShader)
+		XAssert(desc.meshShader->isInitialized());
+	if (desc.pixelShader)
+		XAssert(desc.pixelShader->isInitialized());
+
 	for (uint32 i = 0; i < HAL::MaxRenderTargetCount; i++)
 		desc.renderTargetsFormats[i] = graphicsDesc.renderTargetsFormats[i];
 	desc.depthStencilFormat = graphicsDesc.depthStencilFormat;
+
+	const HAL::ShaderCompiler::CompiledPipelineLayout& compiledPipelineLayout = pipelineLayout->getCompiled();
+	XAssert(compiledPipelineLayout.isInitialized());
 
 	return HAL::ShaderCompiler::Host::CompileGraphicsPipeline(HAL::ShaderCompiler::Platform::D3D12,
 		pipelineLayout->getCompiled(), desc, compiledGraphicsPipeline);

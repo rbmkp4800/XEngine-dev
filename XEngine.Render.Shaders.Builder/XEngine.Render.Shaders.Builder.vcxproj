@@ -102,6 +102,7 @@ copy $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.pd
   <ItemGroup>
     <ClCompile Include="PseudoCTokenizer.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.cpp" />
+    <ClCompile Include="XEngine.Render.Shaders.Builder.DescriptorSetLayoutList.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.EntryPoint.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.PipelineLayoutList.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.PipelineList.cpp" />
@@ -111,6 +112,7 @@ copy $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.pd
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PseudoCTokenizer.h" />
+    <ClInclude Include="XEngine.Render.Shaders.Builder.DescriptorSetLayoutList.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.PipelineLayoutList.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.PipelineList.h" />

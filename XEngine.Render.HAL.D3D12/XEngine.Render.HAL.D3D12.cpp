@@ -224,12 +224,12 @@ namespace // Device queue sync points
 	}
 }
 
-//struct XEngine::Render::HAL::Internal::PipelineBindPointsLUTEntry
+//struct XEngine::Render::HAL::Internal::PipelineBindingsLUTEntry
 //{
 //	uint32 data;
 //
 //	inline bool isNameXSHMatching(uint32 nameXSH) const;
-//	inline PipelineBindPointType getType() const;
+//	inline PipelineBindingType getType() const;
 //
 //	inline uint8 getRootParameterIndex() const;
 //	inline uint8 getConstantsSize32bitValues() const;
@@ -280,9 +280,8 @@ struct Device::PipelineLayout
 	uint32 sourceHash;
 	uint8 handleGeneration;
 
-	//uint32 bindPointsLUT[MaxPipelineBindPointCount];
-	ObjectFormat::PipelineBindPointRecord bindPoints[MaxPipelineBindPointCount];
-	uint8 bindPointCount;
+	ObjectFormat::PipelineBindingRecord bindings[MaxPipelineBindingCount];
+	uint8 bindingCount;
 };
 
 struct Device::Pipeline
@@ -315,37 +314,37 @@ enum class CommandList::State : uint8
 	Executing,
 };
 
-struct CommandList::BindPointResolveResult
+struct CommandList::BindingResolveResult
 {
-	PipelineBindPointType type;
+	PipelineBindingType type;
 	uint8 rootParameterIndex;
 	uint8 constantsSize;
 };
 
-inline CommandList::BindPointResolveResult CommandList::ResolveBindPointByNameXSH(
-	Device* device, PipelineLayoutHandle pipleineLayoutHandle, uint64 bindPointNameXSH)
+inline CommandList::BindingResolveResult CommandList::ResolveBindingByNameXSH(
+	Device* device, PipelineLayoutHandle pipleineLayoutHandle, uint64 bindingNameXSH)
 {
 	Device::PipelineLayout& pipelineLayout = device->getPipelineLayoutByHandle(pipleineLayoutHandle);
-	for (uint8 i = 0; i < pipelineLayout.bindPointCount; i++)
+	for (uint8 i = 0; i < pipelineLayout.bindingCount; i++)
 	{
-		ObjectFormat::PipelineBindPointRecord& bindPoint = pipelineLayout.bindPoints[i];
-		if (bindPoint.nameXSH == uint32(bindPointNameXSH))
+		ObjectFormat::PipelineBindingRecord& binding = pipelineLayout.bindings[i];
+		if (binding.nameXSH == uint32(bindingNameXSH))
 		{
-			BindPointResolveResult result = {};
-			result.type = bindPoint.type;
-			result.rootParameterIndex = bindPoint.rootParameterIndex;
-			result.constantsSize = bindPoint.constantsSize32bitValues;
+			BindingResolveResult result = {};
+			result.type = binding.type;
+			result.rootParameterIndex = binding.rootParameterIndex;
+			result.constantsSize = binding.constantsSize32bitValues;
 			return result;
 		}
 	}
 	XEAssertUnreachableCode();
 }
 
-//inline PipelineBindPointsLUTEntry CommandList::lookupBindPointsLUT(uint32 bindPointNameXSH) const
+//inline PipelineBindingsLUTEntry CommandList::lookupBindingsLUT(uint32 bindingNameXSH) const
 //{
-	//const uint32 lutIndex = (bindPointNameHash >> bindPointsLUTKeyShift) & bindPointsLUTKeyAndMask;
-	//const PipelineBindPointsLUTEntry lutEntry = bindPointsLUT[lutIndex];
-	//XEAssert(lutEntry.isNameXSHMatching(bindPointNameXSH));
+	//const uint32 lutIndex = (bindingNameXSH >> bindingsLUTKeyShift) & bindingsLUTKeyAndMask;
+	//const PipelineBindingsLUTEntry lutEntry = bindingsLUT[lutIndex];
+	//XEAssert(lutEntry.isNameXSHMatching(bindingNameXSH));
 	//return lutEntry;
 //}
 
@@ -490,7 +489,7 @@ void CommandList::setPipeline(PipelineHandle pipelineHandle)
 	d3dCommandList->SetPipelineState(pipeline.d3dPipelineState);
 }
 
-void CommandList::bindConstants(uint64 bindPointNameXSH,
+void CommandList::bindConstants(uint64 bindingNameXSH,
 	const void* data, uint32 size32bitValues, uint32 offset32bitValues)
 {
 	XEAssert(state == State::Recording);
@@ -498,22 +497,22 @@ void CommandList::bindConstants(uint64 bindPointNameXSH,
 
 	const Device::PipelineLayout& pipelineLayout = device->getPipelineLayoutByHandle(currentPipelineLayoutHandle);
 
-	const ObjectFormat::PipelineBindPointRecord* bindPointRecord = nullptr;
-	for (uint8 i = 0; i < pipelineLayout.bindPointCount; i++)
+	const ObjectFormat::PipelineBindingRecord* bindingRecord = nullptr;
+	for (uint8 i = 0; i < pipelineLayout.bindingCount; i++)
 	{
-		if (pipelineLayout.bindPoints[i].nameXSH == bindPointNameXSH)
+		if (pipelineLayout.bindings[i].nameXSH == bindingNameXSH)
 		{
-			bindPointRecord = &pipelineLayout.bindPoints[i];
+			bindingRecord = &pipelineLayout.bindings[i];
 			break;
 		}
 	}
 
-	XEAssert(bindPointRecord);
+	XEAssert(bindingRecord);
 
-	//const PipelineBindPointsLUTEntry bindPointsLUTEntry = lookupBindPointsLUT(bindPointNameXSH);
-	//XEAssert(bindPointsLUTEntry.getType() == PipelineBindPointType::Constants);
-	//XEAssert(offset32bitValues + size32bitValues <= bindPointsLUTEntry.getConstantsSize32bitValues());
-	const uint32 rootParameterIndex = bindPointRecord->rootParameterIndex; //bindPointsLUTEntry.getRootParameterIndex();
+	//const PipelineBindingsLUTEntry bindingsLUTEntry = lookupBindingsLUT(bindingNameXSH);
+	//XEAssert(bindingsLUTEntry.getType() == PipelineBindingType::Constants);
+	//XEAssert(offset32bitValues + size32bitValues <= bindingsLUTEntry.getConstantsSize32bitValues());
+	const uint32 rootParameterIndex = bindingRecord->rootParameterIndex; //bindingsLUTEntry.getRootParameterIndex();
 
 	if (currentPipelineType == PipelineType::Graphics)
 		d3dCommandList->SetGraphicsRoot32BitConstants(rootParameterIndex, size32bitValues, data, offset32bitValues);
@@ -523,17 +522,17 @@ void CommandList::bindConstants(uint64 bindPointNameXSH,
 		XEAssertUnreachableCode();
 }
 
-void CommandList::bindBuffer(uint64 bindPointNameXSH,
+void CommandList::bindBuffer(uint64 bindingNameXSH,
 	BufferBindType bindType, ResourceHandle bufferHandle, uint32 offset)
 {
 	XEAssert(state == State::Recording);
 
-	//const PipelineBindPointsLUTEntry bindPointsLUTEntry = lookupBindPointsLUT(bindPointNameXSH);
-	//XEAssertImply(bindType == BufferBindType::Constant, bindPointsLUTEntry.getType() == PipelineBindPointType::ConstantBuffer);
-	//XEAssertImply(bindType == BufferBindType::ReadOnly, bindPointsLUTEntry.getType() == PipelineBindPointType::ReadOnlyBuffer);
-	//XEAssertImply(bindType == BufferBindType::ReadWrite, bindPointsLUTEntry.getType() == PipelineBindPointType::ReadWriteBuffer);
+	//const PipelineBindingsLUTEntry bindingsLUTEntry = lookupBindingsLUT(bindingNameXSH);
+	//XEAssertImply(bindType == BufferBindType::Constant, bindingsLUTEntry.getType() == PipelineBindingType::ConstantBuffer);
+	//XEAssertImply(bindType == BufferBindType::ReadOnly, bindingsLUTEntry.getType() == PipelineBindingType::ReadOnlyBuffer);
+	//XEAssertImply(bindType == BufferBindType::ReadWrite, bindingsLUTEntry.getType() == PipelineBindingType::ReadWriteBuffer);
 	
-	const BindPointResolveResult resolvedBindPoint = ResolveBindPointByNameXSH(device, currentPipelineLayoutHandle, bindPointNameXSH);
+	const BindingResolveResult resolvedBinding = ResolveBindingByNameXSH(device, currentPipelineLayoutHandle, bindingNameXSH);
 
 	const Device::Resource& resource = device->getResourceByHandle(bufferHandle);
 	XEAssert(resource.type == ResourceType::Buffer);
@@ -545,22 +544,22 @@ void CommandList::bindBuffer(uint64 bindPointNameXSH,
 	if (currentPipelineType == PipelineType::Graphics)
 	{
 		if (bindType == BufferBindType::Constant)
-			d3dCommandList->SetGraphicsRootConstantBufferView(resolvedBindPoint.rootParameterIndex, bufferAddress);
+			d3dCommandList->SetGraphicsRootConstantBufferView(resolvedBinding.rootParameterIndex, bufferAddress);
 		else if (bindType == BufferBindType::ReadOnly)
-			d3dCommandList->SetGraphicsRootShaderResourceView(resolvedBindPoint.rootParameterIndex, bufferAddress);
+			d3dCommandList->SetGraphicsRootShaderResourceView(resolvedBinding.rootParameterIndex, bufferAddress);
 		else if (bindType == BufferBindType::ReadWrite)
-			d3dCommandList->SetGraphicsRootUnorderedAccessView(resolvedBindPoint.rootParameterIndex, bufferAddress);
+			d3dCommandList->SetGraphicsRootUnorderedAccessView(resolvedBinding.rootParameterIndex, bufferAddress);
 		else
 			XEAssertUnreachableCode();
 	}
 	else if (currentPipelineType == PipelineType::Compute)
 	{
 		if (bindType == BufferBindType::Constant)
-			d3dCommandList->SetComputeRootConstantBufferView(resolvedBindPoint.rootParameterIndex, bufferAddress);
+			d3dCommandList->SetComputeRootConstantBufferView(resolvedBinding.rootParameterIndex, bufferAddress);
 		else if (bindType == BufferBindType::ReadOnly)
-			d3dCommandList->SetComputeRootShaderResourceView(resolvedBindPoint.rootParameterIndex, bufferAddress);
+			d3dCommandList->SetComputeRootShaderResourceView(resolvedBinding.rootParameterIndex, bufferAddress);
 		else if (bindType == BufferBindType::ReadWrite)
-			d3dCommandList->SetComputeRootUnorderedAccessView(resolvedBindPoint.rootParameterIndex, bufferAddress);
+			d3dCommandList->SetComputeRootUnorderedAccessView(resolvedBinding.rootParameterIndex, bufferAddress);
 		else
 			XEAssertUnreachableCode();
 	}
@@ -1119,41 +1118,41 @@ PipelineLayoutHandle Device::createPipelineLayout(ObjectDataView objectData)
 	const PipelineLayoutObjectHeader& header = *(const PipelineLayoutObjectHeader*)objectDataBytes;
 	XEMasterAssert(ValidateGenericObjectHeader(&header.generic, PipelineLayoutObjectSignature, objectData.size));
 
-	XEMasterAssert(header.bindPointCount > 0);
-	XEMasterAssert(header.bindPointCount <= MaxPipelineBindPointCount);
-	//const uint8 bindPointsLUTSizeLog2 = uint8(32 - countLeadingZeros32(header.bindPointCount));
-	//const uint8 bindPointsLUTSize = 1 << bindPointsLUTSizeLog2;
+	XEMasterAssert(header.bindingCount > 0);
+	XEMasterAssert(header.bindingCount <= MaxPipelineBindingCount);
+	//const uint8 bindingsLUTSizeLog2 = uint8(32 - countLeadingZeros32(header.bindingCount));
+	//const uint8 bindingsLUTSize = 1 << bindingsLUTSizeLog2;
 
-	//XEMasterAssert(header.bindPointsLUTKeyShift + bindPointsLUTSizeLog2 < 32);
-	//const uint8 bindPointsLUTKeyShift = header.bindPointsLUTKeyShift;
-	//const uint8 bindPointsLUTKeyAndMask = bindPointsLUTSize - 1;
+	//XEMasterAssert(header.bindingsLUTKeyShift + bindingsLUTSizeLog2 < 32);
+	//const uint8 bindingsLUTKeyShift = header.bindingsLUTKeyShift;
+	//const uint8 bindingsLUTKeyAndMask = bindingsLUTSize - 1;
 
-	//pipelineLayout.bindPointsLUTKeyShift = bindPointsLUTKeyShift;
-	//pipelineLayout.bindPointsLUTKeyAndMask = bindPointsLUTKeyAndMask;
+	//pipelineLayout.bindingsLUTKeyShift = bindingsLUTKeyShift;
+	//pipelineLayout.bindingsLUTKeyAndMask = bindingsLUTKeyAndMask;
 
-	pipelineLayout.bindPointCount = header.bindPointCount;
+	pipelineLayout.bindingCount = header.bindingCount;
 
-	const PipelineBindPointRecord* bindPoints =
-		(const PipelineBindPointRecord*)(objectDataBytes + sizeof(PipelineLayoutObjectHeader));
+	const PipelineBindingRecord* bindings =
+		(const PipelineBindingRecord*)(objectDataBytes + sizeof(PipelineLayoutObjectHeader));
 
-	for (uint8 i = 0; i < header.bindPointCount; i++)
+	for (uint8 i = 0; i < header.bindingCount; i++)
 	{
-		const PipelineBindPointRecord& bindPoint = bindPoints[i];
-		XEMasterAssert(bindPoint.nameXSH);
-		//const uint8 lutIndex = (bindPoint.nameXSH >> bindPointsLUTKeyShift) & bindPointsLUTKeyAndMask;
+		const PipelineBindingRecord& binding = bindings[i];
+		XEMasterAssert(binding.nameXSH);
+		//const uint8 lutIndex = (binding.nameXSH >> bindingsLUTKeyShift) & bindingsLUTKeyAndMask;
 
-		//XEMasterAssert(!pipelineLayout.bindPointsLUT[lutIndex]); // Check collision
-		//pipelineLayout.bindPointsLUT[lutIndex] = ...;
+		//XEMasterAssert(!pipelineLayout.bindingsLUT[lutIndex]); // Check collision
+		//pipelineLayout.bindingsLUT[lutIndex] = ...;
 
-		pipelineLayout.bindPoints[i] = bindPoint;
+		pipelineLayout.bindings[i] = binding;
 	}
 
-	const uint32 headerAndBindPointsLength =
-		sizeof(PipelineLayoutObjectHeader) + sizeof(PipelineBindPointRecord) * header.bindPointCount;
-	XEMasterAssert(objectData.size > headerAndBindPointsLength);
+	const uint32 headerAndBindingsLength =
+		sizeof(PipelineLayoutObjectHeader) + sizeof(PipelineBindingRecord) * header.bindingCount;
+	XEMasterAssert(objectData.size > headerAndBindingsLength);
 
-	const void* d3dRootSignatureData = objectDataBytes + headerAndBindPointsLength;
-	const uint32 d3dRootSignatureSize = objectData.size - headerAndBindPointsLength;
+	const void* d3dRootSignatureData = objectDataBytes + headerAndBindingsLength;
+	const uint32 d3dRootSignatureSize = objectData.size - headerAndBindingsLength;
 
 	XEAssert(!pipelineLayout.d3dRootSignature);
 	HRESULT hResult = d3dDevice->CreateRootSignature(0, d3dRootSignatureData, d3dRootSignatureSize,

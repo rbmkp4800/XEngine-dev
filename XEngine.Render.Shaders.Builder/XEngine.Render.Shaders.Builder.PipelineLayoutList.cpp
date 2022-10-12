@@ -1,4 +1,3 @@
-#include <XLib.String.h>
 #include <XLib.SystemHeapAllocator.h>
 
 #include <XEngine.XStringHash.h>
@@ -10,15 +9,33 @@ using namespace XEngine::Render::Shaders::Builder_;
 
 bool PipelineLayout::compile()
 {
+	HAL::ShaderCompiler::PipelineBindingDesc halBindings[HAL::MaxPipelineBindingCount] = {};
+
+	for (uint8 i = 0; i < bindingCount; i++)
+	{
+		const PipelineBindingDesc& srcBinding = bindings[i];
+		HAL::ShaderCompiler::PipelineBindingDesc& dstBinding = halBindings[i];
+
+		dstBinding.name = srcBinding.name;
+		dstBinding.type = srcBinding.type;
+		if (srcBinding.type == HAL::PipelineBindingType::Constants)
+			dstBinding.constantsSize = srcBinding.constantsSize;
+		else if (srcBinding.type == HAL::PipelineBindingType::DescriptorSet)
+		{
+			dstBinding.descriptorSetLayout = &srcBinding.descriptorSetLayout->getCompiled();
+			XAssert(dstBinding.descriptorSetLayout->isInitialized());
+		}
+	}
+
 	return HAL::ShaderCompiler::Host::CompilePipelineLayout(HAL::ShaderCompiler::Platform::D3D12,
-		bindPoints, bindPointCount, compiledPipelineLayout);
+		halBindings, bindingCount, compiledPipelineLayout);
 }
 
 PipelineLayoutCreationResult PipelineLayoutList::create(XLib::StringViewASCII name,
-	const HAL::ShaderCompiler::PipelineBindPointDesc* bindPoints, uint8 bindPointCount)
+	const PipelineBindingDesc* bindings, uint8 bindingCount)
 {
-	if (bindPointCount > HAL::MaxPipelineBindPointCount)
-		return PipelineLayoutCreationResult { PipelineLayoutCreationStatus::Failure_TooManyBindPoints };
+	if (bindingCount > HAL::MaxPipelineBindingCount)
+		return PipelineLayoutCreationResult { PipelineLayoutCreationStatus::Failure_TooManyBindings };
 
 	const uint64 nameXSH = XStringHash::Compute(name);
 	if (entrySearchTree.find(nameXSH))
@@ -31,17 +48,17 @@ PipelineLayoutCreationResult PipelineLayoutList::create(XLib::StringViewASCII na
 	uint32 memoryBlockSizeAccum = sizeof(PipelineLayout);
 	memoryBlockSizeAccum = alignUp<uint32>(memoryBlockSizeAccum, 16);
 
-	const uint32 bindPointsMemOffset = memoryBlockSizeAccum;
-	memoryBlockSizeAccum += sizeof(HAL::ShaderCompiler::PipelineBindPointDesc) * bindPointCount;
+	const uint32 bindingsMemoryOffset = memoryBlockSizeAccum;
+	memoryBlockSizeAccum += sizeof(PipelineBindingDesc) * bindingCount;
 
-	const uint32 nameMemOffset = memoryBlockSizeAccum;
+	const uint32 nameMemoryOffset = memoryBlockSizeAccum;
 	memoryBlockSizeAccum += uint32(name.getLength()) + 1;
 
-	uint32 bindPointNamesMemOffset[HAL::MaxPipelineBindPointCount] = {};
-	for (uint8 i = 0; i < bindPointCount; i++)
+	uint32 bindingNamesMemoryOffsets[HAL::MaxPipelineBindingCount] = {};
+	for (uint8 i = 0; i < bindingCount; i++)
 	{
-		bindPointNamesMemOffset[i] = memoryBlockSizeAccum;
-		memoryBlockSizeAccum += uint32(bindPoints[i].name.getLength()) + 1;
+		bindingNamesMemoryOffsets[i] = memoryBlockSizeAccum;
+		memoryBlockSizeAccum += uint32(bindings[i].name.getLength()) + 1;
 	}
 
 	// Allocate and populate memory block.
@@ -49,32 +66,31 @@ PipelineLayoutCreationResult PipelineLayoutList::create(XLib::StringViewASCII na
 	byte* pipelineLayoutMemory = (byte*)SystemHeapAllocator::Allocate(memoryBlockSize);
 	memorySet(pipelineLayoutMemory, 0, memoryBlockSize);
 
-	char* nameMemory = (char*)(pipelineLayoutMemory + nameMemOffset);
+	char* nameMemory = (char*)(pipelineLayoutMemory + nameMemoryOffset);
 	memoryCopy(nameMemory, name.getData(), name.getLength());
 	nameMemory[name.getLength()] = '\0';
 
-	HAL::ShaderCompiler::PipelineBindPointDesc* bindPointsMemory =
-		(HAL::ShaderCompiler::PipelineBindPointDesc*)(pipelineLayoutMemory + bindPointsMemOffset);
-	for (uint8 i = 0; i < bindPointCount; i++)
+	PipelineBindingDesc* bindingsMemory =
+		(PipelineBindingDesc*)(pipelineLayoutMemory + bindingsMemoryOffset);
+	for (uint8 i = 0; i < bindingCount; i++)
 	{
-		const HAL::ShaderCompiler::PipelineBindPointDesc& srcBindPoint = bindPoints[i];
-		HAL::ShaderCompiler::PipelineBindPointDesc& dstBindPoint = bindPointsMemory[i];
-		const StringViewASCII& srcBindPointName = bindPoints[i].name;
+		const PipelineBindingDesc& srcBinding = bindings[i];
+		PipelineBindingDesc& dstBinding = bindingsMemory[i];
 
-		char* bindPointNameMemory = (char*)(pipelineLayoutMemory + bindPointNamesMemOffset[i]);
-		memoryCopy(bindPointNameMemory, srcBindPointName.getData(), srcBindPointName.getLength());
-		bindPointNameMemory[srcBindPointName.getLength()] = '\0';
+		char* bindingNameMemory = (char*)(pipelineLayoutMemory + bindingNamesMemoryOffsets[i]);
+		memoryCopy(bindingNameMemory, srcBinding.name.getData(), srcBinding.name.getLength());
+		bindingNameMemory[srcBinding.name.getLength()] = '\0';
 
-		dstBindPoint = srcBindPoint;
-		dstBindPoint.name = StringView(bindPointNameMemory, srcBindPointName.getLength());
+		dstBinding = srcBinding;
+		dstBinding.name = StringView(bindingNameMemory, srcBinding.name.getLength());
 	}
 
 	PipelineLayout& pipelineLayout = *(PipelineLayout*)pipelineLayoutMemory;
 	construct(pipelineLayout);
 	pipelineLayout.name = StringView(nameMemory, name.getLength());
 	pipelineLayout.nameXSH = nameXSH;
-	pipelineLayout.bindPoints = bindPointsMemory;
-	pipelineLayout.bindPointCount = bindPointCount;
+	pipelineLayout.bindings = bindingsMemory;
+	pipelineLayout.bindingCount = bindingCount;
 
 	entrySearchTree.insert(pipelineLayout);
 	entryCount++;

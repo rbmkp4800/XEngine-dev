@@ -114,16 +114,16 @@ Object Object::Create(uint32 size)
 	return object;
 }
 
-bool CompiledPipelineLayout::findBindPointMetadata(uint32 bindPointNameXSH, BindPointMetadata& result) const
+bool CompiledPipelineLayout::findBindingMetadata(uint32 bindingNameXSH, BindingMetadata& result) const
 {
 	const PipelineLayoutObjectHeader& header = *(PipelineLayoutObjectHeader*)object.getData();
-	const PipelineBindPointRecord* bindPointRecords = (PipelineBindPointRecord*)(&header + 1);
+	const PipelineBindingRecord* bindingRecords = (PipelineBindingRecord*)(&header + 1);
 
-	for (uint8 i = 0; i < header.bindPointCount; i++)
+	for (uint8 i = 0; i < header.bindingCount; i++)
 	{
-		if (bindPointRecords[i].nameXSH == bindPointNameXSH)
+		if (bindingRecords[i].nameXSH == bindingNameXSH)
 		{
-			result = bindPointsMetadata[i];
+			result = bindingsMetadata[i];
 			return true;
 		}
 	}
@@ -153,94 +153,140 @@ ShaderType CompiledShader::getShaderType() const
 	return ShaderType::Undefined;
 }
 
-bool Host::CompilePipelineLayout(Platform platform,
-	const PipelineBindPointDesc* bindPoints, const uint8 bindPointCount, CompiledPipelineLayout& result)
+bool Host::CompileDescriptorSetLayout(Platform platform,
+	const DescriptorSetBindingDesc* bindings, uint8 bindingCount,
+	CompiledDescriptorSetLayout& result)
 {
 	result.destroy();
 
-	if (bindPointCount >= MaxPipelineBindPointCount)
+	if (bindingCount > MaxDescriptorSetBindingCount)
 		return false;
 
-	// TODO: Check for non-unique bind point names
+	// TODO: Check for non-unique binding names, zero name hashes, invalid descriptor types.
 
-	D3D12_ROOT_PARAMETER1 d3dRootParams[MaxPipelineBindPointCount] = {};
-	PipelineBindPointRecord bindPointRecords[MaxPipelineBindPointCount] = {};
-	CompiledPipelineLayout::BindPointMetadata bindPointsMetadata[MaxPipelineBindPointCount] = {};
+	const uint32 headerOffset = 0;
+	const uint32 bindingNameHashesOffset = headerOffset + sizeof(DescriptorSetLayoutObjectHeader);
+	const uint32 bindingDescriptorTypesOffset = bindingNameHashesOffset + sizeof(uint32) * bindingCount;
+	const uint32 objectSize = bindingDescriptorTypesOffset + sizeof(DescriptorType) * bindingCount;
+
+	result.object = Object::Create(objectSize);
+	{
+		byte* objectDataBytes = (byte*)result.object.getMutableData();
+
+		uint32* bindingNameHashes = (uint32*)(objectDataBytes + bindingNameHashesOffset);
+		DescriptorType* bindingDescriptorTypes = (DescriptorType*)(objectDataBytes + bindingDescriptorTypesOffset);
+		for (uint8 i = 0; i < bindingCount; i++)
+		{
+			bindingNameHashes[i] = uint32(XStringHash::Compute(bindings[i].name));
+			bindingDescriptorTypes[i] = bindings[i].descriptorType;
+		}
+
+		const uint32 sourceHash = CRC32::Compute(objectDataBytes + bindingNameHashesOffset,
+			(sizeof(uint32) + sizeof(DescriptorType)) * bindingCount);
+
+		DescriptorSetLayoutObjectHeader& header = *(DescriptorSetLayoutObjectHeader*)(objectDataBytes + headerOffset);
+		header = {};
+		header.generic = {}; // Will be filled later
+		header.sourceHash = sourceHash;
+		header.bindingCount = bindingCount;
+	}
+	result.object.fillGenericHeaderAndFinalize(DescriptorSetLayoutObjectSignature);
+
+	return true;
+}
+
+bool Host::CompilePipelineLayout(Platform platform,
+	const PipelineBindingDesc* bindings, uint8 bindingCount, CompiledPipelineLayout& result)
+{
+	result.destroy();
+
+	if (bindingCount >= MaxPipelineBindingCount)
+		return false;
+
+	// TODO: Check for non-unique binding names.
+
+	D3D12_ROOT_PARAMETER1 d3dRootParams[MaxPipelineBindingCount] = {};
+	PipelineBindingRecord bindingRecords[MaxPipelineBindingCount] = {};
+	CompiledPipelineLayout::BindingMetadata bindingsMetadata[MaxPipelineBindingCount] = {};
 
 	uint8 rootParameterCount = 0;
 	uint8 cbvRegisterCount = 0;
 	uint8 srvRegisterCount = 0;
 	uint8 uavRegisterCount = 0;
-	for (uint32 i = 0; i < bindPointCount; i++)
+	for (uint32 i = 0; i < bindingCount; i++)
 	{
-		const PipelineBindPointDesc& bindPointDesc = bindPoints[i];
-		PipelineBindPointRecord& objectBindPointRecord = bindPointRecords[i];
-		CompiledPipelineLayout::BindPointMetadata& bindPointMetadata = bindPointsMetadata[i];
+		const PipelineBindingDesc& bindingDesc = bindings[i];
+		PipelineBindingRecord& objectBindingRecord = bindingRecords[i];
+		CompiledPipelineLayout::BindingMetadata& bindingMetadata = bindingsMetadata[i];
 
 		const uint8 rootParameterIndex = rootParameterCount;
 		rootParameterCount++;
 
-		XAssert(!bindPointDesc.name.isEmpty());
-		const uint32 bindPointNameXSH = uint32(XStringHash::Compute(bindPointDesc.name));
+		XAssert(!bindingDesc.name.isEmpty());
+		const uint32 bindingNameXSH = uint32(XStringHash::Compute(bindingDesc.name));
 
-		// HAL requires this because user can set bindpoint by name hash and zero hash should be invalid input.
-		XAssert(bindPointNameXSH);
+		// HAL requires this because user can set binding by name hash and zero hash should be invalid input.
+		XAssert(bindingNameXSH);
 
-		objectBindPointRecord.nameXSH = bindPointNameXSH;
-		objectBindPointRecord.type = bindPointDesc.type;
-		objectBindPointRecord.rootParameterIndex = rootParameterIndex;
-		if (bindPointDesc.type == PipelineBindPointType::Constants)
-			objectBindPointRecord.constantsSize32bitValues = bindPointDesc.constantsSize32bitValues;
+		objectBindingRecord.nameXSH = bindingNameXSH;
+		objectBindingRecord.type = bindingDesc.type;
+		objectBindingRecord.rootParameterIndex = rootParameterIndex;
+		if (bindingDesc.type == PipelineBindingType::Constants)
+			objectBindingRecord.constantsSize32bitValues = bindingDesc.constantsSize;
 
 		D3D12_ROOT_PARAMETER1& d3dRootParam = d3dRootParams[rootParameterIndex];
 
-		if (bindPointDesc.type == PipelineBindPointType::Constants)
+		if (bindingDesc.type == PipelineBindingType::Constants)
 		{
 			d3dRootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
 			d3dRootParam.Constants.ShaderRegister = cbvRegisterCount;
 			d3dRootParam.Constants.RegisterSpace = 0;
-			d3dRootParam.Constants.Num32BitValues = bindPointDesc.constantsSize32bitValues;
+			d3dRootParam.Constants.Num32BitValues = bindingDesc.constantsSize;
 
-			bindPointMetadata.registerIndex = cbvRegisterCount;
-			bindPointMetadata.registerType = 'b';
+			bindingMetadata.registerIndex = cbvRegisterCount;
+			bindingMetadata.registerType = 'b';
 
 			cbvRegisterCount++;
 		}
-		else if (bindPointDesc.type == PipelineBindPointType::ConstantBuffer)
+		else if (bindingDesc.type == PipelineBindingType::ConstantBuffer)
 		{
 			d3dRootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 			d3dRootParam.Descriptor.ShaderRegister = cbvRegisterCount;
 			d3dRootParam.Descriptor.RegisterSpace = 0;
 			d3dRootParam.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE;
 
-			bindPointMetadata.registerIndex = cbvRegisterCount;
-			bindPointMetadata.registerType = 'b';
+			bindingMetadata.registerIndex = cbvRegisterCount;
+			bindingMetadata.registerType = 'b';
 
 			cbvRegisterCount++;
 		}
-		else if (bindPointDesc.type == PipelineBindPointType::ReadOnlyBuffer)
+		else if (bindingDesc.type == PipelineBindingType::ReadOnlyBuffer)
 		{
 			d3dRootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
 			d3dRootParam.Descriptor.ShaderRegister = srvRegisterCount;
 			d3dRootParam.Descriptor.RegisterSpace = 0;
 			d3dRootParam.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE;
 
-			bindPointMetadata.registerIndex = srvRegisterCount;
-			bindPointMetadata.registerType = 't';
+			bindingMetadata.registerIndex = srvRegisterCount;
+			bindingMetadata.registerType = 't';
 
 			srvRegisterCount++;
 		}
-		else if (bindPointDesc.type == PipelineBindPointType::ReadWriteBuffer)
+		else if (bindingDesc.type == PipelineBindingType::ReadWriteBuffer)
 		{
 			d3dRootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_UAV;
 			d3dRootParam.Descriptor.ShaderRegister = uavRegisterCount;
 			d3dRootParam.Descriptor.RegisterSpace = 0;
 			d3dRootParam.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE;
 
-			bindPointMetadata.registerIndex = uavRegisterCount;
-			bindPointMetadata.registerType = 'u';
+			bindingMetadata.registerIndex = uavRegisterCount;
+			bindingMetadata.registerType = 'u';
 
 			uavRegisterCount++;
+		}
+		else if (bindingDesc.type == PipelineBindingType::DescriptorSet)
+		{
+			XAssertUnreachableCode(); // Not implemented.
 		}
 		else
 			XAssertUnreachableCode();
@@ -263,8 +309,8 @@ bool Host::CompilePipelineLayout(Platform platform,
 	// Compose compiled object
 
 	const uint32 headerOffset = 0;
-	const uint32 bindPointRecordsOffset = headerOffset + sizeof(PipelineLayoutObjectHeader);
-	const uint32 rootSignatureOffset = bindPointRecordsOffset + sizeof(PipelineBindPointRecord) * bindPointCount;
+	const uint32 bindingRecordsOffset = headerOffset + sizeof(PipelineLayoutObjectHeader);
+	const uint32 rootSignatureOffset = bindingRecordsOffset + sizeof(PipelineBindingRecord) * bindingCount;
 	const uint32 objectSize = rootSignatureOffset + uint32(d3dRootSignature->GetBufferSize());
 
 	result.object = Object::Create(objectSize);
@@ -275,16 +321,16 @@ bool Host::CompilePipelineLayout(Platform platform,
 		header = {};
 		header.generic = {}; // Will be filled later
 		header.sourceHash = 0; // TODO: ...
-		header.bindPointCount = bindPointCount;
+		header.bindingCount = bindingCount;
 
-		memoryCopy(objectDataBytes + bindPointRecordsOffset, bindPointRecords, sizeof(PipelineBindPointRecord) * bindPointCount);
+		memoryCopy(objectDataBytes + bindingRecordsOffset, bindingRecords, sizeof(PipelineBindingRecord) * bindingCount);
 		memoryCopy(objectDataBytes + rootSignatureOffset, d3dRootSignature->GetBufferPointer(), d3dRootSignature->GetBufferSize());
 	}
 	result.object.fillGenericHeaderAndFinalize(PipelineLayoutObjectSignature);
 
 	// Fill compiled object metadata
-	memoryCopy(result.bindPointsMetadata, bindPointsMetadata,
-		sizeof(CompiledPipelineLayout::BindPointMetadata) * bindPointCount);
+	memoryCopy(result.bindingsMetadata, bindingsMetadata,
+		sizeof(CompiledPipelineLayout::BindingMetadata) * bindingCount);
 
 	return true;
 }
@@ -321,16 +367,16 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipeli
 			if (!bindingFound)
 				break;
 
-			InplaceStringASCIIx64 bindPointName;
+			InplaceStringASCIIx64 bindingName;
 			TextSkipWhitespaces(sourceReader);
 			if (sourceReader.getChar() != '(')
 			{
 				TextWriteFmtStdOut("error: invalid binding declaration. Expected `(`\n");
 				return false;
 			}
-			if (!TextReadCIdentifier(sourceReader, bindPointName))
+			if (!TextReadCIdentifier(sourceReader, bindingName))
 			{
-				TextWriteFmtStdOut("error: invalid binding declaration. Expected bind point name identifier\n");
+				TextWriteFmtStdOut("error: invalid binding declaration. Expected binding name identifier\n");
 				return false;
 			}
 			TextSkipWhitespaces(sourceReader);
@@ -340,16 +386,16 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipeli
 				return false;
 			}
 
-			const uint32 bindPointNameXSH = uint32(XStringHash::Compute(bindPointName.getData()));
-			CompiledPipelineLayout::BindPointMetadata bindPointMetadata = {};
-			if (!pipelineLayout.findBindPointMetadata(bindPointNameXSH, bindPointMetadata))
+			const uint32 bindingNameXSH = uint32(XStringHash::Compute(bindingName.getData()));
+			CompiledPipelineLayout::BindingMetadata bindingMetadata = {};
+			if (!pipelineLayout.findBindingMetadata(bindingNameXSH, bindingMetadata))
 			{
-				TextWriteFmtStdOut("error: unknown bind point name `", bindPointName, "'\n");
+				TextWriteFmtStdOut("error: unknown binding name `", bindingName, "'\n");
 				return false;
 			}
 
 			TextWriteFmt(patchedSourceString, "register(",
-				bindPointMetadata.registerType, uint32(bindPointMetadata.registerIndex), ')');
+				bindingMetadata.registerType, uint32(bindingMetadata.registerIndex), ')');
 		}
 
 		patchedSourceString.compact();

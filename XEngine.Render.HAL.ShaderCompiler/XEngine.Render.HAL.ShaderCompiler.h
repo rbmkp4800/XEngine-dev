@@ -36,42 +36,30 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		Pixel,
 	};
 
-	enum class PipelineBindPointShaderVisibility : uint8
-	{
-		All = 0,
-		Vertex,
-		Amplification,
-		Mesh,
-		Pixel,
-	};
-
-	struct PipelineBindPointDesc
+	struct DescriptorSetBindingDesc
 	{
 		XLib::StringViewASCII name;
-		PipelineBindPointType type;
-		PipelineBindPointShaderVisibility shaderVisibility;
-		union
-		{
-			uint8 constantsSize32bitValues;
-			const CompiledDescriptorSetLayout* descriptorSetLayout;
-		};
+		DescriptorType descriptorType;
 	};
 
-	struct DescriptorBindPointDesc
+	struct PipelineBindingDesc
 	{
-		const char* name;
-		DescriptorType descriptorType;
+		XLib::StringViewASCII name;
+		PipelineBindingType type;
+
+		// TODO: shader visibility
+		uint8 constantsSize;
+		const CompiledDescriptorSetLayout* descriptorSetLayout;
 	};
 
 	struct Define
 	{
-		const char* name;
-		const char* value;
+		XLib::StringViewASCII name;
+		XLib::StringViewASCII value;
 	};
 
 	struct GraphicsPipelineDesc
 	{
-		// TODO: Input assempler?
 		const CompiledShader* vertexShader;
 		const CompiledShader* amplificationShader;
 		const CompiledShader* meshShader;
@@ -149,7 +137,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		friend Host;
 
 	private:
-		struct BindPointMetadata
+		struct BindingMetadata
 		{
 			uint8 registerIndex;
 			char registerType; // b/t/u
@@ -157,10 +145,10 @@ namespace XEngine::Render::HAL::ShaderCompiler
 
 	private:
 		Object object;
-		BindPointMetadata bindPointsMetadata[MaxPipelineBindPointCount] = {};
+		BindingMetadata bindingsMetadata[MaxPipelineBindingCount] = {};
 
 	private:
-		bool findBindPointMetadata(uint32 bindPointNameXSH, BindPointMetadata& result) const;
+		bool findBindingMetadata(uint32 bindingNameXSH, BindingMetadata& result) const;
 		uint32 getSourceHash() const;
 
 	public:
@@ -229,11 +217,11 @@ namespace XEngine::Render::HAL::ShaderCompiler
 	{
 	public:
 		static bool CompileDescriptorSetLayout(Platform platform,
-			const DescriptorBindPointDesc* bindPoints, uint8 bindPointCount,
+			const DescriptorSetBindingDesc* bindings, uint8 bindingCount,
 			CompiledDescriptorSetLayout& result);
 
 		static bool CompilePipelineLayout(Platform platform,
-			const PipelineBindPointDesc* bindPoints, uint8 bindPointCount, CompiledPipelineLayout& result);
+			const PipelineBindingDesc* bindings, uint8 bindingCount, CompiledPipelineLayout& result);
 
 		static bool CompileShaderLibrary(Platform platform,
 			const CompiledPipelineLayout& pipelineLayout, const char* source, uint32 sourceLength,

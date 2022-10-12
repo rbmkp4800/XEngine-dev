@@ -76,6 +76,8 @@ public:
 		Colon = ':',
 		Semicolon = ';',
 		Equal = '=',
+		Less = '<',
+		Greater = '>',
 	};
 
 	struct Token

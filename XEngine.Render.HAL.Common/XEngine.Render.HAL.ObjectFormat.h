@@ -6,6 +6,9 @@
 
 namespace XEngine::Render::HAL::ObjectFormat
 {
+	static constexpr uint64 DescriptorSetLayoutObjectSignature = 0;
+	static constexpr uint16 DescriptorSetLayoutObjectCurrentVerstion = 0;
+
 	static constexpr uint64 PipelineLayoutObjectSignature = 0;
 	static constexpr uint16 PipelineLayoutObjectCurrentVerstion = 0;
 
@@ -22,20 +25,30 @@ namespace XEngine::Render::HAL::ObjectFormat
 		uint32 objectCRC32; // CRC-32/zlib
 	};
 
+	struct DescriptorSetLayoutObjectHeader
+	{
+		GenericObjectHeader generic;
+
+		uint32 sourceHash;
+		uint8 bindingCount;
+		uint8 _padding0;
+		uint16 _padding1;
+	};
+
 	struct PipelineLayoutObjectHeader
 	{
 		GenericObjectHeader generic;
 
 		uint32 sourceHash;
-		uint8 bindPointCount;
+		uint8 bindingCount;
 		uint8 _padding0;
 		uint16 _padding1;
 	};
 
-	struct PipelineBindPointRecord
+	struct PipelineBindingRecord
 	{
 		uint32 nameXSH;
-		PipelineBindPointType type;
+		PipelineBindingType type;
 		uint8 rootParameterIndex;
 		uint8 constantsSize32bitValues;
 	};

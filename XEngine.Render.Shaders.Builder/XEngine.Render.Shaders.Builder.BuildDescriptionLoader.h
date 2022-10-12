@@ -6,6 +6,7 @@
 #include <XEngine.Render.HAL.Common.h>
 
 #include "PseudoCTokenizer.h"
+#include "XEngine.Render.Shaders.Builder.DescriptorSetLayoutList.h"
 #include "XEngine.Render.Shaders.Builder.PipelineLayoutList.h"
 #include "XEngine.Render.Shaders.Builder.PipelineList.h"
 #include "XEngine.Render.Shaders.Builder.ShaderList.h"
@@ -28,6 +29,7 @@ namespace XEngine::Render::Shaders::Builder_
 	private:
 		Tokenizer tokenizer;
 
+		DescriptorSetLayoutList& descriptorSetLayoutList;
 		PipelineLayoutList& pipelineLayoutList;
 		PipelineList& pipelineList;
 		ShaderList& shaderList;
@@ -36,6 +38,7 @@ namespace XEngine::Render::Shaders::Builder_
 
 	private:
 		bool expectSimpleToken(TokenType type);
+		bool parseDescriptorSetLayoutDeclaration();
 		bool parsePipelineLayoutDeclaration();
 		bool parseGraphicsPipelineDeclaration();
 		bool parseComputePipelineDeclaration();
@@ -47,6 +50,7 @@ namespace XEngine::Render::Shaders::Builder_
 
 	public:
 		BuildDescriptionLoader(
+			DescriptorSetLayoutList& descriptorSetLayoutList,
 			PipelineLayoutList& pipelineLayoutList,
 			PipelineList& pipelineList,
 			ShaderList& shaderList,

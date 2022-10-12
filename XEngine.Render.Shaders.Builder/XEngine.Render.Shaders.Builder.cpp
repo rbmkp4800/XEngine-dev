@@ -58,29 +58,22 @@ void Builder::run(const char* packPath)
 {
 	sourceCache.initialize("../XEngine.Render.Shaders/");
 
-	BuildDescriptionLoader descriptionLoader(pipelineLayoutList, pipelineList, shaderList, sourceCache);
+	BuildDescriptionLoader descriptionLoader(descriptorSetLayoutList, pipelineLayoutList, pipelineList, shaderList, sourceCache);
 	if (!descriptionLoader.load("../XEngine.Render.Shaders/.LibraryIndex.txt"))
 		return;
 
-#if 0
-
-	BindPointDesc bp0 = {};
-	bp0.name = "name0";
-	bp0.type = HAL::PipelineBindPointType::ConstantBuffer;
-	bp0.shaderVisibility = HAL::ShaderCompiler::PipelineBindPointShaderVisibility::All;
-
-	PipelineLayout& testLayout = *pipelineLayoutsList.createEntry("TestPipelineLayout", &bp0, 1);
-
-	pipelinesList.createGraphicsPipeline(
-		"TestGfxPipeline",
-		testLayout,
-		Builder_::GraphicsPipelineDesc {
-			.vertexShader = shadersList.findOrCreateEntry(ShaderType::Vertex, sourcesCache.findOrCreateEntry("UIColorVS.hlsl"), testLayout),
-			.renderTargetsFormats = { HAL::TexelViewFormat::R8G8B8A8_UNORM },
-		});
-#endif
-
 	// Compile.
+
+	for (DescriptorSetLayout& descriptorSetLayout : descriptorSetLayoutList)
+	{
+		TextWriteFmtStdOut("Compiling descriptor set layout \"", descriptorSetLayout.getName(), "\"\n");
+	
+		if (!descriptorSetLayout.compile())
+		{
+			TextWriteFmtStdOut("Failed to compile descriptor set layout \"", descriptorSetLayout.getName(), "\"\n");
+			return;
+		}
+	}
 
 	for (PipelineLayout& pipelineLayout : pipelineLayoutList)
 	{

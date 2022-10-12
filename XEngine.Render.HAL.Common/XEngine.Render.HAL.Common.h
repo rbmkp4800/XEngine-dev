@@ -4,12 +4,12 @@
 
 namespace XEngine::Render::HAL
 {
-	static constexpr uint8 MaxPipelineBindPointCountLog2 = 4;
-	static constexpr uint8 MaxPipelineBindPointCount = 1 << MaxPipelineBindPointCountLog2;
+	static constexpr uint8 MaxPipelineBindingCount = 32;
+	static constexpr uint8 MaxDescriptorSetBindingCount = 128;
 	static constexpr uint8 MaxRenderTargetCount = 4;
 	static constexpr uint8 MaxGraphicsPipelineBytecodeObjectCount = 3;
 
-	enum class PipelineBindPointType : uint8
+	enum class PipelineBindingType : uint8
 	{
 		Undefined = 0,
 		Constants,
@@ -27,6 +27,7 @@ namespace XEngine::Render::HAL
 		ReadWriteBuffer,
 		ReadOnlyTexture,
 		ReadWriteTexture,
+		Sampler,
 		RaytracingAccelerationStructure,
 	};
 

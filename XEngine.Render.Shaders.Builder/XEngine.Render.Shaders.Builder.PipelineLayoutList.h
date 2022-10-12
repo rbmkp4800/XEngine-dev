@@ -5,11 +5,23 @@
 #include <XLib.NonCopyable.h>
 #include <XLib.String.h>
 
+#include <XEngine.Render.HAL.Common.h>
 #include <XEngine.Render.HAL.ShaderCompiler.h>
+
+#include "XEngine.Render.Shaders.Builder.DescriptorSetLayoutList.h"
 
 namespace XEngine::Render::Shaders::Builder_
 {
 	class PipelineLayoutList;
+
+	struct PipelineBindingDesc
+	{
+		XLib::StringViewASCII name;
+		HAL::PipelineBindingType type;
+
+		uint8 constantsSize;
+		DescriptorSetLayout* descriptorSetLayout;
+	};
 
 	class PipelineLayout : public XLib::NonCopyable
 	{
@@ -21,8 +33,8 @@ namespace XEngine::Render::Shaders::Builder_
 		XLib::StringViewASCII name;
 		uint64 nameXSH = 0;
 
-		HAL::ShaderCompiler::PipelineBindPointDesc* bindPoints = nullptr;
-		uint8 bindPointCount = 0;
+		const PipelineBindingDesc* bindings = nullptr;
+		uint8 bindingCount = 0;
 
 		HAL::ShaderCompiler::CompiledPipelineLayout compiledPipelineLayout;
 
@@ -43,7 +55,7 @@ namespace XEngine::Render::Shaders::Builder_
 	enum class PipelineLayoutCreationStatus
 	{
 		Success = 0,
-		Failure_TooManyBindPoints,
+		Failure_TooManyBindings,
 		Failure_EntryNameDuplication,
 		//Failure_EntryNameHashCollision,
 	};
@@ -80,7 +92,7 @@ namespace XEngine::Render::Shaders::Builder_
 		~PipelineLayoutList() = default;
 
 		PipelineLayoutCreationResult create(XLib::StringViewASCII name,
-			const HAL::ShaderCompiler::PipelineBindPointDesc* bindPoints, uint8 bindPointCount);
+			const PipelineBindingDesc* bindings, uint8 bindingCount);
 
 		PipelineLayout* find(XLib::StringViewASCII name) const;
 

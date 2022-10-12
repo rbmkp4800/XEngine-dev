@@ -131,6 +131,8 @@ auto PseudoCTokenizer::getToken() -> Token
 			case ':':
 			case ';':
 			case '=':
+			case '<':
+			case '>':
 				textReader.getCharUnsafe();
 				return ComposeSimpleToken(TokenType(tokenFirstChar), tokenLine, tokenOffset);
 		}

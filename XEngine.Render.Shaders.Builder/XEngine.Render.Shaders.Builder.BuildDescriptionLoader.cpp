@@ -7,11 +7,6 @@
 
 #include "XEngine.Render.Shaders.Builder.BuildDescriptionLoader.h"
 
-#include "XEngine.Render.Shaders.Builder.PipelineLayoutList.h"
-#include "XEngine.Render.Shaders.Builder.PipelineList.h"
-#include "XEngine.Render.Shaders.Builder.ShaderList.h"
-#include "XEngine.Render.Shaders.Builder.SourceCache.h"
-
 using namespace XLib;
 using namespace XEngine::Render::Shaders::Builder_;
 
@@ -44,6 +39,86 @@ bool BuildDescriptionLoader::expectSimpleToken(TokenType type)
 	return true;
 }
 
+bool BuildDescriptionLoader::parseDescriptorSetLayoutDeclaration()
+{
+	const Token descriptorSetLayoutNameToken = tokenizer.getToken();
+	if (descriptorSetLayoutNameToken.type != TokenType::Identifier)
+	{
+		reportError("expected descriptor set layout name", descriptorSetLayoutNameToken);
+		return false;
+	}
+
+	if (!expectSimpleToken(TokenType('{')))
+		return false;
+
+	InplaceArrayList<HAL::ShaderCompiler::DescriptorSetBindingDesc, HAL::MaxDescriptorSetBindingCount> bindings;
+
+	for (;;)
+	{
+		const Token token = tokenizer.getToken();
+		if (token.type == TokenType('}'))
+			break;
+		if (token.type == PseudoCTokenizer::TokenType::Semicolon)
+			continue;
+
+		if (token.type != TokenType::Identifier)
+		{
+			reportError("expected descriptor type", token);
+			return false;
+		}
+
+		HAL::ShaderCompiler::DescriptorSetBindingDesc binding = {};
+
+		if (String::IsEqual(token.string, "ReadOnlyBufferDescriptor"))
+			binding.descriptorType = HAL::DescriptorType::ReadOnlyBuffer;
+		else if (String::IsEqual(token.string, "ReadWriteBufferDescriptor"))
+			binding.descriptorType = HAL::DescriptorType::ReadWriteBuffer;
+		else if (String::IsEqual(token.string, "ReadOnlyTextureDescriptor"))
+			binding.descriptorType = HAL::DescriptorType::ReadOnlyTexture;
+		else if (String::IsEqual(token.string, "ReadWriteTextureDescriptor"))
+			binding.descriptorType = HAL::DescriptorType::ReadWriteTexture;
+		else if (String::IsEqual(token.string, "RaytracingAccelerationStructureDescriptor"))
+			binding.descriptorType = HAL::DescriptorType::RaytracingAccelerationStructure;
+		else
+		{
+			reportError("unknown descriptor type", token);
+			return false;
+		}
+
+		const Token descriptorNameToken = tokenizer.getToken();
+		if (descriptorNameToken.type != TokenType::Identifier)
+		{
+			reportError("expected descriptor name", descriptorNameToken);
+			return false;
+		}
+
+		binding.name = descriptorNameToken.string;
+
+		if (!expectSimpleToken(TokenType(';')))
+			return false;
+
+		if (bindings.isFull())
+		{
+			reportError("too many descriptors", token);
+			return false;
+		}
+
+		bindings.pushBack(binding);
+	}
+
+	const DescriptorSetLayoutCreationResult descriptorSetLayoutCreationResult =
+		descriptorSetLayoutList.create(descriptorSetLayoutNameToken.string, bindings, uint8(bindings.getSize()));
+
+	if (descriptorSetLayoutCreationResult.status != DescriptorSetLayoutCreationStatus::Success)
+	{
+		// TODO: Proper error handling (hash collision etc).
+		reportError("descriptor set layout redefinition", descriptorSetLayoutNameToken);
+		return false;
+	}
+
+	return true;
+}
+
 bool BuildDescriptionLoader::parsePipelineLayoutDeclaration()
 {
 	const Token pipelineLayoutNameToken = tokenizer.getToken();
@@ -56,7 +131,7 @@ bool BuildDescriptionLoader::parsePipelineLayoutDeclaration()
 	if (!expectSimpleToken(TokenType('{')))
 		return false;
 
-	InplaceArrayList<HAL::ShaderCompiler::PipelineBindPointDesc, HAL::MaxPipelineBindPointCount> bindPoints;
+	InplaceArrayList<PipelineBindingDesc, HAL::MaxPipelineBindingCount> bindings;
 
 	for (;;)
 	{
@@ -66,43 +141,74 @@ bool BuildDescriptionLoader::parsePipelineLayoutDeclaration()
 		if (token.type == PseudoCTokenizer::TokenType::Semicolon)
 			continue;
 
-		HAL::ShaderCompiler::PipelineBindPointDesc bindPointDesc = {};
+		if (token.type != TokenType::Identifier)
+		{
+			reportError("expected binding type", token);
+			return false;
+		}
+
+		PipelineBindingDesc binding = {};
 
 		if (String::IsEqual(token.string, "ConstantBuffer"))
-			bindPointDesc.type = HAL::PipelineBindPointType::ConstantBuffer;
+			binding.type = HAL::PipelineBindingType::ConstantBuffer;
 		else if (String::IsEqual(token.string, "ReadOnlyBuffer"))
-			bindPointDesc.type = HAL::PipelineBindPointType::ReadOnlyBuffer;
+			binding.type = HAL::PipelineBindingType::ReadOnlyBuffer;
 		else if (String::IsEqual(token.string, "ReadWriteBuffer"))
-			bindPointDesc.type = HAL::PipelineBindPointType::ReadWriteBuffer;
+			binding.type = HAL::PipelineBindingType::ReadWriteBuffer;
+		else if (String::IsEqual(token.string, "DescriptorSet"))
+		{
+			if (!expectSimpleToken(TokenType('<')))
+				return false;
+
+			const Token layoutNameToken = tokenizer.getToken();
+			if (layoutNameToken.type != TokenType::Identifier)
+			{
+				reportError("expected descriptor set layout name", layoutNameToken);
+				return false;
+			}
+
+			if (!expectSimpleToken(TokenType('>')))
+				return false;
+
+			DescriptorSetLayout* descriptorSetLayout = descriptorSetLayoutList.find(layoutNameToken.string);
+			if (!descriptorSetLayout)
+			{
+				reportError("undefined descriptor set layout", layoutNameToken);
+				return false;
+			}
+
+			binding.type = HAL::PipelineBindingType::DescriptorSet;
+			binding.descriptorSetLayout = descriptorSetLayout;
+		}
 		else
 		{
-			reportError("unknown bind point type", token);
+			reportError("unknown binding type", token);
 			return false;
 		}
 
-		const Token bindPointNameToken = tokenizer.getToken();
-		if (bindPointNameToken.type != TokenType::Identifier)
+		const Token bindingNameToken = tokenizer.getToken();
+		if (bindingNameToken.type != TokenType::Identifier)
 		{
-			reportError("expected bind point name", bindPointNameToken);
+			reportError("expected binding name", bindingNameToken);
 			return false;
 		}
 
-		bindPointDesc.name = bindPointNameToken.string;
+		binding.name = bindingNameToken.string;
 
 		if (!expectSimpleToken(TokenType(';')))
 			return false;
 
-		if (bindPoints.isFull())
+		if (bindings.isFull())
 		{
-			reportError("too many bind points", token);
+			reportError("too many bindings", token);
 			return false;
 		}
 
-		bindPoints.pushBack(bindPointDesc);
+		bindings.pushBack(binding);
 	}
 
 	const PipelineLayoutCreationResult pipelineLayoutCreationResult =
-		pipelineLayoutList.create(pipelineLayoutNameToken.string, bindPoints, uint8(bindPoints.getSize()));
+		pipelineLayoutList.create(pipelineLayoutNameToken.string, bindings, uint8(bindings.getSize()));
 	
 	if (pipelineLayoutCreationResult.status != PipelineLayoutCreationStatus::Success)
 	{
@@ -138,6 +244,12 @@ bool BuildDescriptionLoader::parseGraphicsPipelineDeclaration()
 			break;
 		if (token.type == TokenType::Semicolon)
 			continue;
+
+		if (token.type != TokenType::Identifier)
+		{
+			reportError("expected graphics pipeline setup statement", token);
+			return false;
+		}
 
 		if (String::IsEqual(token.string, "SetLayout"))
 		{
@@ -411,7 +523,7 @@ PipelineLayout* BuildDescriptionLoader::parseSetLayoutStatement()
 	PipelineLayout* pipelineLayout = pipelineLayoutList.find(layoutNameToken.string);
 	if (!pipelineLayout)
 	{
-		reportError("pipeline layout is not found", layoutNameToken);
+		reportError("undefined pipeline layout", layoutNameToken);
 		return nullptr;
 	}
 
@@ -481,11 +593,13 @@ void BuildDescriptionLoader::reportError(const char* message, const Token& token
 }
 
 BuildDescriptionLoader::BuildDescriptionLoader(
+	DescriptorSetLayoutList& descriptorSetLayoutList,
 	PipelineLayoutList& pipelineLayoutList,
 	PipelineList& pipelineList,
 	ShaderList& shaderList,
 	SourceCache& sourceCache)
 	:
+	descriptorSetLayoutList(descriptorSetLayoutList),
 	pipelineLayoutList(pipelineLayoutList),
 	pipelineList(pipelineList),
 	shaderList(shaderList),
@@ -529,7 +643,12 @@ bool BuildDescriptionLoader::load(const char* pathCStr)
 			return false;
 		}
 
-		if (String::IsEqual(token.string, "PipelineLayout"))
+		if (String::IsEqual(token.string, "DescriptorSetLayout"))
+		{
+			if (!parseDescriptorSetLayoutDeclaration())
+				return false;
+		}
+		else if (String::IsEqual(token.string, "PipelineLayout"))
 		{
 			if (!parsePipelineLayoutDeclaration())
 				return false;

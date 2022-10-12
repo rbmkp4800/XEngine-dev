@@ -42,8 +42,6 @@ namespace XEngine::Render::HAL
 
 	enum class DeviceQueueSyncPoint : uint64 { Zero = 0 };
 
-	//enum class PipelineBindPointId : uint32;
-
 	using DescriptorAddress = uint32;
 
 	static constexpr MemoryBlockHandle ZeroMemoryBlockHandle = MemoryBlockHandle(0);
@@ -311,10 +309,10 @@ namespace XEngine::Render::HAL
 	private:
 		enum class State : uint8;
 
-		struct BindPointResolveResult;
+		struct BindingResolveResult;
 
-		static inline BindPointResolveResult ResolveBindPointByNameXSH(
-			Device* device, PipelineLayoutHandle pipleineLayoutHandle, uint64 bindPointNameXSH);
+		static inline BindingResolveResult ResolveBindingByNameXSH(
+			Device* device, PipelineLayoutHandle pipleineLayoutHandle, uint64 bindingNameXSH);
 
 	private:
 		Device* device = nullptr;
@@ -326,7 +324,6 @@ namespace XEngine::Render::HAL
 		DeviceQueueSyncPoint executionEndSyncPoint = DeviceQueueSyncPoint::Zero;
 		PipelineType currentPipelineType = PipelineType::Undefined;
 		PipelineLayoutHandle currentPipelineLayoutHandle = ZeroPipelineLayoutHandle;
-		//Internal::PipelineBindPointsLUTEntry* pipelineBindPointsLUTShortcut = nullptr;
 
 	public:
 		CommandList() = default;
@@ -348,12 +345,10 @@ namespace XEngine::Render::HAL
 		void setPipelineLayout(PipelineLayoutHandle pipelineLayoutHandle);
 		void setPipeline(PipelineHandle pipelineHandle);
 
-		//void bindConstants(PipelineBindPointId bindPointId, const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0);
-
-		void bindConstants(uint64 bindPointNameXSH, const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0);
-		void bindBuffer(uint64 bindPointNameXSH, BufferBindType bindType, ResourceHandle bufferHandle, uint32 offset = 0);
-		void bindDescriptorSet(uint64 bindPointNameXSH, DescriptorSetHandle descriptorSetHandle);
-		void bindDescriptorArray(uint64 bindPointNameXSH, DescriptorAddress arrayStartAddress);
+		void bindConstants(uint64 bindingNameXSH, const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0);
+		void bindBuffer(uint64 bindingNameXSH, BufferBindType bindType, ResourceHandle bufferHandle, uint32 offset = 0);
+		void bindDescriptorSet(uint64 bindingNameXSH, DescriptorSetHandle descriptorSetHandle);
+		void bindDescriptorArray(uint64 bindingNameXSH, DescriptorAddress arrayStartAddress);
 
 		void draw(uint32 vertexCount, uint32 vertexOffset = 0);
 		void drawIndexed(uint32 indexCount, uint32 indexOffset = 0, uint32 vertexOffset = 0);
@@ -556,8 +551,8 @@ namespace XEngine::Render::HAL
 		void createCommandList(CommandList& commandList, CommandListType type);
 		void destroyCommandList(CommandList& commandList);
 
+		void writeDescriptorSet(DescriptorSetHandle descriptorSet, uint32 bindingNameXSH, ResourceViewHandle resourceViewHandle);
 		void writeDescriptor(DescriptorAddress descriptorAddress, ResourceViewHandle resourceViewHandle);
-		void writeDescriptor(DescriptorSetHandle descriptorSet, uint32 descriptorNameXSH, ResourceViewHandle resourceViewHandle);
 
 		void submitWorkload(DeviceQueue queue, CommandList& commandList);
 		void submitSyncPointWait(DeviceQueue queue, DeviceQueueSyncPoint syncPoint);
@@ -576,7 +571,6 @@ namespace XEngine::Render::HAL
 		void* mapBuffer(ResourceHandle bufferHandle);
 		void unmapBuffer(ResourceHandle bufferHandle);
 
-		//PipelineBindPointId getPipelineBindPointId(PipelineLayoutHandle pipelineLayoutHandle, uint64 bindPointNameXSH) const;
 		uint64 getFenceValue(FenceHandle fenceHandle) const;
 
 		ResourceHandle getSwapChainBackBuffer(SwapChainHandle swapChainHandle, uint32 backBufferIndex) const;
