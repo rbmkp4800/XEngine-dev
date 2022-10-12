@@ -68,8 +68,12 @@ bool BuildDescriptionLoader::parsePipelineLayoutDeclaration()
 
 		HAL::ShaderCompiler::PipelineBindPointDesc bindPointDesc = {};
 
-		if (String::IsEqual(token.string, "ReadOnlyBuffer"))
+		if (String::IsEqual(token.string, "ConstantBuffer"))
+			bindPointDesc.type = HAL::PipelineBindPointType::ConstantBuffer;
+		else if (String::IsEqual(token.string, "ReadOnlyBuffer"))
 			bindPointDesc.type = HAL::PipelineBindPointType::ReadOnlyBuffer;
+		else if (String::IsEqual(token.string, "ReadWriteBuffer"))
+			bindPointDesc.type = HAL::PipelineBindPointType::ReadWriteBuffer;
 		else
 		{
 			reportError("unknown bind point type", token);
@@ -473,7 +477,7 @@ Shader* BuildDescriptionLoader::parseSetShaderStatement(
 
 void BuildDescriptionLoader::reportError(const char* message, const Token& token)
 {
-	TextWriteFmtStdOut(path, ':', token.line + 1, ':', token.offset + 1, ": ", message, '\n');
+	TextWriteFmtStdOut(path, ':', token.line + 1, ':', token.offset + 1, ": error: ", message, '\n');
 }
 
 BuildDescriptionLoader::BuildDescriptionLoader(

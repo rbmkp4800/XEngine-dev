@@ -13,6 +13,11 @@
   <ItemGroup>
     <CustomBuild Include=".LibraryIndex.txt" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\XEngine.Render.Shaders.Builder\XEngine.Render.Shaders.Builder.vcxproj">
+      <Project>{981d9fcb-69bd-47d9-8033-15f5b4621a85}</Project>
+    </ProjectReference>
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{E6AF7FDC-1839-4501-96B6-389AB9CAFDDB}</ProjectGuid>
