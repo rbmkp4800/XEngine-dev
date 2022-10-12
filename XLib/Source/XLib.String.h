@@ -162,6 +162,13 @@ namespace XLib
 
 	template <typename TextWriter, typename CharType>
 	inline bool TextWriteFmt_HandleArg(TextWriter& writer, const StringView<CharType>& string);
+
+	// TODO: Revisit these:
+	template <typename TextWriter, typename CharType, uintptr Capacity, typename CounterType>
+	inline bool TextWriteFmt_HandleArg(TextWriter& writer, const InplaceString<CharType, Capacity, CounterType>& string) { return TextWriteFmt_HandleArg(writer, StringView<CharType>(string)); }
+
+	template <typename TextWriter, typename CharType, typename CounterType, typename AllocatorType>
+	inline bool TextWriteFmt_HandleArg(TextWriter& writer, const DynamicString<CharType>& string) { return TextWriteFmt_HandleArg(writer, StringView<CharType>(string)); }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

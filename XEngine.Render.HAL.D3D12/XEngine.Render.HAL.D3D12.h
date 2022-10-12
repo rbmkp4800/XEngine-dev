@@ -99,6 +99,7 @@ namespace XEngine::Render::HAL
 
 	enum class BufferFlags : uint8
 	{
+		None = 0,
 		AllowShaderWrite = 0x01,
 		// AllowRaytracingAccelerationStructure
 	};
@@ -310,6 +311,11 @@ namespace XEngine::Render::HAL
 	private:
 		enum class State : uint8;
 
+		struct BindPointResolveResult;
+
+		static inline BindPointResolveResult ResolveBindPointByNameXSH(
+			Device* device, PipelineLayoutHandle pipleineLayoutHandle, uint64 bindPointNameXSH);
+
 	private:
 		Device* device = nullptr;
 		ID3D12GraphicsCommandList7* d3dCommandList = nullptr;
@@ -321,8 +327,6 @@ namespace XEngine::Render::HAL
 		PipelineType currentPipelineType = PipelineType::Undefined;
 		PipelineLayoutHandle currentPipelineLayoutHandle = ZeroPipelineLayoutHandle;
 		//Internal::PipelineBindPointsLUTEntry* pipelineBindPointsLUTShortcut = nullptr;
-
-	private:
 
 	public:
 		CommandList() = default;
@@ -491,6 +495,10 @@ namespace XEngine::Render::HAL
 		void initialize(ID3D12Device10* d3dDevice);
 
 	public:
+		static constexpr uint32 ConstantBufferSizeLimit = 0x10000;
+		static constexpr uint32 ConstantBufferBindAlignment = 0x100;
+
+	public:
 		Device() = default;
 		~Device() = default;
 
@@ -563,6 +571,10 @@ namespace XEngine::Render::HAL
 
 		void* mapHostVisibleMemoryBlock(MemoryBlockHandle hostVisibleMemoryBlock);
 		void unmapHostVisibleMemoryBlock(MemoryBlockHandle hostVisibleMemoryBlock);
+
+		// TODO: Remove. Temporary solution.
+		void* mapBuffer(ResourceHandle bufferHandle);
+		void unmapBuffer(ResourceHandle bufferHandle);
 
 		//PipelineBindPointId getPipelineBindPointId(PipelineLayoutHandle pipelineLayoutHandle, uint64 bindPointNameXSH) const;
 		uint64 getFenceValue(FenceHandle fenceHandle) const;

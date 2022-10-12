@@ -22,6 +22,8 @@ using namespace XLib::Platform;
 using namespace XEngine::Render::HAL;
 //using namespace XEngine::Render::HAL::Internal;
 
+static_assert(Device::ConstantBufferBindAlignment >= D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+
 static COMPtr<IDXGIFactory7> dxgiFactory;
 static COMPtr<ID3D12Debug3> d3dDebug;
 
@@ -237,6 +239,7 @@ namespace // Device queue sync points
 struct Device::MemoryBlock
 {
 	ID3D12Heap* d3dHeap;
+	MemoryType type;
 	uint8 handleGeneration;
 };
 
@@ -311,6 +314,32 @@ enum class CommandList::State : uint8
 	Recording,
 	Executing,
 };
+
+struct CommandList::BindPointResolveResult
+{
+	PipelineBindPointType type;
+	uint8 rootParameterIndex;
+	uint8 constantsSize;
+};
+
+inline CommandList::BindPointResolveResult CommandList::ResolveBindPointByNameXSH(
+	Device* device, PipelineLayoutHandle pipleineLayoutHandle, uint64 bindPointNameXSH)
+{
+	Device::PipelineLayout& pipelineLayout = device->getPipelineLayoutByHandle(pipleineLayoutHandle);
+	for (uint8 i = 0; i < pipelineLayout.bindPointCount; i++)
+	{
+		ObjectFormat::PipelineBindPointRecord& bindPoint = pipelineLayout.bindPoints[i];
+		if (bindPoint.nameXSH == uint32(bindPointNameXSH))
+		{
+			BindPointResolveResult result = {};
+			result.type = bindPoint.type;
+			result.rootParameterIndex = bindPoint.rootParameterIndex;
+			result.constantsSize = bindPoint.constantsSize32bitValues;
+			return result;
+		}
+	}
+	XEAssertUnreachableCode();
+}
 
 //inline PipelineBindPointsLUTEntry CommandList::lookupBindPointsLUT(uint32 bindPointNameXSH) const
 //{
@@ -503,35 +532,35 @@ void CommandList::bindBuffer(uint64 bindPointNameXSH,
 	//XEAssertImply(bindType == BufferBindType::Constant, bindPointsLUTEntry.getType() == PipelineBindPointType::ConstantBuffer);
 	//XEAssertImply(bindType == BufferBindType::ReadOnly, bindPointsLUTEntry.getType() == PipelineBindPointType::ReadOnlyBuffer);
 	//XEAssertImply(bindType == BufferBindType::ReadWrite, bindPointsLUTEntry.getType() == PipelineBindPointType::ReadWriteBuffer);
-	//const uint32 rootParameterIndex = bindPointsLUTEntry.getRootParameterIndex();
-	XEAssertUnreachableCode(); // Not implemented.
-	const uint32 rootParameterIndex = 0;
+	
+	const BindPointResolveResult resolvedBindPoint = ResolveBindPointByNameXSH(device, currentPipelineLayoutHandle, bindPointNameXSH);
 
 	const Device::Resource& resource = device->getResourceByHandle(bufferHandle);
 	XEAssert(resource.type == ResourceType::Buffer);
 	XEAssert(resource.d3dResource);
 
 	const uint64 bufferAddress = resource.d3dResource->GetGPUVirtualAddress() + offset;
+	XEAssert(imply(bindType == BufferBindType::Constant, bufferAddress % Device::ConstantBufferBindAlignment == 0));
 
 	if (currentPipelineType == PipelineType::Graphics)
 	{
 		if (bindType == BufferBindType::Constant)
-			d3dCommandList->SetGraphicsRootConstantBufferView(rootParameterIndex, bufferAddress);
+			d3dCommandList->SetGraphicsRootConstantBufferView(resolvedBindPoint.rootParameterIndex, bufferAddress);
 		else if (bindType == BufferBindType::ReadOnly)
-			d3dCommandList->SetGraphicsRootShaderResourceView(rootParameterIndex, bufferAddress);
+			d3dCommandList->SetGraphicsRootShaderResourceView(resolvedBindPoint.rootParameterIndex, bufferAddress);
 		else if (bindType == BufferBindType::ReadWrite)
-			d3dCommandList->SetGraphicsRootUnorderedAccessView(rootParameterIndex, bufferAddress);
+			d3dCommandList->SetGraphicsRootUnorderedAccessView(resolvedBindPoint.rootParameterIndex, bufferAddress);
 		else
 			XEAssertUnreachableCode();
 	}
 	else if (currentPipelineType == PipelineType::Compute)
 	{
 		if (bindType == BufferBindType::Constant)
-			d3dCommandList->SetComputeRootConstantBufferView(rootParameterIndex, bufferAddress);
+			d3dCommandList->SetComputeRootConstantBufferView(resolvedBindPoint.rootParameterIndex, bufferAddress);
 		else if (bindType == BufferBindType::ReadOnly)
-			d3dCommandList->SetComputeRootShaderResourceView(rootParameterIndex, bufferAddress);
+			d3dCommandList->SetComputeRootShaderResourceView(resolvedBindPoint.rootParameterIndex, bufferAddress);
 		else if (bindType == BufferBindType::ReadWrite)
-			d3dCommandList->SetComputeRootUnorderedAccessView(rootParameterIndex, bufferAddress);
+			d3dCommandList->SetComputeRootUnorderedAccessView(resolvedBindPoint.rootParameterIndex, bufferAddress);
 		else
 			XEAssertUnreachableCode();
 	}
@@ -876,11 +905,11 @@ MemoryBlockHandle Device::allocateMemory(uint64 size, MemoryType memoryType)
 	MemoryBlock& memoryBlock = memoryBlockTable[memoryBlockIndex];
 	XEAssert(!memoryBlock.d3dHeap);
 
-	const D3D12_HEAP_TYPE d3dHeapType = TranslateMemoryTypeToD3D12HeapType(memoryType);
+	memoryBlock.type = memoryType;
 
 	D3D12_HEAP_DESC d3dHeapDesc = {};
 	d3dHeapDesc.SizeInBytes = size;
-	d3dHeapDesc.Properties = D3D12Helpers::HeapProperties(d3dHeapType);
+	d3dHeapDesc.Properties = D3D12Helpers::HeapProperties(TranslateMemoryTypeToD3D12HeapType(memoryType));
 	d3dHeapDesc.Alignment = 0;
 	d3dHeapDesc.Flags = D3D12_HEAP_FLAG_CREATE_NOT_ZEROED | D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES;
 	// TODO: Check D3D12_RESOURCE_HEAP_TIER_2 during starup. We need it for `D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES`.
@@ -920,8 +949,19 @@ ResourceHandle Device::createBuffer(uint64 size, BufferFlags flags,
 		&d3dResourceDesc, D3D12_BARRIER_LAYOUT_UNDEFINED, nullptr, 0, nullptr,
 		IID_PPV_ARGS(&resource.d3dResource));
 #else
+
+	D3D12_RESOURCE_STATES d3dInitialState = D3D12_RESOURCE_STATE_COMMON;
+	if (memoryBlock.type == MemoryType::DeviceLocal)
+		d3dInitialState = D3D12_RESOURCE_STATE_COMMON;
+	else if (memoryBlock.type == MemoryType::DeviceReadHostWrite)
+		d3dInitialState = D3D12_RESOURCE_STATE_GENERIC_READ;
+	else if (memoryBlock.type == MemoryType::DeviceWriteHostRead)
+		d3dInitialState = D3D12_RESOURCE_STATE_COPY_DEST;
+	else
+		XEAssertUnreachableCode();
+
 	d3dDevice->CreatePlacedResource1(memoryBlock.d3dHeap, memoryBlockOffset,
-		&d3dResourceDesc, D3D12_RESOURCE_STATE_COMMON, nullptr,
+		&d3dResourceDesc, d3dInitialState, nullptr,
 		IID_PPV_ARGS(&resource.d3dResource));
 #endif
 
@@ -1516,6 +1556,16 @@ bool Device::isQueueSyncPointReached(DeviceQueueSyncPoint syncPoint) const
 
 	const uint64 currentFenceCounterValue = d3dGraphicsQueueSyncPointFence->GetCompletedValue();
 	return IsDeviceQueueSyncPointFenceCounterValueReached(currentFenceCounterValue, decomposedSyncPoint.queueFenceCounterValue);
+}
+
+void* Device::mapBuffer(ResourceHandle bufferHandle)
+{
+	const Device::Resource& buffer = getResourceByHandle(bufferHandle);
+	XEAssert(buffer.type == ResourceType::Buffer && buffer.d3dResource);
+
+	void* result = nullptr;
+	buffer.d3dResource->Map(0, nullptr, &result);
+	return result;
 }
 
 uint64 Device::getFenceValue(FenceHandle fenceHandle) const

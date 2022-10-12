@@ -323,19 +323,33 @@ bool Host::CompileShader(Platform platform, const CompiledPipelineLayout& pipeli
 
 			InplaceStringASCIIx64 bindPointName;
 			TextSkipWhitespaces(sourceReader);
-			if (!TextReadCIdentifier(sourceReader, bindPointName))
+			if (sourceReader.getChar() != '(')
+			{
+				TextWriteFmtStdOut("error: invalid binding declaration. Expected `(`\n");
 				return false;
+			}
+			if (!TextReadCIdentifier(sourceReader, bindPointName))
+			{
+				TextWriteFmtStdOut("error: invalid binding declaration. Expected bind point name identifier\n");
+				return false;
+			}
 			TextSkipWhitespaces(sourceReader);
 			if (sourceReader.getChar() != ')')
+			{
+				TextWriteFmtStdOut("error: invalid binding declaration. Expected `)`\n");
 				return false;
+			}
 
 			const uint32 bindPointNameXSH = uint32(XStringHash::Compute(bindPointName.getData()));
 			CompiledPipelineLayout::BindPointMetadata bindPointMetadata = {};
 			if (!pipelineLayout.findBindPointMetadata(bindPointNameXSH, bindPointMetadata))
+			{
+				TextWriteFmtStdOut("error: unknown bind point name `", bindPointName, "'\n");
 				return false;
+			}
 
-			TextWriteFmt(patchedSourceString, ": register(",
-				bindPointMetadata.registerType, bindPointMetadata.registerIndex, ')');
+			TextWriteFmt(patchedSourceString, "register(",
+				bindPointMetadata.registerType, uint32(bindPointMetadata.registerIndex), ')');
 		}
 
 		patchedSourceString.compact();
