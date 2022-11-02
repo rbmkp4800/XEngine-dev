@@ -165,9 +165,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="XEngine.Render.HAL.Common.h" />
-    <ClInclude Include="XEngine.Render.HAL.ObjectFormat.h" />
+    <ClInclude Include="XEngine.Render.HAL.BlobFormat.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="XEngine.Render.HAL.BlobFormat.cpp" />
     <ClCompile Include="XEngine.Render.HAL.Common.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

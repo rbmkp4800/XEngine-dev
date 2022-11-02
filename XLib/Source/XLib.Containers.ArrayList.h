@@ -312,12 +312,12 @@ namespace XLib
 	template <typename Type, typename CounterType, bool IsSafe, typename AllocatorType>
 	template <typename ... ConstructorArgsTypes>
 	inline Type& ArrayList<Type, CounterType, IsSafe, AllocatorType>::
-		emplaceBack(ConstructorArgsTypes&& ... args)
+		emplaceBack(ConstructorArgsTypes&& ... constructorArgs)
 	{
 		ensureCapacity(size + 1);
 
 		Type& result = buffer[size];
-		construct(result, forwardRValue<ConstructorArgsTypes>(args) ...);
+		construct(result, forwardRValue<ConstructorArgsTypes>(constructorArgs) ...);
 		size++;
 
 		return result;
@@ -330,10 +330,7 @@ namespace XLib
 		ensureCapacity(size + 1);
 
 		Type& result = buffer[size];
-		if constexpr (IsSafe)
-			construct(result, value);
-		else
-			result = value;
+		construct(result, value);
 		size++;
 
 		return result;
@@ -405,14 +402,34 @@ namespace XLib
 	}
 
 	template <typename Type, uintptr Capacity, typename CounterType, bool IsSafe>
+	template <typename ... ConstructorArgsTypes>
+	inline auto InplaceArrayList<Type, Capacity, CounterType, IsSafe>::
+		emplaceBack(ConstructorArgsTypes&& ... constructorArgs) -> Type&
+	{
+		Type& result = buffer[size];
+		construct(result, forwardRValue<ConstructorArgsTypes>(constructorArgs) ...);
+		size++;
+
+		return result;
+	}
+
+	template <typename Type, uintptr Capacity, typename CounterType, bool IsSafe>
 	inline auto InplaceArrayList<Type, Capacity, CounterType, IsSafe>::
 		pushBack(const Type& value) -> Type&
 	{
 		Type& result = buffer[size];
-		if constexpr (IsSafe)
-			construct(result, value);
-		else
-			result = value;
+		construct(result, value);
+		size++;
+
+		return result;
+	}
+
+	template <typename Type, uintptr Capacity, typename CounterType, bool IsSafe>
+	inline auto InplaceArrayList<Type, Capacity, CounterType, IsSafe>::
+		pushBack(Type&& value) -> Type&
+	{
+		Type& result = buffer[size];
+		construct(result, asRValue(value));
 		size++;
 
 		return result;

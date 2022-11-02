@@ -10,7 +10,13 @@
 using namespace XLib;
 using namespace XEngine::Render;
 
-// TODO: Implement proper search for `getPipelineLayout` and `getPipeline`.
+// TODO: Implement proper search for all getters.
+
+struct ShaderLibrary::DescriptorSetLayout
+{
+	uint64 nameXSH;
+	HAL::DescriptorSetLayoutHandle halDescriptorSetLayout;
+};
 
 struct ShaderLibrary::PipelineLayout
 {
@@ -33,8 +39,10 @@ ShaderLibrary::~ShaderLibrary()
 		// TODO: Do this properly.
 		SystemHeapAllocator::Release(pipelineLayoutTable);
 
+		descriptorSetLayoutTable = nullptr;
 		pipelineLayoutTable = nullptr;
 		pipelineTable = nullptr;
+		descriptorSetLayoutCount = 0;
 		pipelineLayoutCount = 0;
 		pipelineCount = 0;
 	}
@@ -61,14 +69,14 @@ void ShaderLibrary::load(const char* packPath)
 	XEMasterAssert(packHeader.version == PackCurrentVersion);
 	XEMasterAssert(packHeader.pipelineLayoutCount > 0);
 	XEMasterAssert(packHeader.pipelineCount > 0);
-	XEMasterAssert(packHeader.bytecodeObjectCount > 0);
+	XEMasterAssert(packHeader.bytecodeBlobCount > 0);
 
-	const uint32 objectsBaseOffsetCheck = sizeof(PackHeader) +
+	const uint32 blobsDataOffset = sizeof(PackHeader) +
 		sizeof(PipelineLayoutRecord) * packHeader.pipelineLayoutCount +
 		sizeof(PipelineRecord) * packHeader.pipelineCount +
-		sizeof(ObjectRecord) * packHeader.bytecodeObjectCount;
-	XEMasterAssert(packHeader.objectsBaseOffset == objectsBaseOffsetCheck);
-	XEMasterAssert(packHeader.objectsBaseOffset < packFileSize);
+		sizeof(BlobRecord) * packHeader.bytecodeBlobCount;
+	XEMasterAssert(packHeader.blobsDataOffset == blobsDataOffset);
+	XEMasterAssert(packHeader.blobsDataOffset < packFileSize);
 
 	pipelineLayoutCount = packHeader.pipelineLayoutCount;
 	pipelineCount = packHeader.pipelineCount;
@@ -94,13 +102,13 @@ void ShaderLibrary::load(const char* packPath)
 
 	const PipelineLayoutRecord* pipelineLayoutRecords = (PipelineLayoutRecord*)(packData + sizeof(PackHeader));
 	const PipelineRecord* pipelineRecords = (PipelineRecord*)(pipelineLayoutRecords + packHeader.pipelineLayoutCount);
-	const ObjectRecord* bytecodeObjectRecords = (ObjectRecord*)(pipelineRecords + packHeader.pipelineCount);
-	const byte* objectsDataBegin = (byte*)(bytecodeObjectRecords + packHeader.bytecodeObjectCount);
-	XEAssert(uintptr(objectsDataBegin) == uintptr(packData) + objectsBaseOffsetCheck);
+	const BlobRecord* bytecodeBlobRecords = (BlobRecord*)(pipelineRecords + packHeader.pipelineCount);
+	const byte* blobsDataBegin = (byte*)(bytecodeBlobRecords + packHeader.bytecodeBlobCount);
+	XEAssert(uintptr(blobsDataBegin) == uintptr(packData) + blobsDataOffset);
 
 	byte* packDataEnd = packData + packFileSize;
-	XEAssert(objectsDataBegin < packDataEnd);
-	const uint64 objectsDataSize = packDataEnd - objectsDataBegin;
+	XEAssert(blobsDataBegin < packDataEnd);
+	const uint64 blobsDataSize = packDataEnd - blobsDataBegin;
 
 	uint64 prevNameXSH = 0;
 
@@ -109,11 +117,11 @@ void ShaderLibrary::load(const char* packPath)
 		const PipelineLayoutRecord& pipelineLayoutRecord = pipelineLayoutRecords[pipelineLayoutIndex];
 		PipelineLayout& pipelineLayout = pipelineLayoutTable[pipelineLayoutIndex];
 
-		HAL::ObjectDataView pipelineLayoutObject = {};
-		pipelineLayoutObject.data = objectsDataBegin + pipelineLayoutRecord.object.offset;
-		pipelineLayoutObject.size = pipelineLayoutRecord.object.size;
+		HAL::BlobDataView pipelineLayoutBlob = {};
+		pipelineLayoutBlob.data = blobsDataBegin + pipelineLayoutRecord.blob.offset;
+		pipelineLayoutBlob.size = pipelineLayoutRecord.blob.size;
 
-		pipelineLayout.halPipelineLayout = halDevice.createPipelineLayout(pipelineLayoutObject);
+		pipelineLayout.halPipelineLayout = halDevice.createPipelineLayout(pipelineLayoutBlob);
 		pipelineLayout.nameXSH = pipelineLayoutRecord.nameXSH;
 
 		XEMasterAssert(prevNameXSH < pipelineLayout.nameXSH); // Check order.
@@ -133,61 +141,60 @@ void ShaderLibrary::load(const char* packPath)
 		if (pipelineRecord.isGraphics)
 		{
 			XEMasterAssert(
-				pipelineRecord.graphicsBaseObject.offset + pipelineRecord.graphicsBaseObject.size <= objectsDataSize);
+				pipelineRecord.graphicsBaseBlob.offset + pipelineRecord.graphicsBaseBlob.size <= blobsDataSize);
 
-			HAL::ObjectDataView graphicsBaseObject = {};
-			graphicsBaseObject.data = objectsDataBegin + pipelineRecord.graphicsBaseObject.offset;
-			graphicsBaseObject.size = pipelineRecord.graphicsBaseObject.size;
+			HAL::BlobDataView graphicsBaseBlob = {};
+			graphicsBaseBlob.data = blobsDataBegin + pipelineRecord.graphicsBaseBlob.offset;
+			graphicsBaseBlob.size = pipelineRecord.graphicsBaseBlob.size;
 
-			HAL::ObjectDataView bytecodeObjects[HAL::MaxGraphicsPipelineBytecodeObjectCount] = {};
-			uint8 bytecodeObjectCount = 0;
+			HAL::BlobDataView bytecodeBlobs[HAL::MaxGraphicsPipelineBytecodeBlobCount] = {};
+			uint8 bytecodeBlobCount = 0;
 
-			// Fill `bytecodeObjects`.
-			bool invalidBytecodeObjectIndexReached = false;
-			for (uint8 i = 0; i < countof(pipelineRecord.bytecodeObjectsIndices); i++)
+			// Fill `bytecodeBlobs`.
+			bool invalidBytecodeBlobIndexReached = false;
+			for (uint8 i = 0; i < countof(pipelineRecord.bytecodeBlobIndices); i++)
 			{
-				const uint16 bytecodeObjectIndex = pipelineRecord.bytecodeObjectsIndices[i];
-				if (bytecodeObjectIndex == uint16(-1))
+				const uint16 bytecodeBlobIndex = pipelineRecord.bytecodeBlobIndices[i];
+				if (bytecodeBlobIndex == uint16(-1))
 				{
-					invalidBytecodeObjectIndexReached = true;
+					invalidBytecodeBlobIndexReached = true;
 					continue;
 				}
 
-				XEMasterAssert(!invalidBytecodeObjectIndexReached);
-				XEMasterAssert(i < HAL::MaxGraphicsPipelineBytecodeObjectCount);
-				XEMasterAssert(bytecodeObjectIndex < packHeader.bytecodeObjectCount);
-				const ObjectRecord& bytecodeObjectRecord = bytecodeObjectRecords[bytecodeObjectIndex];
+				XEMasterAssert(!invalidBytecodeBlobIndexReached);
+				XEMasterAssert(i < HAL::MaxGraphicsPipelineBytecodeBlobCount);
+				XEMasterAssert(bytecodeBlobIndex < packHeader.bytecodeBlobCount);
+				const BlobRecord& bytecodeBlobRecord = bytecodeBlobRecords[bytecodeBlobIndex];
 
-				XEMasterAssert(bytecodeObjectRecord.offset + bytecodeObjectRecord.size <= objectsDataSize);
+				XEMasterAssert(bytecodeBlobRecord.offset + bytecodeBlobRecord.size <= blobsDataSize);
 
-				bytecodeObjects[i].data = objectsDataBegin + bytecodeObjectRecord.offset;
-				bytecodeObjects[i].size = bytecodeObjectRecord.size;
-				bytecodeObjectCount++;
+				bytecodeBlobs[i].data = blobsDataBegin + bytecodeBlobRecord.offset;
+				bytecodeBlobs[i].size = bytecodeBlobRecord.size;
+				bytecodeBlobCount++;
 			}
 
-			XEMasterAssert(bytecodeObjectCount > 0);
+			XEMasterAssert(bytecodeBlobCount > 0);
 
 			pipeline.halPipeline = halDevice.createGraphicsPipeline(
 				pipelineLayout.halPipelineLayout,
-				graphicsBaseObject, bytecodeObjects, bytecodeObjectCount,
-				HAL::RasterizerDesc{}, HAL::DepthStencilDesc{}, HAL::BlendDesc{});
+				graphicsBaseBlob, bytecodeBlobs, bytecodeBlobCount);
 		}
 		else
 		{
 			// TODO: Asserts everywhere.
-			// TODO: Check that all bytecode object indicies after first are invalid.
-			const uint16 computeShaderObjectIndex = pipelineRecord.bytecodeObjectsIndices[0];
-			XEMasterAssert(computeShaderObjectIndex < packHeader.bytecodeObjectCount);
-			const ObjectRecord& computeShaderObjectRecord = bytecodeObjectRecords[computeShaderObjectIndex];
+			// TODO: Check that all bytecode blob indicies after first are invalid.
+			const uint16 computeShaderBlobIndex = pipelineRecord.bytecodeBlobIndices[0];
+			XEMasterAssert(computeShaderBlobIndex < packHeader.bytecodeBlobCount);
+			const BlobRecord& computeShaderBlobRecord = bytecodeBlobRecords[computeShaderBlobIndex];
 
-			XEMasterAssert(computeShaderObjectRecord.offset + computeShaderObjectRecord.size <= objectsDataSize);
+			XEMasterAssert(computeShaderBlobRecord.offset + computeShaderBlobRecord.size <= blobsDataSize);
 
-			HAL::ObjectDataView computeShaderObject = {};
-			computeShaderObject.data = objectsDataBegin + computeShaderObjectRecord.offset;
-			computeShaderObject.size = computeShaderObjectRecord.size;
+			HAL::BlobDataView computeShaderBlob = {};
+			computeShaderBlob.data = blobsDataBegin + computeShaderBlobRecord.offset;
+			computeShaderBlob.size = computeShaderBlobRecord.size;
 
 			pipeline.halPipeline = halDevice.createComputePipeline(
-				pipelineLayout.halPipelineLayout, computeShaderObject);
+				pipelineLayout.halPipelineLayout, computeShaderBlob);
 		}
 
 		pipeline.nameXSH = pipelineRecord.nameXSH;
@@ -198,6 +205,16 @@ void ShaderLibrary::load(const char* packPath)
 	}
 
 	SystemHeapAllocator::Release(packData);
+}
+
+HAL::DescriptorSetLayoutHandle ShaderLibrary::getDescriptorSetLayout(uint64 nameXSH) const
+{
+	for (uint32 i = 0; i < descriptorSetLayoutCount; i++)
+	{
+		if (descriptorSetLayoutTable[i].nameXSH == nameXSH)
+			return descriptorSetLayoutTable[i].halDescriptorSetLayout;
+	}
+	XEMasterAssertUnreachableCode();
 }
 
 HAL::PipelineLayoutHandle ShaderLibrary::getPipelineLayout(uint64 nameXSH) const

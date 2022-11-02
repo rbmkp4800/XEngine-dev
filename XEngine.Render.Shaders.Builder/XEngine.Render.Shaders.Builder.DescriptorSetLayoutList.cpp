@@ -14,9 +14,9 @@ bool DescriptorSetLayout::compile()
 }
 
 DescriptorSetLayoutCreationResult DescriptorSetLayoutList::create(XLib::StringViewASCII name,
-	const HAL::ShaderCompiler::DescriptorSetBindingDesc* bindings, uint8 bindingCount)
+	const HAL::ShaderCompiler::DescriptorSetNestedBindingDesc* bindings, uint8 bindingCount)
 {
-	if (bindingCount > HAL::MaxDescriptorSetBindingCount)
+	if (bindingCount > HAL::MaxDescriptorSetNestedBindingCount)
 		return DescriptorSetLayoutCreationResult { DescriptorSetLayoutCreationStatus::Failure_TooManyBindings };
 
 	const uint64 nameXSH = XStringHash::Compute(name);
@@ -31,12 +31,12 @@ DescriptorSetLayoutCreationResult DescriptorSetLayoutList::create(XLib::StringVi
 	memoryBlockSizeAccum = alignUp<uint32>(memoryBlockSizeAccum, 16);
 
 	const uint32 bindingsMemoryOffset = memoryBlockSizeAccum;
-	memoryBlockSizeAccum += sizeof(HAL::ShaderCompiler::DescriptorSetBindingDesc) * bindingCount;
+	memoryBlockSizeAccum += sizeof(HAL::ShaderCompiler::DescriptorSetNestedBindingDesc) * bindingCount;
 
 	const uint32 nameMemoryOffset = memoryBlockSizeAccum;
 	memoryBlockSizeAccum += uint32(name.getLength()) + 1;
 
-	uint32 bindingNamesMemoryOffsets[HAL::MaxDescriptorSetBindingCount] = {};
+	uint32 bindingNamesMemoryOffsets[HAL::MaxDescriptorSetNestedBindingCount] = {};
 	for (uint8 i = 0; i < bindingCount; i++)
 	{
 		bindingNamesMemoryOffsets[i] = memoryBlockSizeAccum;
@@ -52,12 +52,12 @@ DescriptorSetLayoutCreationResult DescriptorSetLayoutList::create(XLib::StringVi
 	memoryCopy(nameMemory, name.getData(), name.getLength());
 	nameMemory[name.getLength()] = '\0';
 
-	HAL::ShaderCompiler::DescriptorSetBindingDesc* bindingsMemory =
-		(HAL::ShaderCompiler::DescriptorSetBindingDesc*)(descriptorSetLayoutMemory + bindingsMemoryOffset);
+	HAL::ShaderCompiler::DescriptorSetNestedBindingDesc* bindingsMemory =
+		(HAL::ShaderCompiler::DescriptorSetNestedBindingDesc*)(descriptorSetLayoutMemory + bindingsMemoryOffset);
 	for (uint8 i = 0; i < bindingCount; i++)
 	{
-		const HAL::ShaderCompiler::DescriptorSetBindingDesc& srcBinding = bindings[i];
-		HAL::ShaderCompiler::DescriptorSetBindingDesc& dstBinding = bindingsMemory[i];
+		const HAL::ShaderCompiler::DescriptorSetNestedBindingDesc& srcBinding = bindings[i];
+		HAL::ShaderCompiler::DescriptorSetNestedBindingDesc& dstBinding = bindingsMemory[i];
 
 		char* bindingNameMemory = (char*)(descriptorSetLayoutMemory + bindingNamesMemoryOffsets[i]);
 		memoryCopy(bindingNameMemory, srcBinding.name.getData(), srcBinding.name.getLength());

@@ -13,29 +13,29 @@ bool Pipeline::compile()
 		return true; // Compute shader already compiled
 
 	HAL::ShaderCompiler::GraphicsPipelineDesc desc = {};
-	desc.vertexShader = graphicsDesc.vertexShader ? &graphicsDesc.vertexShader->getCompiled() : nullptr;
-	desc.amplificationShader = graphicsDesc.amplificationShader ? &graphicsDesc.amplificationShader->getCompiled() : nullptr;
-	desc.meshShader = graphicsDesc.meshShader ? &graphicsDesc.meshShader->getCompiled() : nullptr;
-	desc.pixelShader = graphicsDesc.pixelShader ? &graphicsDesc.pixelShader->getCompiled() : nullptr;
+	desc.compiledVertexShader = graphicsDesc.vertexShader ? &graphicsDesc.vertexShader->getCompiledBlob() : nullptr;
+	desc.compiledAmplificationShader = graphicsDesc.amplificationShader ? &graphicsDesc.amplificationShader->getCompiledBlob() : nullptr;
+	desc.compiledMeshShader = graphicsDesc.meshShader ? &graphicsDesc.meshShader->getCompiledBlob() : nullptr;
+	desc.compiledPixelShader = graphicsDesc.pixelShader ? &graphicsDesc.pixelShader->getCompiledBlob() : nullptr;
 
-	if (desc.vertexShader)
-		XAssert(desc.vertexShader->isInitialized());
-	if (desc.amplificationShader)
-		XAssert(desc.amplificationShader->isInitialized());
-	if (desc.meshShader)
-		XAssert(desc.meshShader->isInitialized());
-	if (desc.pixelShader)
-		XAssert(desc.pixelShader->isInitialized());
+	if (desc.compiledVertexShader)
+		XAssert(desc.compiledVertexShader->isInitialized());
+	if (desc.compiledAmplificationShader)
+		XAssert(desc.compiledAmplificationShader->isInitialized());
+	if (desc.compiledMeshShader)
+		XAssert(desc.compiledMeshShader->isInitialized());
+	if (desc.compiledPixelShader)
+		XAssert(desc.compiledPixelShader->isInitialized());
 
 	for (uint32 i = 0; i < HAL::MaxRenderTargetCount; i++)
 		desc.renderTargetsFormats[i] = graphicsDesc.renderTargetsFormats[i];
 	desc.depthStencilFormat = graphicsDesc.depthStencilFormat;
 
-	const HAL::ShaderCompiler::CompiledPipelineLayout& compiledPipelineLayout = pipelineLayout->getCompiled();
-	XAssert(compiledPipelineLayout.isInitialized());
+	const HAL::ShaderCompiler::Blob& compiledPipelineLayoutBlob = pipelineLayout->getCompiledBlob();
+	XAssert(compiledPipelineLayoutBlob.isInitialized());
 
 	return HAL::ShaderCompiler::Host::CompileGraphicsPipeline(HAL::ShaderCompiler::Platform::D3D12,
-		pipelineLayout->getCompiled(), desc, compiledGraphicsPipeline);
+		compiledPipelineLayoutBlob, desc, compiledGraphicsPipeline);
 }
 
 PipelineCreationResult PipelineList::create(StringViewASCII name, const PipelineLayout& pipelineLayout,

@@ -22,13 +22,13 @@ bool PipelineLayout::compile()
 			dstBinding.constantsSize = srcBinding.constantsSize;
 		else if (srcBinding.type == HAL::PipelineBindingType::DescriptorSet)
 		{
-			dstBinding.descriptorSetLayout = &srcBinding.descriptorSetLayout->getCompiled();
-			XAssert(dstBinding.descriptorSetLayout->isInitialized());
+			dstBinding.compiledDescriptorSetLayout = &srcBinding.descriptorSetLayout->getCompiledBlob();
+			XAssert(dstBinding.compiledDescriptorSetLayout->isInitialized());
 		}
 	}
 
 	return HAL::ShaderCompiler::Host::CompilePipelineLayout(HAL::ShaderCompiler::Platform::D3D12,
-		halBindings, bindingCount, compiledPipelineLayout);
+		halBindings, bindingCount, compiledPipelineLayoutBlob, pipelineLayoutMetadataBlob);
 }
 
 PipelineLayoutCreationResult PipelineLayoutList::create(XLib::StringViewASCII name,

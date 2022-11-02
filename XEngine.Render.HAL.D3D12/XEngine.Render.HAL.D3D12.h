@@ -279,29 +279,6 @@ namespace XEngine::Render::HAL
 		};
 	};
 
-	struct ObjectDataView
-	{
-		const void* data;
-		uint32 size;
-	};
-
-	struct RasterizerDesc
-	{
-
-	};
-
-	struct DepthStencilDesc
-	{
-		bool enableDepthRead;
-		bool enableDepthWrite;
-		// depthComparisonFunc;
-	};
-
-	struct BlendDesc
-	{
-
-	};
-
 	class CommandList : public XLib::NonCopyable
 	{
 		friend Device;
@@ -375,6 +352,12 @@ namespace XEngine::Render::HAL
 		void initializeTextureMetadata(ResourceHandle textureHandle, const TextureSubresourceRange* subresourceRange = nullptr);
 	};
 
+	struct BlobDataView
+	{
+		const void* data;
+		uint32 size;
+	};
+
 	class Device : public XLib::NonCopyable
 	{
 		friend CommandList;
@@ -387,6 +370,7 @@ namespace XEngine::Render::HAL
 		static constexpr uint32 MaxResourceDescriptorCount = 4096;
 		static constexpr uint32 MaxRenderTargetViewCount = 64;
 		static constexpr uint32 MaxDepthStencilViewCount = 64;
+		static constexpr uint32 MaxDescriptorSetLayoutCount = 64;
 		static constexpr uint32 MaxPipelineLayoutCount = 64;
 		static constexpr uint32 MaxPipelineCount = 1024;
 		static constexpr uint32 MaxFenceCount = 64;
@@ -396,6 +380,7 @@ namespace XEngine::Render::HAL
 		struct MemoryBlock;
 		struct Resource;
 		struct ResourceView;
+		struct DescriptorSetLayout;
 		struct PipelineLayout;
 		struct Pipeline;
 		struct Fence;
@@ -423,6 +408,7 @@ namespace XEngine::Render::HAL
 		MemoryBlock* memoryBlockTable = nullptr;
 		Resource* resourceTable = nullptr;
 		ResourceView* resourceViewTable = nullptr;
+		DescriptorSetLayout* descriptorSetLayoutTable = nullptr;
 		PipelineLayout* pipelineLayoutTable = nullptr;
 		Pipeline* pipelineTable = nullptr;
 		Fence* fenceTable = nullptr;
@@ -433,6 +419,7 @@ namespace XEngine::Render::HAL
 		XLib::InplaceBitArray<MaxResourceViewCount> resourceViewTableAllocationMask;
 		XLib::InplaceBitArray<MaxRenderTargetViewCount> renderTargetViewTableAllocationMask;
 		XLib::InplaceBitArray<MaxDepthStencilViewCount> depthStencilViewTableAllocationMask;
+		XLib::InplaceBitArray<MaxDescriptorSetLayoutCount> descriptorSetLayoutTableAllocationMask;
 		XLib::InplaceBitArray<MaxPipelineLayoutCount> pipelineLayoutTableAllocationMask;
 		XLib::InplaceBitArray<MaxPipelineCount> pipelineTableAllocationMask;
 		XLib::InplaceBitArray<MaxFenceCount> fenceTableAllocationMask;
@@ -524,23 +511,22 @@ namespace XEngine::Render::HAL
 		DepthStencilViewHandle createDepthStencilView(ResourceHandle textureHandle);
 		void destroyDepthStencilView(DepthStencilViewHandle handle);
 
-		DescriptorAddress allocateDescriptors(uint32 count = 1);
-		void releaseDescriptors(DescriptorAddress address);
-
-		DescriptorSetLayoutHandle createDescriptorSetLayout(ObjectDataView objectData);
+		DescriptorSetLayoutHandle createDescriptorSetLayout(BlobDataView blob);
 		void destroyDescriptorSetLayout(DescriptorSetLayoutHandle handle);
+
+		PipelineLayoutHandle createPipelineLayout(BlobDataView blob);
+		void destroyPipelineLayout(PipelineLayoutHandle handle);
+
+		PipelineHandle createGraphicsPipeline(PipelineLayoutHandle pipelineLayoutHandle,
+			BlobDataView baseBlob, const BlobDataView* bytecodeBlobs, uint32 bytecodeBlobCount);
+		PipelineHandle createComputePipeline(PipelineLayoutHandle pipelineLayoutHandle, BlobDataView computeShaderBlob);
+		void destroyPipeline(PipelineHandle handle);
 
 		DescriptorSetHandle createDescriptorSet(DescriptorSetLayoutHandle layoutHandle);
 		void destroyDescriptorSet(DescriptorSetHandle handle);
 
-		PipelineLayoutHandle createPipelineLayout(ObjectDataView objectData);
-		void destroyPipelineLayout(PipelineLayoutHandle handle);
-
-		PipelineHandle createGraphicsPipeline(PipelineLayoutHandle pipelineLayoutHandle,
-			ObjectDataView baseObjectData, const ObjectDataView* bytecodeObjectsData, uint8 bytecodeObjectCount,
-			const RasterizerDesc& rasterizerDesc, const DepthStencilDesc& depthStencilDesc, const BlendDesc& blendDesc);
-		PipelineHandle createComputePipeline(PipelineLayoutHandle pipelineLayoutHandle, ObjectDataView computeShaderObjectData);
-		void destroyPipeline(PipelineHandle handle);
+		DescriptorAddress allocateDescriptors(uint32 count = 1);
+		void releaseDescriptors(DescriptorAddress address);
 
 		FenceHandle createFence(uint64 initialValue);
 		void destroyFence(FenceHandle handle);

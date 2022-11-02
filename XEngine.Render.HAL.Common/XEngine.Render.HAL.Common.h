@@ -5,9 +5,9 @@
 namespace XEngine::Render::HAL
 {
 	static constexpr uint8 MaxPipelineBindingCount = 32;
-	static constexpr uint8 MaxDescriptorSetBindingCount = 128;
-	static constexpr uint8 MaxRenderTargetCount = 4;
-	static constexpr uint8 MaxGraphicsPipelineBytecodeObjectCount = 3;
+	static constexpr uint8 MaxDescriptorSetNestedBindingCount = 128;
+	static constexpr uint8 MaxRenderTargetCount = 8;
+	static constexpr uint8 MaxGraphicsPipelineBytecodeBlobCount = 3;
 
 	enum class PipelineBindingType : uint8
 	{

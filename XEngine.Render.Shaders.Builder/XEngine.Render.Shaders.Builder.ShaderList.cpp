@@ -12,8 +12,9 @@ bool Shader::compile()
 		return false;
 
 	return HAL::ShaderCompiler::Host::CompileShader(HAL::ShaderCompiler::Platform::D3D12,
-		pipelineLayout->getCompiled(), sourceText.getData(), uint32(sourceText.getLength()),
-		type, source->getLocalPathCStr(), entryPointName, compiledShader);
+		pipelineLayout->getCompiledBlob(), pipelineLayout->getMetadataBlob(),
+		sourceText.getData(), uint32(sourceText.getLength()),
+		type, source->getLocalPathCStr(), entryPointName, compiledShaderBlob);
 }
 
 struct ShaderList::EntrySearchKey

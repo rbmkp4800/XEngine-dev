@@ -51,7 +51,7 @@ bool BuildDescriptionLoader::parseDescriptorSetLayoutDeclaration()
 	if (!expectSimpleToken(TokenType('{')))
 		return false;
 
-	InplaceArrayList<HAL::ShaderCompiler::DescriptorSetBindingDesc, HAL::MaxDescriptorSetBindingCount> bindings;
+	InplaceArrayList<HAL::ShaderCompiler::DescriptorSetNestedBindingDesc, HAL::MaxDescriptorSetNestedBindingCount> bindings;
 
 	for (;;)
 	{
@@ -67,7 +67,7 @@ bool BuildDescriptionLoader::parseDescriptorSetLayoutDeclaration()
 			return false;
 		}
 
-		HAL::ShaderCompiler::DescriptorSetBindingDesc binding = {};
+		HAL::ShaderCompiler::DescriptorSetNestedBindingDesc binding = {};
 
 		if (String::IsEqual(token.string, "ReadOnlyBufferDescriptor"))
 			binding.descriptorType = HAL::DescriptorType::ReadOnlyBuffer;
@@ -93,6 +93,7 @@ bool BuildDescriptionLoader::parseDescriptorSetLayoutDeclaration()
 		}
 
 		binding.name = descriptorNameToken.string;
+		binding.descriptorCount = 1;
 
 		if (!expectSimpleToken(TokenType(';')))
 			return false;

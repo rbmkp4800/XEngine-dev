@@ -21,10 +21,10 @@ namespace XEngine::Render::Shaders::Builder_
 		XLib::StringViewASCII name;
 		uint64 nameXSH = 0;
 
-		const HAL::ShaderCompiler::DescriptorSetBindingDesc* bindings = nullptr;
+		const HAL::ShaderCompiler::DescriptorSetNestedBindingDesc* bindings = nullptr;
 		uint8 bindingCount = 0;
 
-		HAL::ShaderCompiler::CompiledDescriptorSetLayout compiledDescriptorSetLayout;
+		HAL::ShaderCompiler::Blob compiledDescriptorSetLayout;
 
 	private:
 		DescriptorSetLayout() = default;
@@ -35,7 +35,7 @@ namespace XEngine::Render::Shaders::Builder_
 
 		inline XLib::StringViewASCII getName() const { return name; }
 		inline uint64 getNameXSH() const { return nameXSH; }
-		inline const HAL::ShaderCompiler::CompiledDescriptorSetLayout& getCompiled() const { return compiledDescriptorSetLayout; }
+		inline const HAL::ShaderCompiler::Blob& getCompiledBlob() const { return compiledDescriptorSetLayout; }
 
 		static inline ordering CompareOrdered(const DescriptorSetLayout& left, const DescriptorSetLayout& right) { return compare(left.nameXSH, right.nameXSH); }
 	};
@@ -75,7 +75,7 @@ namespace XEngine::Render::Shaders::Builder_
 
 	public:
 		DescriptorSetLayoutCreationResult create(XLib::StringViewASCII name,
-			const HAL::ShaderCompiler::DescriptorSetBindingDesc* bindings, uint8 bindingCount);
+			const HAL::ShaderCompiler::DescriptorSetNestedBindingDesc* bindings, uint8 bindingCount);
 
 		DescriptorSetLayout* find(XLib::StringViewASCII name) const;
 

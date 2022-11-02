@@ -40,7 +40,7 @@ namespace XEngine::Render::Shaders::Builder_
 		GraphicsPipelineDesc graphicsDesc = {};
 		bool isGraphics = false;
 
-		HAL::ShaderCompiler::CompiledGraphicsPipeline compiledGraphicsPipeline;
+		HAL::ShaderCompiler::GraphicsPipelineCompilationResult compiledGraphicsPipeline;
 
 	private:
 		Pipeline() = default;
@@ -54,8 +54,8 @@ namespace XEngine::Render::Shaders::Builder_
 		inline const PipelineLayout& getPipelineLayout() const { return *pipelineLayout; }
 		inline bool isGraphicsPipeline() const { return isGraphics; }
 
-		inline const HAL::ShaderCompiler::CompiledShader& getCompiledCompute() const { return computeShader->getCompiled(); }
-		inline const HAL::ShaderCompiler::CompiledGraphicsPipeline& getCompiledGraphics() const { return compiledGraphicsPipeline; }
+		inline const HAL::ShaderCompiler::Blob& getCompiledComputeShaderBlob() const { return computeShader->getCompiledBlob(); }
+		inline const HAL::ShaderCompiler::GraphicsPipelineCompilationResult& getCompiledGraphics() const { return compiledGraphicsPipeline; }
 	};
 
 	enum class PipelineCreationStatus

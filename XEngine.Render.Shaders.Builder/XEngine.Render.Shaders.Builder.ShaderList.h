@@ -26,7 +26,7 @@ namespace XEngine::Render::Shaders::Builder_
 		const PipelineLayout* pipelineLayout = nullptr;
 		HAL::ShaderCompiler::ShaderType type = HAL::ShaderCompiler::ShaderType::Undefined;
 
-		HAL::ShaderCompiler::CompiledShader compiledShader;
+		HAL::ShaderCompiler::Blob compiledShaderBlob;
 
 	private:
 		Shader() = default;
@@ -39,7 +39,7 @@ namespace XEngine::Render::Shaders::Builder_
 		inline const char* getEntryPointName() const { return entryPointName; }
 		inline const PipelineLayout& getPipelineLayout() const { return *pipelineLayout; }
 		inline HAL::ShaderCompiler::ShaderType getType() const { return type; }
-		inline const HAL::ShaderCompiler::CompiledShader& getCompiled() const { return compiledShader; }
+		inline const HAL::ShaderCompiler::Blob& getCompiledBlob() const { return compiledShaderBlob; }
 	};
 
 	enum class ShaderCreationStatus

@@ -1,10 +1,12 @@
 #include <XLib.h>
 #include <XLib.Containers.ArrayList.h>
+#include <XLib.CRC.h>	// TODO: Remove
 #include <XLib.String.h>
 #include <XLib.System.File.h>
 #include <XLib.SystemHeapAllocator.h>
 #include <XLib.Text.h>
 
+#include <XEngine.Render.HAL.BlobFormat.h> // TODO: Remove
 #include <XEngine.Render.HAL.ShaderCompiler.h>
 #include <XEngine.Render.Shaders.PackFormat.h>
 
@@ -53,6 +55,21 @@ public:
 		return nullptr;
 	}
 };
+
+uint64 GetBlobLongHash(const Blob& blob) // TODO: Remove this hack.
+{
+	XAssert(blob.isInitialized());
+	return CRC64::Compute(blob.getData(), blob.getSize());
+}
+
+uint32 GetBlobChecksum(const Blob& blob) // TODO: Remove this hack.
+{
+	using namespace XEngine::Render::HAL::BlobFormat::Data;
+
+	XAssert(blob.isInitialized());
+	const GenericBlobHeader* header = (const GenericBlobHeader*)blob.getData();
+	return header->checksum;
+}
 
 void Builder::run(const char* packPath)
 {
@@ -123,33 +140,34 @@ void Builder::run(const char* packPath)
 
 	ArrayList<PipelineLayoutRecord> pipelineLayoutRecords;
 	ArrayList<PipelineRecord> pipelineRecords;
-	ArrayList<ObjectRecord> bytecodeObjectRecords;
+	ArrayList<BlobRecord> bytecodeBlobRecords;
 
-	ArrayList<Object, uint16> genericObjects;
-	ArrayList<Object, uint16> bytecodeObjects;
+	ArrayList<Blob, uint16> genericBlobs;
+	ArrayList<Blob, uint16> bytecodeBlobs;
 
-	Map<uint64, uint16> pipelineLayoutNameXSHToGenericObjectIdxMap;
-	Map<ObjectLongHash, uint16> bytecodeObjectLongHashToIdxMap; // Used for objects deduplication.
+	Map<uint64, uint16> pipelineLayoutNameXSHToGenericBlobIdxMap;
+	Map<uint64, uint16> bytecodeBlobLongHashToIdxMap; // Used for blobs deduplication.
 
-	uint32 genericObjectsOffsetAccum = 0;
+	uint32 genericBlobsSizeAccum = 0;
 
 	pipelineLayoutRecords.reserve(pipelineLayoutList.getSize());
 	for (PipelineLayout& pipelineLayout : pipelineLayoutList) // Iterating in order of name hash increase
 	{
-		const Object& object = pipelineLayout.getCompiled().getObject();
+		const Blob& blob = pipelineLayout.getCompiledBlob();
 
-		PipelineLayoutRecord& record = pipelineLayoutRecords.pushBack(PipelineLayoutRecord{});
-		record.nameXSH = pipelineLayout.getNameXSH();
+		PipelineLayoutRecord& pipelineLayoutRecord = pipelineLayoutRecords.emplaceBack();
+		pipelineLayoutRecord = {};
+		pipelineLayoutRecord.nameXSH = pipelineLayout.getNameXSH();
 
-		record.object.offset = genericObjectsOffsetAccum;
-		record.object.size = object.getSize();
-		record.object.crc32 = object.getCRC32();
-		genericObjectsOffsetAccum += object.getSize();
+		pipelineLayoutRecord.blob.offset = genericBlobsSizeAccum;
+		pipelineLayoutRecord.blob.size = blob.getSize();
+		pipelineLayoutRecord.blob.checksum = GetBlobChecksum(blob);
+		genericBlobsSizeAccum += blob.getSize();
 
-		const uint16 objectIndex = genericObjects.getSize();
-		genericObjects.emplaceBack(object.clone());
+		const uint16 blobIndex = genericBlobs.getSize();
+		genericBlobs.emplaceBack(blob.addReference());
 
-		pipelineLayoutNameXSHToGenericObjectIdxMap.insert(pipelineLayout.getNameXSH(), objectIndex);
+		pipelineLayoutNameXSHToGenericBlobIdxMap.insert(pipelineLayout.getNameXSH(), blobIndex);
 	}
 
 	pipelineRecords.reserve(pipelineList.getSize());
@@ -157,83 +175,93 @@ void Builder::run(const char* packPath)
 	{
 		// TODO: Check if element does not exist
 		const uint16 pipelineLayoutIndex =
-			*pipelineLayoutNameXSHToGenericObjectIdxMap.find(pipeline.getPipelineLayout().getNameXSH());
+			*pipelineLayoutNameXSHToGenericBlobIdxMap.find(pipeline.getPipelineLayout().getNameXSH());
 
 		const bool isGraphics = pipeline.isGraphicsPipeline();
 
-		PipelineRecord& pipelineRecord = pipelineRecords.pushBack(PipelineRecord{});
+		PipelineRecord& pipelineRecord = pipelineRecords.emplaceBack();
+		pipelineRecord = {};
 		pipelineRecord.nameXSH = pipeline.getNameXSH();
 		pipelineRecord.pipelineLayoutIndex = pipelineLayoutIndex;
 		pipelineRecord.isGraphics = isGraphics;
 
-		auto deduplicateBytecodeObject = [&bytecodeObjectLongHashToIdxMap, &bytecodeObjects](const Object& object) -> uint16
+		auto deduplicateBytecodeBlob = [&bytecodeBlobLongHashToIdxMap, &bytecodeBlobs](const Blob& blob) -> uint16
 		{
-			const uint16* existingObjectIndexIt = bytecodeObjectLongHashToIdxMap.find(object.getLongHash());
-			if (existingObjectIndexIt)
-				return *existingObjectIndexIt;
+			const uint64 blobLongHash = GetBlobLongHash(blob);
+
+			const uint16* existingBlobIndexIt = bytecodeBlobLongHashToIdxMap.find(blobLongHash);
+			if (existingBlobIndexIt)
+				return *existingBlobIndexIt;
 			
-			const uint16 objectIndex = bytecodeObjects.getSize();
-			bytecodeObjects.emplaceBack(object.clone());
-			bytecodeObjectLongHashToIdxMap.insert(object.getLongHash(), objectIndex);
-			return objectIndex;
+			const uint16 blobIndex = bytecodeBlobs.getSize();
+			bytecodeBlobs.emplaceBack(blob.addReference());
+			bytecodeBlobLongHashToIdxMap.insert(blobLongHash, blobIndex);
+			return blobIndex;
 		};
 
-		uint8 bytecodeObjectCount = 0;
+		uint8 bytecodeBlobCount = 0;
 
 		if (isGraphics)
 		{
-			const CompiledGraphicsPipeline& compiled = pipeline.getCompiledGraphics();
+			const HAL::ShaderCompiler::GraphicsPipelineCompilationResult& compiled = pipeline.getCompiledGraphics();
 
-			// Base object
+			// Base blob.
 			{
-				const Object& baseObject = compiled.getBaseObject();
+				pipelineRecord.graphicsBaseBlob.offset = genericBlobsSizeAccum;
+				pipelineRecord.graphicsBaseBlob.size = compiled.baseBlob.getSize();
+				pipelineRecord.graphicsBaseBlob.checksum = GetBlobChecksum(compiled.baseBlob);
+				genericBlobsSizeAccum += compiled.baseBlob.getSize();
 
-				pipelineRecord.graphicsBaseObject.offset = genericObjectsOffsetAccum;
-				pipelineRecord.graphicsBaseObject.size = baseObject.getSize();
-				pipelineRecord.graphicsBaseObject.crc32 = baseObject.getCRC32();
-				genericObjectsOffsetAccum += baseObject.getSize();
-
-				genericObjects.emplaceBack(baseObject.clone());
+				genericBlobs.emplaceBack(compiled.baseBlob.addReference());
 			}
 
-			// Bytecode objects
-			XAssert(compiled.getBytecodeObjectCount() < countof(pipelineRecord.bytecodeObjectsIndices));
-			for (uint8 i = 0; i < compiled.getBytecodeObjectCount(); i++)
-				pipelineRecord.bytecodeObjectsIndices[i] = deduplicateBytecodeObject(compiled.getBytecodeObject(i));
-			bytecodeObjectCount = compiled.getBytecodeObjectCount();
+			// Bytecode blobs.
+			XAssert(countof(compiled.bytecodeBlobs) <= countof(pipelineRecord.bytecodeBlobIndices));
+			for (uint8 i = 0; i < countof(compiled.bytecodeBlobs); i++)
+			{
+				const Blob& bytecodeBlob = compiled.bytecodeBlobs[i];
+				if (!bytecodeBlob.isInitialized())
+					break;
+				pipelineRecord.bytecodeBlobIndices[i] = deduplicateBytecodeBlob(bytecodeBlob);
+				bytecodeBlobCount++;
+			}
 		}
 		else
 		{
-			pipelineRecord.bytecodeObjectsIndices[0] = deduplicateBytecodeObject(pipeline.getCompiledCompute().getObject());
-			bytecodeObjectCount = 1;
+			pipelineRecord.bytecodeBlobIndices[0] = deduplicateBytecodeBlob(pipeline.getCompiledComputeShaderBlob());
+			bytecodeBlobCount = 1;
 		}
 
-		for (uint8 i = bytecodeObjectCount; i < countof(pipelineRecord.bytecodeObjectsIndices); i++)
-			pipelineRecord.bytecodeObjectsIndices[i] = uint16(-1);
+		for (uint8 i = bytecodeBlobCount; i < countof(pipelineRecord.bytecodeBlobIndices); i++)
+			pipelineRecord.bytecodeBlobIndices[i] = uint16(-1);
 	}
 
-	const uint32 genericObjectsTotalSize = genericObjectsOffsetAccum;
+	const uint32 genericBlobsTotalSize = genericBlobsSizeAccum;
 
-	const uint32 bytecodeObjectsBaseOffset = genericObjectsTotalSize;
-	uint32 bytecodeObjectOffsetAccum = 0;
+	const uint32 bytecodeBlobsBaseOffset = genericBlobsTotalSize;
+	uint32 bytecodeBlobsOffsetAccum = 0;
 
-	bytecodeObjectRecords.reserve(bytecodeObjects.getSize());
-	for (const Object& object : bytecodeObjects)
+	bytecodeBlobRecords.reserve(bytecodeBlobs.getSize());
+	for (const Blob& blob : bytecodeBlobs)
 	{
-		ObjectRecord& record = bytecodeObjectRecords.pushBack(ObjectRecord{});
-		record.offset = bytecodeObjectOffsetAccum + bytecodeObjectsBaseOffset;
-		record.size = object.getSize();
-		record.crc32 = object.getCRC32();
-		bytecodeObjectOffsetAccum += object.getSize();
+		BlobRecord& record = bytecodeBlobRecords.emplaceBack();
+		record = {};
+		record.offset = bytecodeBlobsOffsetAccum + bytecodeBlobsBaseOffset;
+		record.size = blob.getSize();
+		record.checksum = GetBlobChecksum(blob);
+		bytecodeBlobsOffsetAccum += blob.getSize();
 	}
 
-	const uint32 bytecodeObjectsTotalSize = bytecodeObjectOffsetAccum;
+	const uint32 bytecodeBlobsTotalSize = bytecodeBlobsOffsetAccum;
 
 	const uint32 pipelineLayoutRecordsSizeBytes = pipelineLayoutRecords.getSize() * sizeof(PipelineLayoutRecord);
 	const uint32 pipelineRecordsSizeBytes = pipelineRecords.getSize() * sizeof(PipelineRecord);
-	const uint32 bytecodeObjectRecordsSizeBytes = bytecodeObjectRecords.getSize() * sizeof(ObjectRecord);
-	const uint32 objectsBaseOffset = sizeof(PackHeader) +
-		pipelineLayoutRecordsSizeBytes + pipelineRecordsSizeBytes + bytecodeObjectRecordsSizeBytes;
+	const uint32 bytecodeBlobRecordsSizeBytes = bytecodeBlobRecords.getSize() * sizeof(BlobRecord);
+	const uint32 blobsDataOffset =
+		sizeof(PackHeader) +
+		pipelineLayoutRecordsSizeBytes +
+		pipelineRecordsSizeBytes +
+		bytecodeBlobRecordsSizeBytes;
 
 	File file;
 	file.open(packPath, FileAccessMode::Write, FileOpenMode::Override);
@@ -241,32 +269,32 @@ void Builder::run(const char* packPath)
 	PackHeader header = {};
 	header.signature = PackSignature;
 	header.version = PackCurrentVersion;
-	header.pipelineLayoutCount = uint16(pipelineLayoutRecords.getSize()); // TODO: Check overflows
+	header.pipelineLayoutCount = uint16(pipelineLayoutRecords.getSize());
 	header.pipelineCount = uint16(pipelineRecords.getSize());
-	header.bytecodeObjectCount = uint16(bytecodeObjectRecords.getSize());
-	header.objectsBaseOffset = objectsBaseOffset;
+	header.bytecodeBlobCount = uint16(bytecodeBlobRecords.getSize());
+	header.blobsDataOffset = blobsDataOffset;
 	file.write(header);
 
 	file.write(pipelineLayoutRecords.getData(), pipelineLayoutRecordsSizeBytes);
 	file.write(pipelineRecords.getData(), pipelineRecordsSizeBytes);
-	file.write(bytecodeObjectRecords.getData(), bytecodeObjectRecordsSizeBytes);
+	file.write(bytecodeBlobRecords.getData(), bytecodeBlobRecordsSizeBytes);
 
-	uint32 genericObjectsTotalSizeCheck = 0;
-	for (const Object& object : genericObjects)
+	uint32 genericBlobsTotalSizeCheck = 0;
+	for (const Blob& blob : genericBlobs)
 	{
-		file.write(object.getData(), object.getSize());
-		genericObjectsTotalSizeCheck += object.getSize();
+		file.write(blob.getData(), blob.getSize());
+		genericBlobsTotalSizeCheck += blob.getSize();
 	}
 
-	uint32 bytecodeObjectsTotalSizeCheck = 0;
-	for (const Object& object : bytecodeObjects)
+	uint32 bytecodeBlobsTotalSizeCheck = 0;
+	for (const Blob& blob : bytecodeBlobs)
 	{
-		file.write(object.getData(), object.getSize());
-		bytecodeObjectsTotalSizeCheck += object.getSize();
+		file.write(blob.getData(), blob.getSize());
+		bytecodeBlobsTotalSizeCheck += blob.getSize();
 	}
 
-	XAssert(genericObjectsTotalSizeCheck == genericObjectsTotalSize);
-	XAssert(bytecodeObjectsTotalSizeCheck == bytecodeObjectsTotalSize);
+	XAssert(genericBlobsTotalSizeCheck == genericBlobsTotalSize);
+	XAssert(bytecodeBlobsTotalSizeCheck == bytecodeBlobsTotalSize);
 
 	file.close();
 

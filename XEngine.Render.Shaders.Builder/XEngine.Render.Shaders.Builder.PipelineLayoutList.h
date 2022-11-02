@@ -36,7 +36,8 @@ namespace XEngine::Render::Shaders::Builder_
 		const PipelineBindingDesc* bindings = nullptr;
 		uint8 bindingCount = 0;
 
-		HAL::ShaderCompiler::CompiledPipelineLayout compiledPipelineLayout;
+		HAL::ShaderCompiler::Blob compiledPipelineLayoutBlob;
+		HAL::ShaderCompiler::Blob pipelineLayoutMetadataBlob;
 
 	private:
 		PipelineLayout() = default;
@@ -47,7 +48,8 @@ namespace XEngine::Render::Shaders::Builder_
 
 		inline XLib::StringViewASCII getName() const { return name; }
 		inline uint64 getNameXSH() const { return nameXSH; }
-		inline const HAL::ShaderCompiler::CompiledPipelineLayout& getCompiled() const { return compiledPipelineLayout; }
+		inline const HAL::ShaderCompiler::Blob& getCompiledBlob() const { return compiledPipelineLayoutBlob; }
+		inline const HAL::ShaderCompiler::Blob& getMetadataBlob() const { return pipelineLayoutMetadataBlob; }
 
 		static inline ordering CompareOrdered(const PipelineLayout& left, const PipelineLayout& right) { return compare(left.nameXSH, right.nameXSH); }
 	};
