@@ -51,11 +51,7 @@ namespace XLib
 		template <uint methodPointerSize, class Class>
 		struct MethodPointerConverter abstract
 		{
-			static inline void Convert(Class* _object, MethodPointer<Class> _method,
-				DummyClass*& targetObject, MethodPointer<DummyClass>& targetMethod)
-			{
-				static_assert(false, "this type of method pointer not supported");
-			}
+			// This type of method pointer not supported.
 		};
 
 		// single inheritance
