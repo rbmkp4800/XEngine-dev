@@ -138,6 +138,7 @@ void Builder::run(const char* packPath)
 
 	using namespace PackFormat;
 
+	ArrayList<DescriptorSetLayoutRecord> descriptorSetLayoutRecords;
 	ArrayList<PipelineLayoutRecord> pipelineLayoutRecords;
 	ArrayList<PipelineRecord> pipelineRecords;
 	ArrayList<BlobRecord> bytecodeBlobRecords;
@@ -150,24 +151,39 @@ void Builder::run(const char* packPath)
 
 	uint32 genericBlobsSizeAccum = 0;
 
+	descriptorSetLayoutRecords.reserve(descriptorSetLayoutList.getSize());
+	for (DescriptorSetLayout& descriptorSetLayout : descriptorSetLayoutList)
+	{
+		const Blob& blob = descriptorSetLayout.getCompiledBlob();
+
+		DescriptorSetLayoutRecord& descriptorSetLayoutRecord = descriptorSetLayoutRecords.emplaceBack();
+		descriptorSetLayoutRecord = {};
+		descriptorSetLayoutRecord.nameXSH = descriptorSetLayout.getNameXSH();
+		descriptorSetLayoutRecord.blob.offset = genericBlobsSizeAccum;
+		descriptorSetLayoutRecord.blob.size = blob.getSize();
+		descriptorSetLayoutRecord.blob.checksum = GetBlobChecksum(blob);
+
+		genericBlobsSizeAccum += blob.getSize();
+		genericBlobs.emplaceBack(blob.addReference());
+	}
+
 	pipelineLayoutRecords.reserve(pipelineLayoutList.getSize());
 	for (PipelineLayout& pipelineLayout : pipelineLayoutList) // Iterating in order of name hash increase
 	{
 		const Blob& blob = pipelineLayout.getCompiledBlob();
 
+		const uint32 pipelineLayoutIndex = pipelineLayoutRecords.getSize();
 		PipelineLayoutRecord& pipelineLayoutRecord = pipelineLayoutRecords.emplaceBack();
 		pipelineLayoutRecord = {};
 		pipelineLayoutRecord.nameXSH = pipelineLayout.getNameXSH();
-
 		pipelineLayoutRecord.blob.offset = genericBlobsSizeAccum;
 		pipelineLayoutRecord.blob.size = blob.getSize();
 		pipelineLayoutRecord.blob.checksum = GetBlobChecksum(blob);
+
+		pipelineLayoutNameXSHToGenericBlobIdxMap.insert(pipelineLayout.getNameXSH(), uint16(pipelineLayoutIndex));
+
 		genericBlobsSizeAccum += blob.getSize();
-
-		const uint16 blobIndex = genericBlobs.getSize();
 		genericBlobs.emplaceBack(blob.addReference());
-
-		pipelineLayoutNameXSHToGenericBlobIdxMap.insert(pipelineLayout.getNameXSH(), blobIndex);
 	}
 
 	pipelineRecords.reserve(pipelineList.getSize());
@@ -254,14 +270,12 @@ void Builder::run(const char* packPath)
 
 	const uint32 bytecodeBlobsTotalSize = bytecodeBlobsOffsetAccum;
 
-	const uint32 pipelineLayoutRecordsSizeBytes = pipelineLayoutRecords.getSize() * sizeof(PipelineLayoutRecord);
-	const uint32 pipelineRecordsSizeBytes = pipelineRecords.getSize() * sizeof(PipelineRecord);
-	const uint32 bytecodeBlobRecordsSizeBytes = bytecodeBlobRecords.getSize() * sizeof(BlobRecord);
 	const uint32 blobsDataOffset =
 		sizeof(PackHeader) +
-		pipelineLayoutRecordsSizeBytes +
-		pipelineRecordsSizeBytes +
-		bytecodeBlobRecordsSizeBytes;
+		descriptorSetLayoutRecords.getByteSize() +
+		pipelineLayoutRecords.getByteSize() +
+		pipelineRecords.getByteSize() +
+		bytecodeBlobRecords.getByteSize();
 
 	File file;
 	file.open(packPath, FileAccessMode::Write, FileOpenMode::Override);
@@ -269,15 +283,17 @@ void Builder::run(const char* packPath)
 	PackHeader header = {};
 	header.signature = PackSignature;
 	header.version = PackCurrentVersion;
+	header.descriptorSetLayoutCount = uint16(descriptorSetLayoutRecords.getSize());
 	header.pipelineLayoutCount = uint16(pipelineLayoutRecords.getSize());
 	header.pipelineCount = uint16(pipelineRecords.getSize());
 	header.bytecodeBlobCount = uint16(bytecodeBlobRecords.getSize());
 	header.blobsDataOffset = blobsDataOffset;
 	file.write(header);
 
-	file.write(pipelineLayoutRecords.getData(), pipelineLayoutRecordsSizeBytes);
-	file.write(pipelineRecords.getData(), pipelineRecordsSizeBytes);
-	file.write(bytecodeBlobRecords.getData(), bytecodeBlobRecordsSizeBytes);
+	file.write(descriptorSetLayoutRecords.getData(), descriptorSetLayoutRecords.getByteSize());
+	file.write(pipelineLayoutRecords.getData(), pipelineLayoutRecords.getByteSize());
+	file.write(pipelineRecords.getData(), pipelineRecords.getByteSize());
+	file.write(bytecodeBlobRecords.getData(), bytecodeBlobRecords.getByteSize());
 
 	uint32 genericBlobsTotalSizeCheck = 0;
 	for (const Blob& blob : genericBlobs)

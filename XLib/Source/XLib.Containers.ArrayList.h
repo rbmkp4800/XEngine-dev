@@ -56,6 +56,7 @@ namespace XLib
 		inline void reserve(CounterType newCapacity) { ensureCapacity(newCapacity); }
 
 		inline CounterType getSize() const { return size; }
+		inline uintptr getByteSize() const { return uintptr(size) * sizeof(Type); }
 		inline bool isEmpty() const { return size == 0; }
 
 		inline Type& front() { return buffer[0]; }
@@ -96,6 +97,7 @@ namespace XLib
 		inline void clear() { resize(0); }
 
 		inline CounterType getSize() const { return size; }
+		inline uintptr getByteSize() const { return uintptr(size) * sizeof(Type); }
 		inline bool isEmpty() const { return size == 0; }
 		inline bool isFull() const { return size == Capacity; }
 
@@ -139,6 +141,7 @@ namespace XLib
 		inline void reserve(CounterType newCapacity);
 
 		inline CounterType getSize() const { return size; }
+		inline uintptr getByteSize() const { return uintptr(size) * sizeof(Type); }
 		inline bool isEmpty() const { return size == 0; }
 
 		inline operator Type*() { return buffer; }

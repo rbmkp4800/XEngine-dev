@@ -1055,13 +1055,23 @@ DepthStencilViewHandle Device::createDepthStencilView(ResourceHandle textureHand
 	return composeDepthStencilViewHandle(viewIndex);
 }
 
-/*DescriptorSetLayoutHandle Device::createDescriptorSetLayout(BlobDataView blob)
+DescriptorSetLayoutHandle Device::createDescriptorSetLayout(BlobDataView blob)
 {
 	const sint32 descriptorSetLayoutIndex = descriptorSetLayoutTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(descriptorSetLayoutIndex >= 0);
 
+	DescriptorSetLayout& descriptorSetLayout = descriptorSetLayoutTable[descriptorSetLayoutIndex];
+
+	BlobFormat::DescriptorSetLayoutBlobReader blobReader;
+	blobReader.open(blob.data, blob.size);
+
+	const uint32 bindingCount = blobReader.getBindingCount();
+	XEMasterAssert(bindingCount > 0 && bindingCount <= MaxDescriptorSetNestedBindingCount);
+
+	descriptorSetLayout.sourceHash = blobReader.getSourceHash();
+
 	return composeDescriptorSetLayoutHandle(descriptorSetLayoutIndex);
-}*/
+}
 
 PipelineLayoutHandle Device::createPipelineLayout(BlobDataView blob)
 {
@@ -1558,10 +1568,11 @@ namespace
 	constexpr uint8 ResourceViewHandleSignature = 0x3;
 	constexpr uint8 RenderTargetViewHandleSignature = 0x4;
 	constexpr uint8 DepthStencilViewHandleSignature = 0x5;
-	constexpr uint8 PipelineLayoutHandleSignature = 0x6;
-	constexpr uint8 PipelineHandleSignature = 0x7;
-	constexpr uint8 FenceHandleSignature = 0x8;
-	constexpr uint8 SwapChainHandleSignature = 0x9;
+	constexpr uint8 DescriptorSetLayoutHandleSignature = 0x6;
+	constexpr uint8 PipelineLayoutHandleSignature = 0x7;
+	constexpr uint8 PipelineHandleSignature = 0x8;
+	constexpr uint8 FenceHandleSignature = 0x9;
+	constexpr uint8 SwapChainHandleSignature = 0xA;
 
 	struct DecomposedHandle
 	{
@@ -1619,6 +1630,13 @@ DepthStencilViewHandle Device::composeDepthStencilViewHandle(uint32 depthStencil
 	XEAssert(depthStencilViewIndex < MaxDepthStencilViewCount);
 	// depthStencilViewTable[depthStencilViewIndex].handleGeneration;
 	return DepthStencilViewHandle(ComposeHandle(DepthStencilViewHandleSignature, 0, depthStencilViewIndex));
+}
+
+DescriptorSetLayoutHandle Device::composeDescriptorSetLayoutHandle(uint32 descriptorSetLayoutIndex) const
+{
+	XEAssert(descriptorSetLayoutIndex < MaxDescriptorSetLayoutCount);
+	return DescriptorSetLayoutHandle(ComposeHandle(
+		DescriptorSetLayoutHandleSignature, descriptorSetLayoutTable[descriptorSetLayoutIndex].handleGeneration, descriptorSetLayoutIndex));
 }
 
 PipelineLayoutHandle Device::composePipelineLayoutHandle(uint32 pipelineLayoutIndex) const
@@ -1695,6 +1713,15 @@ uint32 Device::resolveDepthStencilViewHandle(DepthStencilViewHandle handle) cons
 	return decomposed.entryIndex;
 }
 
+uint32 Device::resolveDescriptorSetLayoutHandle(DescriptorSetLayoutHandle handle) const
+{
+	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
+	XEAssert(decomposed.signature == DescriptorSetLayoutHandleSignature);
+	XEAssert(decomposed.entryIndex < MaxDescriptorSetLayoutCount);
+	XEAssert(decomposed.generation == descriptorSetLayoutTable[decomposed.entryIndex].handleGeneration);
+	return decomposed.entryIndex;
+}
+
 uint32 Device::resolvePipelineLayoutHandle(PipelineLayoutHandle handle) const
 {
 	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
@@ -1735,6 +1762,7 @@ uint32 Device::resolveSwapChainHandle(SwapChainHandle handle) const
 auto Device::getMemoryBlockByHandle(MemoryBlockHandle handle) -> MemoryBlock& { return memoryBlockTable[resolveMemoryBlockHandle(handle)]; }
 auto Device::getResourceByHandle(ResourceHandle handle) -> Resource& { return resourceTable[resolveResourceHandle(handle)]; }
 auto Device::getResourceViewByHandle(ResourceViewHandle handle) -> ResourceView& { return resourceViewTable[resolveResourceViewHandle(handle)]; }
+auto Device::getDescriptorSetLayoutByHandle(DescriptorSetLayoutHandle handle) -> DescriptorSetLayout& { return descriptorSetLayoutTable[resolveDescriptorSetLayoutHandle(handle)]; }
 auto Device::getPipelineLayoutByHandle(PipelineLayoutHandle handle) -> PipelineLayout& { return pipelineLayoutTable[resolvePipelineLayoutHandle(handle)]; }
 auto Device::getPipelineByHandle(PipelineHandle handle) -> Pipeline& { return pipelineTable[resolvePipelineHandle(handle)]; }
 auto Device::getFenceByHandle(FenceHandle handle) -> Fence& { return fenceTable[resolveFenceHandle(handle)]; }

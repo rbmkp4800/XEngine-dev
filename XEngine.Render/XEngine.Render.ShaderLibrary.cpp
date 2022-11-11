@@ -71,24 +71,30 @@ void ShaderLibrary::load(const char* packPath)
 	XEMasterAssert(packHeader.pipelineCount > 0);
 	XEMasterAssert(packHeader.bytecodeBlobCount > 0);
 
-	const uint32 blobsDataOffset = sizeof(PackHeader) +
-		sizeof(PipelineLayoutRecord) * packHeader.pipelineLayoutCount +
-		sizeof(PipelineRecord) * packHeader.pipelineCount +
-		sizeof(BlobRecord) * packHeader.bytecodeBlobCount;
+	const uint32 descriptorSetLayoutRecordsOffset = sizeof(PackHeader);
+	const uint32 pipelineLayoutRecordsOffset = descriptorSetLayoutRecordsOffset + sizeof(DescriptorSetLayoutRecord) * packHeader.descriptorSetLayoutCount;
+	const uint32 pipelineRecordsOffset = pipelineLayoutRecordsOffset + sizeof(PipelineLayoutRecord) * packHeader.pipelineLayoutCount;
+	const uint32 bytecodeBlobRecordsOffset = pipelineRecordsOffset + sizeof(PipelineRecord) * packHeader.pipelineCount;
+	const uint32 blobsDataOffset = bytecodeBlobRecordsOffset + sizeof(BlobRecord) * packHeader.bytecodeBlobCount;
 	XEMasterAssert(packHeader.blobsDataOffset == blobsDataOffset);
 	XEMasterAssert(packHeader.blobsDataOffset < packFileSize);
 
+	descriptorSetLayoutCount = packHeader.descriptorSetLayoutCount;
 	pipelineLayoutCount = packHeader.pipelineLayoutCount;
 	pipelineCount = packHeader.pipelineCount;
 
 	// Allocate tables.
 	{
 		// TODO: Handle this memory in proper way.
-		const uintptr tablesMemorySize = sizeof(PipelineLayout) * pipelineLayoutCount + sizeof(Pipeline) * pipelineCount;
+		const uintptr tablesMemorySize =
+			sizeof(DescriptorSetLayout) * descriptorSetLayoutCount +
+			sizeof(PipelineLayout) * pipelineLayoutCount +
+			sizeof(Pipeline) * pipelineCount;
 		void* tablesMemory = SystemHeapAllocator::Allocate(tablesMemorySize);
 		memorySet(tablesMemory, 0, tablesMemorySize);
 
-		pipelineLayoutTable = (PipelineLayout*)tablesMemory;
+		descriptorSetLayoutTable = (DescriptorSetLayout*)tablesMemory;
+		pipelineLayoutTable = (PipelineLayout*)(descriptorSetLayoutTable + descriptorSetLayoutCount);
 		pipelineTable = (Pipeline*)(pipelineLayoutTable + pipelineLayoutCount);
 		void* tablesMemoryEnd = pipelineTable + pipelineCount;
 
@@ -100,11 +106,11 @@ void ShaderLibrary::load(const char* packPath)
 	memoryCopy(packData, &packHeader, sizeof(PackHeader)); // Pack header is already read.
 	packFile.read(packData + sizeof(PackHeader), packFileSize - sizeof(PackHeader));
 
-	const PipelineLayoutRecord* pipelineLayoutRecords = (PipelineLayoutRecord*)(packData + sizeof(PackHeader));
-	const PipelineRecord* pipelineRecords = (PipelineRecord*)(pipelineLayoutRecords + packHeader.pipelineLayoutCount);
-	const BlobRecord* bytecodeBlobRecords = (BlobRecord*)(pipelineRecords + packHeader.pipelineCount);
-	const byte* blobsDataBegin = (byte*)(bytecodeBlobRecords + packHeader.bytecodeBlobCount);
-	XEAssert(uintptr(blobsDataBegin) == uintptr(packData) + blobsDataOffset);
+	auto descriptorSetLayoutRecords = (const DescriptorSetLayoutRecord*)(packData + descriptorSetLayoutRecordsOffset);
+	auto pipelineLayoutRecords = (const PipelineLayoutRecord*)(packData + pipelineLayoutRecordsOffset);
+	auto pipelineRecords = (const PipelineRecord*)(packData + pipelineRecordsOffset);
+	auto bytecodeBlobRecords = (const BlobRecord*)(packData + bytecodeBlobRecordsOffset);
+	auto blobsDataBegin = (const byte*)(packData + blobsDataOffset);
 
 	byte* packDataEnd = packData + packFileSize;
 	XEAssert(blobsDataBegin < packDataEnd);
@@ -112,7 +118,25 @@ void ShaderLibrary::load(const char* packPath)
 
 	uint64 prevNameXSH = 0;
 
-	for (uint16 pipelineLayoutIndex = 0; pipelineLayoutIndex < packHeader.pipelineLayoutCount; pipelineLayoutIndex++)
+	for (uint32 descriptorSetLayoutIndex = 0; descriptorSetLayoutIndex < packHeader.descriptorSetLayoutCount; descriptorSetLayoutIndex++)
+	{
+		const DescriptorSetLayoutRecord& descriptorSetLayoutRecord = descriptorSetLayoutRecords[descriptorSetLayoutIndex];
+		DescriptorSetLayout& descriptorSetLayout = descriptorSetLayoutTable[descriptorSetLayoutIndex];
+
+		HAL::BlobDataView descriptorSetLayoutBlob = {};
+		descriptorSetLayoutBlob.data = blobsDataBegin + descriptorSetLayoutRecord.blob.offset;
+		descriptorSetLayoutBlob.size = descriptorSetLayoutRecord.blob.size;
+
+		descriptorSetLayout.halDescriptorSetLayout = halDevice.createDescriptorSetLayout(descriptorSetLayoutBlob);
+		descriptorSetLayout.nameXSH = descriptorSetLayoutRecord.nameXSH;
+
+		XEMasterAssert(prevNameXSH < descriptorSetLayoutRecord.nameXSH); // Check order.
+		prevNameXSH = descriptorSetLayoutRecord.nameXSH;
+	}
+
+	prevNameXSH = 0;
+
+	for (uint32 pipelineLayoutIndex = 0; pipelineLayoutIndex < packHeader.pipelineLayoutCount; pipelineLayoutIndex++)
 	{
 		const PipelineLayoutRecord& pipelineLayoutRecord = pipelineLayoutRecords[pipelineLayoutIndex];
 		PipelineLayout& pipelineLayout = pipelineLayoutTable[pipelineLayoutIndex];
@@ -130,7 +154,7 @@ void ShaderLibrary::load(const char* packPath)
 
 	prevNameXSH = 0;
 
-	for (uint16 pipelineIndex = 0; pipelineIndex < packHeader.pipelineCount; pipelineIndex++)
+	for (uint32 pipelineIndex = 0; pipelineIndex < packHeader.pipelineCount; pipelineIndex++)
 	{
 		const PipelineRecord& pipelineRecord = pipelineRecords[pipelineIndex];
 		Pipeline& pipeline = pipelineTable[pipelineIndex];

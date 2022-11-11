@@ -34,9 +34,9 @@ namespace XEngine::Render::HAL
 	enum class RenderTargetViewHandle		: uint32 {};
 	enum class DepthStencilViewHandle		: uint32 {};
 	enum class DescriptorSetLayoutHandle	: uint32 {};
-	enum class DescriptorSetHandle			: uint32 {};
 	enum class PipelineLayoutHandle			: uint32 {};
 	enum class PipelineHandle				: uint32 {};
+	enum class DescriptorSetHandle			: uint32 {};
 	enum class FenceHandle					: uint32 {};
 	enum class SwapChainHandle				: uint32 {};
 
@@ -49,6 +49,7 @@ namespace XEngine::Render::HAL
 	static constexpr ResourceViewHandle ZeroResourceViewHandle = ResourceViewHandle(0);
 	static constexpr RenderTargetViewHandle ZeroRenderTargetViewHandle = RenderTargetViewHandle(0);
 	static constexpr DepthStencilViewHandle ZeroDepthStencilViewHandle = DepthStencilViewHandle(0);
+	static constexpr DescriptorSetLayoutHandle ZeroDescriptorSetLayoutHandle = DescriptorSetLayoutHandle(0);
 	static constexpr PipelineLayoutHandle ZeroPipelineLayoutHandle = PipelineLayoutHandle(0);
 	static constexpr PipelineHandle ZeroPipelineHandle = PipelineHandle(0);
 	static constexpr FenceHandle ZeroFenceHandle = FenceHandle(0);
@@ -442,6 +443,7 @@ namespace XEngine::Render::HAL
 		ResourceViewHandle composeResourceViewHandle(uint32 resourceViewIndex) const;
 		RenderTargetViewHandle composeRenderTargetViewHandle(uint32 renderTargetIndex) const;
 		DepthStencilViewHandle composeDepthStencilViewHandle(uint32 depthStencilIndex) const;
+		DescriptorSetLayoutHandle composeDescriptorSetLayoutHandle(uint32 descriptorSetLayoutIndex) const;
 		PipelineLayoutHandle composePipelineLayoutHandle(uint32 pipelineLayoutIndex) const;
 		PipelineHandle composePipelineHandle(uint32 pipelineIndex) const;
 		FenceHandle composeFenceHandle(uint32 fenceIndex) const;
@@ -452,6 +454,7 @@ namespace XEngine::Render::HAL
 		uint32 resolveResourceViewHandle(ResourceViewHandle handle) const;
 		uint32 resolveRenderTargetViewHandle(RenderTargetViewHandle handle) const;
 		uint32 resolveDepthStencilViewHandle(DepthStencilViewHandle handle) const;
+		uint32 resolveDescriptorSetLayoutHandle(DescriptorSetLayoutHandle handle) const;
 		uint32 resolvePipelineLayoutHandle(PipelineLayoutHandle handle) const;
 		uint32 resolvePipelineHandle(PipelineHandle handle) const;
 		uint32 resolveFenceHandle(FenceHandle handle) const;
@@ -463,6 +466,7 @@ namespace XEngine::Render::HAL
 		MemoryBlock& getMemoryBlockByHandle(MemoryBlockHandle handle);
 		Resource& getResourceByHandle(ResourceHandle handle);
 		ResourceView& getResourceViewByHandle(ResourceViewHandle handle);
+		DescriptorSetLayout& getDescriptorSetLayoutByHandle(DescriptorSetLayoutHandle handle);
 		PipelineLayout& getPipelineLayoutByHandle(PipelineLayoutHandle handle);
 		Pipeline& getPipelineByHandle(PipelineHandle handle);
 		Fence& getFenceByHandle(FenceHandle handle);

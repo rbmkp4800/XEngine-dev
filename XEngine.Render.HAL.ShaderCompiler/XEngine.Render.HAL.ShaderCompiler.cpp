@@ -337,7 +337,7 @@ bool Host::CompilePipelineLayout(Platform platform,
 				d3dDescriptorRanges.pushBack(d3dCurrentRange);
 			}
 
-			const uint32 descriptorCount = descriptorOffsetCounter;
+			const uint16 descriptorCount = descriptorOffsetCounter;
 			shaderRegisterCounter += descriptorCount;
 
 			d3dRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;

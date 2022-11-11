@@ -17,7 +17,7 @@ namespace XEngine::Render::Shaders::PackFormat
 		// TODO: Size
 		// TODO: Checksum
 
-		//uint16 descriptorSetLayoutCount;
+		uint16 descriptorSetLayoutCount;
 		uint16 pipelineLayoutCount;
 		uint16 pipelineCount;
 		uint16 bytecodeBlobCount;
@@ -31,6 +31,14 @@ namespace XEngine::Render::Shaders::PackFormat
 		uint32 checksum;
 	};
 	static_assert(sizeof(BlobRecord) == 12);
+
+	struct DescriptorSetLayoutRecord // TODO: Should be 20 bytes
+	{
+		uint64 nameXSH;
+		//uint32 nameXSH0;
+		//uint32 nameXSH1;
+		BlobRecord blob;
+	};
 
 	struct PipelineLayoutRecord // TODO: Should be 20 bytes
 	{
