@@ -36,10 +36,10 @@ namespace XEngine::Render::HAL
 	enum class DescriptorSetLayoutHandle	: uint32 {};
 	enum class PipelineLayoutHandle			: uint32 {};
 	enum class PipelineHandle				: uint32 {};
-	enum class DescriptorSetHandle			: uint32 {};
 	enum class FenceHandle					: uint32 {};
 	enum class SwapChainHandle				: uint32 {};
 
+	enum class DescriptorSetReference : uint64 { Zero = 0 };
 	enum class DeviceQueueSyncPoint : uint64 { Zero = 0 };
 
 	using DescriptorAddress = uint32;
@@ -325,7 +325,7 @@ namespace XEngine::Render::HAL
 
 		void bindConstants(uint64 bindingNameXSH, const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0);
 		void bindBuffer(uint64 bindingNameXSH, BufferBindType bindType, ResourceHandle bufferHandle, uint32 offset = 0);
-		void bindDescriptorSet(uint64 bindingNameXSH, DescriptorSetHandle descriptorSetHandle);
+		void bindDescriptorSet(uint64 bindingNameXSH, DescriptorSetReference descriptorSetReference);
 		void bindDescriptorArray(uint64 bindingNameXSH, DescriptorAddress arrayStartAddress);
 
 		void draw(uint32 vertexCount, uint32 vertexOffset = 0);
@@ -387,6 +387,8 @@ namespace XEngine::Render::HAL
 		struct Fence;
 		struct SwapChain;
 
+		struct DecomposedDescriptorSetReference;
+
 	private:
 		XLib::Platform::COMPtr<ID3D12Device10> d3dDevice;
 
@@ -425,17 +427,18 @@ namespace XEngine::Render::HAL
 		XLib::InplaceBitArray<MaxPipelineCount> pipelineTableAllocationMask;
 		XLib::InplaceBitArray<MaxFenceCount> fenceTableAllocationMask;
 		XLib::InplaceBitArray<MaxSwapChainCount> swapChainTableAllocationMask;
-		uint32 allocatedResourceDescriptorCount = 0;
 
-		uint64 referenceSRVHeapStartPtr = 0;
-		uint64 shaderVisbileSRVHeapStartPtrCPU = 0;
-		uint64 shaderVisbileSRVHeapStartPtrGPU = 0;
-		uint64 rtvHeapStartPtr = 0;
-		uint64 dsvHeapStartPtr = 0;
+		uint64 referenceSRVHeapPtr = 0;
+		uint64 shaderVisbileSRVHeapCPUPtr = 0;
+		uint64 shaderVisbileSRVHeapGPUPtr = 0;
+		uint64 rtvHeapPtr = 0;
+		uint64 dsvHeapPtr = 0;
 
 		uint16 srvDescriptorSize = 0;
 		uint16 rtvDescriptorSize = 0;
 		uint16 dsvDescriptorSize = 0;
+
+		uint32 descriptorSetReferenceGenerationCounter = 0;
 
 	private:
 		MemoryBlockHandle composeMemoryBlockHandle(uint32 memoryBlockIndex) const;
@@ -460,9 +463,6 @@ namespace XEngine::Render::HAL
 		uint32 resolveFenceHandle(FenceHandle handle) const;
 		uint32 resolveSwapChainHandle(SwapChainHandle handle) const;
 
-		DescriptorAddress composeDescriptorAddress(uint32 srvHeapDescriptorIndex) const { return DescriptorAddress(srvHeapDescriptorIndex); }
-		uint32 resolveDescriptorAddress(DescriptorAddress address) const { return uint32(address); }
-
 		MemoryBlock& getMemoryBlockByHandle(MemoryBlockHandle handle);
 		Resource& getResourceByHandle(ResourceHandle handle);
 		ResourceView& getResourceViewByHandle(ResourceViewHandle handle);
@@ -473,6 +473,10 @@ namespace XEngine::Render::HAL
 		const Fence& getFenceByHandle(FenceHandle handle) const;
 		SwapChain& getSwapChainByHandle(SwapChainHandle handle);
 		const SwapChain& getSwapChainByHandle(SwapChainHandle handle) const;
+
+		DescriptorSetReference composeDescriptorSetReference(DescriptorSetLayoutHandle descriptorSetLayoutHandle,
+			uint32 baseDescriptorIndex, uint32 descriptorSetGeneration) const;
+		DecomposedDescriptorSetReference decomposeDescriptorSetReference(DescriptorSetReference descriptorSetReference) const;
 
 	private:
 		static uint32 CalculateTextureSubresourceIndex(const Resource& resource, const TextureSubresource& subresource);
@@ -526,12 +530,6 @@ namespace XEngine::Render::HAL
 		PipelineHandle createComputePipeline(PipelineLayoutHandle pipelineLayoutHandle, BlobDataView computeShaderBlob);
 		void destroyPipeline(PipelineHandle handle);
 
-		DescriptorSetHandle createDescriptorSet(DescriptorSetLayoutHandle layoutHandle);
-		void destroyDescriptorSet(DescriptorSetHandle handle);
-
-		DescriptorAddress allocateDescriptors(uint32 count = 1);
-		void releaseDescriptors(DescriptorAddress address);
-
 		FenceHandle createFence(uint64 initialValue);
 		void destroyFence(FenceHandle handle);
 
@@ -541,8 +539,10 @@ namespace XEngine::Render::HAL
 		void createCommandList(CommandList& commandList, CommandListType type);
 		void destroyCommandList(CommandList& commandList);
 
-		void writeDescriptorSet(DescriptorSetHandle descriptorSet, uint32 bindingNameXSH, ResourceViewHandle resourceViewHandle);
+		DescriptorSetReference createDescriptorSetReference(DescriptorSetLayoutHandle descriptorSetLayoutHandle, DescriptorAddress address);
+
 		void writeDescriptor(DescriptorAddress descriptorAddress, ResourceViewHandle resourceViewHandle);
+		void writeDescriptor(DescriptorSetReference descriptorSetReference, uint32 bindingNameXSH, ResourceViewHandle resourceViewHandle);
 
 		void submitWorkload(DeviceQueue queue, CommandList& commandList);
 		void submitSyncPointWait(DeviceQueue queue, DeviceQueueSyncPoint syncPoint);

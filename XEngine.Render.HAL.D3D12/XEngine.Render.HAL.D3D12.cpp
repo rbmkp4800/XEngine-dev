@@ -163,7 +163,7 @@ namespace // Legacy barriers utils
 
 #endif
 
-namespace // Device queue sync points
+namespace // DeviceQueueSyncPoint
 {
 	// DeviceQueueSyncPoint structure:
 	//	Fence counter	0x ....'XXXX'XXXX'XXXX
@@ -253,7 +253,9 @@ struct Device::ResourceView
 
 struct Device::DescriptorSetLayout
 {
+	BlobFormat::DescriptorSetNestedBindingInfo bindings[MaxDescriptorSetNestedBindingCount];
 	uint32 sourceHash;
+	uint16 bindingCount;
 	uint8 handleGeneration;
 };
 
@@ -262,7 +264,7 @@ struct Device::PipelineLayout
 	BlobFormat::PipelineBindingInfo bindings[MaxPipelineBindingCount];
 	ID3D12RootSignature* d3dRootSignature;
 	uint32 sourceHash;
-	uint8 bindingCount;
+	uint16 bindingCount;
 	uint8 handleGeneration;
 };
 
@@ -285,6 +287,13 @@ struct Device::SwapChain
 	ResourceHandle backBuffers[SwapChainBackBufferCount];
 };
 
+struct Device::DecomposedDescriptorSetReference
+{
+	const DescriptorSetLayout& descriptorSetLayout;
+	uint32 baseDescriptorIndex;
+	uint32 descriptorSetGeneration;
+};
+
 
 // CommandList /////////////////////////////////////////////////////////////////////////////////////
 
@@ -300,14 +309,19 @@ struct CommandList::BindingResolveResult
 {
 	PipelineBindingType type;
 	uint8 rootParameterIndex;
-	uint8 constantsSize;
+
+	union
+	{
+		uint8 constantsSize;
+		uint32 descriptorSetLayoutSourceHash;
+	};
 };
 
 inline CommandList::BindingResolveResult CommandList::ResolveBindingByNameXSH(
 	Device* device, PipelineLayoutHandle pipleineLayoutHandle, uint64 bindingNameXSH)
 {
 	Device::PipelineLayout& pipelineLayout = device->getPipelineLayoutByHandle(pipleineLayoutHandle);
-	for (uint8 i = 0; i < pipelineLayout.bindingCount; i++)
+	for (uint16 i = 0; i < pipelineLayout.bindingCount; i++)
 	{
 		const BlobFormat::PipelineBindingInfo& binding = pipelineLayout.bindings[i];
 		if (binding.nameXSH == bindingNameXSH)
@@ -315,7 +329,10 @@ inline CommandList::BindingResolveResult CommandList::ResolveBindingByNameXSH(
 			BindingResolveResult result = {};
 			result.type = binding.type;
 			result.rootParameterIndex = uint8(binding.platformBindingIndex);
-			result.constantsSize = binding.constantsSize;
+			if (binding.type == PipelineBindingType::Constants)
+				result.constantsSize = binding.constantsSize;
+			if (binding.type == PipelineBindingType::DescriptorSet)
+				result.descriptorSetLayoutSourceHash = binding.descriptorSetLayoutSourceHash;
 			return result;
 		}
 	}
@@ -341,6 +358,8 @@ void CommandList::open()
 	d3dCommandAllocator->Reset();
 	d3dCommandList->Reset(d3dCommandAllocator, nullptr);
 
+	d3dCommandList->SetDescriptorHeaps(1, &device->d3dShaderVisbileSRVHeap);
+
 	// TODO: Primitive topologies support.
 	d3dCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
@@ -352,8 +371,8 @@ void CommandList::clearRenderTarget(RenderTargetViewHandle rtv, const float32* c
 	XEAssert(state == State::Recording);
 
 	const uint32 descriptorIndex = device->resolveRenderTargetViewHandle(rtv);
-	const uint64 descriptorPtr = device->rtvHeapStartPtr + descriptorIndex * device->rtvDescriptorSize;
-	d3dCommandList->ClearRenderTargetView(D3D12_CPU_DESCRIPTOR_HANDLE{ descriptorPtr }, color, 0, nullptr);
+	const uint64 descriptorPtr = device->rtvHeapPtr + descriptorIndex * device->rtvDescriptorSize;
+	d3dCommandList->ClearRenderTargetView({ descriptorPtr }, color, 0, nullptr);
 }
 
 void CommandList::clearDepthStencil(DepthStencilViewHandle dsv,
@@ -363,7 +382,7 @@ void CommandList::clearDepthStencil(DepthStencilViewHandle dsv,
 	XEAssert(clearDepth || clearStencil);
 
 	const uint32 descriptorIndex = device->resolveDepthStencilViewHandle(dsv);
-	const uint64 descriptorPtr = device->dsvHeapStartPtr + descriptorIndex * device->dsvDescriptorSize;
+	const uint64 descriptorPtr = device->dsvHeapPtr + descriptorIndex * device->dsvDescriptorSize;
 
 	D3D12_CLEAR_FLAGS d3dClearFlags = D3D12_CLEAR_FLAGS(0);
 	if (clearDepth)
@@ -371,8 +390,7 @@ void CommandList::clearDepthStencil(DepthStencilViewHandle dsv,
 	if (clearStencil)
 		d3dClearFlags |= D3D12_CLEAR_FLAG_STENCIL;
 
-	d3dCommandList->ClearDepthStencilView(D3D12_CPU_DESCRIPTOR_HANDLE{ descriptorPtr },
-		d3dClearFlags, depth, stencil, 0, nullptr);
+	d3dCommandList->ClearDepthStencilView({ descriptorPtr }, d3dClearFlags, depth, stencil, 0, nullptr);
 }
 
 void CommandList::setRenderTargets(uint8 rtvCount, const RenderTargetViewHandle* rtvs, DepthStencilViewHandle dsv)
@@ -390,7 +408,7 @@ void CommandList::setRenderTargets(uint8 rtvCount, const RenderTargetViewHandle*
 		for (uint8 i = 0; i < rtvCount; i++)
 		{
 			const uint32 descriptorIndex = device->resolveRenderTargetViewHandle(rtvs[i]);
-			d3dRTVDescriptorPtrs[i].ptr = device->rtvHeapStartPtr + descriptorIndex * device->rtvDescriptorSize;
+			d3dRTVDescriptorPtrs[i].ptr = device->rtvHeapPtr + descriptorIndex * device->rtvDescriptorSize;
 		}
 	}
 
@@ -398,7 +416,7 @@ void CommandList::setRenderTargets(uint8 rtvCount, const RenderTargetViewHandle*
 	if (useDSV)
 	{
 		const uint32 descriptorIndex = device->resolveDepthStencilViewHandle(dsv);
-		d3dDSVDescriptorPtr.ptr = device->dsvHeapStartPtr + uint32(dsv) * device->dsvDescriptorSize;
+		d3dDSVDescriptorPtr.ptr = device->dsvHeapPtr + uint32(dsv) * device->dsvDescriptorSize;
 	}
 
 	d3dCommandList->OMSetRenderTargets(rtvCount,
@@ -521,6 +539,28 @@ void CommandList::bindBuffer(uint64 bindingNameXSH,
 		else if (bindType == BufferBindType::ReadWrite)
 			d3dCommandList->SetComputeRootUnorderedAccessView(resolvedBinding.rootParameterIndex, bufferAddress);
 	}
+	else
+		XEAssertUnreachableCode();
+}
+
+void CommandList::bindDescriptorSet(uint64 bindingNameXSH, DescriptorSetReference descriptorSetReference)
+{
+	XEAssert(state == State::Recording);
+
+	const BindingResolveResult resolvedBinding = ResolveBindingByNameXSH(device, currentPipelineLayoutHandle, bindingNameXSH);
+	XEAssert(resolvedBinding.type == PipelineBindingType::DescriptorSet);
+
+	const Device::DecomposedDescriptorSetReference decomposedDescriptorSetReference = device->decomposeDescriptorSetReference(descriptorSetReference);
+
+	XEAssert(decomposedDescriptorSetReference.descriptorSetLayout.sourceHash == resolvedBinding.descriptorSetLayoutSourceHash);
+
+	const uint64 descriptorTableGPUPtr =
+		device->shaderVisbileSRVHeapGPUPtr + decomposedDescriptorSetReference.baseDescriptorIndex * device->srvDescriptorSize;
+
+	if (currentPipelineType == PipelineType::Graphics)
+		d3dCommandList->SetGraphicsRootDescriptorTable(resolvedBinding.rootParameterIndex, { descriptorTableGPUPtr });
+	else if (currentPipelineType == PipelineType::Compute)
+		d3dCommandList->SetComputeRootDescriptorTable(resolvedBinding.rootParameterIndex, { descriptorTableGPUPtr });
 	else
 		XEAssertUnreachableCode();
 }
@@ -844,13 +884,12 @@ void Device::initialize(ID3D12Device10* _d3dDevice)
 	pipelineTableAllocationMask.clear();
 	fenceTableAllocationMask.clear();
 	swapChainTableAllocationMask.clear();
-	allocatedResourceDescriptorCount = 0;
 
-	referenceSRVHeapStartPtr = d3dReferenceSRVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
-	shaderVisbileSRVHeapStartPtrCPU = d3dShaderVisbileSRVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
-	shaderVisbileSRVHeapStartPtrGPU = d3dShaderVisbileSRVHeap->GetGPUDescriptorHandleForHeapStart().ptr;
-	rtvHeapStartPtr = d3dRTVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
-	dsvHeapStartPtr = d3dDSVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
+	referenceSRVHeapPtr = d3dReferenceSRVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
+	shaderVisbileSRVHeapCPUPtr = d3dShaderVisbileSRVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
+	shaderVisbileSRVHeapGPUPtr = d3dShaderVisbileSRVHeap->GetGPUDescriptorHandleForHeapStart().ptr;
+	rtvHeapPtr = d3dRTVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
+	dsvHeapPtr = d3dDSVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
 
 	rtvDescriptorSize = uint16(d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV));
 	dsvDescriptorSize = uint16(d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
@@ -1014,13 +1053,13 @@ ResourceViewHandle Device::createResourceView(ResourceHandle resourceHandle, con
 		useUAV = true;
 	}
 
-	const uint64 descriptorPtr = rtvHeapStartPtr + rtvDescriptorSize * viewIndex;
+	const uint64 descriptorPtr = rtvHeapPtr + rtvDescriptorSize * viewIndex;
 
 	XEAssert(useSRV ^ useUAV);
 	if (useUAV)
-		d3dDevice->CreateShaderResourceView(resource.d3dResource, &d3dSRVDesc, D3D12_CPU_DESCRIPTOR_HANDLE{ descriptorPtr });
+		d3dDevice->CreateShaderResourceView(resource.d3dResource, &d3dSRVDesc, { descriptorPtr });
 	if (useSRV)
-		d3dDevice->CreateUnorderedAccessView(resource.d3dResource, nullptr, &d3dUAVDesc, D3D12_CPU_DESCRIPTOR_HANDLE{ descriptorPtr });
+		d3dDevice->CreateUnorderedAccessView(resource.d3dResource, nullptr, &d3dUAVDesc, { descriptorPtr });
 
 	return composeResourceViewHandle(viewIndex);
 }
@@ -1034,8 +1073,8 @@ RenderTargetViewHandle Device::createRenderTargetView(ResourceHandle textureHand
 	const sint32 viewIndex = renderTargetViewTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(viewIndex >= 0);
 
-	const uint64 descriptorPtr = rtvHeapStartPtr + rtvDescriptorSize * viewIndex;
-	d3dDevice->CreateRenderTargetView(resource.d3dResource, nullptr, D3D12_CPU_DESCRIPTOR_HANDLE{ descriptorPtr });
+	const uint64 descriptorPtr = rtvHeapPtr + rtvDescriptorSize * viewIndex;
+	d3dDevice->CreateRenderTargetView(resource.d3dResource, nullptr, { descriptorPtr });
 
 	return composeRenderTargetViewHandle(viewIndex);
 }
@@ -1049,8 +1088,8 @@ DepthStencilViewHandle Device::createDepthStencilView(ResourceHandle textureHand
 	const sint32 viewIndex = depthStencilViewTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(viewIndex >= 0);
 
-	const uint64 descriptorPtr = dsvHeapStartPtr + dsvDescriptorSize * viewIndex;
-	d3dDevice->CreateDepthStencilView(resource.d3dResource, nullptr, D3D12_CPU_DESCRIPTOR_HANDLE{ descriptorPtr });
+	const uint64 descriptorPtr = dsvHeapPtr + dsvDescriptorSize * viewIndex;
+	d3dDevice->CreateDepthStencilView(resource.d3dResource, nullptr, { descriptorPtr });
 
 	return composeDepthStencilViewHandle(viewIndex);
 }
@@ -1065,10 +1104,14 @@ DescriptorSetLayoutHandle Device::createDescriptorSetLayout(BlobDataView blob)
 	BlobFormat::DescriptorSetLayoutBlobReader blobReader;
 	blobReader.open(blob.data, blob.size);
 
-	const uint32 bindingCount = blobReader.getBindingCount();
+	const uint16 bindingCount = uint16(blobReader.getBindingCount()); // TODO: Clean up this.
 	XEMasterAssert(bindingCount > 0 && bindingCount <= MaxDescriptorSetNestedBindingCount);
 
+	for (uint16 i = 0; i < bindingCount; i++)
+		descriptorSetLayout.bindings[i] = blobReader.getBinding(i);
+
 	descriptorSetLayout.sourceHash = blobReader.getSourceHash();
+	descriptorSetLayout.bindingCount = bindingCount;
 
 	return composeDescriptorSetLayoutHandle(descriptorSetLayoutIndex);
 }
@@ -1086,14 +1129,14 @@ PipelineLayoutHandle Device::createPipelineLayout(BlobDataView blob)
 	const uint32 bindingCount = blobReader.getPipelineBindingCount();
 	XEMasterAssert(bindingCount > 0 && bindingCount <= MaxPipelineBindingCount);
 
-	for (uint8 i = 0; i < bindingCount; i++)
+	for (uint16 i = 0; i < bindingCount; i++)
 	{
 		// TODO: Validate binding (root parameter index, binding type etc).
 		pipelineLayout.bindings[i] = blobReader.getPipelineBinding(i);
 	}
 
 	pipelineLayout.sourceHash = blobReader.getSourceHash();
-	pipelineLayout.bindingCount = uint8(bindingCount);
+	pipelineLayout.bindingCount = uint16(bindingCount);
 
 	XEAssert(!pipelineLayout.d3dRootSignature);
 	HRESULT hResult = d3dDevice->CreateRootSignature(0,
@@ -1324,15 +1367,6 @@ PipelineHandle Device::createComputePipeline(PipelineLayoutHandle pipelineLayout
 	return composePipelineHandle(pipelineIndex);
 }
 
-DescriptorAddress Device::allocateDescriptors(uint32 count)
-{
-	const uint32 startIndex = allocatedResourceDescriptorCount;
-	allocatedResourceDescriptorCount += count;
-	XEAssert(allocatedResourceDescriptorCount < MaxResourceDescriptorCount);
-
-	return composeDescriptorAddress(startIndex);
-}
-
 FenceHandle Device::createFence(uint64 initialValue)
 {
 	const sint32 fenceIndex = fenceTableAllocationMask.findFirstZeroAndSet();
@@ -1343,21 +1377,6 @@ FenceHandle Device::createFence(uint64 initialValue)
 	d3dDevice->CreateFence(initialValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence.d3dFence));
 
 	return composeFenceHandle(fenceIndex);
-}
-
-void Device::createCommandList(CommandList& commandList, CommandListType type)
-{
-	XEAssert(type == CommandListType::Graphics); // TODO: ...
-	XEAssert(!commandList.d3dCommandList && !commandList.d3dCommandAllocator);
-
-	d3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandList.d3dCommandAllocator));
-	d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandList.d3dCommandAllocator, nullptr,
-		IID_PPV_ARGS(&commandList.d3dCommandList));
-	commandList.d3dCommandList->Close();
-
-	commandList.device = this;
-	commandList.state = CommandList::State::Idle;
-	commandList.executionEndSyncPoint = DeviceQueueSyncPoint::Zero;
 }
 
 SwapChainHandle Device::createSwapChain(uint16 width, uint16 height, void* hWnd)
@@ -1412,17 +1431,55 @@ SwapChainHandle Device::createSwapChain(uint16 width, uint16 height, void* hWnd)
 	return composeSwapChainHandle(swapChainIndex);
 }
 
+void Device::createCommandList(CommandList& commandList, CommandListType type)
+{
+	XEAssert(type == CommandListType::Graphics); // TODO: ...
+	XEAssert(!commandList.d3dCommandList && !commandList.d3dCommandAllocator);
+
+	d3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandList.d3dCommandAllocator));
+	d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandList.d3dCommandAllocator, nullptr,
+		IID_PPV_ARGS(&commandList.d3dCommandList));
+	commandList.d3dCommandList->Close();
+
+	commandList.device = this;
+	commandList.state = CommandList::State::Idle;
+	commandList.executionEndSyncPoint = DeviceQueueSyncPoint::Zero;
+}
+
+DescriptorSetReference Device::createDescriptorSetReference(
+	DescriptorSetLayoutHandle descriptorSetLayoutHandle, DescriptorAddress address)
+{
+	descriptorSetReferenceGenerationCounter++;
+	return composeDescriptorSetReference(descriptorSetLayoutHandle, uint32(address), descriptorSetReferenceGenerationCounter);
+}
+
 void Device::writeDescriptor(DescriptorAddress descriptorAddress, ResourceViewHandle srvHandle)
 {
 	const uint32 sourceDescriptorIndex = resolveResourceViewHandle(srvHandle);
-	const uint32 destDescriptorIndex = resolveDescriptorAddress(descriptorAddress);
+	const uint32 destDescriptorIndex = uint32(descriptorAddress);
 
-	const uint64 sourcePtr = referenceSRVHeapStartPtr + sourceDescriptorIndex * srvDescriptorSize;
-	const uint64 destPtr = shaderVisbileSRVHeapStartPtrCPU + destDescriptorIndex * srvDescriptorSize;
-	d3dDevice->CopyDescriptorsSimple(1,
-		D3D12_CPU_DESCRIPTOR_HANDLE{ destPtr },
-		D3D12_CPU_DESCRIPTOR_HANDLE{ sourcePtr },
-		D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	const uint64 sourcePtr = referenceSRVHeapPtr + sourceDescriptorIndex * srvDescriptorSize;
+	const uint64 destPtr = shaderVisbileSRVHeapCPUPtr + destDescriptorIndex * srvDescriptorSize;
+	d3dDevice->CopyDescriptorsSimple(1, { destPtr }, { sourcePtr }, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+}
+
+void Device::writeDescriptor(DescriptorSetReference descriptorSetReference,
+	uint32 bindingNameXSH, ResourceViewHandle resourceViewHandle)
+{
+	const DecomposedDescriptorSetReference decomposedDescriptorSetReference = decomposeDescriptorSetReference(descriptorSetReference);
+	const DescriptorSetLayout& descriptorSetLayout = decomposedDescriptorSetReference.descriptorSetLayout;
+
+	for (uint16 i = 0; i < descriptorSetLayout.bindingCount; i++)
+	{
+		const BlobFormat::DescriptorSetNestedBindingInfo& binding = descriptorSetLayout.bindings[i];
+		if (uint32(binding.nameXSH) == bindingNameXSH)
+		{
+			// TODO: This is very hacky. Properly calculate descriptor index and check resource view type.
+			writeDescriptor(DescriptorAddress(decomposedDescriptorSetReference.baseDescriptorIndex + i), resourceViewHandle);
+			return;
+		}
+	}
+	XEAssertUnreachableCode();
 }
 
 void Device::submitWorkload(DeviceQueue queue, CommandList& commandList)
@@ -1769,3 +1826,67 @@ auto Device::getFenceByHandle(FenceHandle handle) -> Fence& { return fenceTable[
 auto Device::getFenceByHandle(FenceHandle handle) const -> const Fence& { return fenceTable[resolveFenceHandle(handle)]; }
 auto Device::getSwapChainByHandle(SwapChainHandle handle) -> SwapChain& { return swapChainTable[resolveSwapChainHandle(handle)]; }
 auto Device::getSwapChainByHandle(SwapChainHandle handle) const -> const SwapChain& { return swapChainTable[resolveSwapChainHandle(handle)]; }
+
+
+// DescriptorSetReference //////////////////////////////////////////////////////////////////////////
+
+// DescriptorSetReference structure:
+//	Base descriptor index					0x ....'....'...X'XXXX
+//	Descriptor set layout index				0x ....'....'XXX.'....
+//	Descriptor set layout handle generation	0x ....'..XX'....'....
+//	Descriptor set generation				0x ...X'XX..'....'....
+//	Checksum								0x .XX.'....'....'....
+//	Signature								0x X...'....'....'....
+
+namespace
+{
+	constexpr uint8 DescriptorSetReferenceSignature = 0xE;
+}
+
+DescriptorSetReference Device::composeDescriptorSetReference(DescriptorSetLayoutHandle descriptorSetLayoutHandle,
+	uint32 baseDescriptorIndex, uint32 descriptorSetGeneration) const
+{
+	const DecomposedHandle decomposedDSLHandle = DecomposeHandle(uint32(descriptorSetLayoutHandle));
+	XEAssert(decomposedDSLHandle.signature == DescriptorSetLayoutHandleSignature);
+	XEAssert(decomposedDSLHandle.entryIndex < MaxDescriptorSetLayoutCount);
+	XEAssert(decomposedDSLHandle.generation == descriptorSetLayoutTable[decomposedDSLHandle.entryIndex].handleGeneration);
+
+	const uint8 checksum = 0x69; // TODO: Proper checksum.
+	const uint8 descriptorSetLayoutHandleGeneration = decomposedDSLHandle.generation;
+	const uint32 descriptorSetLayoutIndex = decomposedDSLHandle.entryIndex;
+
+	XEAssert((baseDescriptorIndex & 0xF'FF'FF) == 0);
+	XEAssert((descriptorSetLayoutIndex & 0xF'FF) == 0);
+	descriptorSetGeneration &= 0xF'FF;
+
+	uint64 result = baseDescriptorIndex;
+	result |= uint64(descriptorSetLayoutIndex) << 20;
+	result |= uint64(descriptorSetLayoutHandleGeneration) << 32;
+	result |= uint64(descriptorSetGeneration) << 40;
+	result |= uint64(checksum) << 52;
+	result |= uint64(DescriptorSetReferenceSignature) << 60;
+
+	return DescriptorSetReference(result);
+}
+
+auto Device::decomposeDescriptorSetReference(DescriptorSetReference descriptorSetReference) const -> DecomposedDescriptorSetReference
+{
+	const uint64 refU64 = uint64(descriptorSetReference);
+
+	const uint32 baseDescriptorIndex = uint32(refU64) & 0xF'FF'FF;
+	const uint32 descriptorSetLayoutIndex = uint32(refU64 >> 20) & 0xF'FF;
+	const uint8 descriptorSetLayoutHandleGeneration = uint8(refU64 >> 32);
+	const uint32 descriptorSetGeneration = uint32(refU64 >> 40) & 0xF'FF;
+	const uint8 checksum = uint8(refU64 >> 52);
+	const uint8 signature = uint8(refU64 >> 60);
+
+	const uint8 checksumVerification = 0x69; // TODO: Proper checksum.
+
+	XEAssert(signature == DescriptorSetReferenceSignature);
+	XEAssert(checksum == checksumVerification);
+	XEAssert(descriptorSetLayoutIndex < MaxDescriptorSetLayoutCount);
+	const DescriptorSetLayout& descriptorSetLayout = descriptorSetLayoutTable[descriptorSetLayoutIndex];
+	XEAssert(descriptorSetLayoutHandleGeneration == descriptorSetLayout.handleGeneration);
+
+	return DecomposedDescriptorSetReference { descriptorSetLayout, baseDescriptorIndex, descriptorSetGeneration };
+}
