@@ -54,6 +54,7 @@
     <ClInclude Include="Source\XLib.Platform.D3D12.Helpers.h" />
     <ClInclude Include="Source\XLib.Platform.DXGI.Helpers.h" />
     <ClInclude Include="Source\XLib.Containers.AVLTreeLogic.h" />
+    <ClInclude Include="Source\XLib.Allocation.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\XLib.Random.cpp" />

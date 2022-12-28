@@ -10,6 +10,9 @@
 
 // TODO: Check that viewport and scissor are set when rendering.
 // TODO: Check that scissor rect is not larget than render target.
+// TODO: Replace DepthStencil with DepthRenderTarget.
+// TODO: Probably replace RenderTargetView with RenderTarget, DepthRenderTargetView with DepthRenderTarget.
+// TODO: Probably we can state that Texture2D is equivalent to Texture2DArray[1].
 
 #define XEAssert(cond) XAssert(cond)
 #define XEAssertUnreachableCode() XAssertUnreachableCode()
@@ -28,32 +31,22 @@ namespace XEngine::Render::HAL
 	class Device;
 	class Host;
 
-	enum class MemoryBlockHandle			: uint32 {};
-	enum class ResourceHandle				: uint32 {};
-	enum class ResourceViewHandle			: uint32 {};
-	enum class RenderTargetViewHandle		: uint32 {};
-	enum class DepthStencilViewHandle		: uint32 {};
-	enum class DescriptorSetLayoutHandle	: uint32 {};
-	enum class PipelineLayoutHandle			: uint32 {};
-	enum class PipelineHandle				: uint32 {};
-	enum class FenceHandle					: uint32 {};
-	enum class SwapChainHandle				: uint32 {};
+	enum class MemoryBlockHandle			: uint32 { Zero = 0 };
+	enum class BufferHandle					: uint32 { Zero = 0 };
+	enum class TextureHandle				: uint32 { Zero = 0 };
+	enum class ResourceViewHandle			: uint32 { Zero = 0 }; // ReferenceDescriptorHandle
+	enum class RenderTargetViewHandle		: uint32 { Zero = 0 }; // RenderTargetHandle
+	enum class DepthStencilViewHandle		: uint32 { Zero = 0 }; // DepthRenderTargetViewHandle (DepthRenderTargetHandle)
+	enum class DescriptorSetLayoutHandle	: uint32 { Zero = 0 };
+	enum class PipelineLayoutHandle			: uint32 { Zero = 0 };
+	enum class PipelineHandle				: uint32 { Zero = 0 };
+	enum class FenceHandle					: uint32 { Zero = 0 };
+	enum class SwapChainHandle				: uint32 { Zero = 0 };
 
-	enum class DescriptorSetReference : uint64 { Zero = 0 };
-	enum class DeviceQueueSyncPoint : uint64 { Zero = 0 };
+	enum class DescriptorSetReference		: uint64 { Zero = 0 };
+	enum class DeviceQueueSyncPoint			: uint64 { Zero = 0 };
 
 	using DescriptorAddress = uint32;
-
-	static constexpr MemoryBlockHandle ZeroMemoryBlockHandle = MemoryBlockHandle(0);
-	static constexpr ResourceHandle ZeroResourceHandle = ResourceHandle(0);
-	static constexpr ResourceViewHandle ZeroResourceViewHandle = ResourceViewHandle(0);
-	static constexpr RenderTargetViewHandle ZeroRenderTargetViewHandle = RenderTargetViewHandle(0);
-	static constexpr DepthStencilViewHandle ZeroDepthStencilViewHandle = DepthStencilViewHandle(0);
-	static constexpr DescriptorSetLayoutHandle ZeroDescriptorSetLayoutHandle = DescriptorSetLayoutHandle(0);
-	static constexpr PipelineLayoutHandle ZeroPipelineLayoutHandle = PipelineLayoutHandle(0);
-	static constexpr PipelineHandle ZeroPipelineHandle = PipelineHandle(0);
-	static constexpr FenceHandle ZeroFenceHandle = FenceHandle(0);
-	static constexpr SwapChainHandle ZeroSwapChainHandle = SwapChainHandle(0);
 
 	enum class DeviceQueue : uint8
 	{
@@ -77,59 +70,24 @@ namespace XEngine::Render::HAL
 		uint64 alignment;
 	};
 
-	enum class ResourceType : uint8
-	{
-		Undefined = 0,
-		Buffer,
-		Texture,
-	};
-
 	enum class TextureDimension : uint8
 	{
 		Undefined = 0,
 		Texture1D,
-		Texture1DArray,
 		Texture2D,
-		Texture2DArray,
 		Texture3D,
-		TextureCube,
-		TextureCubeArray,
+		//Texture1DArray,
+		//Texture2DArray,
 	};
 
-	enum class BufferFlags : uint8
+	struct TextureDesc
 	{
-		None = 0,
-		AllowShaderWrite = 0x01,
-		// AllowRaytracingAccelerationStructure
-	};
-
-	XDefineEnumFlagOperators(BufferFlags, uint8)
-
-	enum class TextureFlags : uint8
-	{
-		None = 0,
-		AllowRenderTarget	= 0x01,
-		AllowDepthStencil	= 0x02,
-		AllowShaderWrite	= 0x04,
-	};
-
-	XDefineEnumFlagOperators(TextureFlags, uint8)
-
-	enum class ResourceViewType : uint8
-	{
-		Undefined = 0,
-		ReadOnlyBuffer,
-		ReadWriteBuffer,
-		ReadOnlyTexelBuffer,
-		ReadWriteTexelBuffer,
-		ReadOnlyTexture1D,
-		ReadWriteTexture1D,
-		ReadOnlyTexture2D,
-		ReadWriteTexture2D,
-		ReadOnlyTexture3D,
-		ReadWriteTexture3D,
-		ReadOnlyTextureCube,
-		RaytracingAccelerationStructure,
+		uint16x3 size;
+		HAL::TextureDimension dimension;
+		TextureFormat format;
+		uint8 mipLevelCount;
+		bool allowRenderTarget;
+		bool allowShaderWrite;
 	};
 
 	enum class PipelineType : uint8
@@ -173,8 +131,8 @@ namespace XEngine::Render::HAL
 	{
 		uint8 baseMipLevel;
 		uint8 mipLevelCount;
-		uint16 baseArraySlice;
-		uint16 arraySliceCount;
+		uint16 baseArrayIndex;
+		uint16 arraySize;
 		// TextureAspects aspects;
 	};
 
@@ -247,39 +205,6 @@ namespace XEngine::Render::HAL
 		uint16x3 size;
 	};
 
-	struct ResourceViewDesc
-	{
-		ResourceViewType type;
-
-		union
-		{
-			struct
-			{
-
-			} readOnlyBuffer;
-
-			struct
-			{
-
-			} readWriteBuffer;
-
-			struct
-			{
-				TexelViewFormat format;
-				uint8 startMipIndex;
-				uint8 mipLevelCount;
-				uint8 plane;
-			} readOnlyTexture2D;
-
-			struct
-			{
-				TexelViewFormat format;
-				uint8 mipIndex;
-				uint8 plane;
-			} readWriteTexture2D;
-		};
-	};
-
 	class CommandList : public XLib::NonCopyable
 	{
 		friend Device;
@@ -301,7 +226,7 @@ namespace XEngine::Render::HAL
 		State state = State(0);
 		DeviceQueueSyncPoint executionEndSyncPoint = DeviceQueueSyncPoint::Zero;
 		PipelineType currentPipelineType = PipelineType::Undefined;
-		PipelineLayoutHandle currentPipelineLayoutHandle = ZeroPipelineLayoutHandle;
+		PipelineLayoutHandle currentPipelineLayoutHandle = PipelineLayoutHandle::Zero;
 
 	public:
 		CommandList() = default;
@@ -313,18 +238,18 @@ namespace XEngine::Render::HAL
 		void clearRenderTarget(RenderTargetViewHandle rtv, const float32* color);
 		void clearDepthStencil(DepthStencilViewHandle dsv, bool clearDepth, bool clearStencil, float32 depth, uint8 stencil);
 
-		void setRenderTargets(uint8 rtvCount, const RenderTargetViewHandle* rtvs, DepthStencilViewHandle dsv = ZeroDepthStencilViewHandle);
+		void setRenderTargets(uint8 rtvCount, const RenderTargetViewHandle* rtvs, DepthStencilViewHandle dsv = DepthStencilViewHandle::Zero);
 		void setViewport(float32 left, float32 top, float32 right, float32 bottom, float32 minDepth = 0.0f, float32 maxDepth = 1.0f);
 		void setScissor(uint32 left, uint32 top, uint32 right, uint32 bottom);
 
-		inline void setRenderTarget(RenderTargetViewHandle rtv, DepthStencilViewHandle dsv = ZeroDepthStencilViewHandle) { setRenderTargets(1, &rtv, dsv); }
+		inline void setRenderTarget(RenderTargetViewHandle rtv, DepthStencilViewHandle dsv = DepthStencilViewHandle::Zero) { setRenderTargets(1, &rtv, dsv); }
 
 		void setPipelineType(PipelineType pipelineType);
 		void setPipelineLayout(PipelineLayoutHandle pipelineLayoutHandle);
 		void setPipeline(PipelineHandle pipelineHandle);
 
 		void bindConstants(uint64 bindingNameXSH, const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0);
-		void bindBuffer(uint64 bindingNameXSH, BufferBindType bindType, ResourceHandle bufferHandle, uint32 offset = 0);
+		void bindBuffer(uint64 bindingNameXSH, BufferBindType bindType, BufferHandle bufferHandle, uint32 offset = 0);
 		void bindDescriptorSet(uint64 bindingNameXSH, DescriptorSetReference descriptorSetReference);
 		void bindDescriptorArray(uint64 bindingNameXSH, DescriptorAddress arrayStartAddress);
 
@@ -333,24 +258,24 @@ namespace XEngine::Render::HAL
 		void dispatchMesh();
 		void dispatch(uint32 groupCountX, uint32 groupCountY = 1, uint32 groupCountZ = 1);
 
-		void bufferMemoryBarrier(ResourceHandle bufferHandle,
+		void bufferMemoryBarrier(BufferHandle bufferHandle,
 			BarrierSync syncBefore, BarrierSync syncAfter,
 			BarrierAccess accessBefore, BarrierAccess accessAfter);
-		void textureMemoryBarrier(ResourceHandle textureHandle,
+		void textureMemoryBarrier(TextureHandle textureHandle,
 			BarrierSync syncBefore, BarrierSync syncAfter,
 			BarrierAccess accessBefore, BarrierAccess accessAfter,
 			TextureLayout layoutBefore, TextureLayout layoutAfter,
 			const TextureSubresourceRange* subresourceRange = nullptr);
 		//void globalMemoryBarrier();
 
-		void copyBuffer(ResourceHandle dstBufferHandle, uint64 dstOffset, ResourceHandle srcBufferHandle, uint64 srcOffset, uint64 size);
-		void copyTexture(ResourceHandle dstTextureHandle, TextureSubresource dstSubresource, uint16x3 dstOffset,
-			ResourceHandle srcTextureHandle, TextureSubresource srcSubresource, const TextureRegion* srcRegion = nullptr);
+		void copyBuffer(BufferHandle dstBufferHandle, uint64 dstOffset, BufferHandle srcBufferHandle, uint64 srcOffset, uint64 size);
+		void copyTexture(TextureHandle dstTextureHandle, TextureSubresource dstSubresource, uint16x3 dstOffset,
+			TextureHandle srcTextureHandle, TextureSubresource srcSubresource, const TextureRegion* srcRegion = nullptr);
 		void copyBufferTexture(CopyBufferTextureDirection direction,
-			ResourceHandle bufferHandle, uint64 bufferOffset, uint32 bufferRowPitch,
-			ResourceHandle textureHandle, TextureSubresource textureSubresource, const TextureRegion* textureRegion = nullptr);
+			BufferHandle bufferHandle, uint64 bufferOffset, uint32 bufferRowPitch,
+			TextureHandle textureHandle, TextureSubresource textureSubresource, const TextureRegion* textureRegion = nullptr);
 
-		void initializeTextureMetadata(ResourceHandle textureHandle, const TextureSubresourceRange* subresourceRange = nullptr);
+		void initializeTextureMetadata(TextureHandle textureHandle, const TextureSubresourceRange* subresourceRange = nullptr);
 	};
 
 	struct BlobDataView
@@ -377,6 +302,8 @@ namespace XEngine::Render::HAL
 		static constexpr uint32 MaxFenceCount = 64;
 		static constexpr uint32 MaxSwapChainCount = 4;
 		static constexpr uint32 SwapChainBackBufferCount = 2;
+
+		enum class ResourceType : uint8;
 
 		struct MemoryBlock;
 		struct Resource;
@@ -495,28 +422,37 @@ namespace XEngine::Render::HAL
 		MemoryBlockHandle allocateMemory(uint64 size, MemoryType memoryType = MemoryType::DeviceLocal);
 		void releaseMemory(MemoryBlockHandle memory);
 
-		ResourceAllocationInfo getTextureAllocationInfo(TextureDimension dimension, uint16x3 size,
-			TextureFormat format, uint8 mipLevelCount, TextureFlags flags);
+		ResourceAllocationInfo getTextureAllocationInfo(const TextureDesc& textureDesc);
 
-		ResourceHandle createBuffer(uint64 size, BufferFlags flags,
+		BufferHandle createBuffer(uint64 size, bool allowShaderWrite,
 			MemoryBlockHandle memoryBlockHandle, uint64 memoryBlockOffset);
-		ResourceHandle createTexture(TextureDimension dimension, uint16x3 size,
-			TextureFormat format, uint8 mipLevelCount, TextureFlags flags,
+		TextureHandle createTexture(const TextureDesc& desc,
 			MemoryBlockHandle memoryBlockHandle, uint64 memoryBlockOffset);
 
-		ResourceHandle createPartiallyResidentBuffer(uint64 size, BufferFlags flags);
-		ResourceHandle createPartiallyResidentTexture(TextureDimension dimension, uint16x3 size,
-			TextureFormat format, uint8 mipLevelCount, TextureFlags flags);
+		BufferHandle createPartiallyResidentBuffer(uint64 size, bool allowShaderWrite);
+		TextureHandle createPartiallyResidentTexture(const TextureDesc& textureDesc);
 
-		void destroyResource(ResourceHandle handle);
+		void destroyBuffer(BufferHandle bufferHandle);
+		void destroyTexture(TextureHandle textureHandle);
 
-		ResourceViewHandle createResourceView(ResourceHandle resourceHandle, const ResourceViewDesc& viewDesc);
+		ResourceViewHandle createBufferView(BufferHandle bufferHandle, TexelViewFormat format, bool writable, );
+		ResourceViewHandle createTextureView(TextureHandle textureHandle, TexelViewFormat format, bool writable,
+			const TextureSubresourceRange& subresourceRange);
+		ResourceViewHandle createTextureCubeView(TextureHandle textureHandle, TexelViewFormat format,
+			uint8 baseMipLevel = 0, uint8 mipLevelCount = 0, uint16 baseArrayIndex = 0, uint16 arraySize = 0);
+		ResourceViewHandle createRaytracingAccelerationStructureView(...);
+
+		// ReferenceDescriptorHandle createBufferDescriptor(...);
+		// ReferenceDescriptorHandle createTextureDescriptor(...);
+		// ReferenceDescriptorHandle createTextureCubeDescriptor(...);
+		// ReferenceDescriptorHandle createRaytracingAccelerationStructureDescriptor(...);
+
 		void destroyResourceView(ResourceViewHandle handle);
 
-		RenderTargetViewHandle createRenderTargetView(ResourceHandle textureHandle);
+		RenderTargetViewHandle createRenderTargetView(TextureHandle textureHandle);
 		void destroyRenderTargetView(RenderTargetViewHandle handle);
 
-		DepthStencilViewHandle createDepthStencilView(ResourceHandle textureHandle);
+		DepthStencilViewHandle createDepthStencilView(TextureHandle textureHandle);
 		void destroyDepthStencilView(DepthStencilViewHandle handle);
 
 		DescriptorSetLayoutHandle createDescriptorSetLayout(BlobDataView blob);
@@ -542,7 +478,7 @@ namespace XEngine::Render::HAL
 		DescriptorSetReference createDescriptorSetReference(DescriptorSetLayoutHandle descriptorSetLayoutHandle, DescriptorAddress address);
 
 		void writeDescriptor(DescriptorAddress descriptorAddress, ResourceViewHandle resourceViewHandle);
-		void writeDescriptor(DescriptorSetReference descriptorSetReference, uint32 bindingNameXSH, ResourceViewHandle resourceViewHandle);
+		void writeDescriptor(DescriptorSetReference descriptorSetReference, uint64 bindingNameXSH, ResourceViewHandle resourceViewHandle);
 
 		void submitWorkload(DeviceQueue queue, CommandList& commandList);
 		void submitSyncPointWait(DeviceQueue queue, DeviceQueueSyncPoint syncPoint);
@@ -558,12 +494,12 @@ namespace XEngine::Render::HAL
 		void unmapHostVisibleMemoryBlock(MemoryBlockHandle hostVisibleMemoryBlock);
 
 		// TODO: Remove. Temporary solution.
-		void* mapBuffer(ResourceHandle bufferHandle);
-		void unmapBuffer(ResourceHandle bufferHandle);
+		void* mapBuffer(BufferHandle bufferHandle);
+		void unmapBuffer(BufferHandle bufferHandle);
 
 		uint64 getFenceValue(FenceHandle fenceHandle) const;
 
-		ResourceHandle getSwapChainBackBuffer(SwapChainHandle swapChainHandle, uint32 backBufferIndex) const;
+		TextureHandle getSwapChainBackBuffer(SwapChainHandle swapChainHandle, uint32 backBufferIndex) const;
 		uint32 getSwapChainCurrentBackBufferIndex(SwapChainHandle swapChainHandle) const;
 
 		const char* getName() const;

@@ -7,5 +7,6 @@
   <ItemGroup>
     <ClInclude Include="XEngine.ThreadPool.h" />
     <ClInclude Include="XEngine.ThreadPoolUtils.h" />
+    <ClInclude Include="XEngine.Memory.h" />
   </ItemGroup>
 </Project>

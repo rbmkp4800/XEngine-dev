@@ -288,6 +288,7 @@
     <ClCompile Include="XEngine.ThreadPoolUtils.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="XEngine.Memory.h" />
     <ClInclude Include="XEngine.ThreadPool.h" />
     <ClInclude Include="XEngine.ThreadPoolUtils.h" />
   </ItemGroup>

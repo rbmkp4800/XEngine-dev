@@ -4,9 +4,12 @@
     <ClInclude Include="XEngine.Render.h" />
     <ClInclude Include="XEngine.Render.Scheduler.h" />
     <ClInclude Include="XEngine.Render.ShaderLibrary.h" />
+    <ClInclude Include="XEngine.Render.BloomPass.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="XEngine.Render.cpp" />
     <ClCompile Include="XEngine.Render.ShaderLibrary.cpp" />
+    <ClCompile Include="XEngine.Render.BloomPass.cpp" />
+    <ClCompile Include="XEngine.Render.Scheduler.cpp" />
   </ItemGroup>
 </Project>

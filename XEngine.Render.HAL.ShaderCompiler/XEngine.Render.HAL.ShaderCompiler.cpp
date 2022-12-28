@@ -34,9 +34,6 @@ static inline D3D12_DESCRIPTOR_RANGE_TYPE TranslateDescriptorTypeToD3D12Descript
 		case DescriptorType::ReadWriteBuffer:
 		case DescriptorType::ReadWriteTexture:
 			return D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-
-		//case DescriptorType::Sampler:
-		//	return D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
 	}
 	XAssertUnreachableCode();
 	return D3D12_DESCRIPTOR_RANGE_TYPE(-1);
@@ -54,9 +51,6 @@ static inline char TranslateDescriptorTypeToShaderRegisterType(DescriptorType ty
 		case DescriptorType::ReadWriteBuffer:
 		case DescriptorType::ReadWriteTexture:
 			return 'u';
-
-		//case DescriptorType::Sampler:
-		//	return 's';
 	}
 	XAssertUnreachableCode();
 	return 0;

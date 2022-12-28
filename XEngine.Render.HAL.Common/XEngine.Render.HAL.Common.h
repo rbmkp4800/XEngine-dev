@@ -27,7 +27,6 @@ namespace XEngine::Render::HAL
 		ReadWriteBuffer,
 		ReadOnlyTexture,
 		ReadWriteTexture,
-		Sampler,
 		RaytracingAccelerationStructure,
 	};
 

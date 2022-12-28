@@ -100,17 +100,23 @@
     <ProjectReference Include="..\XEngine.Render.Shaders\XEngine.Render.Shaders.vcxproj">
       <Project>{e6af7fdc-1839-4501-96b6-389ab9cafddb}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\XEngine.XStringHash\XEngine.XStringHash.vcxproj">
+      <Project>{ca640875-7c04-42ba-b081-8dac82c9f48d}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\XLib\XLib.vcxproj">
       <Project>{df81a513-72e3-4b74-b866-97f3bb61d45f}</Project>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="XEngine.Render.BloomPass.h" />
     <ClInclude Include="XEngine.Render.h" />
     <ClInclude Include="XEngine.Render.Scheduler.h" />
     <ClInclude Include="XEngine.Render.ShaderLibrary.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="XEngine.Render.BloomPass.cpp" />
     <ClCompile Include="XEngine.Render.cpp" />
+    <ClCompile Include="XEngine.Render.Scheduler.cpp" />
     <ClCompile Include="XEngine.Render.ShaderLibrary.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
