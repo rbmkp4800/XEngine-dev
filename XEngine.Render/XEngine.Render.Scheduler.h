@@ -9,8 +9,8 @@
 
 namespace XEngine::Render::Scheduler
 {
-	enum class PipelineBufferHandle : uint32 {};
-	enum class PipelineTextureHandle : uint32 {};
+	enum class BufferHandle : uint32 {};
+	enum class TextureHandle : uint32 {};
 
 	struct TransientMemoryAllocationInfo
 	{
@@ -18,28 +18,28 @@ namespace XEngine::Render::Scheduler
 		uint32 offset;
 	};
 
-	class PipelineSchedulerBroker : public XLib::NonCopyable
+	class PassExecutionBroker : public XLib::NonCopyable
 	{
 		friend class Pipeline;
 
 	private:
 
 	private:
-		PipelineSchedulerBroker() = default;
-		~PipelineSchedulerBroker() = default;
+		PassExecutionBroker() = default;
+		~PassExecutionBroker() = default;
 
 	public:
 		HAL::DescriptorSetReference allocateTransientDescriptorSet(HAL::DescriptorSetLayoutHandle descriptorSetLayout);
 		HAL::DescriptorAddress allocateTransientDescriptors(uint16 descriptorCount);
 		TransientMemoryAllocationInfo allocateTransientMemory(uint32 size, uint32 alignment = 0);
 
-		HAL::ResourceViewHandle getTransientBufferView(PipelineBufferHandle buffer);
-		HAL::ResourceViewHandle getTransientTextureView(PipelineTextureHandle texture);
-		HAL::RenderTargetViewHandle getTransientRenderTargetView(PipelineTextureHandle texture);
-		HAL::DepthStencilViewHandle getTransientDepthStencilView(PipelineTextureHandle texture);
+		HAL::ResourceViewHandle getTransientBufferView(BufferHandle buffer);
+		HAL::ResourceViewHandle getTransientTextureView(TextureHandle texture);
+		HAL::RenderTargetViewHandle getTransientRenderTargetView(TextureHandle texture);
+		HAL::DepthStencilViewHandle getTransientDepthStencilView(TextureHandle texture);
 	};
 
-	using PassExecutorFunc = void(*)(PipelineSchedulerBroker& schedulerBroker,
+	using PassExecutorFunc = void(*)(PassExecutionBroker& executionBroker,
 		HAL::Device& device, HAL::CommandList& commandList, const void* userData);
 
 	enum class BufferAccess : uint8
@@ -97,13 +97,13 @@ namespace XEngine::Render::Scheduler
 
 	struct PassBufferDependencyDesc
 	{
-		PipelineBufferHandle buffer;
+		BufferHandle buffer;
 		BufferAccess access;
 	};
 
 	struct PassTextureDependencyDesc
 	{
-		PipelineTextureHandle texture;
+		TextureHandle texture;
 		TextureAccess access;
 	};
 
@@ -117,7 +117,7 @@ namespace XEngine::Render::Scheduler
 
 #endif
 
-	enum class PassDeviceWorkloadType : uint8
+	enum class PassType : uint8
 	{
 		None = 0,
 		Graphics,
@@ -144,6 +144,8 @@ namespace XEngine::Render::Scheduler
 
 		void initialize(HAL::Device& device, HAL::MemoryBlockHandle memoryBlock, uint64 memoryBlockSize);
 		void reset();
+
+		inline HAL::MemoryBlockHandle getMemory() const { return memoryBlock; }
 	};
 
 	/*class PipelineCommandListPool : public XLib::NonCopyable
@@ -182,27 +184,27 @@ namespace XEngine::Render::Scheduler
 		Pipeline() = default;
 		~Pipeline() = default;
 
-		void open();
-		void close();
+		//void open();
+		//void close();
 
-		PipelineBufferHandle createTransientBuffer(uint64 size);
-		PipelineTextureHandle createTransientTexture(const HAL::TextureDesc& textureDesc);
+		BufferHandle createTransientBuffer(uint64 size);
+		TextureHandle createTransientTexture(const HAL::TextureDesc& textureDesc);
 
-		PipelineBufferHandle importExternalBuffer(HAL::BufferHandle buffer);
-		PipelineTextureHandle importExternalTexture(HAL::TextureHandle texture);
+		BufferHandle importExternalBuffer(HAL::BufferHandle buffer);
+		TextureHandle importExternalTexture(HAL::TextureHandle texture);
 
 		void* allocateUserData(uint32 size);
 
 		//void createVirtualCPUResource();
 
-		void addPass(PassDeviceWorkloadType deviceWorkloadType, const PassDependenciesDesc& dependencies,
+		void schedulePass(PassType type, const PassDependenciesDesc& dependencies,
 			PassExecutorFunc executorFunc, const void* userData);
 
-		void compileDependenciesGraph();
+		void compile();
 
 		uint64 getTransientResourcePoolMemoryRequirement() const;
 
-		void schedule(HAL::Device& device,
+		void executeAndSubmitToDevice(HAL::Device& device,
 			TransientResourcePool& transientResourcePool,
 			TransientDescriptorCircularAllocator& transientDescriptorAllocator,
 			TransientMemoryCircularAllocator& transientMemoryAllocator);

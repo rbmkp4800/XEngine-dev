@@ -235,25 +235,19 @@ struct Device::Resource
 
 	union
 	{
-		struct
-		{
-			uint16x3 size;
-			TextureDimension dimension;
-			TextureFormat format;
-			uint8 mipLevelCount; // TODO: Move this to `size.z`
-		} texture;
-
-		struct
-		{
-			uint64 size;
-		} buffer;
+		uint64 bufferSize;
+		TextureDesc textureDesc;
 	};
 };
 
 struct Device::ResourceView
 {
-	ResourceHandle resourceHandle;
-	ResourceViewType type;
+	union
+	{
+		BufferHandle bufferHandle;
+		TextureHandle textureHandle;
+	};
+	ResourceType resourceType;
 	uint8 handleGeneration;
 };
 
@@ -520,7 +514,7 @@ void CommandList::bindBuffer(uint64 bindingNameXSH,
 	else
 		XEAssertUnreachableCode();
 
-	const Device::Resource& resource = device->getResourceByHandle(bufferHandle);
+	const Device::Resource& resource = device->getResourceByBufferHandle(bufferHandle);
 	XEAssert(resource.type == Device::ResourceType::Buffer);
 	XEAssert(resource.d3dResource);
 
@@ -598,7 +592,7 @@ void CommandList::bufferMemoryBarrier(BufferHandle bufferHandle,
 	XEAssert(ValidateBarrierSyncAndAccessCompatibility(syncBefore, accessBefore));
 	XEAssert(ValidateBarrierSyncAndAccessCompatibility(syncAfter, accessAfter));
 
-	const Device::Resource& buffer = device->getResourceByHandle(bufferHandle);
+	const Device::Resource& buffer = device->getResourceByBufferHandle(bufferHandle);
 	XEAssert(buffer.type == Device::ResourceType::Buffer && buffer.d3dResource);
 
 #if USE_ENHANCED_BARRIERS
@@ -643,7 +637,7 @@ void CommandList::textureMemoryBarrier(TextureHandle textureHandle,
 	XEAssert(ValidateBarrierAccessAndTextureLayoutCompatibility(accessBefore, layoutBefore));
 	XEAssert(ValidateBarrierAccessAndTextureLayoutCompatibility(accessAfter, layoutAfter));
 
-	const Device::Resource& texture = device->getResourceByHandle(textureHandle);
+	const Device::Resource& texture = device->getResourceByTextureHandle(textureHandle);
 	XEAssert(texture.type == Device::ResourceType::Texture && texture.d3dResource);
 
 #if USE_ENHANCED_BARRIERS
@@ -706,8 +700,8 @@ void CommandList::copyBuffer(BufferHandle dstBufferHandle, uint64 dstOffset,
 {
 	XEAssert(state == State::Recording);
 
-	const Device::Resource& dstBuffer = device->getResourceByHandle(dstBufferHandle);
-	const Device::Resource& srcBuffer = device->getResourceByHandle(srcBufferHandle);
+	const Device::Resource& dstBuffer = device->getResourceByBufferHandle(dstBufferHandle);
+	const Device::Resource& srcBuffer = device->getResourceByBufferHandle(srcBufferHandle);
 	XEAssert(dstBuffer.type == Device::ResourceType::Buffer && dstBuffer.d3dResource);
 	XEAssert(srcBuffer.type == Device::ResourceType::Buffer && srcBuffer.d3dResource);
 
@@ -719,10 +713,10 @@ void CommandList::copyTexture(TextureHandle dstTextureHandle, TextureSubresource
 {
 	XEAssert(state == State::Recording);
 
-	const Device::Resource& dstTexture = device->getResourceByHandle(dstTextureHandle);
-	const Device::Resource& srcTexture = device->getResourceByHandle(srcTextureHandle);
-	XEAssert(dstTexture.type == ResourceType::Texture && dstTexture.d3dResource);
-	XEAssert(srcTexture.type == ResourceType::Texture && srcTexture.d3dResource);
+	const Device::Resource& dstTexture = device->getResourceByTextureHandle(dstTextureHandle);
+	const Device::Resource& srcTexture = device->getResourceByTextureHandle(srcTextureHandle);
+	XEAssert(dstTexture.type == Device::ResourceType::Texture && dstTexture.d3dResource);
+	XEAssert(srcTexture.type == Device::ResourceType::Texture && srcTexture.d3dResource);
 
 	D3D12_TEXTURE_COPY_LOCATION d3dDstLocation = {};
 	d3dDstLocation.pResource = dstTexture.d3dResource;
@@ -737,7 +731,7 @@ void CommandList::copyTexture(TextureHandle dstTextureHandle, TextureSubresource
 	const D3D12_BOX d3dSrcBox = srcRegion ?
 		D3D12BoxFromOffsetAndSize(srcRegion->offset, srcRegion->size) :
 		D3D12BoxFromOffsetAndSize(uint16x3(0, 0, 0),
-			Host::CalculateMipLevelSize(srcTexture.texture.size, srcSubresource.mipLevel));
+			Host::CalculateMipLevelSize(srcTexture.textureDesc.size, srcSubresource.mipLevel));
 
 	// TODO: Add texture subresource bounds validation.
 
@@ -752,19 +746,19 @@ void CommandList::copyBufferTexture(CopyBufferTextureDirection direction,
 
 	// TODO: BC formats handling
 
-	const Device::Resource& buffer = device->getResourceByHandle(bufferHandle);
-	const Device::Resource& texture = device->getResourceByHandle(textureHandle);
-	XEAssert(buffer.type == ResourceType::Buffer && buffer.d3dResource);
-	XEAssert(texture.type == ResourceType::Texture && texture.d3dResource);
+	const Device::Resource& buffer = device->getResourceByBufferHandle(bufferHandle);
+	const Device::Resource& texture = device->getResourceByTextureHandle(textureHandle);
+	XEAssert(buffer.type == Device::ResourceType::Buffer && buffer.d3dResource);
+	XEAssert(texture.type == Device::ResourceType::Texture && texture.d3dResource);
 
-	uint16x3 textureRegionSize = textureRegion ?
-		textureRegion->size : Host::CalculateMipLevelSize(texture.texture.size, textureSubresource.mipLevel);
+	const uint16x3 textureRegionSize = textureRegion ?
+		textureRegion->size : Host::CalculateMipLevelSize(texture.textureDesc.size, textureSubresource.mipLevel);
 
 	D3D12_TEXTURE_COPY_LOCATION d3dBufferLocation = {};
 	d3dBufferLocation.pResource = buffer.d3dResource;
 	d3dBufferLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
 	d3dBufferLocation.PlacedFootprint.Offset = bufferOffset;
-	d3dBufferLocation.PlacedFootprint.Footprint.Format = TranslateTextureFormatToDXGIFormat(texture.texture.format);
+	d3dBufferLocation.PlacedFootprint.Footprint.Format = TranslateTextureFormatToDXGIFormat(texture.textureDesc.format);
 	d3dBufferLocation.PlacedFootprint.Footprint.Width = textureRegionSize.x;
 	d3dBufferLocation.PlacedFootprint.Footprint.Height = textureRegionSize.y;
 	d3dBufferLocation.PlacedFootprint.Footprint.Depth = textureRegionSize.z;
@@ -791,7 +785,7 @@ void CommandList::copyBufferTexture(CopyBufferTextureDirection direction,
 		d3dSrcBox = textureRegion ?
 			D3D12BoxFromOffsetAndSize(textureRegion->offset, textureRegion->size) :
 			D3D12BoxFromOffsetAndSize(uint16x3(0, 0, 0),
-				Host::CalculateMipLevelSize(texture.texture.size, textureSubresource.mipLevel));
+				Host::CalculateMipLevelSize(texture.textureDesc.size, textureSubresource.mipLevel));
 		p_d3dSrcBox = &d3dSrcBox;
 	}
 
@@ -805,11 +799,10 @@ void CommandList::copyBufferTexture(CopyBufferTextureDirection direction,
 uint32 Device::CalculateTextureSubresourceIndex(const Resource& resource, const TextureSubresource& subresource)
 {
 	XEAssert(resource.type == ResourceType::Texture);
-	XEAssert(subresource.mipLevel < resource.texture.mipLevelCount);
-	XEAssert(imply(subresource.arraySlice > 0, resource.texture.dimension == TextureDimension::Texture2DArray)); // TODO: Other dim arrays
-	XEAssert(subresource.arraySlice < resource.texture.size.z);
+	XEAssert(subresource.mipLevel < resource.textureDesc.mipLevelCount);
+	XEAssert(subresource.arrayIndex < resource.textureDesc.size.z);
 
-	const TextureFormat format = resource.texture.format;
+	const TextureFormat format = resource.textureDesc.format;
 	const bool hasStencil = (format == TextureFormat::D24S8 || format == TextureFormat::D32S8);
 	const bool isDepthStencilTexture = (format == TextureFormat::D16 || format == TextureFormat::D32 || hasStencil);
 	const bool isColorAspect = (subresource.aspect == TextureAspect::Color);
@@ -818,10 +811,10 @@ uint32 Device::CalculateTextureSubresourceIndex(const Resource& resource, const 
 	XEAssert(imply(isStencilAspect, hasStencil));
 
 	const uint32 planeIndex = isStencilAspect ? 1 : 0;
-	const uint32 mipLevelCount = resource.texture.mipLevelCount;
-	const uint32 arraySize = resource.texture.size.z;
+	const uint32 mipLevelCount = resource.textureDesc.mipLevelCount;
+	const uint32 arraySize = resource.textureDesc.size.z;
 
-	return subresource.mipLevel + (subresource.arraySlice * mipLevelCount) + (planeIndex * mipLevelCount * arraySize);
+	return subresource.mipLevel + (subresource.arrayIndex * mipLevelCount) + (planeIndex * mipLevelCount * arraySize);
 }
 
 void Device::initialize(ID3D12Device10* _d3dDevice)
@@ -970,7 +963,7 @@ BufferHandle Device::createBuffer(uint64 size, bool allowShaderWrite,
 		IID_PPV_ARGS(&resource.d3dResource));
 #endif
 
-	return composeResourceHandle(resourceIndex);
+	return composeBufferHandle(resourceIndex);
 }
 
 TextureHandle Device::createTexture(const TextureDesc& desc,
@@ -988,7 +981,7 @@ TextureHandle Device::createTexture(const TextureDesc& desc,
 	resource.type = ResourceType::Texture;
 	resource.internalOwnership = false;
 
-	const DXGI_FORMAT dxgiFormat = TranslateTextureFormatToDXGIFormat(format);
+	const DXGI_FORMAT dxgiFormat = TranslateTextureFormatToDXGIFormat(desc.format);
 	const D3D12_HEAP_PROPERTIES d3dHeapProps = D3D12Helpers::HeapProperties(D3D12_HEAP_TYPE_DEFAULT);
 
 	D3D12_RESOURCE_FLAGS d3dResourceFlags = D3D12_RESOURCE_FLAG_NONE;
@@ -1023,59 +1016,99 @@ TextureHandle Device::createTexture(const TextureDesc& desc,
 		IID_PPV_ARGS(&resource.d3dResource));
 #endif
 
-	return composeResourceHandle(resourceIndex);
+	return composeTextureHandle(resourceIndex);
 }
 
-ResourceViewHandle Device::createResourceView(ResourceHandle resourceHandle, const ResourceViewDesc& viewDesc)
+ResourceViewHandle Device::createBufferView(BufferHandle bufferHandle, TexelViewFormat format, bool writable)
 {
-	const Resource& resource = getResourceByHandle(resourceHandle);
+	const Resource& resource = getResourceByBufferHandle(bufferHandle);
+	XEAssert(resource.type == Device::ResourceType::Buffer);
 	XEAssert(resource.d3dResource);
 
-	const D3D12_RESOURCE_DESC d3dResourceDesc = resource.d3dResource->GetDesc();
+	// TODO: Check if format is supported to use with texel buffers.
+	const DXGI_FORMAT dxgiFormat = TranslateTexelViewFormatToDXGIFormat(format);
 
 	const sint32 viewIndex = resourceViewTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(viewIndex >= 0);
 
 	ResourceView& resourceView = resourceViewTable[viewIndex];
-	XEAssert(resourceView.type == ResourceViewType::Undefined);
-	resourceView.resourceHandle = resourceHandle;
-	resourceView.type = viewDesc.type;
-
-	bool useSRV = false;
-	bool useUAV = false;
-	D3D12_SHADER_RESOURCE_VIEW_DESC d3dSRVDesc = {};
-	D3D12_UNORDERED_ACCESS_VIEW_DESC d3dUAVDesc = {};
-
-	if (viewDesc.type == ResourceViewType::ReadOnlyTexture2D)
-	{
-		XEAssert(resource.type == ResourceType::Texture);
-		d3dSRVDesc = D3D12Helpers::ShaderResourceViewDescForTexture2D(d3dResourceDesc.Format,
-			viewDesc.readOnlyTexture2D.startMipIndex,
-			viewDesc.readOnlyTexture2D.mipLevelCount,
-			viewDesc.readOnlyTexture2D.plane);
-		useSRV = true;
-	}
-	else if (viewDesc.type == ResourceViewType::ReadWriteTexture2D)
-	{
-		XEAssert(resource.type == ResourceType::Texture);
-		//d3dUAVDesc = D3D12Helpers::UnorderedAccessViewDescForTexture2D(...);
-		useUAV = true;
-	}
+	XEAssert(resourceView.resourceType == ResourceType::Undefined);
+	resourceView.bufferHandle = bufferHandle;
+	resourceView.resourceType = ResourceType::Buffer;
 
 	const uint64 descriptorPtr = rtvHeapPtr + rtvDescriptorSize * viewIndex;
 
-	XEAssert(useSRV ^ useUAV);
-	if (useUAV)
-		d3dDevice->CreateShaderResourceView(resource.d3dResource, &d3dSRVDesc, { descriptorPtr });
-	if (useSRV)
+	if (writable)
+	{
+		D3D12_UNORDERED_ACCESS_VIEW_DESC d3dUAVDesc = {};
+		d3dUAVDesc.Format = dxgiFormat;
+		d3dUAVDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+		d3dUAVDesc.Buffer.FirstElement = 0;
+		d3dUAVDesc.Buffer.NumElements = ...;
+		d3dUAVDesc.Buffer.StructureByteStride = ...;
+		d3dUAVDesc.Buffer.CounterOffsetInBytes = 0;
+		d3dUAVDesc.Buffer.Flags = ...;
+
 		d3dDevice->CreateUnorderedAccessView(resource.d3dResource, nullptr, &d3dUAVDesc, { descriptorPtr });
+	}
+	else
+	{
+		D3D12_SHADER_RESOURCE_VIEW_DESC d3dSRVDesc = {};
+		d3dSRVDesc.Format = dxgiFormat;
+		d3dSRVDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+		d3dSRVDesc.Shader4ComponentMapping = ...;
+		d3dSRVDesc.Buffer.FirstElement = 0;
+		d3dSRVDesc.Buffer.NumElements = ...;
+		d3dSRVDesc.Buffer.StructureByteStride = ...;
+		d3dSRVDesc.Buffer.Flags = ...;
+
+		d3dDevice->CreateShaderResourceView(resource.d3dResource, &d3dSRVDesc, { descriptorPtr });
+	}
 
 	return composeResourceViewHandle(viewIndex);
 }
 
+ResourceViewHandle Device::createTextureView(TextureHandle textureHandle, TexelViewFormat format, bool writable,
+	const TextureSubresourceRange& subresourceRange)
+{
+	const Resource& resource = getResourceByTextureHandle(textureHandle);
+	XEAssert(resource.type == Device::ResourceType::Texture);
+	XEAssert(resource.d3dResource);
+
+	// TODO: Check compatibility with TextureFormat.
+	const DXGI_FORMAT dxgiFormat = TranslateTexelViewFormatToDXGIFormat(format);
+
+	const sint32 viewIndex = resourceViewTableAllocationMask.findFirstZeroAndSet();
+	XEMasterAssert(viewIndex >= 0);
+
+	ResourceView& resourceView = resourceViewTable[viewIndex];
+	XEAssert(resourceView.resourceType == ResourceType::Undefined);
+	resourceView.textureHandle = textureHandle;
+	resourceView.resourceType = ResourceType::Texture;
+
+	const uint64 descriptorPtr = rtvHeapPtr + rtvDescriptorSize * viewIndex;
+
+	if (writable)
+	{
+		D3D12_UNORDERED_ACCESS_VIEW_DESC d3dUAVDesc = {};
+		d3dUAVDesc.Format = dxgiFormat;
+		...;
+
+		d3dDevice->CreateUnorderedAccessView(resource.d3dResource, nullptr, &d3dUAVDesc, { descriptorPtr });
+	}
+	else
+	{
+		D3D12_SHADER_RESOURCE_VIEW_DESC d3dSRVDesc = {};
+		d3dSRVDesc.Format = dxgiFormat;
+		...;
+
+		d3dDevice->CreateShaderResourceView(resource.d3dResource, &d3dSRVDesc, { descriptorPtr });
+	}
+}
+
 RenderTargetViewHandle Device::createRenderTargetView(TextureHandle textureHandle)
 {
-	const Resource& resource = getResourceByHandle(textureHandle);
+	const Resource& resource = getResourceByTextureHandle(textureHandle);
 	XEAssert(resource.type == ResourceType::Texture);
 	XEAssert(resource.d3dResource);
 
@@ -1090,7 +1123,7 @@ RenderTargetViewHandle Device::createRenderTargetView(TextureHandle textureHandl
 
 DepthStencilViewHandle Device::createDepthStencilView(TextureHandle textureHandle)
 {
-	const Resource& resource = getResourceByHandle(textureHandle);
+	const Resource& resource = getResourceByTextureHandle(textureHandle);
 	XEAssert(resource.type == ResourceType::Texture);
 	XEAssert(resource.d3dResource);
 
@@ -1427,14 +1460,16 @@ SwapChainHandle Device::createSwapChain(uint16 width, uint16 height, void* hWnd)
 		XEAssert(!resource.d3dResource);
 		resource.type = ResourceType::Texture;
 		resource.internalOwnership = true;
-		resource.texture.size = uint16x3(width, height, 1);
-		resource.texture.dimension = TextureDimension::Texture2D;
-		resource.texture.format = TextureFormat::R8G8B8A8;
-		resource.texture.mipLevelCount = 1;
+		resource.textureDesc.size = uint16x3(width, height, 1);
+		resource.textureDesc.dimension = TextureDimension::Texture2D;
+		resource.textureDesc.format = TextureFormat::R8G8B8A8;
+		resource.textureDesc.mipLevelCount = 1;
+		resource.textureDesc.allowRenderTarget = true;
+		resource.textureDesc.allowShaderWrite = false;
 
 		dxgiSwapChain1->GetBuffer(i, IID_PPV_ARGS(&resource.d3dResource));
 		
-		swapChain.backBuffers[i] = composeResourceHandle(resourceIndex);
+		swapChain.backBuffers[i] = composeTextureHandle(resourceIndex);
 	}
 
 	return composeSwapChainHandle(swapChainIndex);
@@ -1555,7 +1590,7 @@ bool Device::isQueueSyncPointReached(DeviceQueueSyncPoint syncPoint) const
 
 void* Device::mapBuffer(BufferHandle bufferHandle)
 {
-	const Device::Resource& buffer = getResourceByHandle(bufferHandle);
+	const Device::Resource& buffer = getResourceByBufferHandle(bufferHandle);
 	XEAssert(buffer.type == ResourceType::Buffer && buffer.d3dResource);
 
 	void* result = nullptr;
@@ -1636,15 +1671,16 @@ uint16x3 Host::CalculateMipLevelSize(uint16x3 srcSize, uint8 mipLevel)
 namespace
 {
 	constexpr uint8 MemoryBlockHandleSignature = 0x1;
-	constexpr uint8 ResourceHandleSignature = 0x2;
-	constexpr uint8 ResourceViewHandleSignature = 0x3;
-	constexpr uint8 RenderTargetViewHandleSignature = 0x4;
-	constexpr uint8 DepthStencilViewHandleSignature = 0x5;
-	constexpr uint8 DescriptorSetLayoutHandleSignature = 0x6;
-	constexpr uint8 PipelineLayoutHandleSignature = 0x7;
-	constexpr uint8 PipelineHandleSignature = 0x8;
-	constexpr uint8 FenceHandleSignature = 0x9;
-	constexpr uint8 SwapChainHandleSignature = 0xA;
+	constexpr uint8 BufferHandleSignature = 0x2;
+	constexpr uint8 TextureHandleSignature = 0x3;
+	constexpr uint8 ResourceViewHandleSignature = 0x4;
+	constexpr uint8 RenderTargetViewHandleSignature = 0x5;
+	constexpr uint8 DepthStencilViewHandleSignature = 0x6;
+	constexpr uint8 DescriptorSetLayoutHandleSignature = 0x7;
+	constexpr uint8 PipelineLayoutHandleSignature = 0x8;
+	constexpr uint8 PipelineHandleSignature = 0x9;
+	constexpr uint8 FenceHandleSignature = 0xA;
+	constexpr uint8 SwapChainHandleSignature = 0xB;
 
 	struct DecomposedHandle
 	{
@@ -1676,11 +1712,18 @@ MemoryBlockHandle Device::composeMemoryBlockHandle(uint32 memoryBlockIndex) cons
 		MemoryBlockHandleSignature, memoryBlockTable[memoryBlockIndex].handleGeneration, memoryBlockIndex));
 }
 
-ResourceHandle Device::composeResourceHandle(uint32 resourceIndex) const
+BufferHandle Device::composeBufferHandle(uint32 resourceIndex) const
 {
 	XEAssert(resourceIndex < MaxResourceCount);
-	return ResourceHandle(ComposeHandle(
-		ResourceHandleSignature, resourceTable[resourceIndex].handleGeneration, resourceIndex));
+	return BufferHandle(ComposeHandle(
+		BufferHandleSignature, resourceTable[resourceIndex].handleGeneration, resourceIndex));
+}
+
+TextureHandle Device::composeTextureHandle(uint32 resourceIndex) const
+{
+	XEAssert(resourceIndex < MaxResourceCount);
+	return TextureHandle(ComposeHandle(
+		TextureHandleSignature, resourceTable[resourceIndex].handleGeneration, resourceIndex));
 }
 
 ResourceViewHandle Device::composeResourceViewHandle(uint32 resourceViewIndex) const
@@ -1749,10 +1792,19 @@ uint32 Device::resolveMemoryBlockHandle(MemoryBlockHandle handle) const
 	return decomposed.entryIndex;
 }
 
-uint32 Device::resolveResourceHandle(ResourceHandle handle) const
+uint32 Device::resolveBufferHandle(BufferHandle handle) const
 {
 	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
-	XEAssert(decomposed.signature == ResourceHandleSignature);
+	XEAssert(decomposed.signature == BufferHandleSignature);
+	XEAssert(decomposed.entryIndex < MaxResourceCount);
+	XEAssert(decomposed.generation == resourceTable[decomposed.entryIndex].handleGeneration);
+	return decomposed.entryIndex;
+}
+
+uint32 Device::resolveTextureHandle(TextureHandle handle) const
+{
+	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
+	XEAssert(decomposed.signature == TextureHandleSignature);
 	XEAssert(decomposed.entryIndex < MaxResourceCount);
 	XEAssert(decomposed.generation == resourceTable[decomposed.entryIndex].handleGeneration);
 	return decomposed.entryIndex;
@@ -1832,7 +1884,8 @@ uint32 Device::resolveSwapChainHandle(SwapChainHandle handle) const
 
 
 auto Device::getMemoryBlockByHandle(MemoryBlockHandle handle) -> MemoryBlock& { return memoryBlockTable[resolveMemoryBlockHandle(handle)]; }
-auto Device::getResourceByHandle(ResourceHandle handle) -> Resource& { return resourceTable[resolveResourceHandle(handle)]; }
+auto Device::getResourceByBufferHandle(BufferHandle handle) -> Resource& { return resourceTable[resolveBufferHandle(handle)]; }
+auto Device::getResourceByTextureHandle(TextureHandle handle) -> Resource& { return resourceTable[resolveTextureHandle(handle)]; }
 auto Device::getResourceViewByHandle(ResourceViewHandle handle) -> ResourceView& { return resourceViewTable[resolveResourceViewHandle(handle)]; }
 auto Device::getDescriptorSetLayoutByHandle(DescriptorSetLayoutHandle handle) -> DescriptorSetLayout& { return descriptorSetLayoutTable[resolveDescriptorSetLayoutHandle(handle)]; }
 auto Device::getPipelineLayoutByHandle(PipelineLayoutHandle handle) -> PipelineLayout& { return pipelineLayoutTable[resolvePipelineLayoutHandle(handle)]; }

@@ -4,12 +4,15 @@
     <ClInclude Include="XEngine.Render.h" />
     <ClInclude Include="XEngine.Render.Scheduler.h" />
     <ClInclude Include="XEngine.Render.ShaderLibrary.h" />
-    <ClInclude Include="XEngine.Render.BloomPass.h" />
+    <ClInclude Include="XEngine.Render.Bloom.h" />
+    <ClInclude Include="XEngine.Render.Scene.h" />
+    <ClInclude Include="XEngine.Render.PostComposition.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="XEngine.Render.cpp" />
     <ClCompile Include="XEngine.Render.ShaderLibrary.cpp" />
-    <ClCompile Include="XEngine.Render.BloomPass.cpp" />
+    <ClCompile Include="XEngine.Render.Bloom.cpp" />
     <ClCompile Include="XEngine.Render.Scheduler.cpp" />
+    <ClCompile Include="XEngine.Render.PostComposition.cpp" />
   </ItemGroup>
 </Project>

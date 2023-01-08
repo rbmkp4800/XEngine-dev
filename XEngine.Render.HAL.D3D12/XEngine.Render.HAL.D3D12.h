@@ -13,6 +13,7 @@
 // TODO: Replace DepthStencil with DepthRenderTarget.
 // TODO: Probably replace RenderTargetView with RenderTarget, DepthRenderTargetView with DepthRenderTarget.
 // TODO: Probably we can state that Texture2D is equivalent to Texture2DArray[1].
+// TODO: Probably rename `MemoryBlockHandle` to `DeviceMemoryHandle`.
 
 #define XEAssert(cond) XAssert(cond)
 #define XEAssertUnreachableCode() XAssertUnreachableCode()
@@ -31,7 +32,7 @@ namespace XEngine::Render::HAL
 	class Device;
 	class Host;
 
-	enum class MemoryBlockHandle			: uint32 { Zero = 0 };
+	enum class MemoryBlockHandle			: uint32 { Zero = 0 }; // DeviceMemoryHandle
 	enum class BufferHandle					: uint32 { Zero = 0 };
 	enum class TextureHandle				: uint32 { Zero = 0 };
 	enum class ResourceViewHandle			: uint32 { Zero = 0 }; // ReferenceDescriptorHandle
@@ -83,7 +84,7 @@ namespace XEngine::Render::HAL
 	struct TextureDesc
 	{
 		uint16x3 size;
-		HAL::TextureDimension dimension;
+		TextureDimension dimension;
 		TextureFormat format;
 		uint8 mipLevelCount;
 		bool allowRenderTarget;
@@ -124,7 +125,7 @@ namespace XEngine::Render::HAL
 	{
 		uint8 mipLevel;
 		TextureAspect aspect;
-		uint16 arraySlice;
+		uint16 arrayIndex;
 	};
 
 	struct TextureSubresourceRange
@@ -369,7 +370,8 @@ namespace XEngine::Render::HAL
 
 	private:
 		MemoryBlockHandle composeMemoryBlockHandle(uint32 memoryBlockIndex) const;
-		ResourceHandle composeResourceHandle(uint32 resourceIndex) const;
+		BufferHandle composeBufferHandle(uint32 resourceIndex) const;
+		TextureHandle composeTextureHandle(uint32 resourceIndex) const;
 		ResourceViewHandle composeResourceViewHandle(uint32 resourceViewIndex) const;
 		RenderTargetViewHandle composeRenderTargetViewHandle(uint32 renderTargetIndex) const;
 		DepthStencilViewHandle composeDepthStencilViewHandle(uint32 depthStencilIndex) const;
@@ -380,7 +382,8 @@ namespace XEngine::Render::HAL
 		SwapChainHandle composeSwapChainHandle(uint32 swapChainIndex) const;
 
 		uint32 resolveMemoryBlockHandle(MemoryBlockHandle handle) const;
-		uint32 resolveResourceHandle(ResourceHandle handle) const;
+		uint32 resolveBufferHandle(BufferHandle handle) const;
+		uint32 resolveTextureHandle(TextureHandle handle) const;
 		uint32 resolveResourceViewHandle(ResourceViewHandle handle) const;
 		uint32 resolveRenderTargetViewHandle(RenderTargetViewHandle handle) const;
 		uint32 resolveDepthStencilViewHandle(DepthStencilViewHandle handle) const;
@@ -391,7 +394,8 @@ namespace XEngine::Render::HAL
 		uint32 resolveSwapChainHandle(SwapChainHandle handle) const;
 
 		MemoryBlock& getMemoryBlockByHandle(MemoryBlockHandle handle);
-		Resource& getResourceByHandle(ResourceHandle handle);
+		Resource& getResourceByBufferHandle(BufferHandle handle);
+		Resource& getResourceByTextureHandle(TextureHandle handle);
 		ResourceView& getResourceViewByHandle(ResourceViewHandle handle);
 		DescriptorSetLayout& getDescriptorSetLayoutByHandle(DescriptorSetLayoutHandle handle);
 		PipelineLayout& getPipelineLayoutByHandle(PipelineLayoutHandle handle);
@@ -435,7 +439,7 @@ namespace XEngine::Render::HAL
 		void destroyBuffer(BufferHandle bufferHandle);
 		void destroyTexture(TextureHandle textureHandle);
 
-		ResourceViewHandle createBufferView(BufferHandle bufferHandle, TexelViewFormat format, bool writable, );
+		ResourceViewHandle createBufferView(BufferHandle bufferHandle, TexelViewFormat format, bool writable);
 		ResourceViewHandle createTextureView(TextureHandle textureHandle, TexelViewFormat format, bool writable,
 			const TextureSubresourceRange& subresourceRange);
 		ResourceViewHandle createTextureCubeView(TextureHandle textureHandle, TexelViewFormat format,
