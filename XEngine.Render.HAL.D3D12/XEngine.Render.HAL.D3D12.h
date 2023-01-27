@@ -14,6 +14,8 @@
 // TODO: Probably replace RenderTargetView with RenderTarget, DepthRenderTargetView with DepthRenderTarget.
 // TODO: Probably we can state that Texture2D is equivalent to Texture2DArray[1].
 // TODO: Probably rename `MemoryBlockHandle` to `DeviceMemoryHandle`.
+// TODO: Add ability to create resources without explicit device memory block management.
+// TODO: `TextureDesc` can be packed into 8 bytes.
 
 #define XEAssert(cond) XAssert(cond)
 #define XEAssertUnreachableCode() XAssertUnreachableCode()
@@ -71,14 +73,19 @@ namespace XEngine::Render::HAL
 		uint64 alignment;
 	};
 
+	enum class ResourceType
+	{
+		Undefined = 0,
+		Buffer,
+		Texture,
+	};
+
 	enum class TextureDimension : uint8
 	{
 		Undefined = 0,
 		Texture1D,
 		Texture2D,
 		Texture3D,
-		//Texture1DArray,
-		//Texture2DArray,
 	};
 
 	struct TextureDesc
@@ -304,8 +311,6 @@ namespace XEngine::Render::HAL
 		static constexpr uint32 MaxSwapChainCount = 4;
 		static constexpr uint32 SwapChainBackBufferCount = 2;
 
-		enum class ResourceType : uint8;
-
 		struct MemoryBlock;
 		struct Resource;
 		struct ResourceView;
@@ -416,8 +421,9 @@ namespace XEngine::Render::HAL
 		void initialize(ID3D12Device10* d3dDevice);
 
 	public:
-		static constexpr uint32 ConstantBufferSizeLimit = 0x10000;
-		static constexpr uint32 ConstantBufferBindAlignment = 0x100;
+		static constexpr uint32 ConstantBufferSizeLimit = 64 * 1024;
+		static constexpr uint16 ConstantBufferBindAlignment = 256;
+		static constexpr uint16 TextureArraySizeLimit = 2048;
 
 	public:
 		Device() = default;
@@ -440,8 +446,8 @@ namespace XEngine::Render::HAL
 		void destroyTexture(TextureHandle textureHandle);
 
 		ResourceViewHandle createBufferView(BufferHandle bufferHandle, TexelViewFormat format, bool writable);
-		ResourceViewHandle createTextureView(TextureHandle textureHandle, TexelViewFormat format, bool writable,
-			const TextureSubresourceRange& subresourceRange);
+		ResourceViewHandle createTextureView(TextureHandle textureHandle,
+			TexelViewFormat format, bool writable, const TextureSubresourceRange& subresourceRange);
 		ResourceViewHandle createTextureCubeView(TextureHandle textureHandle, TexelViewFormat format,
 			uint8 baseMipLevel = 0, uint8 mipLevelCount = 0, uint16 baseArrayIndex = 0, uint16 arraySize = 0);
 		ResourceViewHandle createRaytracingAccelerationStructureView(...);
@@ -453,10 +459,12 @@ namespace XEngine::Render::HAL
 
 		void destroyResourceView(ResourceViewHandle handle);
 
-		RenderTargetViewHandle createRenderTargetView(TextureHandle textureHandle);
+		RenderTargetViewHandle createRenderTargetView(TextureHandle textureHandle,
+			TexelViewFormat format, uint8 mipLevel = 0, uint16 arrayIndex = 0);
 		void destroyRenderTargetView(RenderTargetViewHandle handle);
 
-		DepthStencilViewHandle createDepthStencilView(TextureHandle textureHandle);
+		DepthStencilViewHandle createDepthStencilView(TextureHandle textureHandle,
+			bool writableDepth, bool writableStencil, uint8 mipLevel = 0, uint16 arrayIndex = 0);
 		void destroyDepthStencilView(DepthStencilViewHandle handle);
 
 		DescriptorSetLayoutHandle createDescriptorSetLayout(BlobDataView blob);

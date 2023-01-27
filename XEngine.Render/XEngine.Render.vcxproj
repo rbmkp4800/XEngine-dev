@@ -108,6 +108,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="XEngine.Render.Allocation.h" />
     <ClInclude Include="XEngine.Render.Bloom.h" />
     <ClInclude Include="XEngine.Render.h" />
     <ClInclude Include="XEngine.Render.PostComposition.h" />
