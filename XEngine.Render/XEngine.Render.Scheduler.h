@@ -17,30 +17,27 @@ namespace XEngine::Render::Scheduler
 	class TransientResourcePool : public XLib::NonCopyable
 	{
 	private:
+		enum class EntryType : uint8;
+
 		struct Entry;
 
 	private:
-		HAL::MemoryBlockHandle arena = HAL::MemoryBlockHandle::Zero;
-		uint64 arenaSize = 0;
+		HAL::MemoryBlockHandle deviceMemoryPool = HAL::MemoryBlockHandle::Zero;
+		uint64 deviceMemoryPoolSize = 0;
 
 		Entry* entries = nullptr;
-
-		HAL::DeviceQueueSyncPoint releaseSyncPoint = HAL::DeviceQueueSyncPoint::Zero;
+		uint16 entryCount = 0;
 
 	public:
 		TransientResourcePool() = default;
 		~TransientResourcePool() = default;
 
-		void initialize(HAL::Device& device, HAL::MemoryBlockHandle arena, uint64 arenaSize);
+		void initialize(HAL::MemoryBlockHandle deviceMemoryPool, uint64 deviceMemoryPoolSize);
+
+		// NOTE: Temporary
 		void reset();
 
-		inline HAL::MemoryBlockHandle getMemory() const { return memoryBlock; }
-	};
-
-	struct TransientUploadMemoryAllocationInfo
-	{
-		HAL::BufferHandle buffer;
-		uint32 offset;
+		//inline HAL::MemoryBlockHandle getMemoryPool() const { return deviceMemoryPool; }
 	};
 
 	class PassExecutionBroker : public XLib::NonCopyable
@@ -48,6 +45,7 @@ namespace XEngine::Render::Scheduler
 		friend class Pipeline;
 
 	private:
+		HAL::Device& device;
 		TransientResourcePool& transientResourcePool;
 		CircularDescriptorAllocator& transientDescriptorAllocator;
 		CircularUploadMemoryAllocator& transientUploadMemoryAllocator;
@@ -57,9 +55,9 @@ namespace XEngine::Render::Scheduler
 		~PassExecutionBroker() = default;
 
 	public:
-		HAL::DescriptorSetReference allocateTransientDescriptorSet(HAL::DescriptorSetLayoutHandle descriptorSetLayout);
 		HAL::DescriptorAddress allocateTransientDescriptors(uint16 descriptorCount);
-		TransientUploadMemoryAllocationInfo allocateTransientUploadMemory(uint32 size, uint32 alignment = 0);
+		HAL::DescriptorSetReference allocateTransientDescriptorSet(HAL::DescriptorSetLayoutHandle descriptorSetLayout);
+		UploadMemoryAllocationInfo allocateTransientUploadMemory(uint32 size); // Aligned up to `Host::Device::ConstantBufferBindAlignment`.
 
 		HAL::BufferHandle resolveBuffer(Scheduler::BufferHandle buffer);
 		HAL::TextureHandle resolveTexture(Scheduler::TextureHandle texture);
@@ -168,10 +166,8 @@ namespace XEngine::Render::Scheduler
 	{
 	private:
 		enum class ResourceLifetime : uint8;
-		enum class ResourceViewType : uint8;
 
 		struct Resource;
-		struct ResourceView;
 		struct Pass;
 
 	private:

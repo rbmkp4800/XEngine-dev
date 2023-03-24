@@ -16,6 +16,7 @@
 // TODO: Probably rename `MemoryBlockHandle` to `DeviceMemoryHandle`.
 // TODO: Add ability to create resources without explicit device memory block management.
 // TODO: `TextureDesc` can be packed into 8 bytes.
+// TODO: Handle should be 18+10+4 or 17+11+4 instead of 20+8+4.
 
 #define XEAssert(cond) XAssert(cond)
 #define XEAssertUnreachableCode() XAssertUnreachableCode()
@@ -508,6 +509,8 @@ namespace XEngine::Render::HAL
 		// TODO: Remove. Temporary solution.
 		void* mapBuffer(BufferHandle bufferHandle);
 		void unmapBuffer(BufferHandle bufferHandle);
+
+		uint32 getDescriptorSetLayoutDescriptorCount(DescriptorSetLayoutHandle descriptorSetLayoutHandle);
 
 		uint64 getFenceValue(FenceHandle fenceHandle) const;
 
