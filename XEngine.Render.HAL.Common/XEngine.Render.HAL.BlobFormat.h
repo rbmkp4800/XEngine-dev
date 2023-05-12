@@ -41,7 +41,8 @@ namespace XEngine::Render::HAL::BlobFormat::Data
 	struct DescriptorSetLayoutBlobSubHeader
 	{
 		uint32 sourceHash;
-		uint32 bindingCount;
+		uint16 bindingCount;
+		uint16 _reserved;
 	};
 
 	struct DescriptorSetNestedBindingRecord // 12 bytes
@@ -164,17 +165,17 @@ namespace XEngine::Render::HAL::BlobFormat
 		void* memoryBlock = nullptr;
 		uint32 memoryBlockSize = 0;
 
-		uint32 bindingCount = 0;
+		uint16 bindingCount = 0;
 
 	public:
 		DescriptorSetLayoutBlobWriter() = default;
 		~DescriptorSetLayoutBlobWriter() = default;
 
-		void initialize(uint32 bindingCount);
+		void initialize(uint16 bindingCount);
 
 		uint32 getMemoryBlockSize() const;
 		void setMemoryBlock(void* memoryBlock, uint32 memoryBlockSize);
-		void writeBinding(uint32 bindingIndex, const DescriptorSetNestedBindingInfo& bindingInfo);
+		void writeBinding(uint16 bindingIndex, const DescriptorSetNestedBindingInfo& bindingInfo);
 		void finalize(uint32 sourceHash);
 	};
 
@@ -190,7 +191,7 @@ namespace XEngine::Render::HAL::BlobFormat
 
 		bool open(const void* data, uint32 size);
 		uint32 getSourceHash() const { return subHeader->sourceHash; }
-		uint32 getBindingCount() const { return subHeader->bindingCount; }
+		uint16 getBindingCount() const { return subHeader->bindingCount; }
 		DescriptorSetNestedBindingInfo getBinding(uint32 bindingIndex) const;
 	};
 
@@ -201,7 +202,7 @@ namespace XEngine::Render::HAL::BlobFormat
 		uint32 memoryBlockSize = 0;
 
 		Data::PipelineBindingRecord pipelineBindingRecords[MaxPipelineBindingCount] = {};
-		uint32 pipelineBindingCount = 0;
+		uint16 pipelineBindingCount = 0;
 		uint32 platformDataSize = 0;
 		bool initializationInProgress = false;
 
@@ -218,7 +219,7 @@ namespace XEngine::Render::HAL::BlobFormat
 		void writePlatformData(const void* platformData, uint32 platformDataSize);
 		void finalize(uint32 sourceHash);
 
-		inline uint32 getPipelineBingingCount() const { return pipelineBindingCount; }
+		inline uint16 getPipelineBingingCount() const { return pipelineBindingCount; }
 	};
 
 	class PipelineLayoutBlobReader : public GenericBlobReader
@@ -235,8 +236,8 @@ namespace XEngine::Render::HAL::BlobFormat
 		bool open(const void* data, uint32 size);
 
 		uint32 getSourceHash() const { return subHeader->sourceHash; }
-		uint32 getPipelineBindingCount() const { return subHeader->bindingCount; }
-		PipelineBindingInfo getPipelineBinding(uint32 bindingIndex) const;
+		uint16 getPipelineBindingCount() const { return subHeader->bindingCount; }
+		PipelineBindingInfo getPipelineBinding(uint16 bindingIndex) const;
 		uint32 getPlatformDataSize() const { return subHeader->platformDataSize; }
 		const void* getPlatformData() const { return platformData; }
 	};
@@ -388,10 +389,10 @@ namespace XEngine::Render::HAL::BlobFormat
 		bool open(const void* data, uint32 size);
 
 		uint32 getSourceHash() const { return subHeader->sourceHash; }
-		uint32 getPipelineBindingCount() const { return subHeader->pipelineBindingCount; }
-		bool isDescriptorSetBinding(uint32 pipelingBindingIndex) const;
-		uint16 getPipelineBindingShaderRegister(uint32 pipelingBindingIndex) const;
-		uint32 getDescriptorSetNestedBindingCount(uint32 pipelingBindingIndex) const;
-		DescriptorSetNestedBindingMetaInfo getDescriptorSetNestedBinding(uint32 pipelingBindingIndex, uint32 descriptorSetNestedBindingIndex) const;
+		uint16 getPipelineBindingCount() const { return subHeader->pipelineBindingCount; }
+		bool isDescriptorSetBinding(uint16 pipelingBindingIndex) const;
+		uint16 getPipelineBindingShaderRegister(uint16 pipelingBindingIndex) const;
+		uint16 getDescriptorSetNestedBindingCount(uint16 pipelingBindingIndex) const;
+		DescriptorSetNestedBindingMetaInfo getDescriptorSetNestedBinding(uint16 pipelingBindingIndex, uint16 descriptorSetNestedBindingIndex) const;
 	};
 }

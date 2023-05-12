@@ -1190,8 +1190,9 @@ DescriptorSetLayoutHandle Device::createDescriptorSetLayout(BlobDataView blob)
 
 	BlobFormat::DescriptorSetLayoutBlobReader blobReader;
 	blobReader.open(blob.data, blob.size);
+	// TODO: Assert on open result.
 
-	const uint16 bindingCount = uint16(blobReader.getBindingCount()); // TODO: Clean up this.
+	const uint16 bindingCount = blobReader.getBindingCount();
 	XEMasterAssert(bindingCount > 0 && bindingCount <= MaxDescriptorSetNestedBindingCount);
 
 	for (uint16 i = 0; i < bindingCount; i++)
@@ -1212,9 +1213,10 @@ PipelineLayoutHandle Device::createPipelineLayout(BlobDataView blob)
 
 	BlobFormat::PipelineLayoutBlobReader blobReader;
 	blobReader.open(blob.data, blob.size);
+	// TODO: Assert on open result.
 
-	const uint32 bindingCount = blobReader.getPipelineBindingCount();
-	XEMasterAssert(bindingCount > 0 && bindingCount <= MaxPipelineBindingCount);
+	const uint16 bindingCount = blobReader.getPipelineBindingCount();
+	XEMasterAssert(bindingCount <= MaxPipelineBindingCount);
 
 	for (uint16 i = 0; i < bindingCount; i++)
 	{
@@ -1223,7 +1225,7 @@ PipelineLayoutHandle Device::createPipelineLayout(BlobDataView blob)
 	}
 
 	pipelineLayout.sourceHash = blobReader.getSourceHash();
-	pipelineLayout.bindingCount = uint16(bindingCount);
+	pipelineLayout.bindingCount = bindingCount;
 
 	XEAssert(!pipelineLayout.d3dRootSignature);
 	HRESULT hResult = d3dDevice->CreateRootSignature(0,

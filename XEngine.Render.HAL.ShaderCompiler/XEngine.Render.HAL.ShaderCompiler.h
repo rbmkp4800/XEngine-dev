@@ -112,10 +112,10 @@ namespace XEngine::Render::HAL::ShaderCompiler
 	{
 	public:
 		static bool CompileDescriptorSetLayout(Platform platform,
-			const DescriptorSetNestedBindingDesc* bindings, uint32 bindingCount, Blob& resultBlob);
+			const DescriptorSetNestedBindingDesc* bindings, uint16 bindingCount, Blob& resultBlob);
 
 		static bool CompilePipelineLayout(Platform platform,
-			const PipelineBindingDesc* bindings, uint32 bindingCount,
+			const PipelineBindingDesc* bindings, uint16 bindingCount,
 			Blob& resultBlob, Blob& resultMetadataBlob);
 
 		//static bool CompileShaderLibrary(Platform platform,

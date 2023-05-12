@@ -39,7 +39,7 @@ static inline bool ValidateGenericBlobHeader(const void* blobData, uint32 blobSi
 
 // DescriptorSetLayoutBlobWriter ///////////////////////////////////////////////////////////////////
 
-void DescriptorSetLayoutBlobWriter::initialize(uint32 bindingCount)
+void DescriptorSetLayoutBlobWriter::initialize(uint16 bindingCount)
 {
 	XAssert(memoryBlockSize == 0); // Not initialized.
 	XAssert(bindingCount > 0);
@@ -67,7 +67,7 @@ void DescriptorSetLayoutBlobWriter::setMemoryBlock(void* memoryBlock, uint32 mem
 	memorySet(memoryBlock, 0, memoryBlockSize);
 }
 
-void DescriptorSetLayoutBlobWriter::writeBinding(uint32 bindingIndex, const DescriptorSetNestedBindingInfo& bindingInfo)
+void DescriptorSetLayoutBlobWriter::writeBinding(uint16 bindingIndex, const DescriptorSetNestedBindingInfo& bindingInfo)
 {
 	XAssert(memoryBlock);
 	XAssert(bindingIndex < bindingCount);
@@ -176,8 +176,6 @@ void PipelineLayoutBlobWriter::endInitialization(uint32 platformDataSize)
 
 	this->platformDataSize = platformDataSize;
 
-	XAssert(pipelineBindingCount > 0);
-
 	memoryBlockSize =
 		sizeof(GenericBlobHeader) +
 		sizeof(PipelineLayoutBlobSubHeader) +
@@ -249,8 +247,7 @@ bool PipelineLayoutBlobReader::open(const void* data, uint32 size)
 	const PipelineLayoutBlobSubHeader* subHeader =
 		(const PipelineLayoutBlobSubHeader*)((const byte*)data + sizeof(GenericBlobHeader));
 
-	if (subHeader->bindingCount == 0 ||
-		subHeader->bindingCount > MaxPipelineBindingCount)
+	if (subHeader->bindingCount > MaxPipelineBindingCount)
 		return false;
 
 	const uint32 bindingRecordsOffset =
@@ -269,12 +266,12 @@ bool PipelineLayoutBlobReader::open(const void* data, uint32 size)
 	this->data = data;
 	this->size = size;
 	this->subHeader = subHeader;
-	this->bindingRecords = (const PipelineBindingRecord*)((const byte*)data + bindingRecordsOffset);
+	this->bindingRecords = subHeader->bindingCount ? (const PipelineBindingRecord*)((const byte*)data + bindingRecordsOffset) : nullptr;
 	this->platformData = (const byte*)data + platformDataOffset;
 	return true;
 }
 
-PipelineBindingInfo PipelineLayoutBlobReader::getPipelineBinding(uint32 bindingIndex) const
+PipelineBindingInfo PipelineLayoutBlobReader::getPipelineBinding(uint16 bindingIndex) const
 {
 	XAssert(bindingIndex < subHeader->bindingCount);
 	const PipelineBindingRecord& bindingRecord = bindingRecords[bindingIndex];
@@ -590,8 +587,6 @@ void PipelineLayoutMetadataBlobWriter::endInitialization()
 	XAssert(!nestededBindingsAdditionInProgress);
 	initializationInProgress = false;
 
-	XAssert(pipelineBindingCount > 0);
-
 	memoryBlockSize =
 		sizeof(GenericBlobHeader) +
 		sizeof(PipelineLayoutMetadataBlobSubHeader) +
@@ -653,8 +648,7 @@ bool PipelineLayoutMetadataBlobReader::open(const void* data, uint32 size)
 	const PipelineLayoutMetadataBlobSubHeader* subHeader =
 		(const PipelineLayoutMetadataBlobSubHeader*)((const byte*)data + sizeof(GenericBlobHeader));
 
-	if (subHeader->pipelineBindingCount == 0 ||
-		subHeader->pipelineBindingCount > MaxPipelineBindingCount)
+	if (subHeader->pipelineBindingCount > MaxPipelineBindingCount)
 		return false;
 
 	const uint32 pipelineBindingRecordsOffset =
@@ -696,25 +690,25 @@ bool PipelineLayoutMetadataBlobReader::open(const void* data, uint32 size)
 	this->data = data;
 	this->size = size;
 	this->subHeader = subHeader;
-	this->pipelineBindingRecords = pipelineBindingRecords;
-	this->nestedBindingRecords = nestedBindingRecords;
+	this->pipelineBindingRecords = subHeader->pipelineBindingCount ? pipelineBindingRecords : nullptr;
+	this->nestedBindingRecords = subHeader->nestedBindingCount ? nestedBindingRecords : nullptr;
 	return true;
 }
 
-bool PipelineLayoutMetadataBlobReader::isDescriptorSetBinding(uint32 pipelingBindingIndex) const
+bool PipelineLayoutMetadataBlobReader::isDescriptorSetBinding(uint16 pipelingBindingIndex) const
 {
 	XAssert(pipelingBindingIndex < subHeader->pipelineBindingCount);
 	return pipelineBindingRecords[pipelingBindingIndex].nestedBindingCount != 0;
 }
 
-uint16 PipelineLayoutMetadataBlobReader::getPipelineBindingShaderRegister(uint32 pipelingBindingIndex) const
+uint16 PipelineLayoutMetadataBlobReader::getPipelineBindingShaderRegister(uint16 pipelingBindingIndex) const
 {
 	XAssert(pipelingBindingIndex < subHeader->pipelineBindingCount);
 	XAssert(pipelineBindingRecords[pipelingBindingIndex].nestedBindingCount == 0);
 	return pipelineBindingRecords[pipelingBindingIndex].shaderRegisterOrNestedBindingsOffset;
 }
 
-uint32 PipelineLayoutMetadataBlobReader::getDescriptorSetNestedBindingCount(uint32 pipelingBindingIndex) const
+uint16 PipelineLayoutMetadataBlobReader::getDescriptorSetNestedBindingCount(uint16 pipelingBindingIndex) const
 {
 	XAssert(pipelingBindingIndex < subHeader->pipelineBindingCount);
 	XAssert(pipelineBindingRecords[pipelingBindingIndex].nestedBindingCount != 0);
@@ -722,12 +716,12 @@ uint32 PipelineLayoutMetadataBlobReader::getDescriptorSetNestedBindingCount(uint
 }
 
 DescriptorSetNestedBindingMetaInfo PipelineLayoutMetadataBlobReader::getDescriptorSetNestedBinding(
-	uint32 pipelingBindingIndex, uint32 descriptorSetNestedBindingIndex) const
+	uint16 pipelingBindingIndex, uint16 descriptorSetNestedBindingIndex) const
 {
 	XAssert(pipelingBindingIndex < subHeader->pipelineBindingCount);
 	XAssert(descriptorSetNestedBindingIndex < pipelineBindingRecords[pipelingBindingIndex].nestedBindingCount);
-	const uint32 nestedBindingsOffset = pipelineBindingRecords[pipelingBindingIndex].shaderRegisterOrNestedBindingsOffset;
-	const uint32 nestedBindingGlobalIndex = nestedBindingsOffset + descriptorSetNestedBindingIndex;
+	const uint16 nestedBindingsOffset = pipelineBindingRecords[pipelingBindingIndex].shaderRegisterOrNestedBindingsOffset;
+	const uint16 nestedBindingGlobalIndex = nestedBindingsOffset + descriptorSetNestedBindingIndex;
 	XAssert(nestedBindingGlobalIndex < subHeader->nestedBindingCount);
 
 	const DescriptorSetNestedBindingMetaRecord& nestedBindingRecord = nestedBindingRecords[nestedBindingGlobalIndex];

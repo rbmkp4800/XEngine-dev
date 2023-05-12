@@ -128,7 +128,7 @@ void* Blob::Create(uint32 size, Blob& blob)
 // Host ////////////////////////////////////////////////////////////////////////////////////////////
 
 bool Host::CompileDescriptorSetLayout(Platform platform,
-	const DescriptorSetNestedBindingDesc* bindings, uint32 bindingCount, Blob& resultBlob)
+	const DescriptorSetNestedBindingDesc* bindings, uint16 bindingCount, Blob& resultBlob)
 {
 	resultBlob.destroy();
 
@@ -146,7 +146,7 @@ bool Host::CompileDescriptorSetLayout(Platform platform,
 		blobWriter.setMemoryBlock(blobMemoryBlock, blobSize);
 	}
 
-	for (uint32 i = 0; i < bindingCount; i++)
+	for (uint16 i = 0; i < bindingCount; i++)
 	{
 		const DescriptorSetNestedBindingDesc& srcBindingDesc = bindings[i];
 
@@ -170,7 +170,7 @@ bool Host::CompileDescriptorSetLayout(Platform platform,
 }
 
 bool Host::CompilePipelineLayout(Platform platform,
-	const PipelineBindingDesc* bindings, uint32 bindingCount,
+	const PipelineBindingDesc* bindings, uint16 bindingCount,
 	Blob& resultBlob, Blob& resultMetadataBlob)
 {
 	resultBlob.destroy();
@@ -189,7 +189,7 @@ bool Host::CompilePipelineLayout(Platform platform,
 	InplaceArrayList<D3D12_DESCRIPTOR_RANGE1, 128> d3dDescriptorRanges; // TODO: Use ExpandableInplaceArrayList here.
 
 	uint16 shaderRegisterCounter = 0;
-	for (uint32 pipelineBindingIndex = 0; pipelineBindingIndex < bindingCount; pipelineBindingIndex++)
+	for (uint16 pipelineBindingIndex = 0; pipelineBindingIndex < bindingCount; pipelineBindingIndex++)
 	{
 		const PipelineBindingDesc& scrPipelinBindingDesc = bindings[pipelineBindingIndex];
 
@@ -445,19 +445,21 @@ bool Host::CompileShader(Platform platform,
 			const uint64 pipelineBindingNameXSH = XStringHash::Compute(pipelineBindingName);
 
 			BlobFormat::PipelineBindingInfo pipelineBindingInfo = {};
-			sint32 pipelineBindingIndex = -1;
-			for (uint32 i = 0; i < pipelineBindingCount; i++)
+			uint16 pipelineBindingIndex = 0;
+			bool pipelineBindingFound = false;
+			for (uint16 i = 0; i < pipelineBindingCount; i++)
 			{
 				const BlobFormat::PipelineBindingInfo ithBindingInfo = pipelineLayoutBlobReader.getPipelineBinding(i);
 				if (pipelineBindingNameXSH == ithBindingInfo.nameXSH)
 				{
 					pipelineBindingInfo = ithBindingInfo;
 					pipelineBindingIndex = i;
+					pipelineBindingFound = true;
 					break;
 				}
 			}
 
-			if (pipelineBindingIndex < 0)
+			if (!pipelineBindingFound)
 			{
 				TextWriteFmtStdOut("error: unknown binding name `", pipelineBindingName, "'\n");
 				return false;
@@ -501,8 +503,9 @@ bool Host::CompileShader(Platform platform,
 				const uint64 nestedBindingNameXSH = XStringHash::Compute(nestedBindingName);
 
 				BlobFormat::DescriptorSetNestedBindingMetaInfo nestedBindingInfo = {};
-				sint32 nestedBindingIndex = -1;
-				for (uint32 i = 0; i < nestedBindingCount; i++)
+				uint16 nestedBindingIndex = 0;
+				bool nestedBindingFound = false;
+				for (uint16 i = 0; i < nestedBindingCount; i++)
 				{
 					const BlobFormat::DescriptorSetNestedBindingMetaInfo ithBindingInfo =
 						pipelineLayoutMetadataBlobReader.getDescriptorSetNestedBinding(pipelineBindingIndex, i);
@@ -510,11 +513,12 @@ bool Host::CompileShader(Platform platform,
 					{
 						nestedBindingInfo = ithBindingInfo;
 						nestedBindingIndex = i;
+						nestedBindingFound = true;
 						break;
 					}
 				}
 
-				if (nestedBindingIndex < 0)
+				if (!nestedBindingFound)
 				{
 					TextWriteFmtStdOut("error: unknown nested binding name `", nestedBindingName, "'\n");
 					return false;
