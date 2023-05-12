@@ -68,6 +68,7 @@ namespace XEngine::Render::Shaders::Builder_
 
 	private:
 		EntrySearchTree entrySearchTree;
+		uint32 entryCount = 0;
 
 	public:
 		using Iterator = EntrySearchTree::Iterator;
@@ -78,6 +79,8 @@ namespace XEngine::Render::Shaders::Builder_
 
 		ShaderCreationResult findOrCreate(HAL::ShaderCompiler::ShaderType type,
 			Source& source, XLib::StringViewASCII entryPointName, const PipelineLayout& pipelineLayout);
+
+		inline uint32 getSize() const { return entryCount; }
 
 		inline Iterator begin() { return entrySearchTree.begin(); }
 		inline Iterator end() { return entrySearchTree.end(); }

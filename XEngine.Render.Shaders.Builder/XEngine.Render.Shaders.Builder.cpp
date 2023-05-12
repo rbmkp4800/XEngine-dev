@@ -81,53 +81,92 @@ void Builder::run(const char* packPath)
 
 	// Compile.
 
+	if (const uint32 dslCount = descriptorSetLayoutList.getSize())
+		TextWriteFmtStdOut("Compiling ", dslCount, " descriptor set layout", dslCount > 1 ? "s" : "", "\n");
+
+	uint32 i = 0;
 	for (DescriptorSetLayout& descriptorSetLayout : descriptorSetLayoutList)
 	{
-		TextWriteFmtStdOut("Compiling descriptor set layout \"", descriptorSetLayout.getName(), "\"\n");
+		InplaceStringASCIIx256 messageHeader;
+		TextWriteFmt(messageHeader, "DSL [", i + 1, "/", descriptorSetLayoutList.getSize(), "] ", descriptorSetLayout.getName());
+		i++;
+
+		TextWriteFmtStdOut(messageHeader, "\n");
 	
 		if (!descriptorSetLayout.compile())
 		{
-			TextWriteFmtStdOut("Failed to compile descriptor set layout \"", descriptorSetLayout.getName(), "\"\n");
+			TextWriteFmtStdOut(messageHeader, " : Compilation failed\n");
 			return;
 		}
 	}
 
+	if (const uint32 plCount = pipelineLayoutList.getSize())
+		TextWriteFmtStdOut("Compiling ", plCount, " pipeline layout", plCount > 1 ? "s" : "", "\n");
+
+	i = 0;
 	for (PipelineLayout& pipelineLayout : pipelineLayoutList)
 	{
-		TextWriteFmtStdOut("Compiling pipeline layout \"", pipelineLayout.getName(), "\"\n");
+		InplaceStringASCIIx256 messageHeader;
+		TextWriteFmt(messageHeader, "PL [", i + 1, "/", pipelineLayoutList.getSize(), "] ", pipelineLayout.getName());
+		i++;
+
+		TextWriteFmtStdOut(messageHeader, "\n");
 
 		if (!pipelineLayout.compile())
 		{
-			TextWriteFmtStdOut("Failed to compile pipeline layout \"", pipelineLayout.getName(), "\"\n");
+			TextWriteFmtStdOut(messageHeader, " : Compilation failed\n");
 			return;
 		}
 	}
 
+	if (const uint32 shaderCount = shaderList.getSize())
+		TextWriteFmtStdOut("Compiling ", shaderCount, " shader", shaderCount > 1 ? "s" : "", "\n");
+
+	i = 0;
 	for (Shader& shader : shaderList)
 	{
-		InplaceStringASCIIx1024 shaderName;
-		StringViewASCII shaderTypeString = "XS"; // TODO: ...
-		TextWriteFmt(shaderName,
-			'[', shaderTypeString, ']',
-			shader.getSource().getLocalPath(), ':', shader.getEntryPointName(),
-			"(layout=", shader.getPipelineLayout().getName(), ')');
+		const char* shaderTypeString = "?S";
+		switch (shader.getType())
+		{
+			case ShaderType::Compute:		shaderTypeString = "CS";	break;
+			case ShaderType::Vertex:		shaderTypeString = "VS";	break;
+			case ShaderType::Amplification:	shaderTypeString = "AS";	break;
+			case ShaderType::Mesh:			shaderTypeString = "MS";	break;
+			case ShaderType::Pixel:			shaderTypeString = "PS";	break;
+		}
 
-		TextWriteFmtStdOut("Compiling shader \"", StringViewASCII(shaderName), "\"\n"); // TODO: Remove cast to string view.
+		InplaceStringASCIIx2048 messageHeader;
+		TextWriteFmt(messageHeader, shaderTypeString, " [", i + 1, "/", shaderList.getSize(), "] ",
+			shader.getSource().getLocalPath(), " | ", shader.getEntryPointName(),
+			" | ", shader.getPipelineLayout().getName());
+		i++;
+
+		TextWriteFmtStdOut(messageHeader, "\n");
 
 		if (!shader.compile())
 		{
-			TextWriteFmtStdOut("Failed to compile shader \"", StringViewASCII(shaderName), "\"\n");
+			TextWriteFmtStdOut(messageHeader, " : Compilation failed\n");
 			return;
 		}
 	}
 
+	if (const uint32 pipelineCount = pipelineList.getSize())
+		TextWriteFmtStdOut("Compiling ", pipelineCount, " pipeline", pipelineCount > 1 ? "s" : "", "\n");
+
+	i = 0;
 	for (Pipeline& pipeline : pipelineList)
 	{
-		TextWriteFmtStdOut("Compiling pipeline \"", pipeline.getName(), "\"\n");
+		const char* pipelineTypeString = pipeline.isGraphicsPipeline() ? "GP" : "CP";
+
+		InplaceStringASCIIx256 messageHeader;
+		TextWriteFmt(messageHeader, pipelineTypeString, " [", i + 1, "/", pipelineList.getSize(), "] ", pipeline.getName());
+		i++;
+
+		TextWriteFmtStdOut(messageHeader, "\n");
 
 		if (!pipeline.compile())
 		{
-			TextWriteFmtStdOut("Failed to compile pipeline \"", pipeline.getName(), "\"\n");
+			TextWriteFmtStdOut(messageHeader, " : Compilation failed\n");
 			return;
 		}
 	}
@@ -270,7 +309,7 @@ void Builder::run(const char* packPath)
 
 	const uint32 bytecodeBlobsTotalSize = bytecodeBlobsOffsetAccum;
 
-	const uint32 blobsDataOffset =
+	const uintptr blobsDataOffset =
 		sizeof(PackHeader) +
 		descriptorSetLayoutRecords.getByteSize() +
 		pipelineLayoutRecords.getByteSize() +
@@ -287,7 +326,7 @@ void Builder::run(const char* packPath)
 	header.pipelineLayoutCount = uint16(pipelineLayoutRecords.getSize());
 	header.pipelineCount = uint16(pipelineRecords.getSize());
 	header.bytecodeBlobCount = uint16(bytecodeBlobRecords.getSize());
-	header.blobsDataOffset = blobsDataOffset;
+	header.blobsDataOffset = XCheckedCastU8(blobsDataOffset);
 	file.write(header);
 
 	file.write(descriptorSetLayoutRecords.getData(), descriptorSetLayoutRecords.getByteSize());

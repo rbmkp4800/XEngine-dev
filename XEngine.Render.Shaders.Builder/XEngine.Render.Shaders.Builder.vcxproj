@@ -70,8 +70,8 @@
       <AdditionalLibraryDirectories>$(ProjectDir)..\External\Microsoft.DirectXShaderCompiler\lib\$(Platform);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>copy $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.dll $(OutDir)
-copy $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.pdb $(OutDir)</Command>
+      <Command>xcopy /y $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.dll $(OutDir)
+xcopy /y $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.pdb $(OutDir)</Command>
       <Message>Copying DXC DLLs to output directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -94,8 +94,8 @@ copy $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.pd
       <AdditionalLibraryDirectories>$(ProjectDir)..\External\Microsoft.DirectXShaderCompiler\lib\$(Platform);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>copy $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.dll $(OutDir)
-copy $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.pdb $(OutDir)</Command>
+      <Command>xcopy /y $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.dll $(OutDir)
+xcopy /y $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.pdb $(OutDir)</Command>
       <Message>Copying DXC DLLs to output directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>

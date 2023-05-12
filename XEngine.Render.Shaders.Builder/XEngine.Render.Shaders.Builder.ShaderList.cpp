@@ -1,4 +1,5 @@
 #include <XLib.String.h>
+#include <XLib.Text.h>
 
 #include "XEngine.Render.Shaders.Builder.ShaderList.h"
 
@@ -9,7 +10,10 @@ bool Shader::compile()
 {
 	StringViewASCII sourceText = {};
 	if (!source->retrieveText(sourceText))
+	{
+		TextWriteFmtStdOut("Failed to read file \"", source->getLocalPath(), "\"\n");
 		return false;
+	}
 
 	return HAL::ShaderCompiler::Host::CompileShader(HAL::ShaderCompiler::Platform::D3D12,
 		pipelineLayout->getCompiledBlob(), pipelineLayout->getMetadataBlob(),
@@ -80,6 +84,7 @@ ShaderCreationResult ShaderList::findOrCreate(HAL::ShaderCompiler::ShaderType ty
 	shader.type = type;
 
 	entrySearchTree.insert(shader);
+	entryCount++;
 
 	return ShaderCreationResult { ShaderCreationStatus::Success, &shader };
 }
