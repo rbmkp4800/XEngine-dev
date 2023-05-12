@@ -18,6 +18,21 @@ ComputePipeline TestComputePipeline
 	SetCS("TestCompute.hlsl", "MainCS");
 }
 
+/////////////////////////////////////////////////////////////////////////////////
+
+PipelineLayout AccumulateDeferredLighting
+{
+	ConstantBuffer ViewConstants;
+}
+
+GraphicsPipeline AccumulateDeferredLighting
+{
+	SetLayout(AccumulateDeferredLighting);
+	SetVS("FullScreenQuadVS.hlsl", "main");
+	SetPS("Lighting.hlsl", "main");
+	SetRT(0, R8G8B8BA8_Unorm);
+}
+
 /*
 DescriptorTableLayout MyDescriptorTable {
 	ReadOnlyTextureDescriptor MyTexture;

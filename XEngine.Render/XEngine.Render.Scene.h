@@ -3,6 +3,8 @@
 #include <XLib.NonCopyable.h>
 #include <XLib.Vectors.h>
 
+#include <XEngine.Render.HAL.D3D12.h>
+
 #include "XEngine.Render.Scheduler.h"
 
 namespace XEngine::Render
@@ -26,6 +28,8 @@ namespace XEngine::Render
 		Scheduler::TextureHandle textureB;
 	};
 
+	GBuffer CreateGBuffer(Scheduler::Schedule& schedule, uint16 width, uint16 height);
+
 	struct CameraInfo
 	{
 		float32x3 position, forward, up;
@@ -45,19 +49,26 @@ namespace XEngine::Render
 
 	class SceneGeometryRenderer abstract final
 	{
+	private:
+		struct AccumulateDeferredLightingPassUserData;
+		
+	private:
+		static void AccumulateDeferredLightingPassExecutor(Scheduler::PassExecutionContext& context,
+			HAL::Device& device, HAL::CommandList& commandList, const void* userDataPtr);
+
 	public:
-		static void ScheduleDrawDeferredGeometry(Scheduler::Pipeline& pipeline,
+		static void AddDrawDeferredGeometryPass(Scheduler::Schedule& schedule,
 			const SceneGeometry& sceneGeometry, const CameraInfo& camera,
 			const GBuffer& outputGBuffer);
 
-		static void ScheduleDrawForwardGeometry(Scheduler::Pipeline& pipeline,
+		static void AddDrawForwardGeometry(Scheduler::Schedule& schedule,
 			const SceneGeometry& sceneGeometry, const CameraInfo& camera,
 			Scheduler::TextureHandle depthTexture,
 			Scheduler::TextureHandle outputLuminanceTexture);
 
-		static void ScheduleAccumulateAnalyticLightsForDeferredGeometry(Scheduler::Pipeline& pipeline,
-			const SceneAnalyticLights& lights, const CameraInfo& camera,
-			const GBuffer& inputGBuffer,
+		static void AddAccumulateDeferredLightingPass(Scheduler::Schedule& schedule,
+			//const SceneAnalyticLights& lights, const CameraInfo& camera,
+			//const GBuffer& inputGBuffer,
 			Scheduler::TextureHandle outputLuminanceTexture);
 	};
 }

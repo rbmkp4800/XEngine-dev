@@ -2,6 +2,7 @@
 
 #include <XLib.h>
 #include <XLib.NonCopyable.h>
+#include <XLib.Containers.ArrayList.h> // TODO: Remove
 
 #include <XEngine.Render.HAL.D3D12.h>
 
@@ -11,48 +12,98 @@
 
 namespace XEngine::Render::Scheduler
 {
+	class Schedule;
+	class PassExecutionContext;
+
 	enum class BufferHandle : uint32 {};
 	enum class TextureHandle : uint32 {};
 
 	class TransientResourcePool : public XLib::NonCopyable
 	{
+		friend Schedule;
+		friend PassExecutionContext;
+
 	private:
 		enum class EntryType : uint8;
 
-		struct Entry;
+		struct Entry
+		{
+			EntryType type;
+
+			union
+			{
+				struct
+				{
+					HAL::BufferHandle bufferHandle;
+				} buffer;
+
+				struct
+				{
+					HAL::TextureHandle textureHandle;
+				} texture;
+
+				struct
+				{
+					HAL::ResourceViewHandle resourceViewHandle;
+				} descriptor;
+
+				struct
+				{
+					HAL::RenderTargetViewHandle renderTargetViewHandle;
+				} renderTarget;
+
+				struct
+				{
+					HAL::DepthStencilViewHandle depthStencilViewHandle;
+				} depthRenderTarget;
+			};
+		};
 
 	private:
-		HAL::MemoryBlockHandle deviceMemoryPool = HAL::MemoryBlockHandle::Zero;
+		HAL::Device* device = nullptr;
+		HAL::DeviceMemoryAllocationHandle deviceMemoryPool = HAL::DeviceMemoryAllocationHandle::Zero;
 		uint64 deviceMemoryPoolSize = 0;
 
-		Entry* entries = nullptr;
-		uint16 entryCount = 0;
+		//Entry* entries = nullptr;
+		//uint16 entryCount = 0;
+		XLib::ArrayList<Entry> entries;
 
 	public:
 		TransientResourcePool() = default;
 		~TransientResourcePool() = default;
 
-		void initialize(HAL::MemoryBlockHandle deviceMemoryPool, uint64 deviceMemoryPoolSize);
+		void initialize(HAL::Device& device, HAL::DeviceMemoryAllocationHandle deviceMemoryPool, uint64 deviceMemoryPoolSize);
 
 		// NOTE: Temporary
 		void reset();
 
-		//inline HAL::MemoryBlockHandle getMemoryPool() const { return deviceMemoryPool; }
+		//inline HAL::DeviceMemoryAllocationHandle getMemoryPool() const { return deviceMemoryPool; }
 	};
 
-	class PassExecutionBroker : public XLib::NonCopyable
+	class PassExecutionContext : public XLib::NonCopyable
 	{
-		friend class Pipeline;
+		friend Schedule;
 
 	private:
 		HAL::Device& device;
+		const Schedule& schedule;
 		TransientResourcePool& transientResourcePool;
-		CircularDescriptorAllocator& transientDescriptorAllocator;
-		CircularUploadMemoryAllocator& transientUploadMemoryAllocator;
+		TransientDescriptorAllocator& transientDescriptorAllocator;
+		TransientUploadMemoryAllocator& transientUploadMemoryAllocator;
 
 	private:
-		PassExecutionBroker() = default;
-		~PassExecutionBroker() = default;
+		inline PassExecutionContext(HAL::Device& device,
+			const Schedule& schedule,
+			TransientResourcePool& transientResourcePool,
+			TransientDescriptorAllocator& transientDescriptorAllocator,
+			TransientUploadMemoryAllocator& transientUploadMemoryAllocator) :
+			device(device),
+			schedule(schedule),
+			transientResourcePool(transientResourcePool),
+			transientDescriptorAllocator(transientDescriptorAllocator),
+			transientUploadMemoryAllocator(transientUploadMemoryAllocator)
+		{ }
+		~PassExecutionContext() = default;
 
 	public:
 		HAL::DescriptorAddress allocateTransientDescriptors(uint16 descriptorCount);
@@ -62,16 +113,17 @@ namespace XEngine::Render::Scheduler
 		HAL::BufferHandle resolveBuffer(Scheduler::BufferHandle buffer);
 		HAL::TextureHandle resolveTexture(Scheduler::TextureHandle texture);
 
-		HAL::ResourceViewHandle createTransientBufferView(Scheduler::BufferHandle buffer);
-		HAL::ResourceViewHandle createTransientTextureView(Scheduler::TextureHandle texture,
-			HAL::TexelViewFormat format, bool writable, const HAL::TextureSubresourceRange& subresourceRange);
-		HAL::RenderTargetViewHandle createTransientRenderTargetView(Scheduler::TextureHandle texture,
+		HAL::ResourceViewHandle createTransientBufferView(HAL::BufferHandle buffer);
+		HAL::ResourceViewHandle createTransientTextureView(HAL::TextureHandle texture,
+			HAL::TexelViewFormat format = HAL::TexelViewFormat::Undefined,
+			bool writable = false, const HAL::TextureSubresourceRange& subresourceRange = {});
+		HAL::RenderTargetViewHandle createTransientRenderTargetView(HAL::TextureHandle texture,
 			HAL::TexelViewFormat format, uint8 mipLevel = 0, uint16 arrayIndex = 0);
-		HAL::DepthStencilViewHandle createTransientDepthStencilView(Scheduler::TextureHandle texture,
+		HAL::DepthStencilViewHandle createTransientDepthStencilView(HAL::TextureHandle texture,
 			bool writableDepth, bool writableStencil, uint8 mipLevel = 0, uint16 arrayIndex = 0);
 	};
 
-	using PassExecutorFunc = void(*)(PassExecutionBroker& executionBroker,
+	using PassExecutorFunc = void(*)(PassExecutionContext& executionBroker,
 		HAL::Device& device, HAL::CommandList& commandList, const void* userData);
 
 	enum class BufferAccess : uint8
@@ -162,29 +214,52 @@ namespace XEngine::Render::Scheduler
 
 	};*/
 
-	class Pipeline : public XLib::NonCopyable
+	class Schedule : public XLib::NonCopyable
 	{
-	private:
-		enum class ResourceLifetime : uint8;
+		friend PassExecutionContext;
 
-		struct Resource;
-		struct Pass;
+	private:
+		enum class ResourceLifetime : uint8
+		{
+			Undefined = 0,
+			Transient,
+			External,
+		};
+
+		struct Resource
+		{
+			HAL::ResourceType type;
+			ResourceLifetime lifetime;
+
+			union
+			{
+				uint32 transientBufferSize;
+				HAL::TextureDesc transientTextureDesc;
+				HAL::BufferHandle externalBufferHandle;
+				HAL::TextureHandle externalTextureHandle;
+			};
+
+			uint32 transientResourcePoolEntryIndex;
+		};
+
+		struct Pass
+		{
+			PassExecutorFunc executporFunc;
+			const void* userData;
+		};
 
 	private:
 		HAL::Device* device = nullptr;
 		HAL::CommandList commandList;
 
-		Resource* resources = nullptr;
-		Pass* passes = nullptr;
-
-		uint32 resourceCount = 0;
-		uint32 passCount = 0;
+		XLib::ArrayList<Resource> resources;
+		XLib::ArrayList<Pass> passes;
 
 	public:
-		Pipeline() = default;
-		~Pipeline() = default;
+		Schedule() = default;
+		~Schedule() = default;
 
-		void reset(HAL::Device& device);
+		void initialize(HAL::Device& device);
 
 		BufferHandle createTransientBuffer(uint32 size);
 		TextureHandle createTransientTexture(const HAL::TextureDesc& textureDesc);
@@ -196,7 +271,7 @@ namespace XEngine::Render::Scheduler
 
 		//void createVirtualCPUResource();
 
-		void schedulePass(PassType type, const PassDependenciesDesc& dependencies,
+		void addPass(PassType type, const PassDependenciesDesc& dependencies,
 			PassExecutorFunc executorFunc, const void* userData);
 
 		void compile();
@@ -204,7 +279,7 @@ namespace XEngine::Render::Scheduler
 		uint64 getTransientResourcePoolMemoryRequirement() const;
 
 		void execute(TransientResourcePool& transientResourcePool,
-			CircularDescriptorAllocator& transientDescriptorAllocator,
-			CircularUploadMemoryAllocator& transientUploadMemoryAllocator);
+			TransientDescriptorAllocator& transientDescriptorAllocator,
+			TransientUploadMemoryAllocator& transientUploadMemoryAllocator);
 	};
 }

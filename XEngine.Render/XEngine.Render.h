@@ -6,20 +6,16 @@
 
 namespace XEngine::Render
 {
-	class Shaders abstract final
-	{
-	public:
-		static const ShaderLibrary& GetLibrary();
-	};
-
 	class Host abstract final
 	{
 	private:
 		static HAL::Device halDevice;
+		static ShaderLibrary shaderLibrary;
 
 	public:
 		static void Initialize();
 
 		static inline HAL::Device& GetDevice() { return halDevice; }
+		static inline const ShaderLibrary& GetShaders() { return shaderLibrary; }
 	};
 }

@@ -72,7 +72,6 @@
     </Link>
     <CustomBuild>
       <Command>$(OutDir)XEngine.Render.Shaders.Builder_$(PlatformName).$(Configuration).exe</Command>
-      <Message>Compiling shader library</Message>
       <Outputs>$(OutDir)shaderpack;%(Outputs)</Outputs>
     </CustomBuild>
   </ItemDefinitionGroup>
@@ -90,6 +89,10 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
+    <CustomBuild>
+      <Command>$(OutDir)XEngine.Render.Shaders.Builder_$(PlatformName).$(Configuration).exe</Command>
+      <Outputs>$(OutDir)shaderpack;%(Outputs)</Outputs>
+    </CustomBuild>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

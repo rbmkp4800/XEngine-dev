@@ -248,7 +248,7 @@ namespace XEngine::Render::HAL
 		~CommandList();
 
 		void open();
-		void close();
+		//void close(); // TODO: Do we need it at all?
 
 		void clearRenderTarget(RenderTargetViewHandle rtv, const float32* color);
 		void clearDepthStencil(DepthStencilViewHandle dsv, bool clearDepth, bool clearStencil, float32 depth, uint8 stencil);
@@ -291,6 +291,9 @@ namespace XEngine::Render::HAL
 			TextureHandle textureHandle, TextureSubresource textureSubresource, const TextureRegion* textureRegion = nullptr);
 
 		void initializeTextureMetadata(TextureHandle textureHandle, const TextureSubresourceRange* subresourceRange = nullptr);
+
+		//void pushDebugMarker(const char* name);
+		//void popDebugMarker();
 	};
 
 	struct BlobDataView

@@ -238,7 +238,9 @@ HAL::DescriptorSetLayoutHandle ShaderLibrary::getDescriptorSetLayout(uint64 name
 		if (descriptorSetLayoutTable[i].nameXSH == nameXSH)
 			return descriptorSetLayoutTable[i].halDescriptorSetLayout;
 	}
+
 	XEMasterAssertUnreachableCode();
+	return HAL::DescriptorSetLayoutHandle::Zero;
 }
 
 HAL::PipelineLayoutHandle ShaderLibrary::getPipelineLayout(uint64 nameXSH) const
@@ -248,7 +250,9 @@ HAL::PipelineLayoutHandle ShaderLibrary::getPipelineLayout(uint64 nameXSH) const
 		if (pipelineLayoutTable[i].nameXSH == nameXSH)
 			return pipelineLayoutTable[i].halPipelineLayout;
 	}
+
 	XEMasterAssertUnreachableCode();
+	return HAL::PipelineLayoutHandle::Zero;
 }
 
 HAL::PipelineHandle ShaderLibrary::getPipeline(uint64 nameXSH) const
@@ -258,5 +262,7 @@ HAL::PipelineHandle ShaderLibrary::getPipeline(uint64 nameXSH) const
 		if (pipelineTable[i].nameXSH == nameXSH)
 			return pipelineTable[i].halPipeline;
 	}
+
 	XEMasterAssertUnreachableCode();
+	return HAL::PipelineHandle::Zero;
 }

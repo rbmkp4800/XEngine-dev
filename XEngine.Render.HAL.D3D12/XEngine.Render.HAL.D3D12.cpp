@@ -13,7 +13,7 @@
 
 #include "XEngine.Render.HAL.D3D12.Translation.h"
 
-extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = D3D12_PREVIEW_SDK_VERSION; }
+extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = D3D12_SDK_VERSION; }
 extern "C" { __declspec(dllexport) extern const char* D3D12SDKPath = ".\\D3D12\\"; }
 
 using namespace XLib;
@@ -1030,6 +1030,16 @@ TextureHandle Device::createTexture(const TextureDesc& desc,
 	return composeTextureHandle(resourceIndex);
 }
 
+void Device::destroyBuffer(BufferHandle bufferHandle)
+{
+	XEMasterAssertUnreachableCode();
+}
+
+void Device::destroyTexture(TextureHandle textureHandle)
+{
+	XEMasterAssertUnreachableCode();
+}
+
 ResourceViewHandle Device::createBufferView(BufferHandle bufferHandle, TexelViewFormat format, bool writable)
 {
 	const Resource& resource = getResourceByBufferHandle(bufferHandle);
@@ -1148,6 +1158,17 @@ RenderTargetViewHandle Device::createRenderTargetView(TextureHandle textureHandl
 	d3dDevice->CreateRenderTargetView(resource.d3dResource, &d3dRTVDesc, { descriptorPtr });
 
 	return composeRenderTargetViewHandle(renderTargetViewIndex);
+}
+
+void Device::destroyRenderTargetView(RenderTargetViewHandle handle)
+{
+	const uint32 renderTargetViewIndex = resolveRenderTargetViewHandle(handle);
+
+	// TODO: Bump handle generation.
+	//renderTargetViewTable[renderTargetViewIndex].handleGeneration++;
+
+	XAssert(renderTargetViewTableAllocationMask.isSet(renderTargetViewIndex));
+	renderTargetViewTableAllocationMask.reset(renderTargetViewIndex);
 }
 
 DepthStencilViewHandle Device::createDepthStencilView(TextureHandle textureHandle,
