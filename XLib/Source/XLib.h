@@ -48,7 +48,7 @@ template <typename LeftT, typename RightT>
 inline constexpr ordering compare(const LeftT& left, const RightT& right)
 {
 	if (left < right) return ordering::less;
-	if (right > left) return ordering::greater;
+	if (left > right) return ordering::greater;
 	return ordering::equivalent;
 }
 
@@ -127,7 +127,18 @@ inline void operator delete (void* block, XLib::Internal::PlacementNewToken, voi
 
 // Data utils //////////////////////////////////////////////////////////////////////////////////
 
-template <typename T, uintptr size> constexpr uintptr countof(T(&)[size]) { return size; }
+template <typename T, uintptr size>
+constexpr auto countof(T(&)[size])
+{
+	if constexpr (size <= uint8(-1))
+		return uint8(size);
+	else if constexpr (size <= uint16(-1))
+		return uint16(size);
+	else if constexpr (size <= uint32(-1))
+		return uint32(size);
+	else
+		return size;
+}
 
 #undef offsetof
 #define offsetof(type, field) uintptr(&((type*)nullptr)->field)
@@ -208,6 +219,8 @@ void memoryMove(void* destination, const void* source, uintptr size);
 
 // Debug ///////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Dev/Master variations.
+
 namespace XLib
 {
 	class Debug abstract final
@@ -231,6 +244,13 @@ namespace XLib
 #define XAssert(expression) do { if (!(expression)) { XLib::Debug::Fail("Assertion failed: `" #expression "`\n"); } } while (false)
 #define XAssertUnreachableCode() { XLib::Debug::Fail("Assertion failed: unreachable code reached\n"); }
 
+
+inline uint8	XCheckedCastU8	(uint64 a) { XAssert(a <= uint8(-1)); return uint8(a); }
+inline uint16	XCheckedCastU16	(uint64 a) { XAssert(a <= uint16(-1)); return uint16(a); }
+inline uint32	XCheckedCastU32	(uint64 a) { XAssert(a <= uint32(-1)); return uint32(a); }
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////
 
 #define XDefineEnumFlagOperators(T, IntT) \
 	inline constexpr T operator & (T a, T b) { return T(IntT(a) & IntT(b)); }	\

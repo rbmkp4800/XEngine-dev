@@ -41,8 +41,13 @@ void File::close()
 	handle = nullptr;
 }
 
-bool File::read(void* buffer, uint32 size)
+bool File::read(void* buffer, uintptr _size)
 {
+	// TODO: Do this properly.
+	if (_size > uint32(-1))
+		*(int*)nullptr = 0;
+	const uint32 size = uint32(_size);
+
 	DWORD readSize = 0;
 	BOOL result = ReadFile(handle, buffer, size, &readSize, nullptr);
 	if (!result)
@@ -58,8 +63,13 @@ bool File::read(void* buffer, uint32 size)
 	return true;
 }
 
-bool File::read(void* buffer, uint32 bufferSize, uint32& readSize)
+bool File::read(void* buffer, uintptr _bufferSize, uintptr& readSize)
 {
+	// TODO: Do this properly.
+	if (_bufferSize > uint32(-1))
+		*(int*)nullptr = 0;
+	const uint32 bufferSize = uint32(_bufferSize);
+
 	DWORD _readSize = 0;
 	BOOL result = ReadFile(handle, buffer, bufferSize, &_readSize, nullptr);
 	if (!result)
@@ -71,8 +81,13 @@ bool File::read(void* buffer, uint32 bufferSize, uint32& readSize)
 	return true;
 }
 
-bool File::write(const void* buffer, uint32 size)
+bool File::write(const void* buffer, uintptr _size)
 {
+	// TODO: Do this properly.
+	if (_size > uint32(-1))
+		*(int*)nullptr = 0;
+	const uint32 size = uint32(_size);
+
 	DWORD writtenSize = 0;
 	BOOL result = WriteFile(handle, buffer, size, &writtenSize, nullptr);
 	if (!result)

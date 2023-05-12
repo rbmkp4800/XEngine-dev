@@ -4,6 +4,7 @@
 #include "XLib.NonCopyable.h"
 
 // TODO: Rename `File::isInitialized` to `File::isOpen`.
+// TODO: Properly replace `uint32` with `uintptr` everywhere. For now it is hacked just to remove compilation warnings.
 
 namespace XLib
 {
@@ -52,15 +53,15 @@ namespace XLib
 			FileOpenMode openMode = FileOpenMode::OpenExisting);
 		void close();
 
-		bool read(void* buffer, uint32 size);
-		bool read(void* buffer, uint32 bufferSize, uint32& readSize);
-		bool write(const void* buffer, uint32 size);
+		bool read(void* buffer, uintptr size);
+		bool read(void* buffer, uintptr bufferSize, uintptr& readSize);
+		bool write(const void* buffer, uintptr size);
 		void flush();
 
 		template <typename Type>
 		inline bool read(Type& value)
 		{
-			uint32 readSize = 0;
+			uintptr readSize = 0;
 			bool result = read(&value, sizeof(Type), readSize);
 			return readSize == sizeof(Type) && result;
 		}
