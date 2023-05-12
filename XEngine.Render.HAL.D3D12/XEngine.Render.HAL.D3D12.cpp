@@ -211,10 +211,9 @@ namespace // DeviceQueueSyncPoint
 }
 
 
-struct Device::MemoryBlock
+struct Device::MemoryAllocation
 {
 	ID3D12Heap* d3dHeap;
-	MemoryType type;
 	uint8 handleGeneration;
 };
 
@@ -491,8 +490,7 @@ void CommandList::bindConstants(uint64 bindingNameXSH,
 		XEAssertUnreachableCode();
 }
 
-void CommandList::bindBuffer(uint64 bindingNameXSH,
-	BufferBindType bindType, BufferHandle bufferHandle, uint32 offset)
+void CommandList::bindBuffer(uint64 bindingNameXSH, BufferBindType bindType, BufferPointer bufferPointer)
 {
 	XEAssert(state == State::Recording);
 
@@ -506,11 +504,11 @@ void CommandList::bindBuffer(uint64 bindingNameXSH,
 	else
 		XEAssertUnreachableCode();
 
-	const Device::Resource& resource = device->getResourceByBufferHandle(bufferHandle);
+	const Device::Resource& resource = device->getResourceByBufferHandle(bufferPointer.buffer);
 	XEAssert(resource.type == ResourceType::Buffer);
 	XEAssert(resource.d3dResource);
 
-	const uint64 bufferAddress = resource.d3dResource->GetGPUVirtualAddress() + offset;
+	const uint64 bufferAddress = resource.d3dResource->GetGPUVirtualAddress() + bufferPointer.offset;
 	XEAssert(imply(bindType == BufferBindType::Constant, bufferAddress % Device::ConstantBufferBindAlignment == 0));
 
 	if (currentPipelineType == PipelineType::Graphics)
@@ -839,7 +837,7 @@ void Device::initialize(ID3D12Device10* _d3dDevice)
 	{
 		// TODO: Take into account alignments.
 		constexpr uintptr objectTablesMemorySize =
-			sizeof(MemoryBlock) * MaxMemoryBlockCount +
+			sizeof(MemoryAllocation) * MaxMemoryAllocationCount +
 			sizeof(Resource) * MaxResourceCount +
 			sizeof(ResourceView) * MaxResourceViewCount +
 			sizeof(DescriptorSetLayout) * MaxDescriptorSetLayoutCount +
@@ -852,20 +850,20 @@ void Device::initialize(ID3D12Device10* _d3dDevice)
 		void* objectTablesMemory = SystemHeapAllocator::Allocate(objectTablesMemorySize);
 		memorySet(objectTablesMemory, 0, objectTablesMemorySize);
 
-		memoryBlockTable = (MemoryBlock*)objectTablesMemory;
-		resourceTable = (Resource*)(memoryBlockTable + MaxMemoryBlockCount);
+		memoryAllocationTable = (MemoryAllocation*)objectTablesMemory;
+		resourceTable = (Resource*)(memoryAllocationTable + MaxMemoryAllocationCount);
 		resourceViewTable = (ResourceView*)(resourceTable + MaxResourceCount);
 		descriptorSetLayoutTable = (DescriptorSetLayout*)(resourceViewTable + MaxResourceViewCount);
 		pipelineLayoutTable = (PipelineLayout*)(descriptorSetLayoutTable + MaxDescriptorSetLayoutCount);
 		pipelineTable = (Pipeline*)(pipelineLayoutTable + MaxPipelineLayoutCount);
 		fenceTable = (Fence*)(pipelineTable + MaxPipelineCount);
 		swapChainTable = (SwapChain*)(fenceTable + MaxFenceCount);
-		void* objectTablesMemoryEnd = swapChainTable + MaxSwapChainCount;
 
-		XEAssert(uintptr(objectTablesMemory) + objectTablesMemorySize == uintptr(objectTablesMemoryEnd));
+		void* objectTablesMemoryEndCheck = swapChainTable + MaxSwapChainCount;
+		XEAssert(uintptr(objectTablesMemory) + objectTablesMemorySize == uintptr(objectTablesMemoryEndCheck));
 	}
 
-	memoryBlockTableAllocationMask.clear();
+	memoryAllocationTableAllocationMask.clear();
 	resourceTableAllocationMask.clear();
 	resourceViewTableAllocationMask.clear();
 	renderTargetViewTableAllocationMask.clear();
@@ -887,34 +885,45 @@ void Device::initialize(ID3D12Device10* _d3dDevice)
 	srvDescriptorSize = uint16(d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
 }
 
-MemoryBlockHandle Device::allocateMemory(uint64 size, MemoryType memoryType)
+DeviceMemoryAllocationHandle Device::allocateMemory(uint64 size)
 {
-	const sint32 memoryBlockIndex = memoryBlockTableAllocationMask.findFirstZeroAndSet();
-	XEMasterAssert(memoryBlockIndex >= 0);
+	const sint32 memoryAllocationIndex = memoryAllocationTableAllocationMask.findFirstZeroAndSet();
+	XEMasterAssert(memoryAllocationIndex >= 0);
 
-	MemoryBlock& memoryBlock = memoryBlockTable[memoryBlockIndex];
-	XEAssert(!memoryBlock.d3dHeap);
-
-	memoryBlock.type = memoryType;
+	MemoryAllocation& memoryAllocation = memoryAllocationTable[memoryAllocationIndex];
+	XEAssert(!memoryAllocation.d3dHeap);
 
 	D3D12_HEAP_DESC d3dHeapDesc = {};
 	d3dHeapDesc.SizeInBytes = size;
-	d3dHeapDesc.Properties = D3D12Helpers::HeapProperties(TranslateMemoryTypeToD3D12HeapType(memoryType));
+	d3dHeapDesc.Properties = D3D12Helpers::HeapProperties(D3D12_HEAP_TYPE_DEFAULT);
 	d3dHeapDesc.Alignment = 0;
 	d3dHeapDesc.Flags = D3D12_HEAP_FLAG_CREATE_NOT_ZEROED | D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES;
 	// TODO: Check D3D12_RESOURCE_HEAP_TIER_2 during starup. We need it for `D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES`.
 	// TODO: Check if we need `D3D12_HEAP_FLAG_ALLOW_SHADER_ATOMICS`.
 
-	d3dDevice->CreateHeap(&d3dHeapDesc, IID_PPV_ARGS(&memoryBlock.d3dHeap));
+	d3dDevice->CreateHeap(&d3dHeapDesc, IID_PPV_ARGS(&memoryAllocation.d3dHeap));
 
-	return composeMemoryBlockHandle(memoryBlockIndex);
+	return composeMemoryAllocationHandle(memoryAllocationIndex);
 }
 
-BufferHandle Device::createBuffer(uint64 size, bool allowShaderWrite,
-	MemoryBlockHandle memoryBlockHandle, uint64 memoryBlockOffset)
+ResourceAllocationInfo Device::getTextureAllocationInfo(const TextureDesc& textureDesc) const
 {
-	const MemoryBlock& memoryBlock = getMemoryBlockByHandle(memoryBlockHandle);
-	XEAssert(memoryBlock.d3dHeap);
+	XEMasterAssertUnreachableCode();
+	return ResourceAllocationInfo{};
+}
+
+BufferHandle Device::createBuffer(uint64 size, bool allowShaderWrite, BufferMemoryType memoryType,
+	DeviceMemoryAllocationHandle memoryHandle, uint64 memoryOffset)
+{
+	// TODO: Assert `allowShaderWrite` is false when upload buffer is created.
+
+	const MemoryAllocation* memoryAllocation = nullptr;
+	if (memoryHandle != DeviceMemoryAllocationHandle::Zero)
+	{
+		memoryAllocation = &getMemoryAllocationByHandle(memoryHandle);
+		XEAssert(memoryAllocation->d3dHeap);
+		XEAssert(memoryType == BufferMemoryType::DeviceLocal);
+	}
 
 	const sint32 resourceIndex = resourceTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(resourceIndex >= 0);
@@ -932,38 +941,44 @@ BufferHandle Device::createBuffer(uint64 size, bool allowShaderWrite,
 
 	const D3D12_RESOURCE_DESC1 d3dResourceDesc = D3D12Helpers::ResourceDesc1ForBuffer(size);
 
-	// TODO: Check that resource fits into memory block.
+	// TODO: Check that resource fits into memory.
 	// TODO: Check alignment.
 
 #if USE_ENHANCED_BARRIERS
-	d3dDevice->CreatePlacedResource2(memoryBlock.d3dHeap, memoryBlockOffset,
+	XEMasterAssertUnreachableCode();
+
+	d3dDevice->CreatePlacedResource2(memoryAllocation.d3dHeap, memoryOffset,
 		&d3dResourceDesc, D3D12_BARRIER_LAYOUT_UNDEFINED, nullptr, 0, nullptr,
 		IID_PPV_ARGS(&resource.d3dResource));
 #else
 
-	D3D12_RESOURCE_STATES d3dInitialState = D3D12_RESOURCE_STATE_COMMON;
-	if (memoryBlock.type == MemoryType::DeviceLocal)
-		d3dInitialState = D3D12_RESOURCE_STATE_COMMON;
-	else if (memoryBlock.type == MemoryType::DeviceReadHostWrite)
-		d3dInitialState = D3D12_RESOURCE_STATE_GENERIC_READ;
-	else if (memoryBlock.type == MemoryType::DeviceWriteHostRead)
-		d3dInitialState = D3D12_RESOURCE_STATE_COPY_DEST;
+	if (memoryAllocation)
+	{
+		d3dDevice->CreatePlacedResource1(memoryAllocation->d3dHeap, memoryOffset,
+			&d3dResourceDesc, D3D12_RESOURCE_STATE_COMMON, nullptr,
+			IID_PPV_ARGS(&resource.d3dResource));
+	}
 	else
-		XEAssertUnreachableCode();
+	{
+		const D3D12_RESOURCE_STATES d3dInitialState =
+			TranslateBufferMemoryTypeToInitialD3D12ResourceState(memoryType);
+		const D3D12_HEAP_PROPERTIES d3dHeapProperties =
+			D3D12Helpers::HeapProperties(TranslateBufferMemoryTypeToD3D12HeapType(memoryType));
 
-	d3dDevice->CreatePlacedResource1(memoryBlock.d3dHeap, memoryBlockOffset,
-		&d3dResourceDesc, d3dInitialState, nullptr,
-		IID_PPV_ARGS(&resource.d3dResource));
+		d3dDevice->CreateCommittedResource2(&d3dHeapProperties, D3D12_HEAP_FLAG_NONE, &d3dResourceDesc,
+			d3dInitialState, nullptr, nullptr, IID_PPV_ARGS(&resource.d3dResource));
+	}
+	
 #endif
 
 	return composeBufferHandle(resourceIndex);
 }
 
 TextureHandle Device::createTexture(const TextureDesc& desc,
-	MemoryBlockHandle memoryBlockHandle, uint64 memoryBlockOffset)
+	DeviceMemoryAllocationHandle memoryHandle, uint64 memoryOffset)
 {
-	const MemoryBlock& memoryBlock = getMemoryBlockByHandle(memoryBlockHandle);
-	XEAssert(memoryBlock.d3dHeap);
+	const MemoryAllocation& memoryAllocation = getMemoryAllocationByHandle(memoryHandle);
+	XEAssert(memoryAllocation.d3dHeap);
 
 	const sint32 resourceIndex = resourceTableAllocationMask.findFirstZeroAndSet();
 	XEMasterAssert(resourceIndex >= 0);
@@ -982,10 +997,12 @@ TextureHandle Device::createTexture(const TextureDesc& desc,
 	if (desc.allowRenderTarget)
 	{
 		// TODO: Deduce from format type of RT (Color/Depth).
-		if (...)
+		if (DoesTextureFormatSupportColorRenderTargetUsage(desc.format))
 			d3dResourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-		else
+		else if (DoesTextureFormatSupportDepthRenderTargetUsage(desc.format))
 			d3dResourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+		else
+			XEMasterAssertUnreachableCode();
 	}
 	if (desc.allowShaderWrite)
 		d3dResourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
@@ -996,16 +1013,16 @@ TextureHandle Device::createTexture(const TextureDesc& desc,
 	const D3D12_RESOURCE_DESC1 d3dResourceDesc =
 		D3D12Helpers::ResourceDesc1ForTexture2D(desc.size.x, desc.size.y, desc.mipLevelCount, dxgiFormat, d3dResourceFlags);
 
-	// TODO: Check that resource fits into memory block.
+	// TODO: Check that resource fits into memory.
 	// TODO: Check alignment.
 	// TODO: Handle initial layout properly.
 
 #if USE_ENHANCED_BARRIERS
-	d3dDevice->CreatePlacedResource2(memoryBlock.d3dHeap, memoryBlockOffset,
+	d3dDevice->CreatePlacedResource2(memoryAllocation.d3dHeap, memoryOffset,
 		&d3dResourceDesc, D3D12_BARRIER_LAYOUT_COMMON, nullptr, 0, nullptr,
 		IID_PPV_ARGS(&resource.d3dResource));
 #else
-	d3dDevice->CreatePlacedResource1(memoryBlock.d3dHeap, memoryBlockOffset,
+	d3dDevice->CreatePlacedResource1(memoryAllocation.d3dHeap, memoryOffset,
 		&d3dResourceDesc, D3D12_RESOURCE_STATE_COMMON, nullptr,
 		IID_PPV_ARGS(&resource.d3dResource));
 #endif
@@ -1022,16 +1039,18 @@ ResourceViewHandle Device::createBufferView(BufferHandle bufferHandle, TexelView
 	// TODO: Check if format is supported to use with texel buffers.
 	const DXGI_FORMAT dxgiFormat = TranslateTexelViewFormatToDXGIFormat(format);
 
-	const sint32 viewIndex = resourceViewTableAllocationMask.findFirstZeroAndSet();
-	XEMasterAssert(viewIndex >= 0);
+	const sint32 resourceViewIndex = resourceViewTableAllocationMask.findFirstZeroAndSet();
+	XEMasterAssert(resourceViewIndex >= 0);
 
-	ResourceView& resourceView = resourceViewTable[viewIndex];
+	ResourceView& resourceView = resourceViewTable[resourceViewIndex];
 	XEAssert(resourceView.resourceType == ResourceType::Undefined);
 	resourceView.bufferHandle = bufferHandle;
 	resourceView.resourceType = ResourceType::Buffer;
 
-	const uint64 descriptorPtr = rtvHeapPtr + rtvDescriptorSize * viewIndex;
+	const uint64 descriptorPtr = rtvHeapPtr + rtvDescriptorSize * resourceViewIndex;
 
+	XEMasterAssertUnreachableCode();
+#if 0
 	if (writable)
 	{
 		D3D12_UNORDERED_ACCESS_VIEW_DESC d3dUAVDesc = {};
@@ -1058,8 +1077,9 @@ ResourceViewHandle Device::createBufferView(BufferHandle bufferHandle, TexelView
 
 		d3dDevice->CreateShaderResourceView(resource.d3dResource, &d3dSRVDesc, { descriptorPtr });
 	}
+#endif
 
-	return composeResourceViewHandle(viewIndex);
+	return composeResourceViewHandle(resourceViewIndex);
 }
 
 ResourceViewHandle Device::createTextureView(TextureHandle textureHandle, TexelViewFormat format, bool writable,
@@ -1072,21 +1092,22 @@ ResourceViewHandle Device::createTextureView(TextureHandle textureHandle, TexelV
 	// TODO: Check compatibility with TextureFormat.
 	const DXGI_FORMAT dxgiFormat = TranslateTexelViewFormatToDXGIFormat(format);
 
-	const sint32 viewIndex = resourceViewTableAllocationMask.findFirstZeroAndSet();
-	XEMasterAssert(viewIndex >= 0);
+	const sint32 resourceViewIndex = resourceViewTableAllocationMask.findFirstZeroAndSet();
+	XEMasterAssert(resourceViewIndex >= 0);
 
-	ResourceView& resourceView = resourceViewTable[viewIndex];
+	ResourceView& resourceView = resourceViewTable[resourceViewIndex];
 	XEAssert(resourceView.resourceType == ResourceType::Undefined);
 	resourceView.textureHandle = textureHandle;
 	resourceView.resourceType = ResourceType::Texture;
 
-	const uint64 descriptorPtr = rtvHeapPtr + rtvDescriptorSize * viewIndex;
+	const uint64 descriptorPtr = rtvHeapPtr + rtvDescriptorSize * resourceViewIndex;
 
 	if (writable)
 	{
 		D3D12_UNORDERED_ACCESS_VIEW_DESC d3dUAVDesc = {};
 		d3dUAVDesc.Format = dxgiFormat;
-		...;
+		// ...
+		XEMasterAssertUnreachableCode();
 
 		d3dDevice->CreateUnorderedAccessView(resource.d3dResource, nullptr, &d3dUAVDesc, { descriptorPtr });
 	}
@@ -1094,10 +1115,13 @@ ResourceViewHandle Device::createTextureView(TextureHandle textureHandle, TexelV
 	{
 		D3D12_SHADER_RESOURCE_VIEW_DESC d3dSRVDesc = {};
 		d3dSRVDesc.Format = dxgiFormat;
-		...;
+		// ...
+		XEMasterAssertUnreachableCode();
 
 		d3dDevice->CreateShaderResourceView(resource.d3dResource, &d3dSRVDesc, { descriptorPtr });
 	}
+
+	return composeResourceViewHandle(resourceViewIndex);
 }
 
 RenderTargetViewHandle Device::createRenderTargetView(TextureHandle textureHandle,
@@ -1107,22 +1131,23 @@ RenderTargetViewHandle Device::createRenderTargetView(TextureHandle textureHandl
 	XEAssert(resource.type == ResourceType::Texture);
 	XEAssert(resource.d3dResource);
 	XEAssert(resource.textureDesc.dimension == TextureDimension::Texture2D);
+	// TODO: Assert compatible texture format / texel view format.
 
-	const sint32 viewIndex = renderTargetViewTableAllocationMask.findFirstZeroAndSet();
-	XEMasterAssert(viewIndex >= 0);
+	const sint32 renderTargetViewIndex = renderTargetViewTableAllocationMask.findFirstZeroAndSet();
+	XEMasterAssert(renderTargetViewIndex >= 0);
 
 	D3D12_RENDER_TARGET_VIEW_DESC d3dRTVDesc = {};
-	d3dRTVDesc.Format = ;
+	d3dRTVDesc.Format = TranslateTexelViewFormatToDXGIFormat(format);
 	d3dRTVDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 	d3dRTVDesc.Texture2D.MipSlice = mipLevel;
 	d3dRTVDesc.Texture2D.PlaneSlice = 0;
 
 	XEAssert(arrayIndex == 0); // Not implemented.
 
-	const uint64 descriptorPtr = rtvHeapPtr + rtvDescriptorSize * viewIndex;
+	const uint64 descriptorPtr = rtvHeapPtr + rtvDescriptorSize * renderTargetViewIndex;
 	d3dDevice->CreateRenderTargetView(resource.d3dResource, &d3dRTVDesc, { descriptorPtr });
 
-	return composeRenderTargetViewHandle(viewIndex);
+	return composeRenderTargetViewHandle(renderTargetViewIndex);
 }
 
 DepthStencilViewHandle Device::createDepthStencilView(TextureHandle textureHandle,
@@ -1132,8 +1157,8 @@ DepthStencilViewHandle Device::createDepthStencilView(TextureHandle textureHandl
 	XEAssert(resource.type == ResourceType::Texture);
 	XEAssert(resource.d3dResource);
 
-	const sint32 viewIndex = depthStencilViewTableAllocationMask.findFirstZeroAndSet();
-	XEMasterAssert(viewIndex >= 0);
+	const sint32 depthStencilViewIndex = depthStencilViewTableAllocationMask.findFirstZeroAndSet();
+	XEMasterAssert(depthStencilViewIndex >= 0);
 
 	D3D12_DSV_FLAGS d3dDSVFlags = D3D12_DSV_FLAG_NONE;
 	if (!writableDepth)
@@ -1142,17 +1167,18 @@ DepthStencilViewHandle Device::createDepthStencilView(TextureHandle textureHandl
 		d3dDSVFlags |= D3D12_DSV_FLAG_READ_ONLY_STENCIL;
 
 	D3D12_DEPTH_STENCIL_VIEW_DESC d3dDSVDesc = {};
-	d3dDSVDesc.Format = ...;
+	XEAssertUnreachableCode();
+	//d3dDSVDesc.Format = ...;
 	d3dDSVDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 	d3dDSVDesc.Flags = d3dDSVFlags;
 	d3dDSVDesc.Texture2D.MipSlice = mipLevel;
 
 	XEAssert(arrayIndex == 0); // Not implemented.
 
-	const uint64 descriptorPtr = dsvHeapPtr + dsvDescriptorSize * viewIndex;
+	const uint64 descriptorPtr = dsvHeapPtr + dsvDescriptorSize * depthStencilViewIndex;
 	d3dDevice->CreateDepthStencilView(resource.d3dResource, &d3dDSVDesc, { descriptorPtr });
 
-	return composeDepthStencilViewHandle(viewIndex);
+	return composeDepthStencilViewHandle(depthStencilViewIndex);
 }
 
 DescriptorSetLayoutHandle Device::createDescriptorSetLayout(BlobDataView blob)
@@ -1609,12 +1635,21 @@ bool Device::isQueueSyncPointReached(DeviceQueueSyncPoint syncPoint) const
 
 void* Device::mapBuffer(BufferHandle bufferHandle)
 {
+	// TODO: How we handle case when map is called second time?
+	// TODO: Assert upload or readback buffer type.
+
 	const Device::Resource& buffer = getResourceByBufferHandle(bufferHandle);
 	XEAssert(buffer.type == ResourceType::Buffer && buffer.d3dResource);
 
 	void* result = nullptr;
 	buffer.d3dResource->Map(0, nullptr, &result);
 	return result;
+}
+
+uint16 Device::getDescriptorSetLayoutDescriptorCount(DescriptorSetLayoutHandle descriptorSetLayoutHandle) const
+{
+	const DescriptorSetLayout& descriptorSetLayout = getDescriptorSetLayoutByHandle(descriptorSetLayoutHandle);
+	return descriptorSetLayout.bindingCount;
 }
 
 uint64 Device::getFenceValue(FenceHandle fenceHandle) const
@@ -1689,7 +1724,7 @@ uint16x3 Host::CalculateMipLevelSize(uint16x3 srcSize, uint8 mipLevel)
 
 namespace
 {
-	constexpr uint8 MemoryBlockHandleSignature = 0x1;
+	constexpr uint8 MemoryAllocationHandleSignature = 0x1;
 	constexpr uint8 BufferHandleSignature = 0x2;
 	constexpr uint8 TextureHandleSignature = 0x3;
 	constexpr uint8 ResourceViewHandleSignature = 0x4;
@@ -1724,11 +1759,11 @@ namespace
 	}
 }
 
-MemoryBlockHandle Device::composeMemoryBlockHandle(uint32 memoryBlockIndex) const
+DeviceMemoryAllocationHandle Device::composeMemoryAllocationHandle(uint32 memoryAllocationIndex) const
 {
-	XEAssert(memoryBlockIndex < MaxMemoryBlockCount);
-	return MemoryBlockHandle(ComposeHandle(
-		MemoryBlockHandleSignature, memoryBlockTable[memoryBlockIndex].handleGeneration, memoryBlockIndex));
+	XEAssert(memoryAllocationIndex < MaxMemoryAllocationCount);
+	return DeviceMemoryAllocationHandle(ComposeHandle(
+		MemoryAllocationHandleSignature, memoryAllocationTable[memoryAllocationIndex].handleGeneration, memoryAllocationIndex));
 }
 
 BufferHandle Device::composeBufferHandle(uint32 resourceIndex) const
@@ -1802,11 +1837,11 @@ SwapChainHandle Device::composeSwapChainHandle(uint32 swapChainIndex) const
 }
 
 
-uint32 Device::resolveMemoryBlockHandle(MemoryBlockHandle handle) const
+uint32 Device::resolveMemoryAllocationHandle(DeviceMemoryAllocationHandle handle) const
 {
 	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
-	XEAssert(decomposed.signature == MemoryBlockHandleSignature);
-	XEAssert(decomposed.entryIndex < MaxMemoryBlockCount);
+	XEAssert(decomposed.signature == MemoryAllocationHandleSignature);
+	XEAssert(decomposed.entryIndex < MaxMemoryAllocationCount);
 	XEAssert(decomposed.generation == resourceTable[decomposed.entryIndex].handleGeneration);
 	return decomposed.entryIndex;
 }
@@ -1902,11 +1937,11 @@ uint32 Device::resolveSwapChainHandle(SwapChainHandle handle) const
 }
 
 
-auto Device::getMemoryBlockByHandle(MemoryBlockHandle handle) -> MemoryBlock& { return memoryBlockTable[resolveMemoryBlockHandle(handle)]; }
+auto Device::getMemoryAllocationByHandle(DeviceMemoryAllocationHandle handle) -> MemoryAllocation& { return memoryAllocationTable[resolveMemoryAllocationHandle(handle)]; }
 auto Device::getResourceByBufferHandle(BufferHandle handle) -> Resource& { return resourceTable[resolveBufferHandle(handle)]; }
 auto Device::getResourceByTextureHandle(TextureHandle handle) -> Resource& { return resourceTable[resolveTextureHandle(handle)]; }
 auto Device::getResourceViewByHandle(ResourceViewHandle handle) -> ResourceView& { return resourceViewTable[resolveResourceViewHandle(handle)]; }
-auto Device::getDescriptorSetLayoutByHandle(DescriptorSetLayoutHandle handle) -> DescriptorSetLayout& { return descriptorSetLayoutTable[resolveDescriptorSetLayoutHandle(handle)]; }
+auto Device::getDescriptorSetLayoutByHandle(DescriptorSetLayoutHandle handle) const -> const DescriptorSetLayout& { return descriptorSetLayoutTable[resolveDescriptorSetLayoutHandle(handle)]; }
 auto Device::getPipelineLayoutByHandle(PipelineLayoutHandle handle) -> PipelineLayout& { return pipelineLayoutTable[resolvePipelineLayoutHandle(handle)]; }
 auto Device::getPipelineByHandle(PipelineHandle handle) -> Pipeline& { return pipelineTable[resolvePipelineHandle(handle)]; }
 auto Device::getFenceByHandle(FenceHandle handle) -> Fence& { return fenceTable[resolveFenceHandle(handle)]; }

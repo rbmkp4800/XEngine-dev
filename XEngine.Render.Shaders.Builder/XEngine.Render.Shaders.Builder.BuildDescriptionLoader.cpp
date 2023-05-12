@@ -341,7 +341,7 @@ bool BuildDescriptionLoader::parseGraphicsPipelineDeclaration()
 				return false;
 			}
 
-			if (!HAL::ValidateTexelViewFormatForRenderTargetUsage(rtFormat))
+			if (!HAL::DoesTexelViewFormatSupportColorRenderTargetUsage(rtFormat))
 			{
 				reportError("this format is not supported for render target usage", rtFormatToken);
 				return false;

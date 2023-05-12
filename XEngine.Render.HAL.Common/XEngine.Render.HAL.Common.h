@@ -113,7 +113,13 @@ namespace XEngine::Render::HAL
 		D24S8,
 		D32S8,
 	};
+	
+	bool ValidateTextureFormatValue(TextureFormat textureFormat);
+	bool ValidateTexelViewFormatValue(TexelViewFormat texelViewFormat);
 
-	bool ValidateTexelViewFormatValue(TexelViewFormat format);
-	bool ValidateTexelViewFormatForRenderTargetUsage(TexelViewFormat format);
+	bool DoesTextureFormatSupportRenderTargetUsage(TextureFormat textureFormat);
+	bool DoesTextureFormatSupportColorRenderTargetUsage(TextureFormat textureFormat);
+	bool DoesTextureFormatSupportDepthRenderTargetUsage(TextureFormat textureFormat);
+
+	bool DoesTexelViewFormatSupportColorRenderTargetUsage(TexelViewFormat texelViewFormat);
 }

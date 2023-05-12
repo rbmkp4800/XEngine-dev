@@ -5,73 +5,91 @@
 
 #include <XEngine.Render.HAL.D3D12.h>
 
-// TODO: Do we really need to manage buffer externally in `CircularUploadMemoryAllocator`?
+// TODO: All this code should probably be thread safe or assert single-thread usage.
 
 namespace XEngine::Render
 {
-	class CircularRangeAllocatorWithGPURelease : public XLib::NonCopyable
+	class CircularAllocatorWithGPUReleaseQueue : public XLib::NonCopyable
 	{
 	private:
-		uint32 poolSize = 0;
-		HAL::DeviceQueueSyncPoint* releaseQueueSyncPoints = nullptr;
-		uint32* releaseQueueOffsets = nullptr;
+		static constexpr uint8 ReleaseQueueBufferSizeLog2 = 5;
+		static constexpr uint16 ReleaseQueueBufferSize = 1 << ReleaseQueueBufferSizeLog2;
+		static constexpr uint16 ReleaseQueueCounterMask = ReleaseQueueBufferSize - 1;
+		static_assert(ReleaseQueueBufferSizeLog2 < 16);
+
+	private:
+		HAL::DeviceQueueSyncPoint releaseQueueSyncPoints[ReleaseQueueBufferSize];
+		uint16 releaseQueueRangeCounters[ReleaseQueueBufferSize];
+
+		HAL::Device* device = nullptr;
+		uint8 poolSizeLog2 = 0;
+
+		uint16 allocatedRangeHeadCounter = 0;
+		uint16 allocatedRangeTailCounter = 0;
+		uint16 releaseQueueHeadCounter = 0;
+		uint16 releaseQueueTailCounter = 0;
+
+	private:
+		bool tryAllocate(uint16 size, uint16& resultAllocationHeadCounter);
+		bool tryAdvanceReleaseQueue();
+
+		inline bool isReleaseQueueEmpty() const;
+		inline bool isReleaseQueueFull() const;
+		inline bool isPendingReleaseRangeEmpty() const;
 
 	public:
-		static constexpr uint32 CalculateInternalStorageRequirement(uint32 releaseQueueLengthLimit);
+		CircularAllocatorWithGPUReleaseQueue() = default;
+		~CircularAllocatorWithGPUReleaseQueue() = default;
 
-	public:
-		CircularRangeAllocatorWithGPURelease() = default;
-		~CircularRangeAllocatorWithGPURelease(); // TODO: Check if all release sync points are reached.
+		void initialize(HAL::Device& device, uint8 poolSizeLog2);
 
-		void initialize(uint32 poolSize, uint32 releaseQueueLengthLimit, void* internalStorage, uint32 internalStorageSize);
-		void destroy();
-
-		uint32 allocate(uint32 size);
+		uint16 allocate(uint16 size);
 		void enqueueRelease(HAL::DeviceQueueSyncPoint syncPoint);
+
+		inline HAL::Device* getDevice() { return device; }
 	};
 
-	class CircularDescriptorAllocator : public XLib::NonCopyable
+	class TransientDescriptorAllocator : public XLib::NonCopyable
 	{
 	private:
-		CircularRangeAllocatorWithGPURelease internalAllocator;
+		CircularAllocatorWithGPUReleaseQueue baseAllocator;
+
+		HAL::DescriptorAddress descriptorPoolBaseAddress = 0;
 
 	public:
-		CircularDescriptorAllocator() = default;
-		~CircularDescriptorAllocator() = default;
+		TransientDescriptorAllocator() = default;
+		~TransientDescriptorAllocator() = default;
 
-		inline uint32 allocate(uint32 size) { return internalAllocator.allocate(size); }
-		inline void enqueueRelease(HAL::DeviceQueueSyncPoint syncPoint) { internalAllocator.enqueueRelease(syncPoint); }
+		void initialize(HAL::Device& device, HAL::DescriptorAddress descriptorPoolBaseAddress, uint8 descriptorPoolSizeLog2);
+
+		inline HAL::DescriptorAddress allocate(uint16 size) { return baseAllocator.allocate(size); }
+		inline void enqueueRelease(HAL::DeviceQueueSyncPoint syncPoint) { baseAllocator.enqueueRelease(syncPoint); }
 	};
 
 	struct UploadMemoryAllocationInfo
 	{
-		HAL::BufferHandle buffer;
-		uint32 offset;
-
-		void* mappedMemory;
+		HAL::BufferPointer gpuPointer;
+		void* cpuPointer;
 	};
 
-	class CircularUploadMemoryAllocator : public XLib::NonCopyable
+	class TransientUploadMemoryAllocator : public XLib::NonCopyable
 	{
 	private:
-		CircularRangeAllocatorWithGPURelease internalAllocator;
+		CircularAllocatorWithGPUReleaseQueue baseAllocator;
 
 		HAL::BufferHandle uploadMemoryPoolBuffer = HAL::BufferHandle::Zero;
-		uint32 uploadMemoryPoolOffset = 0;
-		uint32 uploadMemoryPoolSize = 0;
-
-		void* mappedUploadMemoryPoolBuffer = nullptr;
+		byte* mappedUploadMemoryPoolBuffer = nullptr;
 
 	public:
 		static constexpr uint32 AllocationAlignment = HAL::Device::ConstantBufferBindAlignment;
 
 	public:
-		CircularUploadMemoryAllocator() = default;
-		~CircularUploadMemoryAllocator() = default;
+		TransientUploadMemoryAllocator() = default;
+		~TransientUploadMemoryAllocator();
 
-		void initialize(HAL::BufferHandle uploadMemoryPoolBuffer, uint32 uploadMemoryPoolOffset, uint32 uploadMemoryPoolSize);
+		void initialize(HAL::Device& device, uint8 poolSizeLog2);
 
-		UploadMemoryAllocationInfo allocate(uint32 size) { return internalAllocator.allocate(divRoundUp(size, AllocationAlignment)) * AllocationAlignment; }
-		inline void enqueueRelease(HAL::DeviceQueueSyncPoint syncPoint) { internalAllocator.enqueueRelease(syncPoint); }
+		UploadMemoryAllocationInfo allocate(uint32 size);
+		void enqueueRelease(HAL::DeviceQueueSyncPoint syncPoint) { baseAllocator.enqueueRelease(syncPoint); }
 	};
 }

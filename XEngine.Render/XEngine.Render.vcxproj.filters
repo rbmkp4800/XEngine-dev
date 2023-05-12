@@ -15,5 +15,6 @@
     <ClCompile Include="XEngine.Render.Bloom.cpp" />
     <ClCompile Include="XEngine.Render.Scheduler.cpp" />
     <ClCompile Include="XEngine.Render.PostComposition.cpp" />
+    <ClCompile Include="XEngine.Render.Allocation.cpp" />
   </ItemGroup>
 </Project>

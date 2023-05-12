@@ -13,10 +13,10 @@
 // TODO: Replace DepthStencil with DepthRenderTarget.
 // TODO: Probably replace RenderTargetView with RenderTarget, DepthRenderTargetView with DepthRenderTarget.
 // TODO: Probably we can state that Texture2D is equivalent to Texture2DArray[1].
-// TODO: Probably rename `MemoryBlockHandle` to `DeviceMemoryHandle`.
-// TODO: Add ability to create resources without explicit device memory block management.
 // TODO: `TextureDesc` can be packed into 8 bytes.
 // TODO: Handle should be 18+10+4 or 17+11+4 instead of 20+8+4.
+// TODO: Probably move all the `Host` stuff to `Device` itself.
+// TODO: Setting pipeline type should not clear pipeline layout as one layout could work for graphics and compute.
 
 #define XEAssert(cond) XAssert(cond)
 #define XEAssertUnreachableCode() XAssertUnreachableCode()
@@ -35,7 +35,7 @@ namespace XEngine::Render::HAL
 	class Device;
 	class Host;
 
-	enum class MemoryBlockHandle			: uint32 { Zero = 0 }; // DeviceMemoryHandle
+	enum class DeviceMemoryAllocationHandle	: uint32 { Zero = 0 };
 	enum class BufferHandle					: uint32 { Zero = 0 };
 	enum class TextureHandle				: uint32 { Zero = 0 };
 	enum class ResourceViewHandle			: uint32 { Zero = 0 }; // ReferenceDescriptorHandle
@@ -60,14 +60,6 @@ namespace XEngine::Render::HAL
 		AsyncCopy,
 	};
 
-	enum class MemoryType : uint8
-	{
-		Undefined = 0,
-		DeviceLocal,
-		DeviceReadHostWrite,
-		DeviceWriteHostRead,
-	};
-
 	struct ResourceAllocationInfo
 	{
 		uint64 size;
@@ -79,6 +71,14 @@ namespace XEngine::Render::HAL
 		Undefined = 0,
 		Buffer,
 		Texture,
+	};
+
+	enum class BufferMemoryType : uint8
+	{
+		Undefined = 0,
+		DeviceLocal,
+		Upload,
+		Readback,
 	};
 
 	enum class TextureDimension : uint8
@@ -120,6 +120,12 @@ namespace XEngine::Render::HAL
 		Constant,
 		ReadOnly,
 		ReadWrite,
+	};
+
+	struct BufferPointer
+	{
+		BufferHandle buffer;
+		uint32 offset;
 	};
 
 	enum class TextureAspect : uint8
@@ -258,7 +264,7 @@ namespace XEngine::Render::HAL
 		void setPipeline(PipelineHandle pipelineHandle);
 
 		void bindConstants(uint64 bindingNameXSH, const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0);
-		void bindBuffer(uint64 bindingNameXSH, BufferBindType bindType, BufferHandle bufferHandle, uint32 offset = 0);
+		void bindBuffer(uint64 bindingNameXSH, BufferBindType bindType, BufferPointer bufferPointer);
 		void bindDescriptorSet(uint64 bindingNameXSH, DescriptorSetReference descriptorSetReference);
 		void bindDescriptorArray(uint64 bindingNameXSH, DescriptorAddress arrayStartAddress);
 
@@ -299,7 +305,7 @@ namespace XEngine::Render::HAL
 		friend Host;
 
 	private:
-		static constexpr uint32 MaxMemoryBlockCount = 1024;
+		static constexpr uint32 MaxMemoryAllocationCount = 1024;
 		static constexpr uint32 MaxResourceCount = 1024;
 		static constexpr uint32 MaxResourceViewCount = 1024;
 		static constexpr uint32 MaxResourceDescriptorCount = 4096;
@@ -312,7 +318,7 @@ namespace XEngine::Render::HAL
 		static constexpr uint32 MaxSwapChainCount = 4;
 		static constexpr uint32 SwapChainBackBufferCount = 2;
 
-		struct MemoryBlock;
+		struct MemoryAllocation;
 		struct Resource;
 		struct ResourceView;
 		struct DescriptorSetLayout;
@@ -342,7 +348,7 @@ namespace XEngine::Render::HAL
 		//uint64 asyncComputeQueueFenceValue = 0;
 		//uint64 asyncCopyQueueFenceValue = 0;
 
-		MemoryBlock* memoryBlockTable = nullptr;
+		MemoryAllocation* memoryAllocationTable = nullptr;
 		Resource* resourceTable = nullptr;
 		ResourceView* resourceViewTable = nullptr;
 		DescriptorSetLayout* descriptorSetLayoutTable = nullptr;
@@ -351,7 +357,7 @@ namespace XEngine::Render::HAL
 		Fence* fenceTable = nullptr;
 		SwapChain* swapChainTable = nullptr;
 
-		XLib::InplaceBitArray<MaxMemoryBlockCount> memoryBlockTableAllocationMask;
+		XLib::InplaceBitArray<MaxMemoryAllocationCount> memoryAllocationTableAllocationMask;
 		XLib::InplaceBitArray<MaxResourceCount> resourceTableAllocationMask;
 		XLib::InplaceBitArray<MaxResourceViewCount> resourceViewTableAllocationMask;
 		XLib::InplaceBitArray<MaxRenderTargetViewCount> renderTargetViewTableAllocationMask;
@@ -375,7 +381,7 @@ namespace XEngine::Render::HAL
 		uint32 descriptorSetReferenceGenerationCounter = 0;
 
 	private:
-		MemoryBlockHandle composeMemoryBlockHandle(uint32 memoryBlockIndex) const;
+		DeviceMemoryAllocationHandle composeMemoryAllocationHandle(uint32 memoryAllocationIndex) const;
 		BufferHandle composeBufferHandle(uint32 resourceIndex) const;
 		TextureHandle composeTextureHandle(uint32 resourceIndex) const;
 		ResourceViewHandle composeResourceViewHandle(uint32 resourceViewIndex) const;
@@ -387,7 +393,7 @@ namespace XEngine::Render::HAL
 		FenceHandle composeFenceHandle(uint32 fenceIndex) const;
 		SwapChainHandle composeSwapChainHandle(uint32 swapChainIndex) const;
 
-		uint32 resolveMemoryBlockHandle(MemoryBlockHandle handle) const;
+		uint32 resolveMemoryAllocationHandle(DeviceMemoryAllocationHandle handle) const;
 		uint32 resolveBufferHandle(BufferHandle handle) const;
 		uint32 resolveTextureHandle(TextureHandle handle) const;
 		uint32 resolveResourceViewHandle(ResourceViewHandle handle) const;
@@ -399,11 +405,11 @@ namespace XEngine::Render::HAL
 		uint32 resolveFenceHandle(FenceHandle handle) const;
 		uint32 resolveSwapChainHandle(SwapChainHandle handle) const;
 
-		MemoryBlock& getMemoryBlockByHandle(MemoryBlockHandle handle);
+		MemoryAllocation& getMemoryAllocationByHandle(DeviceMemoryAllocationHandle handle);
 		Resource& getResourceByBufferHandle(BufferHandle handle);
 		Resource& getResourceByTextureHandle(TextureHandle handle);
 		ResourceView& getResourceViewByHandle(ResourceViewHandle handle);
-		DescriptorSetLayout& getDescriptorSetLayoutByHandle(DescriptorSetLayoutHandle handle);
+		const DescriptorSetLayout& getDescriptorSetLayoutByHandle(DescriptorSetLayoutHandle handle) const;
 		PipelineLayout& getPipelineLayoutByHandle(PipelineLayoutHandle handle);
 		Pipeline& getPipelineByHandle(PipelineHandle handle);
 		Fence& getFenceByHandle(FenceHandle handle);
@@ -423,22 +429,23 @@ namespace XEngine::Render::HAL
 
 	public:
 		static constexpr uint32 ConstantBufferSizeLimit = 64 * 1024;
-		static constexpr uint16 ConstantBufferBindAlignment = 256;
+		static constexpr uint16 ConstantBufferBindAlignmentLog2 = 8;
+		static constexpr uint16 ConstantBufferBindAlignment = 1 << ConstantBufferBindAlignmentLog2;
 		static constexpr uint16 TextureArraySizeLimit = 2048;
 
 	public:
 		Device() = default;
 		~Device() = default;
 
-		MemoryBlockHandle allocateMemory(uint64 size, MemoryType memoryType = MemoryType::DeviceLocal);
-		void releaseMemory(MemoryBlockHandle memory);
+		DeviceMemoryAllocationHandle allocateMemory(uint64 size);
+		void releaseMemory(DeviceMemoryAllocationHandle memory);
 
-		ResourceAllocationInfo getTextureAllocationInfo(const TextureDesc& textureDesc);
+		ResourceAllocationInfo getTextureAllocationInfo(const TextureDesc& textureDesc) const;
 
-		BufferHandle createBuffer(uint64 size, bool allowShaderWrite,
-			MemoryBlockHandle memoryBlockHandle, uint64 memoryBlockOffset);
+		BufferHandle createBuffer(uint64 size, bool allowShaderWrite, BufferMemoryType memoryType = BufferMemoryType::DeviceLocal,
+			DeviceMemoryAllocationHandle memoryHandle = DeviceMemoryAllocationHandle::Zero, uint64 memoryOffset = 0);
 		TextureHandle createTexture(const TextureDesc& desc,
-			MemoryBlockHandle memoryBlockHandle, uint64 memoryBlockOffset);
+			DeviceMemoryAllocationHandle memoryHandle = DeviceMemoryAllocationHandle::Zero, uint64 memoryOffset = 0);
 
 		BufferHandle createPartiallyResidentBuffer(uint64 size, bool allowShaderWrite);
 		TextureHandle createPartiallyResidentTexture(const TextureDesc& textureDesc);
@@ -503,14 +510,10 @@ namespace XEngine::Render::HAL
 		DeviceQueueSyncPoint getEndOfQueueSyncPoint(DeviceQueue queue) const;
 		bool isQueueSyncPointReached(DeviceQueueSyncPoint syncPoint) const;
 
-		void* mapHostVisibleMemoryBlock(MemoryBlockHandle hostVisibleMemoryBlock);
-		void unmapHostVisibleMemoryBlock(MemoryBlockHandle hostVisibleMemoryBlock);
-
-		// TODO: Remove. Temporary solution.
 		void* mapBuffer(BufferHandle bufferHandle);
 		void unmapBuffer(BufferHandle bufferHandle);
 
-		uint32 getDescriptorSetLayoutDescriptorCount(DescriptorSetLayoutHandle descriptorSetLayoutHandle);
+		uint16 getDescriptorSetLayoutDescriptorCount(DescriptorSetLayoutHandle descriptorSetLayoutHandle) const;
 
 		uint64 getFenceValue(FenceHandle fenceHandle) const;
 

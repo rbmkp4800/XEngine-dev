@@ -117,6 +117,7 @@
     <ClInclude Include="XEngine.Render.ShaderLibrary.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="XEngine.Render.Allocation.cpp" />
     <ClCompile Include="XEngine.Render.Bloom.cpp" />
     <ClCompile Include="XEngine.Render.cpp" />
     <ClCompile Include="XEngine.Render.PostComposition.cpp" />
