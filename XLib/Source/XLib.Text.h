@@ -4,6 +4,10 @@
 #include "XLib.NonCopyable.h"
 #include "XLib.System.File.h"
 
+// TODO: Pending `TextReader` overhaul.
+// TODO: What should `read` return on EOF? 0 or -1?
+// TODO: Probably we can replace "read fmt" and "write fmt" with "scan" and "print"? See `java.util.Scanner`.
+
 namespace XLib
 {
 	// Common text readers-writers /////////////////////////////////////////////////////////////////
@@ -11,14 +15,17 @@ namespace XLib
 	class MemoryTextReader
 	{
 	private:
-		const char* current = nullptr;
+		const char* begin = nullptr;
 		const char* end = nullptr;
+		const char* current = nullptr;
 
 	public:
 		MemoryTextReader() = default;
 		~MemoryTextReader() = default;
 
-		inline MemoryTextReader(const char* data, uintptr length = uintptr(-1));
+		inline MemoryTextReader(const char* data, uintptr length) { initialize(data, length); }
+
+		inline void initialize(const char* data, uintptr length) { begin = data; end = data + length; current = data; }
 
 		inline bool canGetChar() const { return current != end && *current != 0; }
 		inline uint32 peekChar() const { return canGetChar() ? *current : uint32(-1); }
@@ -27,7 +34,46 @@ namespace XLib
 		inline char getCharUnsafe() { return *current++; }
 		//inline void readChars();
 
+		inline uintptr getPosition() const { return uintptr(current - begin); }
+		inline void setPosition(uintptr position);
+
 		inline const char* getCurrentPtr() const { return current; }
+		inline void setCurrentPtr(const char* newCurrentPtr) { XAssert(begin <= newCurrentPtr && newCurrentPtr < end); current = newCurrentPtr; }
+
+		inline uintptr getAvailableBytes() const { return uintptr(end - current); }
+	};
+
+	class MemoryTextReaderWithLocation
+	{
+	private:
+		MemoryTextReader base;
+		uint32 lineNumber = 0;
+		uint32 columnNumber = 0;
+
+	private:
+		void advanceLocation(uint32 c);
+
+	public:
+		MemoryTextReaderWithLocation() = default;
+		~MemoryTextReaderWithLocation() = default;
+
+		inline MemoryTextReaderWithLocation(const char* data, uintptr length) { initialize(data, length); }
+
+		inline void initialize(const char* data, uintptr length) { base.initialize(data, length); lineNumber = 0; columnNumber = 0; }
+
+		inline bool canGetChar() const { return base.canGetChar(); }
+		inline uint32 peekChar() const { return base.peekChar(); }
+		inline uint32 getChar() { const uint32 c = base.getChar(); advanceLocation(c); return c; }
+		inline char peekCharUnsafe() const { return base.peekCharUnsafe(); }
+		inline char getCharUnsafe() { const uint32 c = base.getCharUnsafe(); advanceLocation(c); return char(c); }
+
+		inline uint32 getLineNumber() const { return lineNumber + 1; }
+		inline uint32 getColumnNumber() const { return columnNumber + 1; }
+		inline uintptr getAbsoluteOffset() const { return base.getPosition(); }
+
+		inline const char* getCurrentPtr() const { return base.getCurrentPtr(); }
+
+		inline uintptr getAvailableBytes() const { return base.getAvailableBytes(); }
 	};
 
 	class MemoryTextWriter
@@ -131,12 +177,19 @@ namespace XLib
 
 	// Text utils //////////////////////////////////////////////////////////////////////////////////
 
-	inline bool IsWhitespace(char c) { return c == ' ' || c == '\f' || c == '\n' || c == '\r' || c == '\t' || c == '\v'; }
-	inline bool IsLetter(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
-	inline bool IsDigit(char c) { return c >= '0' && c <= '9'; }
-	inline bool IsLetterOrDigit(char c) { return IsLetter(c) || IsDigit(c); }
+	class Char abstract final
+	{
+	public:
+		static inline bool IsDigit(char c) { return c >= '0' && c <= '9'; }
+		static inline bool IsLetter(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
+		static inline bool IsLetterOrDigit(char c) { return IsLetter(c) || IsDigit(c); }
+		static inline bool IsLower(char c) { return c >= 'a' && c <= 'z'; }
+		static inline bool IsUpper(char c) { return c >= 'A' && c <= 'Z'; }
+		static inline bool IsWhitespace(char c) { return c == ' ' || c == '\f' || c == '\n' || c == '\r' || c == '\t' || c == '\v'; }
 
-	inline char ToUpper(char c) { return (c >= 'a' && c <= 'z') ? c - 'a' + 'A' : c; }
+		static inline char ToUpper(char c) { return (c >= 'a' && c <= 'z') ? c - 'a' + 'A' : c; }
+		static inline char ToLower(char c) { return (c >= 'A' && c <= 'Z') ? c - 'A' + 'a' : c; }
+	};
 
 	enum class TextReadTokenResult : uint8
 	{
@@ -261,10 +314,6 @@ namespace XLib
 
 namespace XLib
 {
-	inline MemoryTextReader::MemoryTextReader(const char* data, uintptr length) :
-		current(data),
-		end((length == uintptr(-1)) ? nullptr : data + length) {}
-
 	inline bool MemoryTextWriter::append(char c)
 	{
 		if (!canAppend())
@@ -306,7 +355,7 @@ namespace XLib
 	inline bool TextSkipWhitespaces(TextReader& reader)
 	{
 		bool atLeastOneCharConsumed = false;
-		while ( IsWhitespace(char(reader.peekChar())) )
+		while ( Char::IsWhitespace(char(reader.peekChar())) )
 		{
 			reader.getCharUnsafe();
 			atLeastOneCharConsumed = true;
@@ -479,7 +528,7 @@ namespace XLib
 		if (!reader.canGetChar())
 			return false;
 		const char firstChar = reader.peekCharUnsafe();
-		const bool isIdenitfier = IsLetter(firstChar) || firstChar == '_';
+		const bool isIdenitfier = Char::IsLetter(firstChar) || firstChar == '_';
 		if (!isIdenitfier)
 			return false;
 
@@ -490,7 +539,7 @@ namespace XLib
 		for (;;)
 		{
 			const char c = char(reader.peekChar());
-			if (!IsLetterOrDigit(c) && c != '_')
+			if (!Char::IsLetterOrDigit(c) && c != '_')
 				break;
 			reader.getCharUnsafe();
 			result.pushBack(c); // TODO: Handle when this fails for `InplaceString`

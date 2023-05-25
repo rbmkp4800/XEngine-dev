@@ -710,6 +710,8 @@ bool Host::CompileGraphicsPipeline(Platform platform, const Blob& compiledPipeli
 			{
 				if (!ValidateTexelViewFormatValue(renderTargetFormat))
 					return false;
+				if (!HAL::DoesTexelViewFormatSupportColorRenderTargetUsage(renderTargetFormat))
+					return false;
 				baseBlobWriter.addRenderTarget(renderTargetFormat);
 			}
 		}

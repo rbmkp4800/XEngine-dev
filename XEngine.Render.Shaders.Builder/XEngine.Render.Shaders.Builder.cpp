@@ -12,7 +12,7 @@
 
 #include "XEngine.Render.Shaders.Builder.h"
 
-#include "XEngine.Render.Shaders.Builder.BuildDescriptionLoader.h"
+#include "XEngine.Render.Shaders.Builder.ListingLoader.h"
 
 using namespace XLib;
 using namespace XEngine::Render::HAL::ShaderCompiler;
@@ -75,8 +75,8 @@ void Builder::run(const char* packPath)
 {
 	sourceCache.initialize("../XEngine.Render.Shaders/");
 
-	BuildDescriptionLoader descriptionLoader(descriptorSetLayoutList, pipelineLayoutList, pipelineList, shaderList, sourceCache);
-	if (!descriptionLoader.load("../XEngine.Render.Shaders/.LibraryIndex.txt"))
+	ListingLoader listingLoader(descriptorSetLayoutList, pipelineLayoutList, pipelineList, shaderList, sourceCache);
+	if (!listingLoader.load("../XEngine.Render.Shaders/.listing.xjson"))
 		return;
 
 	// Compile.
@@ -88,7 +88,7 @@ void Builder::run(const char* packPath)
 	for (DescriptorSetLayout& descriptorSetLayout : descriptorSetLayoutList)
 	{
 		InplaceStringASCIIx256 messageHeader;
-		TextWriteFmt(messageHeader, "DSL [", i + 1, "/", descriptorSetLayoutList.getSize(), "] ", descriptorSetLayout.getName());
+		TextWriteFmt(messageHeader, " [", i + 1, "/", descriptorSetLayoutList.getSize(), "] ", descriptorSetLayout.getName());
 		i++;
 
 		TextWriteFmtStdOut(messageHeader, "\n");
@@ -107,7 +107,7 @@ void Builder::run(const char* packPath)
 	for (PipelineLayout& pipelineLayout : pipelineLayoutList)
 	{
 		InplaceStringASCIIx256 messageHeader;
-		TextWriteFmt(messageHeader, "PL [", i + 1, "/", pipelineLayoutList.getSize(), "] ", pipelineLayout.getName());
+		TextWriteFmt(messageHeader, " [", i + 1, "/", pipelineLayoutList.getSize(), "] ", pipelineLayout.getName());
 		i++;
 
 		TextWriteFmtStdOut(messageHeader, "\n");
@@ -136,9 +136,10 @@ void Builder::run(const char* packPath)
 		}
 
 		InplaceStringASCIIx2048 messageHeader;
-		TextWriteFmt(messageHeader, shaderTypeString, " [", i + 1, "/", shaderList.getSize(), "] ",
-			shader.getSource().getLocalPath(), " | ", shader.getEntryPointName(),
-			" | ", shader.getPipelineLayout().getName());
+		TextWriteFmt(messageHeader, " [", i + 1, "/", shaderList.getSize(), "] ",
+			shaderTypeString, " ", shader.getSource().getLocalPath(),
+			" E:", shader.getEntryPointName(),
+			" L:", shader.getPipelineLayout().getName());
 		i++;
 
 		TextWriteFmtStdOut(messageHeader, "\n");
@@ -156,10 +157,10 @@ void Builder::run(const char* packPath)
 	i = 0;
 	for (Pipeline& pipeline : pipelineList)
 	{
-		const char* pipelineTypeString = pipeline.isGraphicsPipeline() ? "GP" : "CP";
+		const char* pipelineTypeString = pipeline.isGraphicsPipeline() ? "GFX" : "CMP";
 
 		InplaceStringASCIIx256 messageHeader;
-		TextWriteFmt(messageHeader, pipelineTypeString, " [", i + 1, "/", pipelineList.getSize(), "] ", pipeline.getName());
+		TextWriteFmt(messageHeader, " [", i + 1, "/", pipelineList.getSize(), "] ", pipelineTypeString, " ", pipeline.getName());
 		i++;
 
 		TextWriteFmtStdOut(messageHeader, "\n");

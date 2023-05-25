@@ -1,3 +1,10 @@
+struct TestCB
+{
+	float4 c;
+};
+
+ConstantBuffer<TestCB> testCB : @binding(SOME_CONSTANT_BUFFER);
+
 float4 MainVS(uint vertexId : SV_VertexID) : SV_Position
 {
 	float4 position;
@@ -15,5 +22,5 @@ float4 MainVS(uint vertexId : SV_VertexID) : SV_Position
 
 float4 MainPS() : SV_Target0
 {
-	return float4(1.0f, 1.0f, 0.0f, 1.0f);
+	return testCB.c;
 }

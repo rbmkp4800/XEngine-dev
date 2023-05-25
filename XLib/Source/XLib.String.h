@@ -31,6 +31,16 @@ namespace XLib
 
 		inline const CharType* begin() const { return data; }
 		inline const CharType* end() const { return data + length; }
+
+		template <typename T>
+		inline bool operator == (const T& that) const;
+
+		inline bool startsWith(const StringView<CharType>& prefix) const;
+		inline bool startsWith(const char* prefixCStr) const;
+		inline bool endsWith(const StringView<CharType>& suffix) const;
+		inline bool endsWith(const char* suffixCStr) const;
+
+		inline StringView<CharType> getSubString(uintptr begin, uintptr end = uintptr(-1)) const;
 	};
 
 
@@ -150,11 +160,18 @@ namespace XLib
 		template <typename CharType>
 		static inline constexpr uintptr GetCStrLength(const CharType* cstr);
 
-		template <typename CharType>
-		static inline bool IsEqual(const StringView<CharType>& a, const StringView<CharType>& b);
+		template <typename CharType> static inline bool IsEqual(const StringView<CharType>& a, const StringView<CharType>& b);
+		template <typename CharType> static inline bool IsEqual(const StringView<CharType>& a, const CharType* bCStr);
 
-		template <typename CharType>
-		static inline bool IsEqual(const StringView<CharType>& a, const CharType* bCStr);
+		template <typename CharType> static inline bool StartsWith(const StringView<CharType>& string, const StringView<CharType>& prefix);
+		template <typename CharType> static inline bool StartsWith(const StringView<CharType>& string, const CharType* prefixCStr);
+		template <typename CharType> static inline bool StartsWith(const CharType* stringCStr, const StringView<CharType>& prefix);
+		template <typename CharType> static inline bool StartsWith(const CharType* stringCStr, const CharType* prefixCStr);
+
+		template <typename CharType> static inline bool EndsWith(const StringView<CharType>& string, const StringView<CharType>& suffix);
+		template <typename CharType> static inline bool EndsWith(const StringView<CharType>& string, const CharType* suffixCStr);
+		template <typename CharType> static inline bool EndsWith(const CharType* stringCStr, const StringView<CharType>& suffix);
+		template <typename CharType> static inline bool EndsWith(const CharType* stringCStr, const CharType* suffixCStr);
 
 		template <typename CharType>
 		static inline ordering CompareOrdered(const StringView<CharType>& left, const StringView<CharType>& right);
@@ -181,6 +198,37 @@ namespace XLib
 	template <typename CharType>
 	inline constexpr StringView<CharType>::StringView(const CharType* cstr)
 		: data(cstr), length(String::GetCStrLength(cstr)) {}
+
+	template <typename CharType>
+	template <typename T>
+	inline bool StringView<CharType>::operator == (const T& that) const
+	{
+		return String::IsEqual(*this, that);
+	}
+
+	template <typename CharType>
+	inline bool StringView<CharType>::startsWith(const StringView<CharType>& prefix) const { return String::StartsWith(*this, prefix); }
+
+	template <typename CharType>
+	inline bool StringView<CharType>::startsWith(const char* prefixCStr) const { return String::StartsWith(*this, prefixCStr); }
+
+	template <typename CharType>
+	inline bool StringView<CharType>::endsWith(const StringView<CharType>& suffix) const { return String::EndsWith(*this, suffix); }
+
+	template <typename CharType>
+	inline bool StringView<CharType>::endsWith(const char* suffixCStr) const { return String::EndsWith(*this, suffixCStr); }
+
+	template <typename CharType>
+	inline StringView<CharType> StringView<CharType>::getSubString(uintptr begin, uintptr end) const
+	{
+		XAssert(begin <= length);
+		if (end == uintptr(-1))
+			end = length;
+		else
+			XAssert(end <= length);
+
+		return StringView<CharType>(data + begin, end - begin);
+	}
 
 	// InplaceString ///////////////////////////////////////////////////////////////////////////////
 
@@ -387,6 +435,57 @@ namespace XLib
 		}
 
 		return leftLength == rightLength ? ordering::equivalent : ordering::less;
+	}
+
+	template <typename CharType>
+	inline bool String::StartsWith(const StringView<CharType>& string, const StringView<CharType>& prefix)
+	{
+		if (prefix.getLength() > string.getLength())
+			return false;
+		for (uintptr i = 0; i < prefix.getLength(); i++)
+		{
+			if (string[i] != prefix[i])
+				return false;
+		}
+		return true;
+	}
+
+	template <typename CharType>
+	inline bool String::StartsWith(const StringView<CharType>& string, const CharType* prefixCStr)
+	{
+		for (uintptr i = 0; prefixCStr[i]; i++)
+		{
+			if (i >= string.getLength())
+				return false;
+			if (string[i] != prefixCStr[i])
+				return false;
+		}
+		return true;
+	}
+
+	template <typename CharType>
+	static inline bool String::EndsWith(const StringView<CharType>& string, const StringView<CharType>& suffix)
+	{
+		if (suffix.getLength() > string.getLength())
+			return false;
+
+		const CharType* stringRevI = string.getData() + string.getLength() - 1;
+		const CharType* suffixRevI = suffix.getData() + suffix.getLength() - 1;
+		for (uintptr i = 0; i < suffix.getLength(); i++)
+		{
+			if (*stringRevI != *suffixRevI)
+				return false;
+			stringRevI--;
+			suffixRevI--;
+		}
+
+		return true;
+	}
+
+	template <typename CharType>
+	static inline bool String::EndsWith(const StringView<CharType>& string, const CharType* suffixCStr)
+	{
+		return EndsWith(string, StringView<CharType>(suffixCStr, GetCStrLength(suffixCStr)));
 	}
 }
 

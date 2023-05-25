@@ -1,0 +1,40 @@
+Test.DescriptorSetLayout<Test> : (descriptor-set-layout)
+{
+	TEST_TEXTURE : (read-only-texture-descriptor),
+	TEST_BUFFER : (read-only-buffer-descriptor),
+},
+
+Test.PipelineLayout : (pipeline-layout)
+{
+	SOME_CONSTANT_BUFFER : (constant-buffer),
+	SOME_BUFFER : (read-only-buffer),
+	SOME_RW_BUFFER : (read-write-buffer),
+	TEST_DS : (descriptor-set<Test.DescriptorSetLayout<Test>>),
+},
+
+Test.ComputePipeline : (compute-pipeline)
+{
+	pipeline-layout : Test.PipelineLayout,
+	cs : { P:"TestCompute.hlsl", E:MainCS },
+},
+
+Test.GraphicsPipeline : (graphics-pipeline)
+{
+	pipeline-layout : Test.PipelineLayout,
+	vs : { P:"TestGraphics.hlsl", E:MainVS },
+	ps : { P:"TestGraphics.hlsl", E:MainPS },
+	render-targets : [ R8G8B8BA8_Unorm ],
+},
+
+AccumulateDeferredLighting : (pipeline-layout)
+{
+	VIEW_CONSTANTS : (constant-buffer)
+},
+
+AccumulateDeferredLighting : (graphics-pipeline)
+{
+	pipeline-layout : AccumulateDeferredLighting,
+	vs : { P:"FullScreenQuadVS.hlsl", E:main },
+	ps : { P:"Lighting.hlsl", E:main },
+	render-targets : [ R8G8B8BA8_Unorm ],
+}

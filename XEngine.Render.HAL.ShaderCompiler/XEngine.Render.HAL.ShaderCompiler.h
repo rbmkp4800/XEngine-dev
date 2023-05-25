@@ -6,6 +6,10 @@
 
 #include <XEngine.Render.HAL.Common.h>
 
+// TODO: Probably we should return to `CompiledShader` upproach instead of generic `Blob` for everything.
+// `CompiledShader` may contain cached metadata so we do not parse bytecode every time we compile
+// pipeline using this shader.
+
 namespace XEngine::Render::HAL::ShaderCompiler
 {
 	class Host;

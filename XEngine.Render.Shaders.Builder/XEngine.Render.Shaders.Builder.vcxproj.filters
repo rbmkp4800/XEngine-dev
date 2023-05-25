@@ -7,9 +7,9 @@
     <ClCompile Include="XEngine.Render.Shaders.Builder.PipelineList.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.PipelineLayoutList.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.ShaderList.cpp" />
-    <ClCompile Include="PseudoCTokenizer.cpp" />
-    <ClCompile Include="XEngine.Render.Shaders.Builder.BuildDescriptionLoader.cpp" />
     <ClCompile Include="XEngine.Render.Shaders.Builder.DescriptorSetLayoutList.cpp" />
+    <ClCompile Include="XJSON.cpp" />
+    <ClCompile Include="XEngine.Render.Shaders.Builder.ListingLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="XEngine.Render.Shaders.Builder.SourceCache.h" />
@@ -17,8 +17,8 @@
     <ClInclude Include="XEngine.Render.Shaders.Builder.PipelineList.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.PipelineLayoutList.h" />
-    <ClInclude Include="PseudoCTokenizer.h" />
-    <ClInclude Include="XEngine.Render.Shaders.Builder.BuildDescriptionLoader.h" />
     <ClInclude Include="XEngine.Render.Shaders.Builder.DescriptorSetLayoutList.h" />
+    <ClInclude Include="XJSON.h" />
+    <ClInclude Include="XEngine.Render.Shaders.Builder.ListingLoader.h" />
   </ItemGroup>
 </Project>

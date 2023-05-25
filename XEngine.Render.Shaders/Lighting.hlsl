@@ -3,7 +3,7 @@ struct ViewConstants
     float4 dummy;
 };
 
-ConstantBuffer<ViewConstants> c_viewConstants : @binding(ViewConstants);
+ConstantBuffer<ViewConstants> c_viewConstants : @binding(VIEW_CONSTANTS);
 
 float4 main() : SV_Target0
 {

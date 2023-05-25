@@ -8,6 +8,8 @@
 
 // TODO: Introduce overflow checks for `FixedLogSegmentedArrayList`.
 // TODO: Introduce `CounterType` overflows checks.
+// TODO: Maybe rename `ArrayList` to `DynamicArrayList`?
+// TODO: Asserts everywhere.
 
 #include "XLib.h"
 #include "XLib.AllocatorAdapterBase.h"
@@ -434,6 +436,17 @@ namespace XLib
 		Type& result = buffer[size];
 		construct(result, asRValue(value));
 		size++;
+
+		return result;
+	}
+
+	template <typename Type, uintptr Capacity, typename CounterType, bool IsSafe>
+	inline auto InplaceArrayList<Type, Capacity, CounterType, IsSafe>::
+		popBack() -> Type
+	{
+		XAssert(!isEmpty());
+		size--;
+		Type result = asRValue(buffer[size]);
 
 		return result;
 	}

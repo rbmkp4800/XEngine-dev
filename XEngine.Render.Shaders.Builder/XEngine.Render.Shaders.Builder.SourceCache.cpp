@@ -19,8 +19,8 @@ static inline ordering CompareStringsOrderedCaseInsensitive(const StringViewASCI
 		if (i >= rightLength)
 			return ordering::greater;
 
-		const char cLeft = ToUpper(left[i]);
-		const char cRight = ToUpper(right[i]);
+		const char cLeft = Char::ToUpper(left[i]);
+		const char cRight = Char::ToUpper(right[i]);
 		if (cLeft > cRight)
 			return ordering::greater;
 		if (cLeft < cRight)
@@ -39,7 +39,7 @@ static inline bool ValidateSourcePath(const StringViewASCII& path)
 	
 	for (char c : path)
 	{
-		if (!IsLetterOrDigit(c) && c != '_' && c != '-' && c != '+' && c != '.' && c != '/')
+		if (!Char::IsLetterOrDigit(c) && c != '_' && c != '-' && c != '+' && c != '.' && c != '/')
 			return false;
 	}
 

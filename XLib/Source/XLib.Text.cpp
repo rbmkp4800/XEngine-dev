@@ -42,3 +42,18 @@ uintptr XLib::TextConvertASCIIToWide(const char* asciText, wchar* resultWideText
 	}
 	return lengthLimit;
 }
+
+void MemoryTextReaderWithLocation::advanceLocation(uint32 c)
+{
+	// TODO: Handle end of file properly.
+
+	if (c == '\n')
+	{
+		lineNumber++;
+		columnNumber = 0;
+	}
+	else if (c != '\r')
+	{
+		columnNumber++;
+	}
+}
