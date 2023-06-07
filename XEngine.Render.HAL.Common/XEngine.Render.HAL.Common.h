@@ -6,6 +6,9 @@ namespace XEngine::Render::HAL
 {
 	static constexpr uint8 MaxPipelineBindingCount = 32;
 	static constexpr uint8 MaxDescriptorSetNestedBindingCount = 128;
+	static constexpr uint8 MaxVertexBufferCount = 8;
+	static constexpr uint8 MaxVertexBindingCount = 32;
+	static constexpr uint16 MaxVertexBufferElementSize = 8192;
 	static constexpr uint8 MaxRenderTargetCount = 8;
 	static constexpr uint8 MaxGraphicsPipelineBytecodeBlobCount = 3;
 
@@ -122,4 +125,5 @@ namespace XEngine::Render::HAL
 	bool DoesTextureFormatSupportDepthRenderTargetUsage(TextureFormat textureFormat);
 
 	bool DoesTexelViewFormatSupportColorRenderTargetUsage(TexelViewFormat texelViewFormat);
+	bool DoesTexelViewFormatSupportVertexInputUsage(TexelViewFormat texelViewFormat);
 }

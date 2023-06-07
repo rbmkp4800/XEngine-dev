@@ -595,7 +595,7 @@ bool Host::CompileShader(Platform platform,
 	ComPtr<IDxcResult> dxcResult;
 	const HRESULT hCompileResult = dxcCompiler->Compile(&dxcSourceBuffer,
 		dxcArgsList.getData(), dxcArgsList.getSize(), nullptr, IID_PPV_ARGS(&dxcResult));
-	if (FAILED(hCompileResult))
+	if (FAILED(hCompileResult) || !dxcResult)
 		return false;
 
 	ComPtr<IDxcBlobUtf8> dxcErrorsBlob;
@@ -636,6 +636,15 @@ bool Host::CompileGraphicsPipeline(Platform platform, const Blob& compiledPipeli
 	result.baseBlob.destroy();
 	for (Blob& resultBytecodeBlob : result.bytecodeBlobs)
 		resultBytecodeBlob.destroy();
+
+	if (desc.vertexBindingCount > 0)
+	{
+		XAssert(desc.vertexBindings);
+		XAssert(desc.compiledVertexShader);
+	}
+
+	if (desc.vertexBindingCount > MaxVertexBindingCount)
+		return false;
 
 	BlobFormat::PipelineLayoutBlobReader pipelineLayoutBlobReader;
 	if (!pipelineLayoutBlobReader.open(compiledPipelineLayout.getData(), compiledPipelineLayout.getSize()))
@@ -719,6 +728,39 @@ bool Host::CompileGraphicsPipeline(Platform platform, const Blob& compiledPipeli
 
 	// TODO: `ValidateDepthStencilFormatValue`.
 	baseBlobWriter.setDepthStencilFormat(desc.depthStencilFormat);
+
+	// Validate and register vertex input layout.
+	for (uint8 i = 0; i < MaxVertexBufferCount; i++)
+	{
+		switch (desc.vertexBuffers[i].type)
+		{
+			case VertexBufferType::Undefined:	break;
+			case VertexBufferType::PerVertex:	baseBlobWriter.enableVertexBuffer(i, false); break;
+			case VertexBufferType::PerInstance:	baseBlobWriter.enableVertexBuffer(i, true);  break;
+			default: return false;
+		}
+	}
+
+	for (uint8 i = 0; i < desc.vertexBindingCount; i++)
+	{
+		const VertexBindingDesc& binding = desc.vertexBindings[i];
+
+		if (binding.name.getLength() > baseBlobWriter.MaxVertexBindingNameLength)
+			return false;
+		if (!HAL::DoesTexelViewFormatSupportVertexInputUsage(binding.format))
+			return false;
+		if (binding.offset >= MaxVertexBufferElementSize)
+			return false;
+		if (binding.bufferIndex >= MaxVertexBindingCount)
+			return false;
+
+		const VertexBufferDesc& buffer = desc.vertexBuffers[binding.bufferIndex];
+		if (buffer.type != VertexBufferType::PerVertex && buffer.type != VertexBufferType::PerInstance)
+			return false;
+
+		baseBlobWriter.addVertexBinding(binding.name.getData(), binding.name.getLength(),
+			binding.format, binding.offset, binding.bufferIndex);
+	}
 
 	baseBlobWriter.endInitialization();
 	{

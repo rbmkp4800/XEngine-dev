@@ -266,7 +266,7 @@ bool PipelineLayoutBlobReader::open(const void* data, uint32 size)
 	this->data = data;
 	this->size = size;
 	this->subHeader = subHeader;
-	this->bindingRecords = subHeader->bindingCount ? (const PipelineBindingRecord*)((const byte*)data + bindingRecordsOffset) : nullptr;
+	this->bindingRecords = subHeader->bindingCount > 0 ? (const PipelineBindingRecord*)((const byte*)data + bindingRecordsOffset) : nullptr;
 	this->platformData = (const byte*)data + platformDataOffset;
 	return true;
 }
@@ -346,6 +346,50 @@ void GraphicsPipelineBaseBlobWriter::setDepthStencilFormat(DepthStencilFormat fo
 	depthStencilFormat = format;
 }
 
+void GraphicsPipelineBaseBlobWriter::enableVertexBuffer(uint8 index, bool perInstance)
+{
+	XAssert(initializationInProgress);
+	static_assert(MaxVertexBufferCount <= 8); // uint8
+	XAssert(index < MaxVertexBufferCount);
+	const uint8 bit = 1 << index;
+	vertexBuffersEnabledFlagBits |= bit;
+	vertexBuffersPerInstanceFlagBits |= perInstance ? bit : 0;
+}
+
+void GraphicsPipelineBaseBlobWriter::addVertexBinding(const char* name, uintptr nameLength, TexelViewFormat format, uint16 offset, uint8 bufferIndex)
+{
+	XAssert(initializationInProgress);
+	XAssert(nameLength > 0 && nameLength <= MaxVertexBindingNameLength);
+	XAssert(offset < MaxVertexBufferElementSize);
+	XAssert(bufferIndex < MaxVertexBufferCount);
+
+	const uint8 bufferBit = 1 << bufferIndex;
+	XAssert((vertexBuffersEnabledFlagBits & bufferBit) != 0); // Buffer should be enabled previously
+	vertexBuffersUsedFlagBits |= bufferBit;
+
+	XAssert(vertexBindingCount < MaxVertexBindingCount);
+	VertexBindingRecord& vertexBindingRecord = vertexBindingRecords[vertexBindingCount];
+	vertexBindingCount++;
+
+	static_assert(MaxVertexBufferElementSize <= (1 << 13));
+	static_assert(MaxVertexBufferCount <= (1 << 3));
+	XAssert((offset & 0b1110'0000'0000'0000) == 0);
+	XAssert((bufferIndex & 0b0111) == 0);
+	vertexBindingRecord.offset13_bufferIndex3 = offset | (uint16(bufferIndex) << 13);
+	vertexBindingRecord.format = format;
+
+	for (uintptr i = 0; i < countof(vertexBindingRecord.name); i++)
+	{
+		if (i < nameLength)
+		{
+			XAssert(name[i] > 0 && name[i] < 128);
+			vertexBindingRecord.name[i] = name[i];
+		}
+		else
+			vertexBindingRecord.name[i] = 0;
+	}
+}
+
 void GraphicsPipelineBaseBlobWriter::endInitialization()
 {
 	XAssert(initializationInProgress);
@@ -354,7 +398,10 @@ void GraphicsPipelineBaseBlobWriter::endInitialization()
 	// At least one bytecode should be registered.
 	XAssert(vsBytecodeRegistered || asBytecodeRegistered || msBytecodeRegistered || psBytecodeRegistered);
 
-	memoryBlockSize = sizeof(GenericBlobHeader) + sizeof(GraphicsPipelineBaseBlobBody);
+	memoryBlockSize =
+		sizeof(GenericBlobHeader) +
+		sizeof(GraphicsPipelineBaseBlobBody) +
+		sizeof(VertexBindingRecord) * vertexBindingCount;
 }
 
 uint32 GraphicsPipelineBaseBlobWriter::getMemoryBlockSize() const
@@ -386,6 +433,17 @@ void GraphicsPipelineBaseBlobWriter::finalizeToMemoryBlock(void* memoryBlock, ui
 
 	body.depthStencilFormat = depthStencilFormat;
 
+	body.vertexBuffersUsedFlagBits = vertexBuffersUsedFlagBits;
+	body.vertexBuffersPerInstanceFlagBits = vertexBuffersPerInstanceFlagBits;
+	body.vertexBindingCount = vertexBindingCount;
+
+	const uint32 vertexBindingRecordsOffset =
+		sizeof(GenericBlobHeader) +
+		sizeof(GraphicsPipelineBaseBlobBody);
+	VertexBindingRecord* dstVertexBindingRecords =
+		(VertexBindingRecord*)((byte*)memoryBlock + vertexBindingRecordsOffset);
+	memoryCopy(dstVertexBindingRecords, vertexBindingRecords, sizeof(VertexBindingRecord) * vertexBindingCount);
+
 	FillGenericBlobHeader(memoryBlock, memoryBlockSize, GraphicsPipelineBaseBlobSignature, 0);
 }
 
@@ -397,12 +455,30 @@ bool GraphicsPipelineBaseBlobReader::open(const void* data, uint32 size)
 
 	if (!ValidateGenericBlobHeader(data, size, GraphicsPipelineBaseBlobSignature, 0))
 		return false;
-	if (size != sizeof(GenericBlobHeader) + sizeof(GraphicsPipelineBaseBlobBody))
+	if (size < sizeof(GenericBlobHeader) + sizeof(GraphicsPipelineBaseBlobBody))
+		return false;
+
+	const GraphicsPipelineBaseBlobBody* body =
+		(const GraphicsPipelineBaseBlobBody*)((const byte*)data + sizeof(GenericBlobHeader));
+
+	if (body->vertexBindingCount > MaxVertexBindingCount)
+		return false;
+
+	const uint32 vertexBindingRecordsOffset =
+		sizeof(GenericBlobHeader) +
+		sizeof(GraphicsPipelineBaseBlobBody);
+	const uint32 sizeCheck =
+		vertexBindingRecordsOffset +
+		sizeof(VertexBindingRecord) * body->vertexBindingCount;
+
+	if (size != sizeCheck)
 		return false;
 
 	this->data = data;
 	this->size = size;
-	this->body = (const GraphicsPipelineBaseBlobBody*)((const byte*)data + sizeof(GenericBlobHeader));
+	this->body = body;
+	this->vertexBindingRecords = body->vertexBindingCount > 0 ?
+		(const VertexBindingRecord*)((const byte*)data + vertexBindingRecordsOffset) : nullptr;
 	return true;
 }
 
@@ -442,6 +518,29 @@ uint32 GraphicsPipelineBaseBlobReader::getRenderTargetCount() const
 			return i;
 	}
 	return MaxRenderTargetCount;
+}
+
+VertexBindingInfo GraphicsPipelineBaseBlobReader::getVertexBinding(uint8 bindingIndex) const
+{
+	XAssert(bindingIndex < body->vertexBindingCount);
+	const VertexBindingRecord& bindingRecord = vertexBindingRecords[bindingIndex];
+
+	uintptr nameLength = 0;
+	for (char c : bindingRecord.name)
+	{
+		if (c > 0)
+			nameLength++;
+		else
+			break;
+	}
+
+	VertexBindingInfo result = {};
+	result.name = bindingRecord.name;
+	result.nameLength = nameLength;
+	result.offset = bindingRecord.offset13_bufferIndex3 & 0x1FFF;
+	result.format = bindingRecord.format;
+	result.bufferIndex = bindingRecord.offset13_bufferIndex3 >> 13;
+	return result;
 }
 
 // BytecodeBlobWriter //////////////////////////////////////////////////////////////////////////////
@@ -690,8 +789,8 @@ bool PipelineLayoutMetadataBlobReader::open(const void* data, uint32 size)
 	this->data = data;
 	this->size = size;
 	this->subHeader = subHeader;
-	this->pipelineBindingRecords = subHeader->pipelineBindingCount ? pipelineBindingRecords : nullptr;
-	this->nestedBindingRecords = subHeader->nestedBindingCount ? nestedBindingRecords : nullptr;
+	this->pipelineBindingRecords = subHeader->pipelineBindingCount > 0 ? pipelineBindingRecords : nullptr;
+	this->nestedBindingRecords = subHeader->nestedBindingCount > 0 ? nestedBindingRecords : nullptr;
 	return true;
 }
 

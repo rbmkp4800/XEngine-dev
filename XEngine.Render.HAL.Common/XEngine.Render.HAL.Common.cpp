@@ -24,3 +24,9 @@ bool XEngine::Render::HAL::DoesTexelViewFormatSupportColorRenderTargetUsage(Texe
 	// TODO: ...
 	return true;
 }
+
+bool XEngine::Render::HAL::DoesTexelViewFormatSupportVertexInputUsage(TexelViewFormat texelViewFormat)
+{
+	// TODO: ...
+	return true;
+}

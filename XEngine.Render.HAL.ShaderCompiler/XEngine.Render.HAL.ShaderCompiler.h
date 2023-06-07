@@ -10,6 +10,8 @@
 // `CompiledShader` may contain cached metadata so we do not parse bytecode every time we compile
 // pipeline using this shader.
 
+// TODO: Proper error reporting.
+
 namespace XEngine::Render::HAL::ShaderCompiler
 {
 	class Host;
@@ -95,6 +97,26 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		XLib::StringViewASCII value;
 	};
 
+	enum class VertexBufferType : uint8
+	{
+		Undefined = 0,
+		PerVertex,
+		PerInstance,
+	};
+
+	struct VertexBufferDesc
+	{
+		VertexBufferType type;
+	};
+
+	struct VertexBindingDesc
+	{
+		XLib::StringViewASCII name;
+		uint16 offset;
+		TexelViewFormat format;
+		uint8 bufferIndex;
+	};
+
 	struct GraphicsPipelineDesc
 	{
 		// TODO: These probably should not be pointers...
@@ -102,6 +124,11 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		const Blob* compiledAmplificationShader;
 		const Blob* compiledMeshShader;
 		const Blob* compiledPixelShader;
+
+		VertexBufferDesc vertexBuffers[MaxVertexBufferCount];
+		VertexBindingDesc* vertexBindings;
+		uint8 vertexBindingCount;
+
 		TexelViewFormat renderTargetsFormats[MaxRenderTargetCount];
 		DepthStencilFormat depthStencilFormat;
 	};

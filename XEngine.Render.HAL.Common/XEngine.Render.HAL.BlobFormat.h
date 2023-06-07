@@ -5,6 +5,7 @@
 #include "XEngine.Render.HAL.Common.h"
 
 // TODO: Revist `GraphicsPipelineBaseBlob`. For now temporary dirty implementaion.
+// TODO: Probably we should remove all pseudo-error reporting via `return false` from readers and just do master assert?
 
 namespace XEngine::Render::HAL::BlobFormat
 {
@@ -63,23 +64,25 @@ namespace XEngine::Render::HAL::BlobFormat::Data
 
 	struct PipelineBindingRecord // 16 bytes
 	{
-		// 0..7
+		// [0..8)
 		uint64 nameXSH;
-		// 8..11
+		// [8..12)
 		uint32 descriptorSetLayoutSourceHash;
-		// 12..13
+		// [12..14)
 		uint16 platformBindingIndex;
-		// 14
+		// [14..15)
 		PipelineBindingType type;
-		// 15
+		// [15..16)
 		uint8 constantsSize;
 	};
 	static_assert(sizeof(PipelineBindingRecord) == 16);
 
-	struct GraphicsPipelineBaseBlobBody
+	struct GraphicsPipelineBaseBlobBody // 36 bytes
 	{
+		// [0..4)
 		uint32 pipelineLayoutSourceHash;
 
+		// [4..24)
 		uint32 vsBytecodeChecksum;
 		uint32 asBytecodeChecksum;
 		uint32 msBytecodeChecksum;
@@ -89,9 +92,26 @@ namespace XEngine::Render::HAL::BlobFormat::Data
 		bool msBytecodeRegistered;
 		bool psBytecodeRegistered;
 
+		// [24..33)
 		TexelViewFormat renderTargetFormats[MaxRenderTargetCount];
 		DepthStencilFormat depthStencilFormat;
+
+		// [33..36)
+		uint8 vertexBuffersUsedFlagBits;
+		uint8 vertexBuffersPerInstanceFlagBits;
+		uint8 vertexBindingCount;
 	};
+	static_assert(sizeof(GraphicsPipelineBaseBlobBody) == 36);
+
+	static constexpr uint8 MaxVertexBindingNameLength = 13;
+
+	struct VertexBindingRecord // 16 bytes
+	{
+		uint16 offset13_bufferIndex3;
+		TexelViewFormat format;
+		char name[MaxVertexBindingNameLength];
+	};
+	static_assert(sizeof(VertexBindingRecord) == 16);
 
 	struct BytecodeBlobSubHeader
 	{
@@ -143,6 +163,15 @@ namespace XEngine::Render::HAL::BlobFormat
 			uint8 constantsSize;
 			uint32 descriptorSetLayoutSourceHash;
 		};
+	};
+
+	struct VertexBindingInfo
+	{
+		const char* name;
+		uintptr nameLength;
+		uint16 offset;
+		TexelViewFormat format;
+		uint8 bufferIndex;
 	};
 
 	class GenericBlobReader
@@ -258,9 +287,18 @@ namespace XEngine::Render::HAL::BlobFormat
 		TexelViewFormat renderTargetFormats[MaxRenderTargetCount] = {};
 		uint8 renderTargetCount = 0;
 
+		Data::VertexBindingRecord vertexBindingRecords[MaxVertexBindingCount] = {};
+		uint8 vertexBuffersEnabledFlagBits = 0;
+		uint8 vertexBuffersUsedFlagBits = 0;
+		uint8 vertexBuffersPerInstanceFlagBits = 0;
+		uint8 vertexBindingCount = 0;
+
 		bool initializationInProgress = false;
 
 		uint32 memoryBlockSize = 0;
+
+	public:
+		static constexpr uint8 MaxVertexBindingNameLength = Data::MaxVertexBindingNameLength;
 
 	public:
 		GraphicsPipelineBaseBlobWriter() = default;
@@ -270,6 +308,8 @@ namespace XEngine::Render::HAL::BlobFormat
 		void registerBytecodeBlob(BytecodeBlobType type, uint32 blobChecksum);
 		void addRenderTarget(TexelViewFormat format);
 		void setDepthStencilFormat(DepthStencilFormat format);
+		void enableVertexBuffer(uint8 index, bool perInstance);
+		void addVertexBinding(const char* name, uintptr nameLength, TexelViewFormat format, uint16 offset, uint8 bufferIndex);
 		void endInitialization();
 
 		uint32 getMemoryBlockSize() const;
@@ -280,6 +320,7 @@ namespace XEngine::Render::HAL::BlobFormat
 	{
 	private:
 		const Data::GraphicsPipelineBaseBlobBody* body = nullptr;
+		const Data::VertexBindingRecord* vertexBindingRecords = nullptr;
 
 	public:
 		GraphicsPipelineBaseBlobReader() = default;
@@ -293,6 +334,8 @@ namespace XEngine::Render::HAL::BlobFormat
 		uint32 getRenderTargetCount() const;
 		TexelViewFormat getRenderTargetFormat(uint32 index) const { XAssert(index < MaxRenderTargetCount); return body->renderTargetFormats[index]; }
 		DepthStencilFormat getDepthStencilFormat() const { return body->depthStencilFormat; }
+		uint8 getVertexBindingCount() const { return body->vertexBindingCount; }
+		VertexBindingInfo getVertexBinding(uint8 bindingIndex) const;
 	};
 
 	class BytecodeBlobWriter
