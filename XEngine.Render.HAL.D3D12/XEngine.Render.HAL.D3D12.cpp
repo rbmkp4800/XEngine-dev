@@ -10,7 +10,6 @@
 #include <XEngine.Render.HAL.BlobFormat.h>
 
 #include "XEngine.Render.HAL.D3D12.h"
-
 #include "XEngine.Render.HAL.D3D12.Translation.h"
 
 extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = D3D12_SDK_VERSION; }
@@ -244,7 +243,7 @@ struct Device::ResourceView
 
 struct Device::DescriptorSetLayout
 {
-	BlobFormat::DescriptorSetNestedBindingInfo bindings[MaxDescriptorSetNestedBindingCount];
+	BlobFormat::DescriptorSetBindingInfo bindings[MaxDescriptorSetBindingCount];
 	uint32 sourceHash;
 	uint16 bindingCount;
 	uint8 handleGeneration;
@@ -299,11 +298,11 @@ enum class CommandList::State : uint8
 struct CommandList::BindingResolveResult
 {
 	PipelineBindingType type;
-	uint8 rootParameterIndex;
+	uint8 d3dRootParameterIndex;
 
 	union
 	{
-		uint8 constantsSize;
+		uint8 inplaceConstantCount;
 		uint32 descriptorSetLayoutSourceHash;
 	};
 };
@@ -319,9 +318,9 @@ inline CommandList::BindingResolveResult CommandList::ResolveBindingByNameXSH(
 		{
 			BindingResolveResult result = {};
 			result.type = binding.type;
-			result.rootParameterIndex = uint8(binding.platformBindingIndex);
-			if (binding.type == PipelineBindingType::Constants)
-				result.constantsSize = binding.constantsSize;
+			result.d3dRootParameterIndex = uint8(binding.d3dRootParameterIndex);
+			if (binding.type == PipelineBindingType::InplaceConstants)
+				result.inplaceConstantCount = binding.inplaceConstantCount;
 			if (binding.type == PipelineBindingType::DescriptorSet)
 				result.descriptorSetLayoutSourceHash = binding.descriptorSetLayoutSourceHash;
 			return result;
@@ -480,12 +479,12 @@ void CommandList::bindConstants(uint64 bindingNameXSH,
 	XEAssert(currentPipelineLayoutHandle != PipelineLayoutHandle::Zero);
 
 	const BindingResolveResult resolvedBinding = ResolveBindingByNameXSH(device, currentPipelineLayoutHandle, bindingNameXSH);
-	XEAssert(resolvedBinding.type == PipelineBindingType::Constants);
+	XEAssert(resolvedBinding.type == PipelineBindingType::InplaceConstants);
 
 	if (currentPipelineType == PipelineType::Graphics)
-		d3dCommandList->SetGraphicsRoot32BitConstants(resolvedBinding.rootParameterIndex, size32bitValues, data, offset32bitValues);
+		d3dCommandList->SetGraphicsRoot32BitConstants(resolvedBinding.d3dRootParameterIndex, size32bitValues, data, offset32bitValues);
 	else if (currentPipelineType == PipelineType::Compute)
-		d3dCommandList->SetComputeRoot32BitConstants(resolvedBinding.rootParameterIndex, size32bitValues, data, offset32bitValues);
+		d3dCommandList->SetComputeRoot32BitConstants(resolvedBinding.d3dRootParameterIndex, size32bitValues, data, offset32bitValues);
 	else
 		XEAssertUnreachableCode();
 }
@@ -514,20 +513,20 @@ void CommandList::bindBuffer(uint64 bindingNameXSH, BufferBindType bindType, Buf
 	if (currentPipelineType == PipelineType::Graphics)
 	{
 		if (bindType == BufferBindType::Constant)
-			d3dCommandList->SetGraphicsRootConstantBufferView(resolvedBinding.rootParameterIndex, bufferAddress);
+			d3dCommandList->SetGraphicsRootConstantBufferView(resolvedBinding.d3dRootParameterIndex, bufferAddress);
 		else if (bindType == BufferBindType::ReadOnly)
-			d3dCommandList->SetGraphicsRootShaderResourceView(resolvedBinding.rootParameterIndex, bufferAddress);
+			d3dCommandList->SetGraphicsRootShaderResourceView(resolvedBinding.d3dRootParameterIndex, bufferAddress);
 		else if (bindType == BufferBindType::ReadWrite)
-			d3dCommandList->SetGraphicsRootUnorderedAccessView(resolvedBinding.rootParameterIndex, bufferAddress);
+			d3dCommandList->SetGraphicsRootUnorderedAccessView(resolvedBinding.d3dRootParameterIndex, bufferAddress);
 	}
 	else if (currentPipelineType == PipelineType::Compute)
 	{
 		if (bindType == BufferBindType::Constant)
-			d3dCommandList->SetComputeRootConstantBufferView(resolvedBinding.rootParameterIndex, bufferAddress);
+			d3dCommandList->SetComputeRootConstantBufferView(resolvedBinding.d3dRootParameterIndex, bufferAddress);
 		else if (bindType == BufferBindType::ReadOnly)
-			d3dCommandList->SetComputeRootShaderResourceView(resolvedBinding.rootParameterIndex, bufferAddress);
+			d3dCommandList->SetComputeRootShaderResourceView(resolvedBinding.d3dRootParameterIndex, bufferAddress);
 		else if (bindType == BufferBindType::ReadWrite)
-			d3dCommandList->SetComputeRootUnorderedAccessView(resolvedBinding.rootParameterIndex, bufferAddress);
+			d3dCommandList->SetComputeRootUnorderedAccessView(resolvedBinding.d3dRootParameterIndex, bufferAddress);
 	}
 	else
 		XEAssertUnreachableCode();
@@ -548,9 +547,9 @@ void CommandList::bindDescriptorSet(uint64 bindingNameXSH, DescriptorSetReferenc
 		device->shaderVisbileSRVHeapGPUPtr + decomposedDescriptorSetReference.baseDescriptorIndex * device->srvDescriptorSize;
 
 	if (currentPipelineType == PipelineType::Graphics)
-		d3dCommandList->SetGraphicsRootDescriptorTable(resolvedBinding.rootParameterIndex, { descriptorTableGPUPtr });
+		d3dCommandList->SetGraphicsRootDescriptorTable(resolvedBinding.d3dRootParameterIndex, { descriptorTableGPUPtr });
 	else if (currentPipelineType == PipelineType::Compute)
-		d3dCommandList->SetComputeRootDescriptorTable(resolvedBinding.rootParameterIndex, { descriptorTableGPUPtr });
+		d3dCommandList->SetComputeRootDescriptorTable(resolvedBinding.d3dRootParameterIndex, { descriptorTableGPUPtr });
 	else
 		XEAssertUnreachableCode();
 }
@@ -1214,7 +1213,7 @@ DescriptorSetLayoutHandle Device::createDescriptorSetLayout(BlobDataView blob)
 	// TODO: Assert on open result.
 
 	const uint16 bindingCount = blobReader.getBindingCount();
-	XEMasterAssert(bindingCount > 0 && bindingCount <= MaxDescriptorSetNestedBindingCount);
+	XEMasterAssert(bindingCount > 0 && bindingCount <= MaxDescriptorSetBindingCount);
 
 	for (uint16 i = 0; i < bindingCount; i++)
 		descriptorSetLayout.bindings[i] = blobReader.getBinding(i);
@@ -1257,8 +1256,7 @@ PipelineLayoutHandle Device::createPipelineLayout(BlobDataView blob)
 	return composePipelineLayoutHandle(pipelineLayoutIndex);
 }
 
-PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayoutHandle,
-	BlobDataView baseBlob, const BlobDataView* bytecodeBlobs, uint32 bytecodeBlobCount)
+PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayoutHandle, const GraphicsPipelineBlobs& blobs)
 {
 	const Device::PipelineLayout& pipelineLayout = getPipelineLayoutByHandle(pipelineLayoutHandle);
 	XEAssert(pipelineLayout.d3dRootSignature);
@@ -1270,48 +1268,64 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 	pipeline.pipelineLayoutHandle = pipelineLayoutHandle;
 	pipeline.type = PipelineType::Graphics;
 
-	BlobFormat::GraphicsPipelineBaseBlobReader baseBlobReader;
-	XEMasterAssert(baseBlobReader.open(baseBlob.data, baseBlob.size));
-	XEMasterAssert(baseBlobReader.getPipelineLayoutSourceHash() == pipelineLayout.sourceHash);
+	BlobFormat::GraphicsPipelineStateBlobReader stateBlobReader;
+	XEMasterAssert(stateBlobReader.open(blobs.state.data, blobs.state.size));
+	XEMasterAssert(stateBlobReader.getPipelineLayoutSourceHash() == pipelineLayout.sourceHash);
 
 	D3D12_SHADER_BYTECODE d3dVS = {};
 	D3D12_SHADER_BYTECODE d3dAS = {};
 	D3D12_SHADER_BYTECODE d3dMS = {};
 	D3D12_SHADER_BYTECODE d3dPS = {};
 
-	for (uint32 i = 0; i < bytecodeBlobCount; i++)
+	if (blobs.vs.data)
 	{
 		BlobFormat::BytecodeBlobReader bytecodeBlobReader;
-		XEMasterAssert(bytecodeBlobReader.open(bytecodeBlobs[i].data, bytecodeBlobs[i].size));
+		XEMasterAssert(bytecodeBlobReader.open(blobs.vs.data, blobs.vs.size));
 		XEMasterAssert(bytecodeBlobReader.getPipelineLayoutSourceHash() == pipelineLayout.sourceHash);
-
-		const BlobFormat::BytecodeBlobType blobType = bytecodeBlobReader.getType();
-		XEMasterAssert(baseBlobReader.isBytecodeBlobRegistered(blobType));
-		XEMasterAssert(baseBlobReader.getBytecodeBlobChecksum(blobType) == bytecodeBlobReader.getChecksum());
-
-		D3D12_SHADER_BYTECODE* d3dBytecodeStorePtr = nullptr;
-		switch (blobType)
-		{
-			case BlobFormat::BytecodeBlobType::VertexShader:		d3dBytecodeStorePtr = &d3dVS; break;
-			case BlobFormat::BytecodeBlobType::AmplificationShader:	d3dBytecodeStorePtr = &d3dAS; break;
-			case BlobFormat::BytecodeBlobType::MeshShader:			d3dBytecodeStorePtr = &d3dMS; break;
-			case BlobFormat::BytecodeBlobType::PixelShader:			d3dBytecodeStorePtr = &d3dPS; break;
-		}
-
-		XEMasterAssert(d3dBytecodeStorePtr);
-		XEMasterAssert(!d3dBytecodeStorePtr->pShaderBytecode);
-		d3dBytecodeStorePtr->pShaderBytecode = bytecodeBlobReader.getBytecodeData();
-		d3dBytecodeStorePtr->BytecodeLength = bytecodeBlobReader.getBytecodeSize();
+		XEMasterAssert(stateBlobReader.isVSBytecodeBlobRegistered());
+		XEMasterAssert(stateBlobReader.getVSBytecodeBlobChecksum() == bytecodeBlobReader.getChecksum());
+		d3dVS.pShaderBytecode = bytecodeBlobReader.getBytecodeData();
+		d3dVS.BytecodeLength = bytecodeBlobReader.getBytecodeSize();
+	}
+	if (blobs.as.data)
+	{
+		BlobFormat::BytecodeBlobReader bytecodeBlobReader;
+		XEMasterAssert(bytecodeBlobReader.open(blobs.as.data, blobs.as.size));
+		XEMasterAssert(bytecodeBlobReader.getPipelineLayoutSourceHash() == pipelineLayout.sourceHash);
+		XEMasterAssert(stateBlobReader.isASBytecodeBlobRegistered());
+		XEMasterAssert(stateBlobReader.getASBytecodeBlobChecksum() == bytecodeBlobReader.getChecksum());
+		d3dAS.pShaderBytecode = bytecodeBlobReader.getBytecodeData();
+		d3dAS.BytecodeLength = bytecodeBlobReader.getBytecodeSize();
+	}
+	if (blobs.ms.data)
+	{
+		BlobFormat::BytecodeBlobReader bytecodeBlobReader;
+		XEMasterAssert(bytecodeBlobReader.open(blobs.ms.data, blobs.ms.size));
+		XEMasterAssert(bytecodeBlobReader.getPipelineLayoutSourceHash() == pipelineLayout.sourceHash);
+		XEMasterAssert(stateBlobReader.isMSBytecodeBlobRegistered());
+		XEMasterAssert(stateBlobReader.getMSBytecodeBlobChecksum() == bytecodeBlobReader.getChecksum());
+		d3dMS.pShaderBytecode = bytecodeBlobReader.getBytecodeData();
+		d3dMS.BytecodeLength = bytecodeBlobReader.getBytecodeSize();
+	}
+	if (blobs.ps.data)
+	{
+		BlobFormat::BytecodeBlobReader bytecodeBlobReader;
+		XEMasterAssert(bytecodeBlobReader.open(blobs.ps.data, blobs.ps.size));
+		XEMasterAssert(bytecodeBlobReader.getPipelineLayoutSourceHash() == pipelineLayout.sourceHash);
+		XEMasterAssert(stateBlobReader.isPSBytecodeBlobRegistered());
+		XEMasterAssert(stateBlobReader.getPSBytecodeBlobChecksum() == bytecodeBlobReader.getChecksum());
+		d3dPS.pShaderBytecode = bytecodeBlobReader.getBytecodeData();
+		d3dPS.BytecodeLength = bytecodeBlobReader.getBytecodeSize();
 	}
 
 	// Verify that all registered bytecode blobs are present.
-	if (baseBlobReader.isBytecodeBlobRegistered(BlobFormat::BytecodeBlobType::VertexShader))
+	if (stateBlobReader.isVSBytecodeBlobRegistered())
 		XEMasterAssert(d3dVS.pShaderBytecode);
-	if (baseBlobReader.isBytecodeBlobRegistered(BlobFormat::BytecodeBlobType::AmplificationShader))
+	if (stateBlobReader.isASBytecodeBlobRegistered())
 		XEMasterAssert(d3dAS.pShaderBytecode);
-	if (baseBlobReader.isBytecodeBlobRegistered(BlobFormat::BytecodeBlobType::MeshShader))
+	if (stateBlobReader.isMSBytecodeBlobRegistered())
 		XEMasterAssert(d3dMS.pShaderBytecode);
-	if (baseBlobReader.isBytecodeBlobRegistered(BlobFormat::BytecodeBlobType::PixelShader))
+	if (stateBlobReader.isPSBytecodeBlobRegistered())
 		XEMasterAssert(d3dPS.pShaderBytecode);
 
 	// Verify enabled shader stages combination.
@@ -1390,29 +1404,29 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 	}
 
 	// Render target formats
-	if (baseBlobReader.getRenderTargetCount() > 0)
+	if (stateBlobReader.getRenderTargetCount() > 0)
 	{
 		D3D12Helpers::PipelineStateSubobjectRenderTargetFormats& d3dSubobjectRTs =
 			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectRenderTargetFormats>(sizeof(void*));
 		d3dSubobjectRTs.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RENDER_TARGET_FORMATS;
 		d3dSubobjectRTs.formats = {};
 
-		const uint32 renderTargetCount = baseBlobReader.getRenderTargetCount();
+		const uint32 renderTargetCount = stateBlobReader.getRenderTargetCount();
 		XEMasterAssert(renderTargetCount < MaxRenderTargetCount);
 
 		D3D12_RT_FORMAT_ARRAY& d3dRTFormatArray = d3dSubobjectRTs.formats;
 		for (uint32 i = 0; i < renderTargetCount; i++)
-			d3dRTFormatArray.RTFormats[i] = TranslateTexelViewFormatToDXGIFormat(baseBlobReader.getRenderTargetFormat(i));
+			d3dRTFormatArray.RTFormats[i] = TranslateTexelViewFormatToDXGIFormat(stateBlobReader.getRenderTargetFormat(i));
 		d3dRTFormatArray.NumRenderTargets = renderTargetCount;
 	}
 
 	// Depth stencil format
-	if (baseBlobReader.getDepthStencilFormat() != DepthStencilFormat::Undefined)
+	if (stateBlobReader.getDepthStencilFormat() != DepthStencilFormat::Undefined)
 	{
 		D3D12Helpers::PipelineStateSubobjectDepthStencilFormat& d3dSubobjectDSFormat =
 			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectDepthStencilFormat>(sizeof(void*));
 		d3dSubobjectDSFormat.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL_FORMAT;
-		d3dSubobjectDSFormat.format = TranslateDepthStencilFormatToDXGIFormat(baseBlobReader.getDepthStencilFormat());
+		d3dSubobjectDSFormat.format = TranslateDepthStencilFormatToDXGIFormat(stateBlobReader.getDepthStencilFormat());
 	}
 
 	D3D12_PIPELINE_STATE_STREAM_DESC d3dPSOStreamDesc = {};
@@ -1426,7 +1440,7 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 	return composePipelineHandle(pipelineIndex);
 }
 
-PipelineHandle Device::createComputePipeline(PipelineLayoutHandle pipelineLayoutHandle, BlobDataView computeShaderBlob)
+PipelineHandle Device::createComputePipeline(PipelineLayoutHandle pipelineLayoutHandle, BlobDataView csBlob)
 {
 	const Device::PipelineLayout& pipelineLayout = getPipelineLayoutByHandle(pipelineLayoutHandle);
 	XEAssert(pipelineLayout.d3dRootSignature);
@@ -1439,8 +1453,8 @@ PipelineHandle Device::createComputePipeline(PipelineLayoutHandle pipelineLayout
 	pipeline.type = PipelineType::Compute;
 
 	BlobFormat::BytecodeBlobReader bytecodeBlobReader;
-	XEMasterAssert(bytecodeBlobReader.open(computeShaderBlob.data, computeShaderBlob.size));
-	XEMasterAssert(bytecodeBlobReader.getType() == BlobFormat::BytecodeBlobType::ComputeShader);
+	XEMasterAssert(bytecodeBlobReader.open(csBlob.data, csBlob.size));
+	XEMasterAssert(bytecodeBlobReader.getType() == ShaderType::Compute);
 	XEMasterAssert(bytecodeBlobReader.getPipelineLayoutSourceHash() == pipelineLayout.sourceHash);
 
 	D3D12_SHADER_BYTECODE d3dCS = {};
@@ -1583,7 +1597,7 @@ void Device::writeDescriptor(DescriptorSetReference descriptorSetReference,
 
 	for (uint16 i = 0; i < descriptorSetLayout.bindingCount; i++)
 	{
-		const BlobFormat::DescriptorSetNestedBindingInfo& binding = descriptorSetLayout.bindings[i];
+		const BlobFormat::DescriptorSetBindingInfo& binding = descriptorSetLayout.bindings[i];
 		if (binding.nameXSH == bindingNameXSH)
 		{
 			// TODO: This is very hacky. Properly calculate descriptor index and check resource view type.

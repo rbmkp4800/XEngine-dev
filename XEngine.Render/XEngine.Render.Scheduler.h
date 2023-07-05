@@ -108,7 +108,7 @@ namespace XEngine::Render::Scheduler
 	public:
 		HAL::DescriptorAddress allocateTransientDescriptors(uint16 descriptorCount);
 		HAL::DescriptorSetReference allocateTransientDescriptorSet(HAL::DescriptorSetLayoutHandle descriptorSetLayout);
-		UploadMemoryAllocationInfo allocateTransientUploadMemory(uint32 size); // Aligned up to `Host::Device::ConstantBufferBindAlignment`.
+		UploadMemoryAllocationInfo allocateTransientUploadMemory(uint32 size); // Aligned up to `Device::ConstantBufferBindAlignment`.
 
 		HAL::BufferHandle resolveBuffer(Scheduler::BufferHandle buffer);
 		HAL::TextureHandle resolveTexture(Scheduler::TextureHandle texture);

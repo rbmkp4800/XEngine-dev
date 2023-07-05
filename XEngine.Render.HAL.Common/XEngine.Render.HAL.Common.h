@@ -5,7 +5,7 @@
 namespace XEngine::Render::HAL
 {
 	static constexpr uint8 MaxPipelineBindingCount = 32;
-	static constexpr uint8 MaxDescriptorSetBindingCount = 64;
+	static constexpr uint8 MaxDescriptorSetBindingCount = 32;
 	static constexpr uint8 MaxVertexBufferCount = 8;
 	static constexpr uint8 MaxVertexBindingCount = 32;
 	static constexpr uint16 MaxVertexBufferElementSize = 8192;

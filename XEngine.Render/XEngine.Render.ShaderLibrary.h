@@ -25,8 +25,8 @@ namespace XEngine::Render
 		ShaderLibrary() = default;
 		~ShaderLibrary();
 
-		void load(const char* packPath);
-		void reload(const char* packPath);
+		void load(const char* libraryFilePath);
+		void reload(const char* libraryFilePath);
 
 		HAL::DescriptorSetLayoutHandle getDescriptorSetLayout(uint64 nameXSH) const;
 		HAL::PipelineLayoutHandle getPipelineLayout(uint64 nameXSH) const;

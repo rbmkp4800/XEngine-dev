@@ -389,7 +389,7 @@ void GraphicsPipelineStateBlobWriter::endInitialization()
 
 	memoryBlockSize =
 		sizeof(GenericBlobHeader) +
-		sizeof(GraphicsPipelineBaseBlobBody) +
+		sizeof(GraphicsPipelineStateBlobBody) +
 		sizeof(VertexBindingRecord) * vertexBindingCount;
 }
 
@@ -404,7 +404,7 @@ void GraphicsPipelineStateBlobWriter::finalizeToMemoryBlock(void* memoryBlock, u
 	XAssert(this->memoryBlockSize == memoryBlockSize && memoryBlockSize > 0);
 	memorySet(memoryBlock, 0, memoryBlockSize);
 
-	GraphicsPipelineBaseBlobBody& body = *(GraphicsPipelineBaseBlobBody*)((byte*)memoryBlock + sizeof(GenericBlobHeader));
+	GraphicsPipelineStateBlobBody& body = *(GraphicsPipelineStateBlobBody*)((byte*)memoryBlock + sizeof(GenericBlobHeader));
 
 	body.pipelineLayoutSourceHash = pipelineLayoutSourceHash;
 
@@ -428,7 +428,7 @@ void GraphicsPipelineStateBlobWriter::finalizeToMemoryBlock(void* memoryBlock, u
 
 	const uint32 vertexBindingRecordsOffset =
 		sizeof(GenericBlobHeader) +
-		sizeof(GraphicsPipelineBaseBlobBody);
+		sizeof(GraphicsPipelineStateBlobBody);
 	VertexBindingRecord* dstVertexBindingRecords =
 		(VertexBindingRecord*)((byte*)memoryBlock + vertexBindingRecordsOffset);
 	memoryCopy(dstVertexBindingRecords, vertexBindingRecords, sizeof(VertexBindingRecord) * vertexBindingCount);
@@ -444,18 +444,18 @@ bool GraphicsPipelineStateBlobReader::open(const void* data, uint32 size)
 
 	if (!ValidateGenericBlobHeader(data, size, GraphicsPipelineStateBlobSignature, 0))
 		return false;
-	if (size < sizeof(GenericBlobHeader) + sizeof(GraphicsPipelineBaseBlobBody))
+	if (size < sizeof(GenericBlobHeader) + sizeof(GraphicsPipelineStateBlobBody))
 		return false;
 
-	const GraphicsPipelineBaseBlobBody* body =
-		(const GraphicsPipelineBaseBlobBody*)((const byte*)data + sizeof(GenericBlobHeader));
+	const GraphicsPipelineStateBlobBody* body =
+		(const GraphicsPipelineStateBlobBody*)((const byte*)data + sizeof(GenericBlobHeader));
 
 	if (body->vertexBindingCount > MaxVertexBindingCount)
 		return false;
 
 	const uint32 vertexBindingRecordsOffset =
 		sizeof(GenericBlobHeader) +
-		sizeof(GraphicsPipelineBaseBlobBody);
+		sizeof(GraphicsPipelineStateBlobBody);
 	const uint32 sizeCheck =
 		vertexBindingRecordsOffset +
 		sizeof(VertexBindingRecord) * body->vertexBindingCount;
@@ -469,34 +469,6 @@ bool GraphicsPipelineStateBlobReader::open(const void* data, uint32 size)
 	this->vertexBindingRecords = body->vertexBindingCount > 0 ?
 		(const VertexBindingRecord*)((const byte*)data + vertexBindingRecordsOffset) : nullptr;
 	return true;
-}
-
-bool GraphicsPipelineStateBlobReader::isBytecodeBlobRegistered(ShaderType type) const
-{
-	switch (type)
-	{
-		case ShaderType::Vertex:		return !!body->vsBytecodeRegistered;
-		case ShaderType::Amplification:	return !!body->asBytecodeRegistered;
-		case ShaderType::Mesh:			return !!body->msBytecodeRegistered;
-		case ShaderType::Pixel:			return !!body->psBytecodeRegistered;
-		default:
-			XAssertUnreachableCode();
-	}
-	return false;
-}
-
-uint32 GraphicsPipelineStateBlobReader::getBytecodeBlobChecksum(ShaderType type) const
-{
-	switch (type)
-	{
-		case ShaderType::Vertex:		XAssert(body->vsBytecodeRegistered); return body->vsBytecodeChecksum;
-		case ShaderType::Amplification:	XAssert(body->asBytecodeRegistered); return body->asBytecodeChecksum;
-		case ShaderType::Mesh:			XAssert(body->msBytecodeRegistered); return body->msBytecodeChecksum;
-		case ShaderType::Pixel:			XAssert(body->psBytecodeRegistered); return body->psBytecodeChecksum;
-		default:
-			XAssertUnreachableCode();
-	}
-	return 0;
 }
 
 uint32 GraphicsPipelineStateBlobReader::getRenderTargetCount() const

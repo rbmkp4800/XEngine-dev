@@ -307,6 +307,15 @@ namespace XEngine::Render::HAL
 		uint32 size;
 	};
 
+	struct GraphicsPipelineBlobs
+	{
+		BlobDataView state;
+		BlobDataView vs;
+		BlobDataView as;
+		BlobDataView ms;
+		BlobDataView ps;
+	};
+
 	class Device : public XLib::NonCopyable
 	{
 		friend CommandList;
@@ -489,9 +498,8 @@ namespace XEngine::Render::HAL
 		PipelineLayoutHandle createPipelineLayout(BlobDataView blob);
 		void destroyPipelineLayout(PipelineLayoutHandle handle);
 
-		PipelineHandle createGraphicsPipeline(PipelineLayoutHandle pipelineLayoutHandle,
-			BlobDataView baseBlob, const BlobDataView* bytecodeBlobs, uint32 bytecodeBlobCount);
-		PipelineHandle createComputePipeline(PipelineLayoutHandle pipelineLayoutHandle, BlobDataView computeShaderBlob);
+		PipelineHandle createGraphicsPipeline(PipelineLayoutHandle pipelineLayoutHandle, const GraphicsPipelineBlobs& blobs);
+		PipelineHandle createComputePipeline(PipelineLayoutHandle pipelineLayoutHandle, BlobDataView csBlob);
 		void destroyPipeline(PipelineHandle handle);
 
 		FenceHandle createFence(uint64 initialValue);

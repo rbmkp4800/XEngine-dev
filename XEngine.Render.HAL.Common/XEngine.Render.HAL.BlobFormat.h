@@ -63,7 +63,7 @@ namespace XEngine::Render::HAL::BlobFormat::Data
 	};
 	static_assert(sizeof(PipelineBindingRecord) == 16);
 
-	struct GraphicsPipelineBaseBlobBody // 36 bytes
+	struct GraphicsPipelineStateBlobBody // 36 bytes
 	{
 		// [0..4)
 		uint32 pipelineLayoutSourceHash;
@@ -87,7 +87,7 @@ namespace XEngine::Render::HAL::BlobFormat::Data
 		uint8 vertexBuffersPerInstanceFlagBits;
 		uint8 vertexBindingCount;
 	};
-	static_assert(sizeof(GraphicsPipelineBaseBlobBody) == 36);
+	static_assert(sizeof(GraphicsPipelineStateBlobBody) == 36);
 
 	static constexpr uint8 MaxVertexBindingNameLength = 13;
 
@@ -277,7 +277,7 @@ namespace XEngine::Render::HAL::BlobFormat
 	class GraphicsPipelineStateBlobReader : public GenericBlobReader
 	{
 	private:
-		const Data::GraphicsPipelineBaseBlobBody* body = nullptr;
+		const Data::GraphicsPipelineStateBlobBody* body = nullptr;
 		const Data::VertexBindingRecord* vertexBindingRecords = nullptr;
 
 	public:
@@ -286,9 +286,16 @@ namespace XEngine::Render::HAL::BlobFormat
 
 		bool open(const void* data, uint32 size);
 
+		bool isVSBytecodeBlobRegistered() const { return body->vsBytecodeRegistered; }
+		bool isASBytecodeBlobRegistered() const { return body->asBytecodeRegistered; }
+		bool isMSBytecodeBlobRegistered() const { return body->msBytecodeRegistered; }
+		bool isPSBytecodeBlobRegistered() const { return body->psBytecodeRegistered; }
+		uint32 getVSBytecodeBlobChecksum() const { return body->vsBytecodeChecksum; }
+		uint32 getASBytecodeBlobChecksum() const { return body->asBytecodeChecksum; }
+		uint32 getMSBytecodeBlobChecksum() const { return body->msBytecodeChecksum; }
+		uint32 getPSBytecodeBlobChecksum() const { return body->psBytecodeChecksum; }
+
 		uint32 getPipelineLayoutSourceHash() const { return body->pipelineLayoutSourceHash; }
-		bool isBytecodeBlobRegistered(ShaderType type) const;
-		uint32 getBytecodeBlobChecksum(ShaderType type) const;
 		uint32 getRenderTargetCount() const;
 		TexelViewFormat getRenderTargetFormat(uint32 index) const { XAssert(index < MaxRenderTargetCount); return body->renderTargetFormats[index]; }
 		DepthStencilFormat getDepthStencilFormat() const { return body->depthStencilFormat; }
