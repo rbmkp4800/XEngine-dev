@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="XEngine.Render.ShaderLibraryBuilder.cpp" />
+    <ClCompile Include="XEngine.Render.ShaderLibraryBuilder.LibraryDefinitionLoader.cpp" />
+    <ClCompile Include="XEngine.Render.ShaderLibraryBuilder.SourceCache.cpp" />
+    <ClCompile Include="XJSON.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="XEngine.Render.ShaderLibraryBuilder.h" />
+    <ClInclude Include="XEngine.Render.ShaderLibraryBuilder.LibraryDefinitionLoader.h" />
+    <ClInclude Include="XEngine.Render.ShaderLibraryBuilder.SourceCache.h" />
+    <ClInclude Include="XJSON.h" />
+  </ItemGroup>
+</Project>

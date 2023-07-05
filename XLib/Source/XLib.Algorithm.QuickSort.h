@@ -2,23 +2,23 @@
 
 #include "XLib.h"
 
-// TODO: investigate performance
+// TODO: Cleanup this mess... I wrote this code in 2015... Add rvalue support at least...
 
-template <typename ElementType>
-void QuickSort(ElementType* buffer, uint32 elementsCount)
+namespace XLib
 {
-	struct Internal
+	namespace Internal
 	{
-		static void QuickSort(ElementType* buffer, sint32 lo, sint32 hi)
+		template <typename ElementType, typename ComparatorType>
+		void QuickSort(ElementType* buffer, sint32 lo, sint32 hi, const ComparatorType& comparator)
 		{
 			sint32 i = lo, j = hi;
-			ElementType pivot = buffer[(lo + hi) / 2];
+			const ElementType& pivot = buffer[(lo + hi) / 2];
 
 			do
 			{
-				while (buffer[i] < pivot)
+				while (comparator(buffer[i], pivot))
 					i++;
-				while (pivot < buffer[j])
+				while (comparator(pivot, buffer[j]))
 					j--;
 				if (i <= j)
 				{
@@ -28,13 +28,24 @@ void QuickSort(ElementType* buffer, uint32 elementsCount)
 			} while (i <= j);
 
 			if (lo < j)
-				Internal::QuickSort(buffer, lo, j);
+				Internal::QuickSort(buffer, lo, j, comparator);
 			if (i < hi)
-				Internal::QuickSort(buffer, i, hi);
+				Internal::QuickSort(buffer, i, hi, comparator);
 		}
-	};
+	}
 
-	Internal::QuickSort(buffer, 0, elementsCount - 1);
+	template <typename ElementType>
+	void QuickSort(ElementType* buffer, uint32 elementsCount)
+	{
+		Internal::QuickSort(buffer, 0, elementsCount - 1, [](const ElementType& left, const ElementType& right) -> bool { return left < right; });
+	}
+
+	// comparator (a, b) -> bool = a < b;
+	template <typename ElementType, typename ComparatorType>
+	void QuickSort(ElementType* buffer, uint32 elementsCount, const ComparatorType& comparator)
+	{
+		Internal::QuickSort(buffer, 0, elementsCount - 1, comparator);
+	}
 }
 
 /*

@@ -1,9 +1,9 @@
-struct TestCB
+struct [[xe::export_cb_layout(XEngine::Render::Shaders::TestCB)]] TestCB
 {
 	float4 c;
 };
 
-ConstantBuffer<TestCB> testCB : @binding(SOME_CONSTANT_BUFFER);
+[[xe::binding(SOME_CONSTANT_BUFFER)]] ConstantBuffer<TestCB> testCB;
 
 float4 MainVS(uint vertexId : SV_VertexID) : SV_Position
 {

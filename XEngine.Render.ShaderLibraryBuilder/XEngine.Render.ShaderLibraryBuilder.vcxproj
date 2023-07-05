@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>15.0</VCProjectVersion>
+    <ProjectGuid>{981D9FCB-69BD-47D9-8033-15F5B4621A85}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>XEngineRenderShaderLibraryBuilder</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <OutDir>$(SolutionDir)Build\</OutDir>
+    <IntDir>$(SolutionDir)Build.Intermediate\$(PlatformName).$(Configuration)\$(ProjectName)\</IntDir>
+    <TargetName>$(ProjectName)_$(PlatformName).$(Configuration)</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(SolutionDir)Build\</OutDir>
+    <IntDir>$(SolutionDir)Build.Intermediate\$(PlatformName).$(Configuration)\$(ProjectName)\</IntDir>
+    <TargetName>$(ProjectName)_$(PlatformName).$(Configuration)</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <IntrinsicFunctions>false</IntrinsicFunctions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\External\Microsoft.DirectXShaderCompiler\lib\$(Platform);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+    <PostBuildEvent>
+      <Command>xcopy /y $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.dll $(OutDir)
+xcopy /y $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.pdb $(OutDir)</Command>
+      <Message>Copying DXC DLLs to output directory</Message>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\External\Microsoft.DirectXShaderCompiler\lib\$(Platform);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+    <PostBuildEvent>
+      <Command>xcopy /y $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.dll $(OutDir)
+xcopy /y $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.pdb $(OutDir)</Command>
+      <Message>Copying DXC DLLs to output directory</Message>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="XEngine.Render.ShaderLibraryBuilder.cpp" />
+    <ClCompile Include="XEngine.Render.ShaderLibraryBuilder.LibraryDefinitionLoader.cpp" />
+    <ClCompile Include="XEngine.Render.ShaderLibraryBuilder.SourceCache.cpp" />
+    <ClCompile Include="XJSON.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="XEngine.Render.ShaderLibraryBuilder.h" />
+    <ClInclude Include="XEngine.Render.ShaderLibraryBuilder.LibraryDefinitionLoader.h" />
+    <ClInclude Include="XEngine.Render.ShaderLibraryBuilder.SourceCache.h" />
+    <ClInclude Include="XJSON.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\XEngine.Render.HAL.Common\XEngine.Render.HAL.Common.vcxproj">
+      <Project>{102d6f8c-faad-4fd3-9b3a-16923042465e}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\XEngine.Render.HAL.ShaderCompiler\XEngine.Render.HAL.ShaderCompiler.vcxproj">
+      <Project>{0e31d4f6-c1d4-4a6f-8c42-a0f7b2e4d9d9}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\XEngine.Render.ShaderLibraryFormat\XEngine.Render.ShaderLibraryFormat.vcxproj">
+      <Project>{e41c3648-b10a-4c33-a052-d98f8ed51ab0}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\XEngine.XStringHash\XEngine.XStringHash.vcxproj">
+      <Project>{ca640875-7c04-42ba-b081-8dac82c9f48d}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\XLib\XLib.vcxproj">
+      <Project>{df81a513-72e3-4b74-b866-97f3bb61d45f}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

@@ -121,8 +121,8 @@ namespace XLib::Internal
 inline void* operator new (size_t, XLib::Internal::PlacementNewToken, void* block) { return block; }
 inline void operator delete (void* block, XLib::Internal::PlacementNewToken, void*) {}
 
-#define construct(value, ...) (new (::XLib::Internal::PlacementNewToken(), &(value)) removeReference<decltype(value)>(__VA_ARGS__))
-#define destruct(value) { using XLibDestructHelperType = removeReference<decltype(value)>; (value).~XLibDestructHelperType(); }
+#define construct(value, ...) (new (::XLib::Internal::PlacementNewToken(), &(value)) ::removeReference<decltype(value)>(__VA_ARGS__))
+#define destruct(value) { using XLibDestructHelperType = ::removeReference<decltype(value)>; (value).~XLibDestructHelperType(); }
 
 
 // Data utils //////////////////////////////////////////////////////////////////////////////////
@@ -260,3 +260,7 @@ inline uint32	XCheckedCastU32	(uint64 a) { XAssert(a <= uint32(-1)); return uint
 	inline constexpr T& operator |= (T &a, T b) { ((IntT&)a) |= IntT(b); return a; }	\
 	inline constexpr T& operator ^= (T &a, T b) { ((IntT&)a) ^= IntT(b); return a; }	\
 	inline constexpr T operator ~ (T a) { return T(~IntT(a)); }
+
+#define STRINGIZE(x) STRINGIZE2(x)
+#define STRINGIZE2(x) #x
+#define XTODO(todo_message) __pragma(message( __FILE__ "(" STRINGIZE(__LINE__) "): @TODO: " todo_message))

@@ -13,7 +13,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GameSample1", "GameSample1\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.Shaders", "XEngine.Render.Shaders\XEngine.Render.Shaders.vcxproj", "{E6AF7FDC-1839-4501-96B6-389AB9CAFDDB}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.Shaders.Builder", "XEngine.Render.Shaders.Builder\XEngine.Render.Shaders.Builder.vcxproj", "{981D9FCB-69BD-47D9-8033-15F5B4621A85}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.ShaderLibraryBuilder", "XEngine.Render.ShaderLibraryBuilder\XEngine.Render.ShaderLibraryBuilder.vcxproj", "{981D9FCB-69BD-47D9-8033-15F5B4621A85}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.MaterialShaderCompiler", "XEngine.Render.MaterialShaderCompiler\XEngine.Render.MaterialShaderCompiler.vcxproj", "{6664E1B3-7DCD-4210-9D6C-F4D218AED043}"
 EndProject
@@ -29,7 +29,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.HAL.Common",
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.HAL.ShaderCompiler", "XEngine.Render.HAL.ShaderCompiler\XEngine.Render.HAL.ShaderCompiler.vcxproj", "{0E31D4F6-C1D4-4A6F-8C42-A0F7B2E4D9D9}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.Shaders.PackFormat", "XEngine.Render.Shaders.PackFormat\XEngine.Render.Shaders.PackFormat.vcxproj", "{E41C3648-B10A-4C33-A052-D98F8ED51AB0}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.ShaderLibraryFormat", "XEngine.Render.ShaderLibraryFormat\XEngine.Render.ShaderLibraryFormat.vcxproj", "{E41C3648-B10A-4C33-A052-D98F8ED51AB0}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XUI", "XUI\XUI.vcxproj", "{41B7A650-F2DA-4859-94E6-008619E2D88B}"
 EndProject

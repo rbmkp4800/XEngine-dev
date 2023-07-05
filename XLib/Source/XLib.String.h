@@ -6,6 +6,7 @@
 
 // TODO: Decide what to do with `String::getCStr()` for empty string.
 // TODO: Do we need separate `pushBack()` and `append()`?
+// TODO: `DynamicString` (without type suffix) -> `DynamicStringBase`? And same for other types.
 
 namespace XLib
 {
@@ -25,6 +26,7 @@ namespace XLib
 		inline constexpr StringView(const CharType* cstr);
 
 		inline const CharType& operator [] (uintptr index) const { return data[index]; }
+
 		inline const CharType* getData() const { return data; }
 		inline uintptr getLength() const { return length; }
 		inline bool isEmpty() const { return length == 0; }
@@ -58,6 +60,9 @@ namespace XLib
 		inline InplaceString();
 		~InplaceString() = default;
 
+		inline InplaceString& operator = (StringView<CharType> that);
+		inline InplaceString& operator = (const CharType* thatCStr);
+
 		inline bool copyFrom(StringView<CharType> string);
 		inline bool copyFrom(const CharType* cstr);
 
@@ -76,13 +81,23 @@ namespace XLib
 		inline StringView<CharType> getView() const { return StringView<CharType>(buffer, length); }
 		inline CharType* getData() { return buffer; }
 		inline CounterType getLength() const { return length; }
-		inline bool isEmpty() const { return length == 0; }
-		inline bool isFull() const { return length + 1 == Capacity; }
+		inline operator StringView<CharType>() const { return getView(); }
 
 		inline CharType& operator [] (CounterType index) { return buffer[index]; }
 		inline CharType operator [] (CounterType index) const { return buffer[index]; }
-		inline operator StringView<CharType>() const { return getView(); }
 
+		template <typename T>
+		inline bool operator == (const T& that) const;
+
+		inline bool startsWith(const StringView<CharType>& prefix) const;
+		inline bool startsWith(const char* prefixCStr) const;
+		inline bool endsWith(const StringView<CharType>& suffix) const;
+		inline bool endsWith(const char* suffixCStr) const;
+
+		inline bool isEmpty() const { return length == 0; }
+		inline bool isFull() const { return length + 1 == Capacity; }
+
+	public:
 		static constexpr CounterType GetCapacity() { return Capacity; }
 		static constexpr CounterType GetMaxLength() { return Capacity - 1; }
 	};
@@ -109,7 +124,12 @@ namespace XLib
 		~DynamicString();
 
 		inline DynamicString(DynamicString&& that);
-		inline void operator = (DynamicString&& that);
+		inline DynamicString(StringView<CharType> that);
+		inline DynamicString(const char* thatCStr);
+
+		inline DynamicString& operator = (DynamicString&& that);
+		inline DynamicString& operator = (StringView<CharType> that);
+		inline DynamicString& operator = (const char* thatCStr);
 
 		inline bool pushBack(CharType c);
 		inline bool append(CharType c) { return pushBack(c); }
@@ -175,6 +195,9 @@ namespace XLib
 
 		template <typename CharType>
 		static inline ordering CompareOrdered(const StringView<CharType>& left, const StringView<CharType>& right);
+
+		template <typename CharType>
+		static inline bool IsLess(const StringView<CharType>& left, const StringView<CharType>& right);
 	};
 
 	template <typename TextWriter, typename CharType>

@@ -37,6 +37,7 @@ namespace XLib
 		inline uintptr getPosition() const { return uintptr(current - begin); }
 		inline void setPosition(uintptr position);
 
+		inline const char* getBeginPtr() const { return begin; }
 		inline const char* getCurrentPtr() const { return current; }
 		inline void setCurrentPtr(const char* newCurrentPtr) { XAssert(begin <= newCurrentPtr && newCurrentPtr < end); current = newCurrentPtr; }
 
@@ -51,7 +52,7 @@ namespace XLib
 		uint32 columnNumber = 0;
 
 	private:
-		void advanceLocation(uint32 c);
+		inline void advanceLocation(uint32 c);
 
 	public:
 		MemoryTextReaderWithLocation() = default;
@@ -71,6 +72,7 @@ namespace XLib
 		inline uint32 getColumnNumber() const { return columnNumber + 1; }
 		inline uintptr getAbsoluteOffset() const { return base.getPosition(); }
 
+		inline const char* getBeginPtr() const { return base.getBeginPtr(); }
 		inline const char* getCurrentPtr() const { return base.getCurrentPtr(); }
 
 		inline uintptr getAvailableBytes() const { return base.getAvailableBytes(); }
@@ -217,13 +219,6 @@ namespace XLib
 
 	template <typename TextReader, typename TextWriter>
 	inline bool TextForwardToFirstOccurrence(TextReader& reader, const char* substring, TextWriter& writer);
-
-
-	// Encoding convertion utils ///////////////////////////////////////////////////////////////////
-
-	// Converts until null-terminator of input string is reached or until lengthLimit is reached.
-	// Returns number of characters processed.
-	uintptr TextConvertASCIIToWide(const char* asciText, wchar* resultWideText, uintptr lengthLimit = uintptr(-1));
 
 
 	// Standart types to/from text converstion utils for plain chars ///////////////////////////////

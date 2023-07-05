@@ -2,58 +2,29 @@
 
 #include <XLib.h>
 #include <XLib.NonCopyable.h>
+#include <XLib.RefCounted.h>
 #include <XLib.String.h>
 
 #include <XEngine.Render.HAL.Common.h>
 
-// TODO: Probably we should return to `CompiledShader` upproach instead of generic `Blob` for everything.
-// `CompiledShader` may contain cached metadata so we do not parse bytecode every time we compile
-// pipeline using this shader.
-
-// TODO: Proper error reporting.
+// TODO: Pipeline bindings shader visibility.
 
 namespace XEngine::Render::HAL::ShaderCompiler
 {
-	class Host;
+	constexpr uint16 MaxPipelineBindingNameLength = 254;
+	constexpr uint16 MaxDescriptorSetBindingNameLength = 254;
 
-	// TODO: This should be `class Blob : public XLib::RefCounted`.
-	// User should manipulate with `BlobRef` which is `XLib::RefCountPtr<Blob>`.
-	// Blob creation should be done via separate `BlobBuilder`.
-	class Blob : public XLib::NonCopyable
-	{
-	private:
-		struct Preamble
-		{
-			volatile uint32 referenceCount;
-			uint32 dataSize;
-			//BlobUIDHash uidHash; // Should be SHA1/SHA256.
-		};
+	constexpr uint32 StartShaderRegiserIndex = 1000;
 
-	private:
-		Preamble* data = nullptr;
+	class DescriptorSetLayout;
+	class PipelineLayout;
+	class Blob;
+	class ShaderCompilationArtifacts;
 
-	public:
-		Blob() = default;
-		~Blob();
-
-		inline Blob(Blob&& that) { moveFrom(that); }
-		inline void operator = (Blob&& that) { moveFrom(that); }
-
-		inline void destroy() { this->~Blob(); }
-		inline void moveFrom(Blob& that) { destroy(); data = that.data; that.data = nullptr; }
-		inline Blob addReference() const;
-
-		inline const void* getData() const { XAssert(data); return data + 1; }
-		inline uint32 getSize() const { XAssert(data); return data->dataSize; }
-
-		inline bool isInitialized() const { return data != nullptr; }
-
-	public:
-		static void* Create(uint32 size, Blob& blob);
-	};
-
-	using BindingNameInplaceString = XLib::InplaceStringASCIIx64;
-	static constexpr uint8 MaxBindingNameLength = BindingNameInplaceString::GetMaxLength();
+	using DescriptorSetLayoutRef = XLib::RefCountedPtr<DescriptorSetLayout>;
+	using PipelineLayoutRef = XLib::RefCountedPtr<PipelineLayout>;
+	using BlobRef = XLib::RefCountedPtr<Blob>;
+	using ShaderCompilationArtifactsRef = XLib::RefCountedPtr<ShaderCompilationArtifacts>;
 
 	enum class Platform : uint8
 	{
@@ -64,37 +35,23 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		//Prospero,
 	};
 
-	enum class ShaderType : uint8
-	{
-		Undefined = 0,
-		Compute,
-		Vertex,
-		Amplification,
-		Mesh,
-		Pixel,
-	};
-
-	struct DescriptorSetNestedBindingDesc
+	struct DescriptorSetBindingDesc
 	{
 		XLib::StringViewASCII name;
 		uint16 descriptorCount; // Not implemented. Should be 1 for now.
-		DescriptorType descriptorType;
+		HAL::DescriptorType descriptorType;
 	};
 
 	struct PipelineBindingDesc
 	{
 		XLib::StringViewASCII name;
-		PipelineBindingType type;
+		HAL::PipelineBindingType type;
 
-		// TODO: shader visibility
-		uint8 constantsSize;
-		const Blob* compiledDescriptorSetLayout; // TODO: This probably should not be pointer...
-	};
-
-	struct Define
-	{
-		XLib::StringViewASCII name;
-		XLib::StringViewASCII value;
+		union
+		{
+			const DescriptorSetLayout* descriptorSetLayout;
+			uint8 inplaceConstantCount;
+		};
 	};
 
 	enum class VertexBufferType : uint8
@@ -113,56 +70,211 @@ namespace XEngine::Render::HAL::ShaderCompiler
 	{
 		XLib::StringViewASCII name;
 		uint16 offset;
-		TexelViewFormat format;
+		HAL::TexelViewFormat format;
 		uint8 bufferIndex;
 	};
 
-	struct GraphicsPipelineDesc
+	struct ShaderDesc
 	{
-		// TODO: These probably should not be pointers...
-		const Blob* compiledVertexShader;
-		const Blob* compiledAmplificationShader;
-		const Blob* compiledMeshShader;
-		const Blob* compiledPixelShader;
+		XLib::StringViewASCII sourcePath;
+		XLib::StringViewASCII sourceText;
+		XLib::StringViewASCII entryPointName;
+		// Optimization, platform specific stuff, etc.
+	};
 
-		VertexBufferDesc vertexBuffers[MaxVertexBufferCount];
+	struct GraphicsPipelineShaders
+	{
+		union
+		{
+			struct
+			{
+				ShaderDesc vs;
+				ShaderDesc as;
+				ShaderDesc ms;
+				ShaderDesc ps;
+			};
+			struct
+			{
+				ShaderDesc all[4];
+			};
+		};
+	};
+
+	struct GraphicsPipelineSettings
+	{
+		VertexBufferDesc vertexBuffers[HAL::MaxVertexBufferCount];
 		VertexBindingDesc* vertexBindings;
 		uint8 vertexBindingCount;
 
-		TexelViewFormat renderTargetsFormats[MaxRenderTargetCount];
-		DepthStencilFormat depthStencilFormat;
+		HAL::TexelViewFormat renderTargetsFormats[HAL::MaxRenderTargetCount];
+		HAL::DepthStencilFormat depthStencilFormat;
 	};
 
-	struct GraphicsPipelineCompilationResult
+	class DescriptorSetLayout final : public XLib::RefCounted
 	{
-		Blob baseBlob;
-		Blob bytecodeBlobs[MaxGraphicsPipelineBytecodeBlobCount];
-	};
+	private:
+		struct BindingDesc
+		{
+			uint16 nameOffset;
+			uint16 nameLength;
+			uint32 descriptorOffset;
+			uint16 descriptorCount;
+			HAL::DescriptorType descriptorType;
+		};
 
-	class Host abstract final
-	{
+	private:
+		const BindingDesc* bindings = nullptr;
+		XLib::StringViewASCII namesBuffer;
+		const void* serializedBlobData = nullptr;
+		uint32 serializedBlobSize = 0;
+		uint32 sourceHash = 0;
+		uint32 descriptorCount = 0;
+		uint16 bindingCount = 0;
+
+	private:
+		DescriptorSetLayout() = default;
+		virtual ~DescriptorSetLayout() override = default;
+
 	public:
-		static bool CompileDescriptorSetLayout(Platform platform,
-			const DescriptorSetNestedBindingDesc* bindings, uint16 bindingCount, Blob& resultBlob);
+		inline uint16 getBindingCount() const { return bindingCount; }
+		inline uint32 getDescriptorCount() const { return descriptorCount; }
+		inline uint32 getSourceHash() const { return sourceHash; }
 
-		static bool CompilePipelineLayout(Platform platform,
-			const PipelineBindingDesc* bindings, uint16 bindingCount,
-			Blob& resultBlob, Blob& resultMetadataBlob);
+		sint16 findBinding(XLib::StringViewASCII name) const; // Returns negative number on failure.
+		DescriptorSetBindingDesc getBindingDesc(uint16 bindingIndex) const;
+		uint32 getBindingDescriptorOffset(uint16 bindingIndex) const;
 
-		//static bool CompileShaderLibrary(Platform platform,
-		//	const CompiledPipelineLayout& pipelineLayout, const char* source, uint32 sourceLength,
-		//	const Define* defines, uint16 defineCount, CompiledShaderLibrary& result);
+		inline const void* getSerializedBlobData() const { return serializedBlobData; }
+		inline uint32 getSerializedBlobSize() const { return serializedBlobSize; }
+		inline uint32 getSerializedBlobChecksum() const;
 
-		//static bool CompileShader(Platform platform,
-		//	const CompiledPipelineLayout& pipelineLayout, const CompiledShaderLibrary& library,
-		//	ShaderType shaderType, const char* entryPointName, CompiledShader& result);
-
-		static bool CompileShader(Platform platform,
-			const Blob& compiledPipelineLayoutBlob, const Blob& pipelineLayoutMetadataBlob,
-			const char* source, uint32 sourceLength, ShaderType shaderType, const char* displayedShaderFilename,
-			const char* entryPointName, Blob& resultBlob);
-
-		static bool CompileGraphicsPipeline(Platform platform, const Blob& compiledPipelineLayout,
-			const GraphicsPipelineDesc& desc, GraphicsPipelineCompilationResult& result);
+	public:
+		static DescriptorSetLayoutRef Create(const DescriptorSetBindingDesc* bindings, uint16 bindingCount);
 	};
+
+	class PipelineLayout final : public XLib::RefCounted
+	{
+	private:
+		struct BindingDesc
+		{
+			uint16 nameOffset;
+			uint16 nameLength;
+			uint32 baseShaderRegister;
+			HAL::PipelineBindingType type;
+		};
+
+	private:
+		// TODO: Replace with something like `XLib::Array` that supports external storage and calls destructors.
+		DescriptorSetLayoutRef descriptorSetLayoutTable[HAL::MaxPipelineBindingCount];
+
+		const BindingDesc* bindings = nullptr;
+		XLib::StringViewASCII namesBuffer;
+		const void* serializedBlobData = nullptr;
+		uint32 serializedBlobSize = 0;
+		uint32 sourceHash = 0;
+		uint16 bindingCount = 0;
+
+	private:
+		PipelineLayout() = default;
+		virtual ~PipelineLayout() override = default;
+
+	public:
+		inline uint16 getBindingCount() const { return bindingCount; }
+		inline uint32 getSourceHash() const { return sourceHash; }
+
+		sint16 findBinding(XLib::StringViewASCII name) const; // Returns negative number on failure.
+		PipelineBindingDesc getBindingDesc(uint16 bindingIndex) const;
+		uint32 getBindingBaseShaderRegister(uint16 bindingIndex) const;
+
+		inline const void* getSerializedBlobData() const { return serializedBlobData; }
+		inline uint32 getSerializedBlobSize() const { return serializedBlobSize; }
+		inline uint32 getSerializedBlobChecksum() const;
+
+	public:
+		static PipelineLayoutRef Create(const PipelineBindingDesc* bindings, uint16 bindingCount);
+	};
+
+	class Blob : public XLib::RefCounted
+	{
+	private:
+		uint32 size;
+
+	private:
+		Blob() = default;
+		virtual ~Blob() override = default;
+
+	public:
+		inline const void* getData() const;
+		inline uint32 getSize() const;
+		inline uint32 getChecksum() const; // Defined by 'HAL::BlobFormat'
+
+	public:
+		static BlobRef Create(uint32 size);
+	};
+
+	enum class ArtifactType : uint8
+	{
+		Undefined = 0,
+
+		D3D_CompilerArgs,
+		PreprocessedSource,
+		Object,
+		Disassembly,
+		D3D_ShaderHash,
+		D3D_PDB,
+		//ExportedCBLayouts,
+
+		EnumCount,
+	};
+
+	class ShaderCompilationArtifacts : public XLib::RefCounted
+	{
+	private:
+
+	public:
+		ShaderCompilationArtifacts() = default;
+		~ShaderCompilationArtifacts() = default;
+
+		void* getArtifactDataPtr(ArtifactType type) const;
+		uint32 getArtifactSize(ArtifactType type) const;
+		XLib::StringViewASCII getOutput() const;
+	};
+
+	struct GraphicsPipelineCompilationArtifacts
+	{
+		ShaderCompilationArtifactsRef vs;
+		ShaderCompilationArtifactsRef as;
+		ShaderCompilationArtifactsRef ms;
+		ShaderCompilationArtifactsRef ps;
+		XLib::DynamicStringASCII pipelineCompilationOutput;
+	};
+
+	struct GraphicsPipelineCompiledBlobs
+	{
+		BlobRef stateBlob;
+		BlobRef vsBytecodeBlob;
+		BlobRef asBytecodeBlob;
+		BlobRef msBytecodeBlob;
+		BlobRef psBytecodeBlob;
+	};
+
+	bool CompileGraphicsPipeline(
+		const PipelineLayout& pipelineLayout,
+		const GraphicsPipelineShaders& shaders,
+		const GraphicsPipelineSettings& settings,
+		GraphicsPipelineCompilationArtifacts& artifacts,
+		GraphicsPipelineCompiledBlobs& compiledBlobs);
+
+	bool CompileComputePipeline(
+		const PipelineLayout& pipelineLayout,
+		const ShaderDesc& computeShader,
+		ShaderCompilationArtifactsRef& artifacts,
+		BlobRef& compiledBlob);
+
+	// For XDBS we can have something like this:
+	//		SerializeGraphicsPipelineCompilationTask
+	//		SerializeComputePipelineCompilationTask
+	//		CompileSerializedTask
+	//		DeserializeGraphicsPipelineCompilationResult
+	//		DeserializeComputePipelineCompilationResult
 }

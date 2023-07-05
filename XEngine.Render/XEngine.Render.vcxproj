@@ -94,7 +94,7 @@
     <ProjectReference Include="..\XEngine.Render.HAL.D3D12\XEngine.Render.HAL.D3D12.vcxproj">
       <Project>{1ed495b0-b69b-4409-83fc-587f590eab29}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\XEngine.Render.Shaders.PackFormat\XEngine.Render.Shaders.PackFormat.vcxproj">
+    <ProjectReference Include="..\XEngine.Render.ShaderLibraryFormat\XEngine.Render.ShaderLibraryFormat.vcxproj">
       <Project>{e41c3648-b10a-4c33-a052-d98f8ed51ab0}</Project>
     </ProjectReference>
     <ProjectReference Include="..\XEngine.Render.Shaders\XEngine.Render.Shaders.vcxproj">

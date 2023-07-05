@@ -1,11 +1,15 @@
 #include <XLib.String.h>
 #include <XLib.System.File.h>
 
-#include "XEngine.Render.Shaders.Builder.ListingLoader.h"
+#include <XEngine.XStringHash.h>
+
+#include "XEngine.Render.ShaderLibraryBuilder.LibraryDefinitionLoader.h"
 
 using namespace XLib;
 using namespace XEngine::Render;
-using namespace XEngine::Render::Shaders::Builder_;
+using namespace XEngine::Render::ShaderLibraryBuilder;
+
+XTODO("Any object name (DSL / pipeline layout / pipeline) should be valid filename");
 
 static bool ParseTexelViewFormatString(StringViewASCII string, HAL::TexelViewFormat& resultFormat)
 {
@@ -27,20 +31,20 @@ static bool ParseDepthStencilFormatString(StringViewASCII string, HAL::DepthSten
 	return false;
 }
 
-void ListingLoader::reportError(const char* message, const XJSON::Location& location)
+void LibraryDefinitionLoader::reportError(const char* message, const XJSON::Location& location)
 {
-	TextWriteFmtStdOut(path, ':',
+	TextWriteFmtStdOut(xjsonPath, ':',
 		location.lineNumber, ':', location.columnNumber, ": error: ", message, '\n');
 }
 
-void ListingLoader::reportXJSONError(const XJSON::ParserError& xjsonError)
+void LibraryDefinitionLoader::reportXJSONError(const XJSON::ParserError& xjsonError)
 {
-	TextWriteFmtStdOut(path, ':',
+	TextWriteFmtStdOut(xjsonPath, ':',
 		xjsonError.location.lineNumber, ':', xjsonError.location.columnNumber,
 		": error: XJSON: ", xjsonError.message, '\n');
 }
 
-bool ListingLoader::readDescriptorSetLayoutDeclaration(const XJSON::KeyValue& xjsonEntryDeclarationProperty)
+bool LibraryDefinitionLoader::readDescriptorSetLayoutDeclaration(const XJSON::KeyValue& xjsonEntryDeclarationProperty)
 {
 	if (xjsonEntryDeclarationProperty.value.valueType != XJSON::ValueType::Object)
 	{
@@ -49,7 +53,7 @@ bool ListingLoader::readDescriptorSetLayoutDeclaration(const XJSON::KeyValue& xj
 		return false;
 	}
 
-	InplaceArrayList<HAL::ShaderCompiler::DescriptorSetNestedBindingDesc, HAL::MaxDescriptorSetNestedBindingCount> bindings;
+	InplaceArrayList<HAL::ShaderCompiler::DescriptorSetBindingDesc, HAL::MaxDescriptorSetBindingCount> bindings;
 
 	xjsonParser.openObjectValueScope();
 	for (;;)
@@ -83,7 +87,7 @@ bool ListingLoader::readDescriptorSetLayoutDeclaration(const XJSON::KeyValue& xj
 			return false;
 		}
 
-		HAL::ShaderCompiler::DescriptorSetNestedBindingDesc binding = {};
+		HAL::ShaderCompiler::DescriptorSetBindingDesc binding = {};
 		binding.name = xjsonProperty.key;
 		binding.descriptorCount = 1;
 
@@ -105,7 +109,7 @@ bool ListingLoader::readDescriptorSetLayoutDeclaration(const XJSON::KeyValue& xj
 
 		if (bindings.isFull())
 		{
-			reportError("too many descriptors", xjsonEntryDeclarationProperty.keyLocation);
+			reportError("descriptors limit exceeded", xjsonEntryDeclarationProperty.keyLocation);
 			return false;
 		}
 
@@ -113,20 +117,28 @@ bool ListingLoader::readDescriptorSetLayoutDeclaration(const XJSON::KeyValue& xj
 	}
 	xjsonParser.closeObjectValueScope();
 
-	const DescriptorSetLayoutCreationResult descriptorSetLayoutCreationResult =
-		descriptorSetLayoutList.create(xjsonEntryDeclarationProperty.key, bindings, uint8(bindings.getSize()));
-
-	if (descriptorSetLayoutCreationResult.status != DescriptorSetLayoutCreationStatus::Success)
+	const uint64 descriptorSetLayoutNameXSH = XSH::Compute(xjsonEntryDeclarationProperty.key);
+	if (!descriptorSetLayoutNameXSH)
 	{
-		// TODO: Proper error handling (hash collision etc).
+		reportError("descriptor set layout name XSH = 0. This is not allowed", xjsonEntryDeclarationProperty.keyLocation);
+		return false;
+	}
+	if (libraryDefinition.descriptorSetLayouts.find(descriptorSetLayoutNameXSH))
+	{
+		// TODO: We may give separate error for hash collision (that will never happen).
 		reportError("descriptor set layout redefinition", xjsonEntryDeclarationProperty.keyLocation);
 		return false;
 	}
 
+	const HAL::ShaderCompiler::DescriptorSetLayoutRef descriptorSetLayout =
+		HAL::ShaderCompiler::DescriptorSetLayout::Create(bindings, bindings.getSize());
+
+	libraryDefinition.descriptorSetLayouts.insert(descriptorSetLayoutNameXSH, descriptorSetLayout);
+
 	return true;
 }
 
-bool ListingLoader::readPipelineLayoutDeclaration(const XJSON::KeyValue& xjsonEntryDeclarationProperty)
+bool LibraryDefinitionLoader::readPipelineLayoutDeclaration(const XJSON::KeyValue& xjsonEntryDeclarationProperty)
 {
 	if (xjsonEntryDeclarationProperty.value.valueType != XJSON::ValueType::Object)
 	{
@@ -135,7 +147,7 @@ bool ListingLoader::readPipelineLayoutDeclaration(const XJSON::KeyValue& xjsonEn
 		return false;
 	}
 
-	InplaceArrayList<PipelineBindingDesc, HAL::MaxPipelineBindingCount> bindings;
+	InplaceArrayList<HAL::ShaderCompiler::PipelineBindingDesc, HAL::MaxPipelineBindingCount> bindings;
 
 	xjsonParser.openObjectValueScope();
 	for (;;)
@@ -169,7 +181,7 @@ bool ListingLoader::readPipelineLayoutDeclaration(const XJSON::KeyValue& xjsonEn
 			return false;
 		}
 
-		PipelineBindingDesc binding = {};
+		HAL::ShaderCompiler::PipelineBindingDesc binding = {};
 		binding.name = xjsonProperty.key;
 
 		constexpr StringViewASCII descriptorSetTypeLiteral = StringViewASCII("descriptor-set");
@@ -196,8 +208,10 @@ bool ListingLoader::readPipelineLayoutDeclaration(const XJSON::KeyValue& xjsonEn
 			const StringViewASCII descriptorSetLayoutName =
 				descriptorSetLayoutNameInBrackets.getSubString(1, descriptorSetLayoutNameInBrackets.getLength() - 1);
 			XAssert(!descriptorSetLayoutName.isEmpty());
+			// TODO: Maybe check that `descriptorSetLayoutName` is legal XJSON identifier.
 
-			DescriptorSetLayout* descriptorSetLayout = descriptorSetLayoutList.find(descriptorSetLayoutName);
+			const HAL::ShaderCompiler::DescriptorSetLayoutRef* descriptorSetLayout =
+				libraryDefinition.descriptorSetLayouts.findValue(XSH::Compute(descriptorSetLayoutName));
 			if (!descriptorSetLayout)
 			{
 				reportError("undefined descriptor set layout", xjsonProperty.value.typeAnnotationLocation);
@@ -205,7 +219,7 @@ bool ListingLoader::readPipelineLayoutDeclaration(const XJSON::KeyValue& xjsonEn
 			}
 
 			binding.type = HAL::PipelineBindingType::DescriptorSet;
-			binding.descriptorSetLayout = descriptorSetLayout;
+			binding.descriptorSetLayout = descriptorSetLayout->get();
 		}
 		else
 		{
@@ -215,7 +229,7 @@ bool ListingLoader::readPipelineLayoutDeclaration(const XJSON::KeyValue& xjsonEn
 
 		if (bindings.isFull())
 		{
-			reportError("too many bindings", xjsonEntryDeclarationProperty.keyLocation);
+			reportError("bindings limit exceeded", xjsonEntryDeclarationProperty.keyLocation);
 			return false;
 		}
 
@@ -223,20 +237,28 @@ bool ListingLoader::readPipelineLayoutDeclaration(const XJSON::KeyValue& xjsonEn
 	}
 	xjsonParser.closeObjectValueScope();
 
-	const PipelineLayoutCreationResult pipelineLayoutCreationResult =
-		pipelineLayoutList.create(xjsonEntryDeclarationProperty.key, bindings, uint8(bindings.getSize()));
-
-	if (pipelineLayoutCreationResult.status != PipelineLayoutCreationStatus::Success)
+	const uint64 pipelineLayoutNameXSH = XSH::Compute(xjsonEntryDeclarationProperty.key);
+	if (!pipelineLayoutNameXSH)
 	{
-		// TODO: Proper error handling (hash collision etc).
+		reportError("pipeline layout name XSH = 0. This is not allowed", xjsonEntryDeclarationProperty.keyLocation);
+		return false;
+	}
+	if (libraryDefinition.pipelineLayouts.find(pipelineLayoutNameXSH))
+	{
+		// TODO: We may give separate error for hash collision (that will never happen).
 		reportError("pipeline layout redefinition", xjsonEntryDeclarationProperty.keyLocation);
 		return false;
 	}
 
+	const HAL::ShaderCompiler::PipelineLayoutRef pipelineLayout =
+		HAL::ShaderCompiler::PipelineLayout::Create(bindings, bindings.getSize());
+
+	libraryDefinition.pipelineLayouts.insert(pipelineLayoutNameXSH, pipelineLayout);
+
 	return true;
 }
 
-bool ListingLoader::readGraphicsPipelineDeclaration(const XJSON::KeyValue& xjsonEntryDeclarationProperty)
+bool LibraryDefinitionLoader::readGraphicsPipelineDeclaration(const XJSON::KeyValue& xjsonEntryDeclarationProperty)
 {
 	if (xjsonEntryDeclarationProperty.value.valueType != XJSON::ValueType::Object)
 	{
@@ -245,8 +267,10 @@ bool ListingLoader::readGraphicsPipelineDeclaration(const XJSON::KeyValue& xjson
 		return false;
 	}
 
-	PipelineLayout* pipelineLayout = nullptr;
-	GraphicsPipelineDesc pipelineDesc = {};
+	HAL::ShaderCompiler::PipelineLayoutRef pipelineLayout = nullptr;
+	uint64 pipelineLayoutNameXSH = 0;
+	HAL::ShaderCompiler::GraphicsPipelineShaders pipelineShaders = {};
+	HAL::ShaderCompiler::GraphicsPipelineSettings pipelineSettings = {};
 	bool renderTargetsAreSet = false;
 	bool depthStencilIsSet = false;
 
@@ -280,39 +304,29 @@ bool ListingLoader::readGraphicsPipelineDeclaration(const XJSON::KeyValue& xjson
 				return false;
 			}
 
-			if (!readPipelineLayoutSetupProperty(xjsonProperty, pipelineLayout))
+			if (!readPipelineLayoutSetupProperty(xjsonProperty, pipelineLayout, pipelineLayoutNameXSH))
 				return false;
 		}
 		else if (xjsonProperty.key == "vs")
 		{
-			if (pipelineDesc.vertexShader)
+			if (!pipelineShaders.vs.sourcePath.isEmpty())
 			{
 				reportError("vertex shader is already defined", xjsonProperty.keyLocation);
 				return false;
 			}
-			if (!pipelineLayout)
-			{
-				reportError("pipeline layout should be defined prior to shaders", xjsonProperty.keyLocation);
-				return false;
-			}
 
-			if (!readShaderSetupProperty(xjsonProperty, HAL::ShaderCompiler::ShaderType::Vertex, *pipelineLayout, pipelineDesc.vertexShader))
+			if (!readShaderSetupProperty(xjsonProperty, pipelineShaders.vs))
 				return false;
 		}
 		else if (xjsonProperty.key == "ps")
 		{
-			if (pipelineDesc.pixelShader)
+			if (!pipelineShaders.ps.sourcePath.isEmpty())
 			{
 				reportError("pixel shader is already defined", xjsonProperty.keyLocation);
 				return false;
 			}
-			if (!pipelineLayout)
-			{
-				reportError("pipeline layout should be defined prior to shaders", xjsonProperty.keyLocation);
-				return false;
-			}
 
-			if (!readShaderSetupProperty(xjsonProperty, HAL::ShaderCompiler::ShaderType::Pixel, *pipelineLayout, pipelineDesc.pixelShader))
+			if (!readShaderSetupProperty(xjsonProperty, pipelineShaders.ps))
 				return false;
 		}
 		else if (xjsonProperty.key == "render-targets")
@@ -370,10 +384,10 @@ bool ListingLoader::readGraphicsPipelineDeclaration(const XJSON::KeyValue& xjson
 
 				if (renderTargetCount >= HAL::MaxRenderTargetCount)
 				{
-					reportError("too many render targets", xjsonProperty.value.valueLocation);
+					reportError("render targets limit exceeded", xjsonProperty.value.valueLocation);
 					return false;
 				}
-				pipelineDesc.renderTargetsFormats[renderTargetCount] = renderTargetFormat;
+				pipelineSettings.renderTargetsFormats[renderTargetCount] = renderTargetFormat;
 				renderTargetCount++;
 			}
 			xjsonParser.closeArrayValueScope();
@@ -400,7 +414,7 @@ bool ListingLoader::readGraphicsPipelineDeclaration(const XJSON::KeyValue& xjson
 				return false;
 			}
 
-			pipelineDesc.depthStencilFormat = depthStencilFormat;
+			pipelineSettings.depthStencilFormat = depthStencilFormat;
 			depthStencilIsSet = true;
 		}
 		else
@@ -416,22 +430,36 @@ bool ListingLoader::readGraphicsPipelineDeclaration(const XJSON::KeyValue& xjson
 		reportError("pipeline layout is not defined", xjsonEntryDeclarationProperty.keyLocation);
 		return false;
 	}
+	XAssert(pipelineLayoutNameXSH);
 
 	// TODO: More validation (shader combinations etc).
 
-	const PipelineCreationResult pipelineCreationResult =
-		pipelineList.create(xjsonEntryDeclarationProperty.key, *pipelineLayout, &pipelineDesc, nullptr);
-	if (pipelineCreationResult.status != PipelineCreationStatus::Success)
+	const uint64 pipelineNameXSH = XSH::Compute(xjsonEntryDeclarationProperty.key);
+	if (!pipelineNameXSH)
 	{
-		// TODO: Proper error handling (hash collision etc).
-		reportError("pipeline with this name already defined", xjsonEntryDeclarationProperty.keyLocation);
+		reportError("pipeline name XSH = 0. This is not allowed", xjsonEntryDeclarationProperty.keyLocation);
 		return false;
 	}
+	if (libraryDefinition.pipelines.find(pipelineNameXSH))
+	{
+		// TODO: We may give separate error for hash collision (that will never happen).
+		reportError("pipeline redefinition", xjsonEntryDeclarationProperty.keyLocation);
+		return false;
+	}
+
+	const PipelineRef pipeline = Pipeline::Create(xjsonEntryDeclarationProperty.key);
+	pipeline->pipelineLayout = asRValue(pipelineLayout);
+	pipeline->pipelineLayoutNameXSH = pipelineLayoutNameXSH;
+	pipeline->graphics.shaders = pipelineShaders;
+	pipeline->graphics.settings = pipelineSettings;
+	pipeline->isGraphics = true;
+
+	libraryDefinition.pipelines.insert(pipelineNameXSH, pipeline);
 
 	return true;
 }
 
-bool ListingLoader::readComputePipelineDeclaration(const XJSON::KeyValue& xjsonEntryDeclarationProperty)
+bool LibraryDefinitionLoader::readComputePipelineDeclaration(const XJSON::KeyValue& xjsonEntryDeclarationProperty)
 {
 	if (xjsonEntryDeclarationProperty.value.valueType != XJSON::ValueType::Object)
 	{
@@ -440,8 +468,9 @@ bool ListingLoader::readComputePipelineDeclaration(const XJSON::KeyValue& xjsonE
 		return false;
 	}
 
-	PipelineLayout* pipelineLayout = nullptr;
-	Shader* computeShader = nullptr;
+	HAL::ShaderCompiler::PipelineLayoutRef pipelineLayout = nullptr;
+	uint64 pipelineLayoutNameXSH = 0;
+	HAL::ShaderCompiler::ShaderDesc computeShader = {};
 
 	xjsonParser.openObjectValueScope();
 	for (;;)
@@ -473,23 +502,18 @@ bool ListingLoader::readComputePipelineDeclaration(const XJSON::KeyValue& xjsonE
 				return false;
 			}
 
-			if (!readPipelineLayoutSetupProperty(xjsonProperty, pipelineLayout))
+			if (!readPipelineLayoutSetupProperty(xjsonProperty, pipelineLayout, pipelineLayoutNameXSH))
 				return false;
 		}
 		else if (xjsonProperty.key == "cs")
 		{
-			if (computeShader)
+			if (!computeShader.sourcePath.isEmpty())
 			{
 				reportError("compute shader is already defined", xjsonProperty.keyLocation);
 				return false;
 			}
-			if (!pipelineLayout)
-			{
-				reportError("pipeline layout should be defined prior to shaders", xjsonProperty.keyLocation);
-				return false;
-			}
 
-			if (!readShaderSetupProperty(xjsonProperty, HAL::ShaderCompiler::ShaderType::Compute, *pipelineLayout, computeShader))
+			if (!readShaderSetupProperty(xjsonProperty, computeShader))
 				return false;
 		}
 		else
@@ -505,26 +529,40 @@ bool ListingLoader::readComputePipelineDeclaration(const XJSON::KeyValue& xjsonE
 		reportError("pipeline layout is not defined", xjsonEntryDeclarationProperty.keyLocation);
 		return false;
 	}
+	XAssert(pipelineLayoutNameXSH);
 
-	if (!computeShader)
+	if (computeShader.sourcePath.isEmpty())
 	{
 		reportError("compute shader is not defined", xjsonEntryDeclarationProperty.keyLocation);
 		return false;
 	}
 
-	const PipelineCreationResult pipelineCreationResult =
-		pipelineList.create(xjsonEntryDeclarationProperty.key, *pipelineLayout, nullptr, computeShader);
-	if (pipelineCreationResult.status != PipelineCreationStatus::Success)
+	const uint64 pipelineNameXSH = XSH::Compute(xjsonEntryDeclarationProperty.key);
+	if (!pipelineNameXSH)
 	{
-		// TODO: Proper error handling (hash collision etc).
-		reportError("pipeline with this name already defined", xjsonEntryDeclarationProperty.keyLocation);
+		reportError("pipeline name XSH = 0. This is not allowed", xjsonEntryDeclarationProperty.keyLocation);
 		return false;
 	}
+	if (libraryDefinition.pipelines.find(pipelineNameXSH))
+	{
+		// TODO: We may give separate error for hash collision (that will never happen).
+		reportError("pipeline redefinition", xjsonEntryDeclarationProperty.keyLocation);
+		return false;
+	}
+
+	PipelineRef pipeline = Pipeline::Create(xjsonEntryDeclarationProperty.key);
+	pipeline->pipelineLayout = asRValue(pipelineLayout);
+	pipeline->pipelineLayoutNameXSH = pipelineLayoutNameXSH;
+	pipeline->compute.shader = computeShader;
+	pipeline->isGraphics = false;
+
+	libraryDefinition.pipelines.insert(pipelineNameXSH, pipeline);
 
 	return true;
 }
 
-bool ListingLoader::readPipelineLayoutSetupProperty(const XJSON::KeyValue& xjsonOuterProperty, PipelineLayout*& resultPipelineLayout)
+bool LibraryDefinitionLoader::readPipelineLayoutSetupProperty(const XJSON::KeyValue& xjsonOuterProperty,
+	HAL::ShaderCompiler::PipelineLayoutRef& resultPipelineLayout, uint64& resultPipelineLayoutNameXSH)
 {
 	if (xjsonOuterProperty.value.valueType != XJSON::ValueType::Literal)
 	{
@@ -532,18 +570,25 @@ bool ListingLoader::readPipelineLayoutSetupProperty(const XJSON::KeyValue& xjson
 		return false;
 	}
 
-	resultPipelineLayout = pipelineLayoutList.find(xjsonOuterProperty.value.valueLiteral);
-	if (!resultPipelineLayout)
+	const uint64 pipelineLayoutNameXSH = XSH::Compute(xjsonOuterProperty.value.valueLiteral);
+	const HAL::ShaderCompiler::PipelineLayoutRef* foundPipelineLayout =
+		libraryDefinition.pipelineLayouts.findValue(pipelineLayoutNameXSH);
+	if (!foundPipelineLayout)
 	{
-		reportError("undefined pipeline layout", xjsonOuterProperty.value.valueLocation);
+		reportError("unknown pipeline layout", xjsonOuterProperty.value.valueLocation);
 		return false;
 	}
+	// TODO: Additionally compare actual names to check for hash collision (that will never happen).
+
+	resultPipelineLayout = *foundPipelineLayout;
+	resultPipelineLayoutNameXSH = pipelineLayoutNameXSH;
+	XAssert(resultPipelineLayout);
 
 	return true;
 }
 
-bool ListingLoader::readShaderSetupProperty(const XJSON::KeyValue& xjsonOuterProperty,
-	HAL::ShaderCompiler::ShaderType shaderType, PipelineLayout& pipelineLayout, Shader*& resultShader)
+bool LibraryDefinitionLoader::readShaderSetupProperty(const XJSON::KeyValue& xjsonOuterProperty,
+	HAL::ShaderCompiler::ShaderDesc& resultShader)
 {
 	if (xjsonOuterProperty.value.valueType != XJSON::ValueType::Object)
 	{
@@ -551,7 +596,7 @@ bool ListingLoader::readShaderSetupProperty(const XJSON::KeyValue& xjsonOuterPro
 		return false;
 	}
 
-	StringViewASCII path;
+	StringViewASCII sourcePath;
 	StringViewASCII entryPointName;
 
 	XJSON::Location pathLocation = {};
@@ -580,7 +625,7 @@ bool ListingLoader::readShaderSetupProperty(const XJSON::KeyValue& xjsonOuterPro
 
 		if (xjsonProperty.key == "P")
 		{
-			if (!path.isEmpty())
+			if (!sourcePath.isEmpty())
 			{
 				reportError("shader path already defined", xjsonProperty.value.valueLocation);
 				return false;
@@ -596,7 +641,7 @@ bool ListingLoader::readShaderSetupProperty(const XJSON::KeyValue& xjsonOuterPro
 				return false;
 			}
 
-			path = xjsonProperty.value.valueLiteral;
+			sourcePath = xjsonProperty.value.valueLiteral;
 			pathLocation = xjsonProperty.value.valueLocation;
 		}
 		else if (xjsonProperty.key == "E")
@@ -628,67 +673,28 @@ bool ListingLoader::readShaderSetupProperty(const XJSON::KeyValue& xjsonOuterPro
 	}
 	xjsonParser.closeObjectValueScope();
 
-	if (path.isEmpty())
+	if (sourcePath.isEmpty())
 	{
-		reportError("shader is not defined", xjsonOuterProperty.keyLocation);
+		reportError("shader path is not defined", xjsonOuterProperty.keyLocation);
 		return false;
 	}
 
-	const SourceCreationResult sourceCreationResult = sourceCache.findOrCreate(path);
-
-	if (sourceCreationResult.status == SourceCreationStatus::Failure_PathIsTooLong)
-	{
-		reportError("shader path is too long", pathLocation);
-		return false;
-	}
-	else if (sourceCreationResult.status == SourceCreationStatus::Failure_InvalidPath)
-	{
-		reportError("shader path is invalid", pathLocation);
-		return false;
-	}
-
-	XAssert(sourceCreationResult.status == SourceCreationStatus::Success);
-	XAssert(sourceCreationResult.source);
-
-	const ShaderCreationResult shaderCreationResult =
-		shaderList.findOrCreate(shaderType, *sourceCreationResult.source, entryPointName, pipelineLayout);
-
-	if (shaderCreationResult.status == ShaderCreationStatus::Failure_ShaderTypeMismatch)
-	{
-		reportError("same shader is already defined with other type", xjsonOuterProperty.keyLocation);
-		return false;
-	}
-
-	XAssert(shaderCreationResult.status == ShaderCreationStatus::Success);
-	XAssert(shaderCreationResult.shader);
-	resultShader = shaderCreationResult.shader;
+	resultShader = {};
+	resultShader.sourcePath = sourcePath;
+	resultShader.entryPointName = entryPointName;
 	return true;
 }
 
-ListingLoader::ListingLoader(
-	DescriptorSetLayoutList& descriptorSetLayoutList,
-	PipelineLayoutList& pipelineLayoutList,
-	PipelineList& pipelineList,
-	ShaderList& shaderList,
-	SourceCache& sourceCache)
-	:
-	descriptorSetLayoutList(descriptorSetLayoutList),
-	pipelineLayoutList(pipelineLayoutList),
-	pipelineList(pipelineList),
-	shaderList(shaderList),
-	sourceCache(sourceCache)
-{}
-
-bool ListingLoader::load(const char* pathCStr)
+bool LibraryDefinitionLoader::load(const char* xjsonPathCStr)
 {
-	path = pathCStr;
+	xjsonPath = xjsonPathCStr;
 
 	DynamicStringASCII text;
 
 	// Read text from file.
 	{
 		File file;
-		file.open(pathCStr, FileAccessMode::Read, FileOpenMode::OpenExisting);
+		file.open(xjsonPath, FileAccessMode::Read, FileOpenMode::OpenExisting);
 		if (!file.isInitialized())
 			return false;
 

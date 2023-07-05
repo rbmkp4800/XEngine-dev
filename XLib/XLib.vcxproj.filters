@@ -22,9 +22,9 @@
     <ClInclude Include="Source\XLib.Containers.BinaryHeap.h" />
     <ClInclude Include="Source\XLib.Containers.BitArray.h" />
     <ClInclude Include="Source\XLib.Containers.CyclicQueue.h" />
-    <ClInclude Include="Source\XLib.Containers.FlatHashMap.h" />
-    <ClInclude Include="Source\XLib.Containers.IntrusiveBinaryTree.h" />
-    <ClInclude Include="Source\XLib.Containers.IntrusiveDoublyLinkedList.h" />
+    <ClInclude Include="Source\XLib.Containers.HashMap.h" />
+    <ClInclude Include="Source\XLib.Containers.BinaryTree.h" />
+    <ClInclude Include="Source\XLib.Containers.DoublyLinkedList.h" />
     <ClInclude Include="Source\XLib.Math.h" />
     <ClInclude Include="Source\XLib.Math.Matrix2x3.h" />
     <ClInclude Include="Source\XLib.Math.Matrix3x4.h" />
@@ -55,6 +55,7 @@
     <ClInclude Include="Source\XLib.Platform.DXGI.Helpers.h" />
     <ClInclude Include="Source\XLib.Containers.AVLTreeLogic.h" />
     <ClInclude Include="Source\XLib.Allocation.h" />
+    <ClInclude Include="Source\XLib.RefCounted.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\XLib.Random.cpp" />

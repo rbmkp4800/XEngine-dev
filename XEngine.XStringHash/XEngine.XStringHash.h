@@ -66,6 +66,8 @@ namespace XEngine
 			return Compute(string.getData(), initialValue, string.getLength());
 		}
 	};
+
+	using XSH = XStringHash;
 }
 
 consteval uint64 operator ""_xsh(const char* string, uintptr length)

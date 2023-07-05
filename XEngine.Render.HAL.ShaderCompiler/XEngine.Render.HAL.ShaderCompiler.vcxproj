@@ -170,6 +170,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="XEngine.Render.HAL.ShaderCompiler.h" />
+    <ClInclude Include="XEngine.Render.HAL.ShaderCompiler.HLSLPatcher.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\XEngine.Render.HAL.Common\XEngine.Render.HAL.Common.vcxproj">
@@ -184,6 +185,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="XEngine.Render.HAL.ShaderCompiler.cpp" />
+    <ClCompile Include="XEngine.Render.HAL.ShaderCompiler.HLSLPatcher.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

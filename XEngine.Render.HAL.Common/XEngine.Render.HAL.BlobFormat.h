@@ -4,30 +4,16 @@
 
 #include "XEngine.Render.HAL.Common.h"
 
-// TODO: Revist `GraphicsPipelineBaseBlob`. For now temporary dirty implementaion.
-// TODO: Probably we should remove all pseudo-error reporting via `return false` from readers and just do master assert?
-
-namespace XEngine::Render::HAL::BlobFormat
-{
-	enum class BytecodeBlobType : uint8
-	{
-		Undefined = 0,
-		ComputeShader,
-		VertexShader,
-		AmplificationShader,
-		MeshShader,
-		PixelShader,
-	};
-}
+// TODO: Revisit `GraphicsPipelineStateBlob`. For now temporary dirty implementaion.
+// TODO: Probably we should remove all pseudo-error-reporting via `return false` from readers and just do master assert?
 
 namespace XEngine::Render::HAL::BlobFormat::Data
 {
 	constexpr uint32 GenericBlobSignature = 0x874C2131;
-	constexpr uint16 DescriptorSetLayoutBlobSignature		= 0xF1A6;
-	constexpr uint16 PipelineLayoutBlobSignature			= 0xE1B2;
-	constexpr uint16 GraphicsPipelineBaseBlobSignature		= 0xBCF2;
-	constexpr uint16 BytecodeBlobSignature					= 0xE084;
-	constexpr uint16 PipelineLayoutMetadataBlobSignature	= 0x17B9;
+	constexpr uint16 DescriptorSetLayoutBlobSignature	= 0xF1A6;
+	constexpr uint16 PipelineLayoutBlobSignature		= 0xE1B2;
+	constexpr uint16 GraphicsPipelineStateBlobSignature	= 0xBCF2;
+	constexpr uint16 BytecodeBlobSignature				= 0xE084;
 
 	struct GenericBlobHeader // 16 bytes
 	{
@@ -46,14 +32,14 @@ namespace XEngine::Render::HAL::BlobFormat::Data
 		uint16 _reserved;
 	};
 
-	struct DescriptorSetNestedBindingRecord // 12 bytes
+	struct DescriptorSetBindingRecord // 12 bytes
 	{
 		uint32 nameXSH0;
 		uint32 nameXSH1;
 		uint16 descriptorCount;
 		DescriptorType descriptorType;
 	};
-	static_assert(sizeof(DescriptorSetNestedBindingRecord) == 12);
+	static_assert(sizeof(DescriptorSetBindingRecord) == 12);
 
 	struct PipelineLayoutBlobSubHeader
 	{
@@ -69,11 +55,11 @@ namespace XEngine::Render::HAL::BlobFormat::Data
 		// [8..12)
 		uint32 descriptorSetLayoutSourceHash;
 		// [12..14)
-		uint16 platformBindingIndex;
+		uint16 d3dRootParameterIndex;
 		// [14..15)
 		PipelineBindingType type;
 		// [15..16)
-		uint8 constantsSize;
+		uint8 inplaceConstantCount;
 	};
 	static_assert(sizeof(PipelineBindingRecord) == 16);
 
@@ -116,36 +102,13 @@ namespace XEngine::Render::HAL::BlobFormat::Data
 	struct BytecodeBlobSubHeader
 	{
 		uint32 pipelineLayoutSourceHash;
-		BytecodeBlobType type;
+		ShaderType type;
 	};
-
-	struct PipelineLayoutMetadataBlobSubHeader
-	{
-		uint32 sourceHash;
-		uint16 pipelineBindingCount;
-		uint16 nestedBindingCount;
-	};
-
-	struct PipelineBindingMetaRecord // 4 bytes
-	{
-		uint16 shaderRegisterOrNestedBindingsOffset;
-		uint16 nestedBindingCount;
-	};
-	static_assert(sizeof(PipelineBindingMetaRecord) == 4);
-
-	struct DescriptorSetNestedBindingMetaRecord // 16 bytes
-	{
-		uint64 nameXSH;
-		uint16 descriptorCount;
-		DescriptorType descriptorType;
-		uint16 shaderRegister;
-	};
-	static_assert(sizeof(DescriptorSetNestedBindingMetaRecord) == 16);
 }
 
 namespace XEngine::Render::HAL::BlobFormat
 {
-	struct DescriptorSetNestedBindingInfo
+	struct DescriptorSetBindingInfo
 	{
 		uint64 nameXSH;
 		uint16 descriptorCount;
@@ -155,12 +118,12 @@ namespace XEngine::Render::HAL::BlobFormat
 	struct PipelineBindingInfo
 	{
 		uint64 nameXSH;
-		uint16 platformBindingIndex;
+		uint16 d3dRootParameterIndex;
 		PipelineBindingType type;
 
 		union
 		{
-			uint8 constantsSize;
+			uint8 inplaceConstantCount;
 			uint32 descriptorSetLayoutSourceHash;
 		};
 	};
@@ -204,7 +167,7 @@ namespace XEngine::Render::HAL::BlobFormat
 
 		uint32 getMemoryBlockSize() const;
 		void setMemoryBlock(void* memoryBlock, uint32 memoryBlockSize);
-		void writeBinding(uint16 bindingIndex, const DescriptorSetNestedBindingInfo& bindingInfo);
+		void writeBinding(uint16 bindingIndex, const DescriptorSetBindingInfo& bindingInfo);
 		void finalize(uint32 sourceHash);
 	};
 
@@ -212,7 +175,7 @@ namespace XEngine::Render::HAL::BlobFormat
 	{
 	private:
 		const Data::DescriptorSetLayoutBlobSubHeader* subHeader = nullptr;
-		const Data::DescriptorSetNestedBindingRecord* bindingRecords = nullptr;
+		const Data::DescriptorSetBindingRecord* bindingRecords = nullptr;
 
 	public:
 		DescriptorSetLayoutBlobReader() = default;
@@ -221,7 +184,7 @@ namespace XEngine::Render::HAL::BlobFormat
 		bool open(const void* data, uint32 size);
 		uint32 getSourceHash() const { return subHeader->sourceHash; }
 		uint16 getBindingCount() const { return subHeader->bindingCount; }
-		DescriptorSetNestedBindingInfo getBinding(uint32 bindingIndex) const;
+		DescriptorSetBindingInfo getBinding(uint32 bindingIndex) const;
 	};
 
 	class PipelineLayoutBlobWriter
@@ -230,25 +193,20 @@ namespace XEngine::Render::HAL::BlobFormat
 		void* memoryBlock = nullptr;
 		uint32 memoryBlockSize = 0;
 
-		Data::PipelineBindingRecord pipelineBindingRecords[MaxPipelineBindingCount] = {};
-		uint16 pipelineBindingCount = 0;
+		uint16 bindingCount = 0;
 		uint32 platformDataSize = 0;
-		bool initializationInProgress = false;
 
 	public:
 		PipelineLayoutBlobWriter() = default;
 		~PipelineLayoutBlobWriter() = default;
 
-		void beginInitialization();
-		void addPipelineBinding(const PipelineBindingInfo& bindingInfo);
-		void endInitialization(uint32 platformDataSize);
+		void initialize(uint16 bindingCount, uint32 platformDataSize);
 
 		uint32 getMemoryBlockSize() const;
 		void setMemoryBlock(void* memoryBlock, uint32 memoryBlockSize);
+		void writeBinding(uint16 bindingIndex, const PipelineBindingInfo& bindingInfo);
 		void writePlatformData(const void* platformData, uint32 platformDataSize);
 		void finalize(uint32 sourceHash);
-
-		inline uint16 getPipelineBingingCount() const { return pipelineBindingCount; }
 	};
 
 	class PipelineLayoutBlobReader : public GenericBlobReader
@@ -271,7 +229,7 @@ namespace XEngine::Render::HAL::BlobFormat
 		const void* getPlatformData() const { return platformData; }
 	};
 
-	class GraphicsPipelineBaseBlobWriter
+	class GraphicsPipelineStateBlobWriter
 	{
 	private:
 		uint32 vsBytecodeChecksum = 0;
@@ -301,11 +259,11 @@ namespace XEngine::Render::HAL::BlobFormat
 		static constexpr uint8 MaxVertexBindingNameLength = Data::MaxVertexBindingNameLength;
 
 	public:
-		GraphicsPipelineBaseBlobWriter() = default;
-		~GraphicsPipelineBaseBlobWriter() = default;
+		GraphicsPipelineStateBlobWriter() = default;
+		~GraphicsPipelineStateBlobWriter() = default;
 
 		void beginInitialization();
-		void registerBytecodeBlob(BytecodeBlobType type, uint32 blobChecksum);
+		void registerBytecodeBlob(ShaderType type, uint32 blobChecksum);
 		void addRenderTarget(TexelViewFormat format);
 		void setDepthStencilFormat(DepthStencilFormat format);
 		void enableVertexBuffer(uint8 index, bool perInstance);
@@ -316,21 +274,21 @@ namespace XEngine::Render::HAL::BlobFormat
 		void finalizeToMemoryBlock(void* memoryBlock, uint32 memoryBlockSize, uint32 pipelineLayoutSourceHash);
 	};
 
-	class GraphicsPipelineBaseBlobReader : public GenericBlobReader
+	class GraphicsPipelineStateBlobReader : public GenericBlobReader
 	{
 	private:
 		const Data::GraphicsPipelineBaseBlobBody* body = nullptr;
 		const Data::VertexBindingRecord* vertexBindingRecords = nullptr;
 
 	public:
-		GraphicsPipelineBaseBlobReader() = default;
-		~GraphicsPipelineBaseBlobReader() = default;
+		GraphicsPipelineStateBlobReader() = default;
+		~GraphicsPipelineStateBlobReader() = default;
 
 		bool open(const void* data, uint32 size);
 
 		uint32 getPipelineLayoutSourceHash() const { return body->pipelineLayoutSourceHash; }
-		bool isBytecodeBlobRegistered(BytecodeBlobType type) const;
-		uint32 getBytecodeBlobChecksum(BytecodeBlobType type) const;
+		bool isBytecodeBlobRegistered(ShaderType type) const;
+		uint32 getBytecodeBlobChecksum(ShaderType type) const;
 		uint32 getRenderTargetCount() const;
 		TexelViewFormat getRenderTargetFormat(uint32 index) const { XAssert(index < MaxRenderTargetCount); return body->renderTargetFormats[index]; }
 		DepthStencilFormat getDepthStencilFormat() const { return body->depthStencilFormat; }
@@ -355,7 +313,7 @@ namespace XEngine::Render::HAL::BlobFormat
 		uint32 getMemoryBlockSize() const;
 		void setMemoryBlock(void* memoryBlock, uint32 memoryBlockSize);
 		void writeBytecode(const void* bytecodeData, uint32 bytecodeSize);
-		void finalize(BytecodeBlobType type, uint32 pipelineLayoutSourceHash);
+		void finalize(ShaderType type, uint32 pipelineLayoutSourceHash);
 	};
 
 	class BytecodeBlobReader : public GenericBlobReader
@@ -371,71 +329,9 @@ namespace XEngine::Render::HAL::BlobFormat
 
 		bool open(const void* data, uint32 size);
 
-		BytecodeBlobType getType() const { return subHeader->type; }
+		ShaderType getType() const { return subHeader->type; }
 		uint32 getPipelineLayoutSourceHash() const { return subHeader->pipelineLayoutSourceHash; }
 		uint32 getBytecodeSize() const { return bytecodeSize; }
 		const void* getBytecodeData() const { return bytecodeData; }
-	};
-
-	// Metadata blobs //////////////////////////////////////////////////////////////////////////////
-	// These are used only in compiler.
-
-	struct DescriptorSetNestedBindingMetaInfo
-	{
-		DescriptorSetNestedBindingInfo generic;
-		uint16 shaderRegister;
-	};
-
-	class PipelineLayoutMetadataBlobWriter
-	{
-	private:
-		static constexpr uint32 MaxTotalNestedBindingCount = 256;
-
-	private:
-		Data::PipelineBindingMetaRecord pipelineBindingRecords[MaxPipelineBindingCount] = {};
-		Data::DescriptorSetNestedBindingMetaRecord nestedBindingRecords[MaxTotalNestedBindingCount] = {};
-		uint16 pipelineBindingCount = 0;
-		uint16 nestedBindingCount = 0;
-		bool nestededBindingsAdditionInProgress = false;
-		bool initializationInProgress = false;
-
-		uint32 memoryBlockSize = 0;
-
-	public:
-		PipelineLayoutMetadataBlobWriter() = default;
-		~PipelineLayoutMetadataBlobWriter() = default;
-
-		void beginInitialization();
-		void addGenericPipelineBinding(uint16 shaderRegister);
-		void addDescriptorSetPipelineBindingAndBeginAddingNestedBindings();
-		void addDescriptorSetNestedBinding(const DescriptorSetNestedBindingInfo& nestedBindingInfo, uint16 shaderRegister);
-		void endAddingDescriptorSetNestedBindings();
-		void endInitialization();
-
-		uint32 getMemoryBlockSize() const;
-		void finalizeToMemoryBlock(void* memoryBlock, uint32 memoryBlockSize, uint32 sourceHash);
-
-		uint32 getPipelineBingingCount() const { return pipelineBindingCount; }
-	};
-
-	class PipelineLayoutMetadataBlobReader : public GenericBlobReader
-	{
-	private:
-		const Data::PipelineLayoutMetadataBlobSubHeader* subHeader = nullptr;
-		const Data::PipelineBindingMetaRecord* pipelineBindingRecords = nullptr;
-		const Data::DescriptorSetNestedBindingMetaRecord* nestedBindingRecords = nullptr;
-
-	public:
-		PipelineLayoutMetadataBlobReader() = default;
-		~PipelineLayoutMetadataBlobReader() = default;
-
-		bool open(const void* data, uint32 size);
-
-		uint32 getSourceHash() const { return subHeader->sourceHash; }
-		uint16 getPipelineBindingCount() const { return subHeader->pipelineBindingCount; }
-		bool isDescriptorSetBinding(uint16 pipelingBindingIndex) const;
-		uint16 getPipelineBindingShaderRegister(uint16 pipelingBindingIndex) const;
-		uint16 getDescriptorSetNestedBindingCount(uint16 pipelingBindingIndex) const;
-		DescriptorSetNestedBindingMetaInfo getDescriptorSetNestedBinding(uint16 pipelingBindingIndex, uint16 descriptorSetNestedBindingIndex) const;
 	};
 }

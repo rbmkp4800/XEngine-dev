@@ -1,3 +1,7 @@
+// Every object name should be valid filename. And probably we should drop dots too.
+//	Test.DescriptorSetLayout<Test>
+//	Test-DescriptorSetLayout[Test]
+
 Test.DescriptorSetLayout<Test> : (descriptor-set-layout)
 {
 	TEST_TEXTURE : (read-only-texture-descriptor),
@@ -37,4 +41,5 @@ AccumulateDeferredLighting : (graphics-pipeline)
 	vs : { P:"FullScreenQuadVS.hlsl", E:main },
 	ps : { P:"Lighting.hlsl", E:main },
 	render-targets : [ R8G8B8BA8_Unorm ],
-}
+	// flags { force-generate-d3d-pdbs, force-disable-optimization },
+},

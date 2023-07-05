@@ -17,6 +17,11 @@
 // TODO: Handle should be 18+10+4 or 17+11+4 instead of 20+8+4.
 // TODO: Probably move all the `Host` stuff to `Device` itself.
 // TODO: Setting pipeline type should not clear pipeline layout as one layout could work for graphics and compute.
+// TODO: Depth-stencil state, rasterizer state, blend state should be provided in runtime. We assume that these settings have nothing to do with shader bytecode.
+
+// NOTE: `CreateGraphicsPipeline` / `CreateComputePipeline` will be replaced with `CreateShader` / `CompileShader`, when
+// D3D12 GPU work graphs (including collection state objects) and VK_EXT_shader_object are ready. At that point we should
+// also rename `PipelineLayout` to something like `ShaderInputLayout`.
 
 #define XEAssert(cond) XAssert(cond)
 #define XEAssertUnreachableCode() XAssertUnreachableCode()

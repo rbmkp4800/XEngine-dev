@@ -61,16 +61,15 @@ namespace XLib
 		inline uintptr getByteSize() const { return uintptr(size) * sizeof(Type); }
 		inline bool isEmpty() const { return size == 0; }
 
-		inline Type& front() { return buffer[0]; }
-		inline Type& back() { return buffer[size - 1]; }
-
 		inline operator Type*() { return buffer; }
 		inline operator const Type*() const { return buffer; }
 		inline Type* getData() { return buffer; }
 		inline const Type* getData() const { return buffer; }
 
 		inline Type* begin() { return buffer; }
-		inline Type* end() { return (Type*)buffer + size; }
+		inline Type* end() { return buffer + size; }
+		inline Type& front() { return buffer[0]; }
+		inline Type& back() { return buffer[size - 1]; }
 	};
 
 
@@ -108,8 +107,10 @@ namespace XLib
 		inline Type* getData() { return buffer; }
 		inline const Type* getData() const { return buffer; }
 
-		inline Type* begin();
-		inline Type* end();
+		inline Type* begin() { return buffer; }
+		inline Type* end() { return buffer + size; }
+		inline Type& front() { return buffer[0]; }
+		inline Type& back() { return buffer[size - 1]; }
 	};
 
 

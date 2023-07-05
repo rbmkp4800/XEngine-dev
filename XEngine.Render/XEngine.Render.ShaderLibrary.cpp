@@ -1,7 +1,7 @@
 #include <XLib.System.File.h>
 #include <XLib.SystemHeapAllocator.h>
 
-#include <XEngine.Render.Shaders.PackFormat.h>
+#include <XEngine.Render.ShaderLibraryFormat.h>
 
 #include "XEngine.Render.h"
 
@@ -54,7 +54,7 @@ void ShaderLibrary::load(const char* packPath)
 
 	HAL::Device& halDevice = Host::GetDevice();
 
-	using namespace Shaders::PackFormat;
+	using namespace ShaderLibraryFormat;
 
 	File packFile;
 	packFile.open(packPath, FileAccessMode::Read, FileOpenMode::OpenExisting);

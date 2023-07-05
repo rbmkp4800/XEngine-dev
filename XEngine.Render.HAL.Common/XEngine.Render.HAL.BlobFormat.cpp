@@ -43,14 +43,14 @@ void DescriptorSetLayoutBlobWriter::initialize(uint16 bindingCount)
 {
 	XAssert(memoryBlockSize == 0); // Not initialized.
 	XAssert(bindingCount > 0);
-	XAssert(bindingCount <= MaxDescriptorSetNestedBindingCount);
+	XAssert(bindingCount <= MaxDescriptorSetBindingCount);
 
 	this->bindingCount = bindingCount;
 
 	memoryBlockSize =
 		sizeof(GenericBlobHeader) +
 		sizeof(DescriptorSetLayoutBlobSubHeader) +
-		sizeof(DescriptorSetNestedBindingRecord) * bindingCount;
+		sizeof(DescriptorSetBindingRecord) * bindingCount;
 }
 
 uint32 DescriptorSetLayoutBlobWriter::getMemoryBlockSize() const
@@ -67,7 +67,7 @@ void DescriptorSetLayoutBlobWriter::setMemoryBlock(void* memoryBlock, uint32 mem
 	memorySet(memoryBlock, 0, memoryBlockSize);
 }
 
-void DescriptorSetLayoutBlobWriter::writeBinding(uint16 bindingIndex, const DescriptorSetNestedBindingInfo& bindingInfo)
+void DescriptorSetLayoutBlobWriter::writeBinding(uint16 bindingIndex, const DescriptorSetBindingInfo& bindingInfo)
 {
 	XAssert(memoryBlock);
 	XAssert(bindingIndex < bindingCount);
@@ -75,12 +75,13 @@ void DescriptorSetLayoutBlobWriter::writeBinding(uint16 bindingIndex, const Desc
 	const uint32 offset =
 		sizeof(GenericBlobHeader) +
 		sizeof(DescriptorSetLayoutBlobSubHeader) +
-		sizeof(DescriptorSetNestedBindingRecord) * bindingIndex;
-	DescriptorSetNestedBindingRecord& bindingRecord = *(DescriptorSetNestedBindingRecord*)((byte*)memoryBlock + offset);
-	bindingRecord.nameXSH0 = uint32(bindingInfo.nameXSH);
-	bindingRecord.nameXSH1 = uint32(bindingInfo.nameXSH >> 32);
-	bindingRecord.descriptorCount = bindingInfo.descriptorCount;
-	bindingRecord.descriptorType = bindingInfo.descriptorType;
+		sizeof(DescriptorSetBindingRecord) * bindingIndex;
+	DescriptorSetBindingRecord& record = *(DescriptorSetBindingRecord*)((byte*)memoryBlock + offset);
+	record = {};
+	record.nameXSH0 = uint32(bindingInfo.nameXSH);
+	record.nameXSH1 = uint32(bindingInfo.nameXSH >> 32);
+	record.descriptorCount = bindingInfo.descriptorCount;
+	record.descriptorType = bindingInfo.descriptorType;
 }
 
 void DescriptorSetLayoutBlobWriter::finalize(uint32 sourceHash)
@@ -111,7 +112,7 @@ bool DescriptorSetLayoutBlobReader::open(const void* data, uint32 size)
 		(const DescriptorSetLayoutBlobSubHeader*)((const byte*)data + sizeof(GenericBlobHeader));
 
 	if (subHeader->bindingCount == 0 ||
-		subHeader->bindingCount > MaxDescriptorSetNestedBindingCount)
+		subHeader->bindingCount > MaxDescriptorSetBindingCount)
 		return false;
 
 	const uint32 bindingRecordsOffset =
@@ -119,7 +120,7 @@ bool DescriptorSetLayoutBlobReader::open(const void* data, uint32 size)
 		sizeof(DescriptorSetLayoutBlobSubHeader);
 	const uint32 sizeCheck =
 		bindingRecordsOffset +
-		sizeof(DescriptorSetNestedBindingRecord) * subHeader->bindingCount;
+		sizeof(DescriptorSetBindingRecord) * subHeader->bindingCount;
 
 	if (size != sizeCheck)
 		return false;
@@ -127,59 +128,37 @@ bool DescriptorSetLayoutBlobReader::open(const void* data, uint32 size)
 	this->data = data;
 	this->size = size;
 	this->subHeader = subHeader;
-	this->bindingRecords = (const DescriptorSetNestedBindingRecord*)((const byte*)data + bindingRecordsOffset);
+	this->bindingRecords = (const DescriptorSetBindingRecord*)((const byte*)data + bindingRecordsOffset);
 	return true;
 }
 
-DescriptorSetNestedBindingInfo DescriptorSetLayoutBlobReader::getBinding(uint32 bindingIndex) const
+DescriptorSetBindingInfo DescriptorSetLayoutBlobReader::getBinding(uint32 bindingIndex) const
 {
 	XAssert(bindingIndex < subHeader->bindingCount);
-	const DescriptorSetNestedBindingRecord& bindingRecord = bindingRecords[bindingIndex];
+	const DescriptorSetBindingRecord& record = bindingRecords[bindingIndex];
 
-	DescriptorSetNestedBindingInfo result = {};
-	result.nameXSH = uint64(bindingRecord.nameXSH0) | (uint64(bindingRecord.nameXSH1) << 32);
-	result.descriptorCount = bindingRecord.descriptorCount;
-	result.descriptorType = bindingRecord.descriptorType;
+	DescriptorSetBindingInfo result = {};
+	result.nameXSH = uint64(record.nameXSH0) | (uint64(record.nameXSH1) << 32);
+	result.descriptorCount = record.descriptorCount;
+	result.descriptorType = record.descriptorType;
 	return result;
 }
 
 // PipelineLayoutBlobWriter ////////////////////////////////////////////////////////////////////////
 
-void PipelineLayoutBlobWriter::beginInitialization()
+void PipelineLayoutBlobWriter::initialize(uint16 bindingCount, uint32 platformDataSize)
 {
-	XAssert(memoryBlockSize == 0);	// Not initialized.
-	XAssert(!initializationInProgress);
-	initializationInProgress = true;
-}
+	XAssert(memoryBlockSize == 0); // Not initialized.
+	XAssert(bindingCount > 0);
+	XAssert(bindingCount <= MaxDescriptorSetBindingCount);
 
-void PipelineLayoutBlobWriter::addPipelineBinding(const PipelineBindingInfo& bindingInfo)
-{
-	XAssert(initializationInProgress);
-
-	XAssert(pipelineBindingCount < MaxPipelineBindingCount);
-	PipelineBindingRecord& bindingRecord = pipelineBindingRecords[pipelineBindingCount];
-	pipelineBindingCount++;
-
-	bindingRecord.nameXSH = bindingInfo.nameXSH;
-	bindingRecord.platformBindingIndex = bindingInfo.platformBindingIndex;
-	bindingRecord.type = bindingInfo.type;
-	if (bindingInfo.type == PipelineBindingType::DescriptorSet)
-		bindingRecord.descriptorSetLayoutSourceHash = bindingInfo.descriptorSetLayoutSourceHash;
-	if (bindingInfo.type == PipelineBindingType::Constants)
-		bindingRecord.constantsSize = bindingInfo.constantsSize;
-}
-
-void PipelineLayoutBlobWriter::endInitialization(uint32 platformDataSize)
-{
-	XAssert(initializationInProgress);
-	initializationInProgress = false;
-
+	this->bindingCount = bindingCount;
 	this->platformDataSize = platformDataSize;
 
 	memoryBlockSize =
 		sizeof(GenericBlobHeader) +
 		sizeof(PipelineLayoutBlobSubHeader) +
-		sizeof(PipelineBindingRecord) * pipelineBindingCount +
+		sizeof(PipelineBindingRecord) * bindingCount +
 		platformDataSize;
 }
 
@@ -197,6 +176,26 @@ void PipelineLayoutBlobWriter::setMemoryBlock(void* memoryBlock, uint32 memoryBl
 	memorySet(memoryBlock, 0, memoryBlockSize);
 }
 
+void PipelineLayoutBlobWriter::writeBinding(uint16 bindingIndex, const PipelineBindingInfo& bindingInfo)
+{
+	XAssert(memoryBlock);
+	XAssert(bindingIndex < bindingCount);
+
+	const uint32 offset =
+		sizeof(GenericBlobHeader) +
+		sizeof(PipelineLayoutBlobSubHeader) +
+		sizeof(PipelineBindingRecord) * bindingIndex;
+	PipelineBindingRecord& record = *(PipelineBindingRecord*)((byte*)memoryBlock + offset);
+	record = {};
+	record.nameXSH = bindingInfo.nameXSH;
+	record.d3dRootParameterIndex = bindingInfo.d3dRootParameterIndex;
+	record.type = bindingInfo.type;
+	if (bindingInfo.type == PipelineBindingType::DescriptorSet)
+		record.descriptorSetLayoutSourceHash = bindingInfo.descriptorSetLayoutSourceHash;
+	if (bindingInfo.type == PipelineBindingType::InplaceConstants)
+		record.inplaceConstantCount = bindingInfo.inplaceConstantCount;
+}
+
 void PipelineLayoutBlobWriter::writePlatformData(const void* platformData, uint32 platformDataSize)
 {
 	XAssert(memoryBlock);
@@ -205,7 +204,7 @@ void PipelineLayoutBlobWriter::writePlatformData(const void* platformData, uint3
 	const uint32 offset =
 		sizeof(GenericBlobHeader) +
 		sizeof(PipelineLayoutBlobSubHeader) +
-		sizeof(PipelineBindingRecord) * pipelineBindingCount;
+		sizeof(PipelineBindingRecord) * bindingCount;
 	memoryCopy((byte*)memoryBlock + offset, platformData, platformDataSize);
 }
 
@@ -216,18 +215,8 @@ void PipelineLayoutBlobWriter::finalize(uint32 sourceHash)
 	PipelineLayoutBlobSubHeader& subHeader =
 		*(PipelineLayoutBlobSubHeader*)((byte*)memoryBlock + sizeof(GenericBlobHeader));
 	subHeader.sourceHash = sourceHash;
-	subHeader.bindingCount = uint16(pipelineBindingCount);
-	subHeader.platformDataSize = uint16(platformDataSize);
-	XAssert(subHeader.platformDataSize == platformDataSize);
-
-	const uint32 pipelineBindingRecordsOffset =
-		sizeof(GenericBlobHeader) +
-		sizeof(PipelineLayoutBlobSubHeader);
-
-	PipelineBindingRecord* dstPipelineBindingRecords =
-		(PipelineBindingRecord*)((byte*)memoryBlock + pipelineBindingRecordsOffset);
-	
-	memoryCopy(dstPipelineBindingRecords, pipelineBindingRecords, sizeof(PipelineBindingRecord) * pipelineBindingCount);
+	subHeader.bindingCount = bindingCount;
+	subHeader.platformDataSize = XCheckedCastU16(platformDataSize);
 
 	FillGenericBlobHeader(memoryBlock, memoryBlockSize, PipelineLayoutBlobSignature, 0);
 	memoryBlock = nullptr;
@@ -274,53 +263,53 @@ bool PipelineLayoutBlobReader::open(const void* data, uint32 size)
 PipelineBindingInfo PipelineLayoutBlobReader::getPipelineBinding(uint16 bindingIndex) const
 {
 	XAssert(bindingIndex < subHeader->bindingCount);
-	const PipelineBindingRecord& bindingRecord = bindingRecords[bindingIndex];
+	const PipelineBindingRecord& record = bindingRecords[bindingIndex];
 
 	PipelineBindingInfo result = {};
-	result.nameXSH = bindingRecord.nameXSH;
-	result.platformBindingIndex = bindingRecord.platformBindingIndex;
-	result.type = bindingRecord.type;
-	if (bindingRecord.type == PipelineBindingType::Constants)
-		result.constantsSize = bindingRecord.constantsSize;
-	if (bindingRecord.type == PipelineBindingType::DescriptorSet)
-		result.descriptorSetLayoutSourceHash = bindingRecord.descriptorSetLayoutSourceHash;
+	result.nameXSH = record.nameXSH;
+	result.d3dRootParameterIndex = record.d3dRootParameterIndex;
+	result.type = record.type;
+	if (record.type == PipelineBindingType::InplaceConstants)
+		result.inplaceConstantCount = record.inplaceConstantCount;
+	if (record.type == PipelineBindingType::DescriptorSet)
+		result.descriptorSetLayoutSourceHash = record.descriptorSetLayoutSourceHash;
 	return result;
 }
 
-// GraphicsPipelineBaseBlobWriter //////////////////////////////////////////////////////////////////
+// GraphicsPipelineStateBlobWriter /////////////////////////////////////////////////////////////////
 
-void GraphicsPipelineBaseBlobWriter::beginInitialization()
+void GraphicsPipelineStateBlobWriter::beginInitialization()
 {
 	XAssert(memoryBlockSize == 0);	// Not initialized.
 	XAssert(!initializationInProgress);
 	initializationInProgress = true;
 }
 
-void GraphicsPipelineBaseBlobWriter::registerBytecodeBlob(BytecodeBlobType type, uint32 blobChecksum)
+void GraphicsPipelineStateBlobWriter::registerBytecodeBlob(ShaderType type, uint32 blobChecksum)
 {
 	XAssert(initializationInProgress);
 
 	switch (type)
 	{
-		case BytecodeBlobType::VertexShader:
+		case ShaderType::Vertex:
 			XAssert(!vsBytecodeRegistered);
 			vsBytecodeRegistered = true;
 			vsBytecodeChecksum = blobChecksum;
 			break;
 
-		case BytecodeBlobType::AmplificationShader:
+		case ShaderType::Amplification:
 			XAssert(!asBytecodeRegistered);
 			asBytecodeRegistered = true;
 			asBytecodeChecksum = blobChecksum;
 			break;
 
-		case BytecodeBlobType::MeshShader:
+		case ShaderType::Mesh:
 			XAssert(!msBytecodeRegistered);
 			msBytecodeRegistered = true;
 			msBytecodeChecksum = blobChecksum;
 			break;
 
-		case BytecodeBlobType::PixelShader:
+		case ShaderType::Pixel:
 			XAssert(!psBytecodeRegistered);
 			psBytecodeRegistered = true;
 			psBytecodeChecksum = blobChecksum;
@@ -331,7 +320,7 @@ void GraphicsPipelineBaseBlobWriter::registerBytecodeBlob(BytecodeBlobType type,
 	}
 }
 
-void GraphicsPipelineBaseBlobWriter::addRenderTarget(TexelViewFormat format)
+void GraphicsPipelineStateBlobWriter::addRenderTarget(TexelViewFormat format)
 {
 	XAssert(initializationInProgress);
 	XAssert(renderTargetCount < MaxRenderTargetCount);
@@ -340,13 +329,13 @@ void GraphicsPipelineBaseBlobWriter::addRenderTarget(TexelViewFormat format)
 	renderTargetCount++;
 }
 
-void GraphicsPipelineBaseBlobWriter::setDepthStencilFormat(DepthStencilFormat format)
+void GraphicsPipelineStateBlobWriter::setDepthStencilFormat(DepthStencilFormat format)
 {
 	XAssert(initializationInProgress);
 	depthStencilFormat = format;
 }
 
-void GraphicsPipelineBaseBlobWriter::enableVertexBuffer(uint8 index, bool perInstance)
+void GraphicsPipelineStateBlobWriter::enableVertexBuffer(uint8 index, bool perInstance)
 {
 	XAssert(initializationInProgress);
 	static_assert(MaxVertexBufferCount <= 8); // uint8
@@ -356,7 +345,7 @@ void GraphicsPipelineBaseBlobWriter::enableVertexBuffer(uint8 index, bool perIns
 	vertexBuffersPerInstanceFlagBits |= perInstance ? bit : 0;
 }
 
-void GraphicsPipelineBaseBlobWriter::addVertexBinding(const char* name, uintptr nameLength, TexelViewFormat format, uint16 offset, uint8 bufferIndex)
+void GraphicsPipelineStateBlobWriter::addVertexBinding(const char* name, uintptr nameLength, TexelViewFormat format, uint16 offset, uint8 bufferIndex)
 {
 	XAssert(initializationInProgress);
 	XAssert(nameLength > 0 && nameLength <= MaxVertexBindingNameLength);
@@ -390,7 +379,7 @@ void GraphicsPipelineBaseBlobWriter::addVertexBinding(const char* name, uintptr 
 	}
 }
 
-void GraphicsPipelineBaseBlobWriter::endInitialization()
+void GraphicsPipelineStateBlobWriter::endInitialization()
 {
 	XAssert(initializationInProgress);
 	initializationInProgress = false;
@@ -404,13 +393,13 @@ void GraphicsPipelineBaseBlobWriter::endInitialization()
 		sizeof(VertexBindingRecord) * vertexBindingCount;
 }
 
-uint32 GraphicsPipelineBaseBlobWriter::getMemoryBlockSize() const
+uint32 GraphicsPipelineStateBlobWriter::getMemoryBlockSize() const
 {
 	XAssert(memoryBlockSize > 0);
 	return memoryBlockSize;
 }
 
-void GraphicsPipelineBaseBlobWriter::finalizeToMemoryBlock(void* memoryBlock, uint32 memoryBlockSize, uint32 pipelineLayoutSourceHash)
+void GraphicsPipelineStateBlobWriter::finalizeToMemoryBlock(void* memoryBlock, uint32 memoryBlockSize, uint32 pipelineLayoutSourceHash)
 {
 	XAssert(this->memoryBlockSize == memoryBlockSize && memoryBlockSize > 0);
 	memorySet(memoryBlock, 0, memoryBlockSize);
@@ -444,16 +433,16 @@ void GraphicsPipelineBaseBlobWriter::finalizeToMemoryBlock(void* memoryBlock, ui
 		(VertexBindingRecord*)((byte*)memoryBlock + vertexBindingRecordsOffset);
 	memoryCopy(dstVertexBindingRecords, vertexBindingRecords, sizeof(VertexBindingRecord) * vertexBindingCount);
 
-	FillGenericBlobHeader(memoryBlock, memoryBlockSize, GraphicsPipelineBaseBlobSignature, 0);
+	FillGenericBlobHeader(memoryBlock, memoryBlockSize, GraphicsPipelineStateBlobSignature, 0);
 }
 
-// GraphicsPipelineBaseBlobReader //////////////////////////////////////////////////////////////////
+// GraphicsPipelineStateBlobReader /////////////////////////////////////////////////////////////////
 
-bool GraphicsPipelineBaseBlobReader::open(const void* data, uint32 size)
+bool GraphicsPipelineStateBlobReader::open(const void* data, uint32 size)
 {
 	XAssert(!this->data);
 
-	if (!ValidateGenericBlobHeader(data, size, GraphicsPipelineBaseBlobSignature, 0))
+	if (!ValidateGenericBlobHeader(data, size, GraphicsPipelineStateBlobSignature, 0))
 		return false;
 	if (size < sizeof(GenericBlobHeader) + sizeof(GraphicsPipelineBaseBlobBody))
 		return false;
@@ -482,35 +471,35 @@ bool GraphicsPipelineBaseBlobReader::open(const void* data, uint32 size)
 	return true;
 }
 
-bool GraphicsPipelineBaseBlobReader::isBytecodeBlobRegistered(BytecodeBlobType type) const
+bool GraphicsPipelineStateBlobReader::isBytecodeBlobRegistered(ShaderType type) const
 {
 	switch (type)
 	{
-		case BytecodeBlobType::VertexShader:		return !!body->vsBytecodeRegistered;
-		case BytecodeBlobType::AmplificationShader:	return !!body->asBytecodeRegistered;
-		case BytecodeBlobType::MeshShader:			return !!body->msBytecodeRegistered;
-		case BytecodeBlobType::PixelShader:			return !!body->psBytecodeRegistered;
+		case ShaderType::Vertex:		return !!body->vsBytecodeRegistered;
+		case ShaderType::Amplification:	return !!body->asBytecodeRegistered;
+		case ShaderType::Mesh:			return !!body->msBytecodeRegistered;
+		case ShaderType::Pixel:			return !!body->psBytecodeRegistered;
 		default:
 			XAssertUnreachableCode();
 	}
 	return false;
 }
 
-uint32 GraphicsPipelineBaseBlobReader::getBytecodeBlobChecksum(BytecodeBlobType type) const
+uint32 GraphicsPipelineStateBlobReader::getBytecodeBlobChecksum(ShaderType type) const
 {
 	switch (type)
 	{
-		case BytecodeBlobType::VertexShader:		XAssert(body->vsBytecodeRegistered); return body->vsBytecodeChecksum;
-		case BytecodeBlobType::AmplificationShader:	XAssert(body->asBytecodeRegistered); return body->asBytecodeChecksum;
-		case BytecodeBlobType::MeshShader:			XAssert(body->msBytecodeRegistered); return body->msBytecodeChecksum;
-		case BytecodeBlobType::PixelShader:			XAssert(body->psBytecodeRegistered); return body->psBytecodeChecksum;
+		case ShaderType::Vertex:		XAssert(body->vsBytecodeRegistered); return body->vsBytecodeChecksum;
+		case ShaderType::Amplification:	XAssert(body->asBytecodeRegistered); return body->asBytecodeChecksum;
+		case ShaderType::Mesh:			XAssert(body->msBytecodeRegistered); return body->msBytecodeChecksum;
+		case ShaderType::Pixel:			XAssert(body->psBytecodeRegistered); return body->psBytecodeChecksum;
 		default:
 			XAssertUnreachableCode();
 	}
 	return 0;
 }
 
-uint32 GraphicsPipelineBaseBlobReader::getRenderTargetCount() const
+uint32 GraphicsPipelineStateBlobReader::getRenderTargetCount() const
 {
 	for (uint32 i = 0; i < MaxRenderTargetCount; i++)
 	{
@@ -520,13 +509,13 @@ uint32 GraphicsPipelineBaseBlobReader::getRenderTargetCount() const
 	return MaxRenderTargetCount;
 }
 
-VertexBindingInfo GraphicsPipelineBaseBlobReader::getVertexBinding(uint8 bindingIndex) const
+VertexBindingInfo GraphicsPipelineStateBlobReader::getVertexBinding(uint8 bindingIndex) const
 {
 	XAssert(bindingIndex < body->vertexBindingCount);
-	const VertexBindingRecord& bindingRecord = vertexBindingRecords[bindingIndex];
+	const VertexBindingRecord& record = vertexBindingRecords[bindingIndex];
 
 	uintptr nameLength = 0;
-	for (char c : bindingRecord.name)
+	for (char c : record.name)
 	{
 		if (c > 0)
 			nameLength++;
@@ -535,11 +524,11 @@ VertexBindingInfo GraphicsPipelineBaseBlobReader::getVertexBinding(uint8 binding
 	}
 
 	VertexBindingInfo result = {};
-	result.name = bindingRecord.name;
+	result.name = record.name;
 	result.nameLength = nameLength;
-	result.offset = bindingRecord.offset13_bufferIndex3 & 0x1FFF;
-	result.format = bindingRecord.format;
-	result.bufferIndex = bindingRecord.offset13_bufferIndex3 >> 13;
+	result.offset = record.offset13_bufferIndex3 & 0x1FFF;
+	result.format = record.format;
+	result.bufferIndex = record.offset13_bufferIndex3 >> 13;
 	return result;
 }
 
@@ -583,7 +572,7 @@ void BytecodeBlobWriter::writeBytecode(const void* bytecodeData, uint32 bytecode
 	memoryCopy((byte*)memoryBlock + offset, bytecodeData, bytecodeSize);
 }
 
-void BytecodeBlobWriter::finalize(BytecodeBlobType type, uint32 pipelineLayoutSourceHash)
+void BytecodeBlobWriter::finalize(ShaderType type, uint32 pipelineLayoutSourceHash)
 {
 	XAssert(memoryBlock);
 
@@ -612,223 +601,4 @@ bool BytecodeBlobReader::open(const void* data, uint32 size)
 	this->bytecodeData = subHeader + 1;
 	this->bytecodeSize = size - (sizeof(GenericBlobHeader) + sizeof(BytecodeBlobSubHeader));
 	return true;
-}
-
-// PipelineLayoutMetadataBlobWriter ////////////////////////////////////////////////////////////////
-
-void PipelineLayoutMetadataBlobWriter::beginInitialization()
-{
-	XAssert(memoryBlockSize == 0);	// Not initialized.
-	XAssert(!initializationInProgress);
-	initializationInProgress = true;
-}
-
-void PipelineLayoutMetadataBlobWriter::addGenericPipelineBinding(uint16 shaderRegister)
-{
-	XAssert(initializationInProgress);
-	XAssert(!nestededBindingsAdditionInProgress);
-
-	XAssert(pipelineBindingCount < MaxPipelineBindingCount);
-	PipelineBindingMetaRecord& pipelineBindingRecord = pipelineBindingRecords[pipelineBindingCount];
-	pipelineBindingCount++;
-
-	pipelineBindingRecord.shaderRegisterOrNestedBindingsOffset = shaderRegister;
-	pipelineBindingRecord.nestedBindingCount = 0;
-}
-
-void PipelineLayoutMetadataBlobWriter::addDescriptorSetPipelineBindingAndBeginAddingNestedBindings()
-{
-	XAssert(initializationInProgress);
-	XAssert(!nestededBindingsAdditionInProgress);
-
-	XAssert(pipelineBindingCount < MaxPipelineBindingCount);
-	PipelineBindingMetaRecord& pipelineBindingRecord = pipelineBindingRecords[pipelineBindingCount];
-	pipelineBindingCount++;
-
-	pipelineBindingRecord.shaderRegisterOrNestedBindingsOffset = nestedBindingCount;
-	pipelineBindingRecord.nestedBindingCount = 0;
-
-	nestededBindingsAdditionInProgress = true;
-}
-
-void PipelineLayoutMetadataBlobWriter::addDescriptorSetNestedBinding(
-	const DescriptorSetNestedBindingInfo& nestedBindingInfo, uint16 shaderRegister)
-{
-	XAssert(initializationInProgress);
-	XAssert(nestededBindingsAdditionInProgress);
-
-	XAssert(pipelineBindingCount > 0);
-	pipelineBindingRecords[pipelineBindingCount - 1].nestedBindingCount++;
-
-	XAssert(nestedBindingCount < MaxTotalNestedBindingCount);
-	DescriptorSetNestedBindingMetaRecord& nestedBinding = nestedBindingRecords[nestedBindingCount];
-	nestedBindingCount++;
-
-	nestedBinding.nameXSH = nestedBindingInfo.nameXSH;
-	nestedBinding.descriptorCount = nestedBindingInfo.descriptorCount;
-	nestedBinding.descriptorType = nestedBindingInfo.descriptorType;
-	nestedBinding.shaderRegister = shaderRegister;
-}
-
-void PipelineLayoutMetadataBlobWriter::endAddingDescriptorSetNestedBindings()
-{
-	XAssert(initializationInProgress);
-	XAssert(nestededBindingsAdditionInProgress);
-	nestededBindingsAdditionInProgress = false;
-	
-	XAssert(pipelineBindingCount > 0);
-	XAssert(pipelineBindingRecords[pipelineBindingCount - 1].nestedBindingCount > 0);
-}
-
-void PipelineLayoutMetadataBlobWriter::endInitialization()
-{
-	XAssert(initializationInProgress);
-	XAssert(!nestededBindingsAdditionInProgress);
-	initializationInProgress = false;
-
-	memoryBlockSize =
-		sizeof(GenericBlobHeader) +
-		sizeof(PipelineLayoutMetadataBlobSubHeader) +
-		sizeof(PipelineBindingMetaRecord) * pipelineBindingCount +
-		sizeof(DescriptorSetNestedBindingMetaRecord) * nestedBindingCount;
-}
-
-uint32 PipelineLayoutMetadataBlobWriter::getMemoryBlockSize() const
-{
-	XAssert(memoryBlockSize > 0);
-	return memoryBlockSize;
-}
-
-void PipelineLayoutMetadataBlobWriter::finalizeToMemoryBlock(void* memoryBlock, uint32 memoryBlockSize, uint32 sourceHash)
-{
-	XAssert(this->memoryBlockSize == memoryBlockSize && memoryBlockSize > 0);
-	memorySet(memoryBlock, 0, memoryBlockSize);
-
-	PipelineLayoutMetadataBlobSubHeader& subHeader =
-		*(PipelineLayoutMetadataBlobSubHeader*)((byte*)memoryBlock + sizeof(GenericBlobHeader));
-	subHeader.sourceHash = sourceHash;
-	subHeader.pipelineBindingCount = pipelineBindingCount;
-	subHeader.nestedBindingCount = nestedBindingCount;
-
-	const uint32 pipelineBindingRecordsOffset =
-		sizeof(GenericBlobHeader) +
-		sizeof(PipelineLayoutBlobSubHeader);
-	const uint32 nestedBindingRecordsOffset =
-		pipelineBindingRecordsOffset +
-		sizeof(PipelineBindingMetaRecord) * pipelineBindingCount;
-	const uint32 sizeCheck =
-		nestedBindingRecordsOffset +
-		sizeof(DescriptorSetNestedBindingMetaRecord) * nestedBindingCount;
-
-	XAssert(memoryBlockSize == sizeCheck);
-
-	PipelineBindingMetaRecord* dstPipelineBindingRecords =
-		(PipelineBindingMetaRecord*)((byte*)memoryBlock + pipelineBindingRecordsOffset);
-	DescriptorSetNestedBindingMetaRecord* dstNestedBindingRecords =
-		(DescriptorSetNestedBindingMetaRecord*)((byte*)memoryBlock + nestedBindingRecordsOffset);
-
-	memoryCopy(dstPipelineBindingRecords, pipelineBindingRecords, sizeof(PipelineBindingMetaRecord) * pipelineBindingCount);
-	memoryCopy(dstNestedBindingRecords, nestedBindingRecords, sizeof(DescriptorSetNestedBindingMetaRecord) * nestedBindingCount);
-
-	FillGenericBlobHeader(memoryBlock, memoryBlockSize, PipelineLayoutMetadataBlobSignature, 0);
-}
-
-// PipelineLayoutMetadataBlobReader ////////////////////////////////////////////////////////////////
-
-bool PipelineLayoutMetadataBlobReader::open(const void* data, uint32 size)
-{
-	XAssert(!this->data);
-
-	if (!ValidateGenericBlobHeader(data, size, PipelineLayoutMetadataBlobSignature, 0))
-		return false;
-	if (size < sizeof(GenericBlobHeader) + sizeof(PipelineLayoutMetadataBlobSubHeader))
-		return false;
-
-	const PipelineLayoutMetadataBlobSubHeader* subHeader =
-		(const PipelineLayoutMetadataBlobSubHeader*)((const byte*)data + sizeof(GenericBlobHeader));
-
-	if (subHeader->pipelineBindingCount > MaxPipelineBindingCount)
-		return false;
-
-	const uint32 pipelineBindingRecordsOffset =
-		sizeof(GenericBlobHeader) +
-		sizeof(PipelineLayoutMetadataBlobSubHeader);
-	const uint32 nestedBindingRecordsOffset =
-		pipelineBindingRecordsOffset +
-		sizeof(PipelineBindingMetaRecord) * subHeader->pipelineBindingCount;
-	const uint32 sizeCheck =
-		nestedBindingRecordsOffset +
-		sizeof(DescriptorSetNestedBindingMetaRecord) * subHeader->nestedBindingCount;
-
-	if (size != sizeCheck)
-		return false;
-
-	const PipelineBindingMetaRecord* pipelineBindingRecords =
-		(const PipelineBindingMetaRecord*)((const byte*)data + pipelineBindingRecordsOffset);
-
-	const DescriptorSetNestedBindingMetaRecord* nestedBindingRecords =
-		(const DescriptorSetNestedBindingMetaRecord*)((const byte*)data + nestedBindingRecordsOffset);
-
-	uint32 nestedBindingsCounter = 0;
-	for (uint32 i = 0; i < subHeader->pipelineBindingCount; i++)
-	{
-		const PipelineBindingMetaRecord& pipelineBinding = pipelineBindingRecords[i];
-		const bool hasNestedBindings = pipelineBinding.nestedBindingCount > 0;
-		if (hasNestedBindings)
-		{
-			const uint32 nestedBindingsOffset = pipelineBinding.shaderRegisterOrNestedBindingsOffset;
-			if (nestedBindingsCounter != nestedBindingsOffset)
-				return false;
-			nestedBindingsCounter += pipelineBinding.nestedBindingCount;
-		}
-	}
-
-	if (nestedBindingsCounter != subHeader->nestedBindingCount)
-		return false;
-
-	this->data = data;
-	this->size = size;
-	this->subHeader = subHeader;
-	this->pipelineBindingRecords = subHeader->pipelineBindingCount > 0 ? pipelineBindingRecords : nullptr;
-	this->nestedBindingRecords = subHeader->nestedBindingCount > 0 ? nestedBindingRecords : nullptr;
-	return true;
-}
-
-bool PipelineLayoutMetadataBlobReader::isDescriptorSetBinding(uint16 pipelingBindingIndex) const
-{
-	XAssert(pipelingBindingIndex < subHeader->pipelineBindingCount);
-	return pipelineBindingRecords[pipelingBindingIndex].nestedBindingCount != 0;
-}
-
-uint16 PipelineLayoutMetadataBlobReader::getPipelineBindingShaderRegister(uint16 pipelingBindingIndex) const
-{
-	XAssert(pipelingBindingIndex < subHeader->pipelineBindingCount);
-	XAssert(pipelineBindingRecords[pipelingBindingIndex].nestedBindingCount == 0);
-	return pipelineBindingRecords[pipelingBindingIndex].shaderRegisterOrNestedBindingsOffset;
-}
-
-uint16 PipelineLayoutMetadataBlobReader::getDescriptorSetNestedBindingCount(uint16 pipelingBindingIndex) const
-{
-	XAssert(pipelingBindingIndex < subHeader->pipelineBindingCount);
-	XAssert(pipelineBindingRecords[pipelingBindingIndex].nestedBindingCount != 0);
-	return pipelineBindingRecords[pipelingBindingIndex].nestedBindingCount;
-}
-
-DescriptorSetNestedBindingMetaInfo PipelineLayoutMetadataBlobReader::getDescriptorSetNestedBinding(
-	uint16 pipelingBindingIndex, uint16 descriptorSetNestedBindingIndex) const
-{
-	XAssert(pipelingBindingIndex < subHeader->pipelineBindingCount);
-	XAssert(descriptorSetNestedBindingIndex < pipelineBindingRecords[pipelingBindingIndex].nestedBindingCount);
-	const uint16 nestedBindingsOffset = pipelineBindingRecords[pipelingBindingIndex].shaderRegisterOrNestedBindingsOffset;
-	const uint16 nestedBindingGlobalIndex = nestedBindingsOffset + descriptorSetNestedBindingIndex;
-	XAssert(nestedBindingGlobalIndex < subHeader->nestedBindingCount);
-
-	const DescriptorSetNestedBindingMetaRecord& nestedBindingRecord = nestedBindingRecords[nestedBindingGlobalIndex];
-
-	DescriptorSetNestedBindingMetaInfo result = {};
-	result.generic.nameXSH = nestedBindingRecord.nameXSH;
-	result.generic.descriptorCount = nestedBindingRecord.descriptorCount;
-	result.generic.descriptorType = nestedBindingRecord.descriptorType;
-	result.shaderRegister = nestedBindingRecord.shaderRegister;
-	return result;
 }
