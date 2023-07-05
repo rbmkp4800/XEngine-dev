@@ -9,7 +9,7 @@
 
 #include "XEngine.Render.HAL.ShaderCompiler.h"
 
-// TODO: Add `#line` directives support.
+// TODO: Add '#line' directives support.
 
 namespace XEngine::Render::HAL::ShaderCompiler
 {
@@ -48,20 +48,16 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		{
 		private:
 			XLib::MemoryTextReaderWithLocation textReader;
-			Lexeme nextLexeme = {};
-
-		private:
-			void advance();
+			Lexeme currentLexeme = {};
 
 		public:
-			inline Lexer(XLib::StringViewASCII sourceText) : textReader(sourceText.getData(), sourceText.getLength()) { advance(); }
+			inline Lexer(XLib::StringViewASCII sourceText) : textReader(sourceText.getData(), sourceText.getLength()) {}
 			~Lexer() = default;
 
-			inline Lexeme getLexeme() { Lexeme result = nextLexeme; advance(); return result; }
-			inline Lexeme peekLexeme() const { return nextLexeme; }
+			bool advance(Error& error);
 
-			inline bool canGetLexeme() const { return nextLexeme.type != LexemeType(0); }
-
+			inline Lexeme peekLexeme() const { return currentLexeme; }
+			inline bool hasLexeme() const { return currentLexeme.type != LexemeType(0); }
 			inline const char* getBeginPtr() const { return textReader.getBeginPtr(); }
 		};
 

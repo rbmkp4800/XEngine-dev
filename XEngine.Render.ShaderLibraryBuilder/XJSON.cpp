@@ -55,11 +55,7 @@ bool MemoryStreamParser::skipWhitespacesAndComments(ParserError& error)
 	for (;;)
 	{
 		TextSkipWhitespaces(textReader);
-		if (!textReader.canGetChar())
-			return true;
 
-		// Hacky but will do the thing.
-		// I do not think that we need text reader with full rollback support just for this.
 		if (textReader.getAvailableBytes() < 2)
 			return true;
 
@@ -74,7 +70,7 @@ bool MemoryStreamParser::skipWhitespacesAndComments(ParserError& error)
 		{
 			textReader.getChar();
 			textReader.getChar();
-			XAssert(textReader.getCurrentPtr() == potentialCommentStartPtr + 2); // Check that our hacks worked out.
+			XAssert(textReader.getCurrentPtr() == potentialCommentStartPtr + 2);
 		}
 
 		if (isSingleLineComment)

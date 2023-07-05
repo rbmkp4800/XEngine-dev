@@ -3,6 +3,9 @@
 using namespace XLib;
 using namespace XEngine::Render::HAL::ShaderCompiler;
 
+// TODO: Proper numeric literals lexing support.
+// TODO: Half of 'HLSLPatcher::Lexer' is copypasted from XJSON. Do something with it.
+
 enum class HLSLPatcher::LexemeType : uint8
 {
 	EndOfStream = 0,
@@ -89,52 +92,209 @@ struct HLSLPatcher::BindingInfo
 
 // HLSLPatcher::Lexer //////////////////////////////////////////////////////////////////////////////
 
-void HLSLPatcher::Lexer::advance()
+bool HLSLPatcher::Lexer::advance(Error& error)
 {
-	nextLexeme = {};
+	currentLexeme = {};
 
-	TextSkipWhitespaces(textReader);
+	// Skip whitespaces and comments.
+
+	for (;;)
+	{
+		TextSkipWhitespaces(textReader);
+
+		if (textReader.getAvailableBytes() < 2)
+			break;
+
+		const char* potentialCommentStartPtr = textReader.getCurrentPtr();
+		const char c0 = potentialCommentStartPtr[0];
+		const char c1 = potentialCommentStartPtr[1];
+
+		const bool isSingleLineComment = c0 == '/' && c1 == '/';
+		const bool isMultilineComment = c0 == '/' && c1 == '*';
+
+		if (isSingleLineComment || isMultilineComment)
+		{
+			textReader.getChar();
+			textReader.getChar();
+			XAssert(textReader.getCurrentPtr() == potentialCommentStartPtr + 2);
+		}
+
+		if (isSingleLineComment)
+		{
+			for (;;)
+			{
+				if (!textReader.canGetChar())
+					break;
+				const char c = textReader.getChar();
+				if (c == '\n')
+					break;
+				if (c == '\\')
+				{
+					const char c2 = textReader.getChar();
+					if (c2 == '\n')
+						continue;
+					if (c2 == '\r' && textReader.getChar() == '\n')
+						continue;
+				}
+			}
+		}
+		else if (isMultilineComment)
+		{
+			// TODO: Use 'TextSkipToFirstOccurrence' instead.
+
+			for (;;)
+			{
+				if (textReader.getChar() == '*' && textReader.peekChar() == '/')
+				{
+					textReader.getChar();
+					break;
+				}
+				if (!textReader.canGetChar())
+				{
+					error.message = "lexer: unexpected end-of-file in multiline comment";
+					error.location.lineNumber = textReader.getLineNumber();
+					error.location.lineNumber = textReader.getColumnNumber();
+					return false;
+				}
+			}
+		}
+		else
+			break;
+	}
+
+	// Process lexeme.
+
 	if (!textReader.canGetChar())
-		return;
+	{
+		currentLexeme.string = {};
+		currentLexeme.location.lineNumber = textReader.getLineNumber();
+		currentLexeme.location.columnNumber = textReader.getColumnNumber();
+		currentLexeme.type = LexemeType::EndOfStream;
+		return true;
+	}
+
+	const uint32 lexemeBeginLineNumber = textReader.getLineNumber();
+	const uint32 lexemeBeginColumnNumber = textReader.getColumnNumber();
+	const char* lexemeBegin = textReader.getCurrentPtr();
 
 	if (Char::IsLetter(textReader.peekCharUnsafe()) || textReader.peekCharUnsafe() == '_')
 	{
-		const uint32 identifierBeginLineNumber = textReader.getLineNumber();
-		const uint32 identifierBeginColumnNumber = textReader.getColumnNumber();
-		const char* identifierBegin = textReader.getCurrentPtr();
 		textReader.getCharUnsafe();
 
 		while (textReader.canGetChar() && (Char::IsLetterOrDigit(textReader.peekCharUnsafe()) || textReader.peekCharUnsafe() == '_'))
 			textReader.getCharUnsafe();
 
-		const char* identifierEnd = textReader.getCurrentPtr();
-
-		nextLexeme.string = StringViewASCII(identifierBegin, identifierEnd);
-		nextLexeme.location.lineNumber = identifierBeginLineNumber;
-		nextLexeme.location.columnNumber = identifierBeginColumnNumber;
-		nextLexeme.type = LexemeType::Identifier;
-		return;
+		currentLexeme.string = StringViewASCII(lexemeBegin, textReader.getCurrentPtr());
+		currentLexeme.location.lineNumber = lexemeBeginLineNumber;
+		currentLexeme.location.columnNumber = lexemeBeginColumnNumber;
+		currentLexeme.type = LexemeType::Identifier;
+		return true;
 	}
 
-#if 0
-	if (Char::IsDigit(textReader.peekCharUnsafe()))
+	if (textReader.peekCharUnsafe() == '\"')
 	{
-		const uint32 numericLiteralBeginLineNumber = textReader.getLineNumber();
-		const uint32 numericLiteralBeginColumnNumber = textReader.getColumnNumber();
-		const char* numericLiteralBegin = textReader.getCurrentPtr();
 		textReader.getCharUnsafe();
 
-		while (textReader.canGetChar())
+		enum class EscapeState : uint8
 		{
-			const char c = textReader.peekCharUnsafe();
+			Normal = 0,
+			BackslashConsumed,
+			CRConsumed,
+		};
+		EscapeState escapeState = EscapeState::Normal;
 
-			if (Char::IsLetterOrDigit(c) ||
-				c == '_')
+		for (;;)
+		{
+			if (!textReader.canGetChar())
+			{
+				error.message = "lexer: unexpected end-of-file in string literal";
+				error.location.lineNumber = textReader.getLineNumber();
+				error.location.lineNumber = textReader.getColumnNumber();
+				return false;
+			}
+
+			const char c = textReader.peekChar();
+
+			if (c == '\"')
+			{
+				if (escapeState == EscapeState::BackslashConsumed)
+					escapeState = EscapeState::Normal;
+				else
+					break;
+			}
+			else if (c == '\\')
+			{
+				if (escapeState == EscapeState::BackslashConsumed)
+					escapeState = EscapeState::Normal;
+				else
+					escapeState = EscapeState::BackslashConsumed;
+			}
+			else if (c == '\n')
+			{
+				if (escapeState == EscapeState::BackslashConsumed || escapeState == EscapeState::CRConsumed)
+					escapeState = EscapeState::Normal;
+				else
+				{
+					error.message = "lexer: unexpected end-of-line in string literal";
+					error.location.lineNumber = textReader.getLineNumber();
+					error.location.lineNumber = textReader.getColumnNumber();
+					return false;
+				}
+			}
+			else if (c == '\r')
+			{
+				if (escapeState == EscapeState::BackslashConsumed)
+					escapeState = EscapeState::CRConsumed;
+			}
+			else
+			{
+				if (escapeState == EscapeState::BackslashConsumed || escapeState == EscapeState::CRConsumed)
+					escapeState = EscapeState::Normal;
+			}
+
+			textReader.getChar();
 		}
-	}
-#endif
 
-	...
+		const char closingQuote = textReader.getChar();
+		XAssert(closingQuote == '\"');
+
+		currentLexeme.string = StringViewASCII(lexemeBegin, textReader.getCurrentPtr());
+		currentLexeme.location.lineNumber = lexemeBeginLineNumber;
+		currentLexeme.location.columnNumber = lexemeBeginColumnNumber;
+		currentLexeme.type = LexemeType::StringLiteral;
+		return true;
+	}
+
+	// This is dummy implementation that works as far as we do not need to lex numeric literals properly :)
+	if (Char::IsDigit(textReader.peekCharUnsafe()))
+	{
+		textReader.getCharUnsafe();
+
+		while (textReader.canGetChar() && (Char::IsLetterOrDigit(textReader.peekCharUnsafe()) || textReader.peekCharUnsafe() == '_'))
+			textReader.getCharUnsafe();
+
+		currentLexeme.string = StringViewASCII(lexemeBegin, textReader.getCurrentPtr());
+		currentLexeme.location.lineNumber = lexemeBeginLineNumber;
+		currentLexeme.location.columnNumber = lexemeBeginColumnNumber;
+		currentLexeme.type = LexemeType::NumericLiteral;
+		return true;
+	}
+
+	if (textReader.peekCharUnsafe() > 32 && textReader.peekCharUnsafe() < 127)
+	{
+		const char c = textReader.getCharUnsafe();
+
+		currentLexeme.string = StringViewASCII(lexemeBegin, textReader.getCurrentPtr());
+		currentLexeme.location.lineNumber = lexemeBeginLineNumber;
+		currentLexeme.location.columnNumber = lexemeBeginColumnNumber;
+		currentLexeme.type = LexemeType(c);
+		return true;
+	}
+
+	error.message = "lexer: invalid character";
+	error.location.lineNumber = lexemeBeginLineNumber;
+	error.location.lineNumber = lexemeBeginColumnNumber;
+	return false;
 }
 
 // HLSLPatcher::OutputComposer /////////////////////////////////////////////////////////////////////
@@ -177,7 +337,10 @@ bool HLSLPatcher::processAttribute(Attribute& attribute, Error& error)
 
 	for (;;)
 	{
-		const Lexeme attributeNamePartLexeme = lexer.getLexeme();
+		const Lexeme attributeNamePartLexeme = lexer.peekLexeme();
+		if (!lexer.advance(error))
+			return false;
+
 		if (attributeNamePartLexeme.type != LexemeType::Identifier)
 		{
 			error.message = "expected identifier";
@@ -187,9 +350,11 @@ bool HLSLPatcher::processAttribute(Attribute& attribute, Error& error)
 
 		attributeName.append(attributeNamePartLexeme.string);
 
+		// Consume '::'
 		if (lexer.peekLexeme().type != LexemeType::DoubleColon)
 			break;
-		lexer.getLexeme(); // Consume `::`
+		if (!lexer.advance(error))
+			return false;
 		attributeName.append("::");
 	}
 
@@ -201,15 +366,19 @@ bool HLSLPatcher::processAttribute(Attribute& attribute, Error& error)
 			return false;
 		}
 
-		const Lexeme leftParenLexeme = lexer.getLexeme();
+		const Lexeme leftParenLexeme = lexer.peekLexeme();
+		if (!lexer.advance(error))
+			return false;
 		if (leftParenLexeme.type != LexemeType::LeftParen)
 		{
-			error.message = "expected `(`";
+			error.message = "expected '('";
 			error.location = leftParenLexeme.location;
 			return false;
 		}
 
-		const Lexeme bindingRootNameLexeme = lexer.getLexeme();
+		const Lexeme bindingRootNameLexeme = lexer.peekLexeme();
+		if (!lexer.advance(error))
+			return false;
 		if (bindingRootNameLexeme.type != LexemeType::Identifier)
 		{
 			error.message = "expected identifier";
@@ -220,8 +389,13 @@ bool HLSLPatcher::processAttribute(Attribute& attribute, Error& error)
 		Lexeme bindingNestedNameLexeme = {};
 		if (lexer.peekLexeme().type == LexemeType::Dot)
 		{
-			lexer.getLexeme(); // Consume dot.
-			bindingNestedNameLexeme = lexer.getLexeme();
+			if (!lexer.advance(error))
+				return false;
+
+			bindingNestedNameLexeme = lexer.peekLexeme();
+			if (!lexer.advance(error))
+				return false;
+
 			if (bindingNestedNameLexeme.type != LexemeType::Identifier)
 			{
 				error.message = "expected identifier";
@@ -230,10 +404,13 @@ bool HLSLPatcher::processAttribute(Attribute& attribute, Error& error)
 			}
 		}
 
-		const Lexeme rightParenLexeme = lexer.getLexeme();
+		const Lexeme rightParenLexeme = lexer.peekLexeme();
+		if (!lexer.advance(error))
+			return false;
+
 		if (rightParenLexeme.type != LexemeType::RightParen)
 		{
-			error.message = "expected `)`";
+			error.message = "expected ')'";
 			error.location = rightParenLexeme.location;
 			return false;
 		}
@@ -264,13 +441,16 @@ bool HLSLPatcher::processAttribute(Attribute& attribute, Error& error)
 
 		if (lexer.peekLexeme().type == LexemeType::LeftParen)
 		{
-			lexer.getLexeme();
+			if (!lexer.advance(error))
+				return false;
 			openedParenCount++;
 		}
 
 		while (openedParenCount > 0)
 		{
-			const Lexeme lexeme = lexer.getLexeme();
+			const Lexeme lexeme = lexer.peekLexeme();
+			if (!lexer.advance(error))
+				return false;
 
 			if (lexeme.type == LexemeType::LeftParen)
 				openedParenCount++;
@@ -292,7 +472,10 @@ bool HLSLPatcher::processVariableDefinitionForBinding(const BindingInfo& binding
 {
 	XAssert(bindingInfo.type == BindingType::Resource);
 
-	const Lexeme resourceTypeLexeme = lexer.getLexeme();
+	const Lexeme resourceTypeLexeme = lexer.peekLexeme();
+	if (!lexer.advance(error))
+		return false;
+
 	if (resourceTypeLexeme.type != LexemeType::Identifier)
 	{
 		error.message = "expected identifier";
@@ -327,9 +510,13 @@ bool HLSLPatcher::processVariableDefinitionForBinding(const BindingInfo& binding
 
 	if (lexer.peekLexeme().type == LexemeType::LeftAngleBracket)
 	{
-		lexer.getLexeme();
+		if (!lexer.advance(error))
+			return false;
 
-		const Lexeme bracketedTypeLexeme = lexer.getLexeme();
+		const Lexeme bracketedTypeLexeme = lexer.peekLexeme();
+		if (!lexer.advance(error))
+			return false;
+
 		if (resourceTypeLexeme.type != LexemeType::Identifier)
 		{
 			error.message = "expected identifier";
@@ -337,16 +524,22 @@ bool HLSLPatcher::processVariableDefinitionForBinding(const BindingInfo& binding
 			return false;
 		}
 
-		const Lexeme closingBracketLexeme = lexer.getLexeme();
+		const Lexeme closingBracketLexeme = lexer.peekLexeme();
+		if (!lexer.advance(error))
+			return false;
+
 		if (closingBracketLexeme.type != LexemeType::RightAngleBracket)
 		{
-			error.message = "expected `>`. Complex template arguments not supported for now :(";
+			error.message = "expected '>'. Complex template arguments not supported for now :(";
 			error.location = bracketedTypeLexeme.location;
 			return false;
 		}
 	}
 
-	const Lexeme resourceNameLexeme = lexer.getLexeme();
+	const Lexeme resourceNameLexeme = lexer.peekLexeme();
+	if (!lexer.advance(error))
+		return false;
+
 	if (resourceNameLexeme.type != LexemeType::Identifier)
 	{
 		error.message = "expected identifier";
@@ -364,15 +557,18 @@ bool HLSLPatcher::processVariableDefinitionForBinding(const BindingInfo& binding
 
 	composer.copyInputRangeUpToCurrentPosition();
 
-	const Lexeme semicolonLexeme = lexer.getLexeme();
+	const Lexeme semicolonLexeme = lexer.peekLexeme();
+	if (!lexer.advance(error))
+		return false;
+
 	if (semicolonLexeme.type != LexemeType::Semicolon)
 	{
-		error.message = "expected `;` (`xe::binding` syntax requirement)";
+		error.message = "expected ';' ('xe::binding' syntax requirement)";
 		error.location = semicolonLexeme.location;
 		return false;
 	}
 
-	// Write `:register(x#);` to output
+	// Write ':register(x#);' to output.
 	{
 		char shaderRegisterChar = 0;
 		const ResourceType type = bindingInfo.resource.type;
@@ -511,9 +707,14 @@ HLSLPatcher::HLSLPatcher(StringViewASCII sourceText, const PipelineLayout& pipel
 
 bool HLSLPatcher::execute(DynamicStringASCII& result, Error& error)
 {
-	while (lexer.canGetLexeme())
+	if (!lexer.advance(error))
+		return false;
+
+	while (lexer.hasLexeme())
 	{
-		const Lexeme lexeme = lexer.getLexeme();
+		Lexeme lexeme = lexer.peekLexeme();
+		if (!lexer.advance(error))
+			return false;
 
 		if (lexeme.string == "register")
 		{
@@ -530,12 +731,13 @@ bool HLSLPatcher::execute(DynamicStringASCII& result, Error& error)
 
 		Attribute attribute = {};
 
-		// Check for `[[`.
+		// Check for '[['.
 		if (lexeme.type == LexemeType::LeftSquareBracket &&
 			lexer.peekLexeme().type == LexemeType::LeftSquareBracket)
 		{
-			// Consume second `[`.
-			lexer.getLexeme();
+			// Consume second '['.
+			if (!lexer.advance(error))
+				return false;
 
 			// Consume attributes separated by commas.
 			for (;;)
@@ -543,26 +745,32 @@ bool HLSLPatcher::execute(DynamicStringASCII& result, Error& error)
 				if (!processAttribute(attribute, error))
 					return false;
 
-				const Lexeme nextLexeme = lexer.getLexeme();
-				if (nextLexeme.type == LexemeType::RightSquareBracket)
+				lexeme = lexer.peekLexeme();
+				if (!lexer.advance(error))
+					return false;
+
+				if (lexeme.type == LexemeType::RightSquareBracket)
 				{
-					// Consume second `]`.
-					const Lexeme secondRightSquareBracketLexeme = lexer.getLexeme();
+					// Consume second ']'.
+					const Lexeme secondRightSquareBracketLexeme = lexer.peekLexeme();
+					if (!lexer.advance(error))
+						return false;
+
 					if (secondRightSquareBracketLexeme.type != LexemeType::RightSquareBracket)
 					{
-						error.message = "expected `]`";
+						error.message = "expected ']'";
 						error.location = secondRightSquareBracketLexeme.location;
 						return false;
 					}
 
 					break;
 				}
-				else if (nextLexeme.type != LexemeType::Comma)
+				else if (lexeme.type != LexemeType::Comma)
 				{
-					error.message = nextLexeme.type == LexemeType::EndOfStream ?
+					error.message = lexeme.type == LexemeType::EndOfStream ?
 						"unexpected end of file in attribute specifier" :
 						"unexpected token in attribute specifier";
-					error.location = nextLexeme.location;
+					error.location = lexeme.location;
 					return false;
 				}
 			}
