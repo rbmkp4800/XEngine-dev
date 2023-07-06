@@ -1,13 +1,15 @@
 #pragma once
 
 #include <XLib.h>
-#include <XLib.Containers.BinaryTree.h>
+#include <XLib.Containers.ArrayList.h>
 #include <XLib.NonCopyable.h>
 #include <XLib.String.h>
 #include <XLib.RefCounted.h>
 
 #include <XEngine.Render.HAL.Common.h>
 #include <XEngine.Render.HAL.ShaderCompiler.h>
+
+// TODO: Use hash maps in LibraryDefinition. Yes, I am retarded.
 
 namespace XEngine::Render::ShaderLibraryBuilder
 {
@@ -18,6 +20,10 @@ namespace XEngine::Render::ShaderLibraryBuilder
 	{
 	private:
 		XLib::StringViewASCII name;
+
+	private:
+		Pipeline() = default;
+		virtual ~Pipeline() override = default;
 
 	public:
 		inline XLib::StringViewASCII getName() const { return name; }
@@ -49,8 +55,26 @@ namespace XEngine::Render::ShaderLibraryBuilder
 
 	struct LibraryDefinition
 	{
-		XLib::FlatBinaryTreeMap<uint64, HAL::ShaderCompiler::DescriptorSetLayoutRef> descriptorSetLayouts;
-		XLib::FlatBinaryTreeMap<uint64, HAL::ShaderCompiler::PipelineLayoutRef> pipelineLayouts;
-		XLib::FlatBinaryTreeMap<uint64, PipelineRef> pipelines;
+		struct DescriptorSetLayout
+		{
+			uint64 nameXSH;
+			HAL::ShaderCompiler::DescriptorSetLayoutRef ref;
+		};
+
+		struct PipelineLayout
+		{
+			uint64 nameXSH;
+			HAL::ShaderCompiler::PipelineLayoutRef ref;
+		};
+
+		struct Pipeline
+		{
+			uint64 nameXSH;
+			PipelineRef ref;
+		};
+
+		XLib::ArrayList<DescriptorSetLayout> descriptorSetLayouts;
+		XLib::ArrayList<PipelineLayout> pipelineLayouts;
+		XLib::ArrayList<Pipeline> pipelines;
 	};
 }

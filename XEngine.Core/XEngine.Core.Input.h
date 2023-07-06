@@ -1,7 +1,7 @@
 #pragma once
 
 #include <XLib.Vectors.h>
-#include <XLib.Containers.IntrusiveDoublyLinkedList.h>
+#include <XLib.Containers.DoublyLinkedList.h>
 #include <XLib.System.Window.h>
 
 namespace XEngine::Core { class Input; }

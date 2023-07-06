@@ -2,6 +2,8 @@
 
 #include "XLib.h"
 
+// TODO: Implement note removal.
+
 namespace XLib
 {
 	template <typename NodeAdapter>
@@ -55,17 +57,17 @@ namespace XLib
 //	public:
 //		using NodeRef = MyNode*;
 //		static constexpr NodeRef ZeroNodeRef = nullptr;
-//	
+//
 //		NodeRef getNodeParent(NodeRef node) const;
 //		NodeRef getNodeChild(NodeRef node, uint8 childIndex) const;
 //		sint8 getNodeBalanceFactor(NodeRef node) const;
-//	
+//
 //		void setNodeParent(NodeRef node, NodeRef parentToSet);
-//		void setNodeChild(NodeRef parent, uint8 childIndex, NodeRef childToSet);
+//		void setNodeChild(NodeRef node, uint8 childIndex, NodeRef childToSet);
 //		void setNodeBalanceFactor(NodeRef node, sint8 balanceFactor);
-//	
+//
 //		void setNodeFull(NodeRef node, NodeRef parent, NodeRef leftChild, NodeRef rightChild, sint8 balanceFactor);
-//	
+//
 //		ordering compareNodeTo(NodeRef left, NodeRef right) const;
 //		ordering compareNodeTo(NodeRef left, OtherKeyType right) const;
 //	};
@@ -226,7 +228,8 @@ namespace XLib
 	inline auto AVLTreeLogic<NodeAdapter>::
 		RemoveAndRebalance(NodeAdapter& adapter, NodeRef rootNode, NodeRef nodeToRemove) -> NodeRef
 	{
-
+		// Not implemented.
+		XAssertUnreachableCode();
 	}
 
 	template <typename NodeAdapter>

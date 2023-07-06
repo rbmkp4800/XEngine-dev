@@ -306,10 +306,12 @@ void HLSLPatcher::OutputComposer::write(const StringViewASCII& text)
 
 void HLSLPatcher::OutputComposer::copyInputRangeUpToCurrentPosition()
 {
-	// TODO: Fix location.
-	const char* currentRangeEnd = inputLexer.peekLexeme().string.getData();
+	const char* currentRangeEnd = inputLexer.hasLexeme() ? inputLexer.peekLexeme().string.getData() : inputLexer.getEndPtr();
+	XAssert(currentRangeEnd && currentRangeStart <= currentRangeEnd);
 	output.append(StringViewASCII(currentRangeStart, currentRangeEnd));
 	currentRangeStart = currentRangeEnd;
+
+	// TODO: Fix location.
 }
 
 void HLSLPatcher::OutputComposer::blankOutInputRangeUpToCurrentPosition()

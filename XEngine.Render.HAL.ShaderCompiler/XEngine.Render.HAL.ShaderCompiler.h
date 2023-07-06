@@ -146,7 +146,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 
 		inline const void* getSerializedBlobData() const { return serializedBlobData; }
 		inline uint32 getSerializedBlobSize() const { return serializedBlobSize; }
-		inline uint32 getSerializedBlobChecksum() const;
+		uint32 getSerializedBlobChecksum() const; // Defined by 'HAL::BlobFormat'
 
 	public:
 		static DescriptorSetLayoutRef Create(const DescriptorSetBindingDesc* bindings, uint16 bindingCount);
@@ -188,7 +188,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 
 		inline const void* getSerializedBlobData() const { return serializedBlobData; }
 		inline uint32 getSerializedBlobSize() const { return serializedBlobSize; }
-		inline uint32 getSerializedBlobChecksum() const;
+		uint32 getSerializedBlobChecksum() const; // Defined by 'HAL::BlobFormat'
 
 	public:
 		static PipelineLayoutRef Create(const PipelineBindingDesc* bindings, uint16 bindingCount);
@@ -204,9 +204,9 @@ namespace XEngine::Render::HAL::ShaderCompiler
 		virtual ~Blob() override = default;
 
 	public:
-		inline const void* getData() const;
-		inline uint32 getSize() const;
-		inline uint32 getChecksum() const; // Defined by 'HAL::BlobFormat'
+		inline const void* getData() const { return this + 1; }
+		inline uint32 getSize() const { return size; }
+		uint32 getChecksum() const; // Defined by 'HAL::BlobFormat'
 
 	public:
 		static BlobRef Create(uint32 size);

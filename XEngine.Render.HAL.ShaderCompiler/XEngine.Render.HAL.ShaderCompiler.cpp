@@ -15,9 +15,6 @@
 #include "XEngine.Render.HAL.ShaderCompiler.h"
 #include "XEngine.Render.HAL.ShaderCompiler.HLSLPatcher.h"
 
-// TODO: Check for non-unique binding names and hash collisions.
-// NOTE: Binding name hash collisions should be checked for lower 32 bits as only these are used in runtime.
-
 using namespace XLib;
 using namespace XEngine::Render::HAL;
 using namespace XEngine::Render::HAL::ShaderCompiler;
@@ -68,6 +65,11 @@ uint32 DescriptorSetLayout::getBindingDescriptorOffset(uint16 bindingIndex) cons
 {
 	XAssert(bindingIndex < bindingCount);
 	return bindings[bindingIndex].descriptorOffset;
+}
+
+uint32 DescriptorSetLayout::getSerializedBlobChecksum() const
+{
+	return ((BlobFormat::Data::GenericBlobHeader*)getSerializedBlobData())->checksum;
 }
 
 DescriptorSetLayoutRef DescriptorSetLayout::Create(const DescriptorSetBindingDesc* bindings, uint16 bindingCount)
@@ -243,6 +245,11 @@ uint32 PipelineLayout::getBindingBaseShaderRegister(uint16 bindingIndex) const
 {
 	XAssert(bindingIndex < bindingCount);
 	return bindings[bindingIndex].baseShaderRegister;
+}
+
+uint32 PipelineLayout::getSerializedBlobChecksum() const
+{
+	return ((BlobFormat::Data::GenericBlobHeader*)getSerializedBlobData())->checksum;
 }
 
 PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, uint16 bindingCount)
@@ -521,6 +528,27 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 }
 
 
+// Blob ////////////////////////////////////////////////////////////////////////////////////////////
+
+uint32 Blob::getChecksum() const
+{
+	return ((BlobFormat::Data::GenericBlobHeader*)getData())->checksum;
+}
+
+BlobRef Blob::Create(uint32 size)
+{
+	const uint32 memoryBlockSize = sizeof(Blob) + size;
+	void* memoryBlock = SystemHeapAllocator::Allocate(memoryBlockSize);
+	memorySet(memoryBlock, 0, memoryBlockSize); // Just in case.
+
+	Blob& resultObject = *(Blob*)memoryBlock;
+	construct(resultObject);
+	resultObject.size = size;
+
+	return BlobRef(&resultObject);
+}
+
+
 // ShaderCompiler //////////////////////////////////////////////////////////////////////////////////
 
 static bool CompileShaderDXC(const PipelineLayout& pipelineLayout, const ShaderDesc& shader, ShaderType shaderType,
@@ -529,9 +557,8 @@ static bool CompileShaderDXC(const PipelineLayout& pipelineLayout, const ShaderD
 	artifacts = nullptr;
 	compiledBytecodeBlob = nullptr;
 
-	// Preprocess source text.
+	// TODO: Preprocess source text.
 	// ...
-	XTODO("Preprocess source text")
 
 	// Patch source text.
 	DynamicStringASCII patchedSource;
@@ -541,8 +568,8 @@ static bool CompileShaderDXC(const PipelineLayout& pipelineLayout, const ShaderD
 
 		if (!hlslPatcher.execute(patchedSource, hlslPatcherError))
 		{
-			XTODO("Output XE HLSL patcher errors");
-			// And add smth like 'xe-hlsl-patcher:' to all error messages
+			// TODO: Store XE HLSL patcher errors in artifacts.
+			TextWriteFmtStdOut("xe-hlsl-patcher: ", hlslPatcherError.message);
 			return false;
 		}
 	}
@@ -595,8 +622,8 @@ static bool CompileShaderDXC(const PipelineLayout& pipelineLayout, const ShaderD
 
 	if (dxcErrorsBlob != nullptr && dxcErrorsBlob->GetStringLength() > 0)
 	{
-		XTODO("Store compiler output in artifact")
-		// ...
+		// TODO: Store compiler output in artifacts.
+		TextWriteFmtStdOut(dxcErrorsBlob->GetStringPointer());
 	}
 
 	HRESULT hCompileStatus = E_FAIL;

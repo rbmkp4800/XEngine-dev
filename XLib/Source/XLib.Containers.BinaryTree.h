@@ -22,33 +22,37 @@ namespace XLib
 			Value value;
 		};
 
-		class Iterator;
-
 	private:
 		class NodeAdapter;
 		using TreeLogic = AVLTreeLogic<NodeAdapter>;
 
-		struct Element
+		struct Entry
 		{
 			KeyValuePair data;
 			uint64 aux;
 		};
 
 	private:
-		Element* buffer = nullptr;
+		Entry* buffer = nullptr;
 		uint32 capacity = 0;
 		uint32 size = 0;
 		uint32 rootNodeIndex = 0;
+
+	public:
+		class Iterator;
 
 	public:
 		FlatBinaryTreeMap() = default;
 		~FlatBinaryTreeMap() = default;
 
 		inline Iterator find(const Key& key) const;
-		inline Value* findValue(const Key& key);
+		inline Value* findValue(const Key& key) const;
 
 		inline Iterator insert(const Key& key, const Value& value);
 		inline Iterator insertOrAssign(const Key& key, const Value& value);
+
+		inline void remove(const Iterator& iterator);
+		inline bool remove(const Key& key);
 
 		inline uint32 getSize() const { return size; }
 		inline bool isEmpty() const { return size == 0; }
@@ -60,9 +64,15 @@ namespace XLib
 	template <typename Key, typename Value>
 	class FlatBinaryTreeMap<Key, Value>::Iterator
 	{
+		template <typename Key, typename Value>
+		friend class FlatBinaryTreeMap;
+
 	private:
 		FlatBinaryTreeMap* parent = nullptr;
 		uint32 index = 0;
+
+	private:
+		inline Iterator(FlatBinaryTreeMap* parent, uint32 index) : parent(parent), index(index) {}
 
 	public:
 		Iterator() = default;
@@ -72,10 +82,10 @@ namespace XLib
 		inline void operator -- ();
 
 		inline operator KeyValuePair* () const;
-		inline KeyValuePair& operator * () const;
-		inline KeyValuePair* operator -> () const;
-		inline bool operator == (const Iterator& that) const;
-		inline bool operator != (const Iterator& that) const;
+		inline KeyValuePair& operator * () const { return parent->buffer[index].data; }
+		inline KeyValuePair* operator -> () const { return &parent->buffer[index].data; }
+		inline bool operator == (const Iterator& that) const { return parent == that.parent && index == that.index; }
+		inline bool operator != (const Iterator& that) const { return !this->operator==(); }
 	};
 
 
@@ -173,6 +183,174 @@ namespace XLib
 
 namespace XLib
 {
+	// FlatBinaryTreeMap::NodeAdapter //////////////////////////////////////////////////////////////
+
+	template <typename Key, typename Value>
+	class FlatBinaryTreeMap<Key, Value>::NodeAdapter
+	{
+	private:
+		Entry* entries;
+		uint32 entryCount;
+
+	private:
+		static constexpr uint32 NodeRefMask = 0xF'FF'FF;
+		static constexpr uint64 NodeRefMaskU64 = NodeRefMask;
+
+	public:
+		using NodeRef = uint32;
+		static constexpr NodeRef ZeroNodeRef = NodeRef(NodeRefMask);
+
+		inline NodeRef getNodeParent(NodeRef node) const;
+		inline NodeRef getNodeChild(NodeRef node, uint8 childIndex) const;
+		inline sint8 getNodeBalanceFactor(NodeRef node) const;
+
+		inline void setNodeParent(NodeRef node, NodeRef parentToSet);
+		inline void setNodeChild(NodeRef node, uint8 childIndex, NodeRef childToSet);
+		inline void setNodeBalanceFactor(NodeRef node, sint8 balanceFactor);
+
+		inline void setNodeFull(NodeRef node, NodeRef parent, NodeRef leftChild, NodeRef rightChild, sint8 balanceFactor);
+
+		inline ordering compareNodeTo(NodeRef left, NodeRef right) const;
+
+	public:
+		inline NodeAdapter(Entry* entries, uint32 entryCount) : entries(entries), entryCount(entryCount) { XAssert(entryCount < NodeRefMask); }
+	};
+
+	template <typename Key, typename Value>
+	inline auto FlatBinaryTreeMap<Key, Value>::NodeAdapter::getNodeParent(NodeRef node) const -> NodeRef
+	{
+		XAssert(node < entryCount);
+		return NodeRef(entries[node].aux & NodeRefMask);
+	}
+
+	template <typename Key, typename Value>
+	inline auto FlatBinaryTreeMap<Key, Value>::NodeAdapter::getNodeChild(NodeRef node, uint8 childIndex) const -> NodeRef
+	{
+		XAssert(childIndex < 2);
+		XAssert(node < entryCount);
+		return NodeRef((entries[node].aux >> (childIndex * 20 + 20)) & NodeRefMask);
+	}
+
+	template <typename Key, typename Value>
+	inline auto FlatBinaryTreeMap<Key, Value>::NodeAdapter::getNodeBalanceFactor(NodeRef node) const -> sint8
+	{
+		XAssert(node < entryCount);
+		return NodeRef(((entries[node].aux >> 60) & 3) - 1);
+	}
+
+	template <typename Key, typename Value>
+	inline void FlatBinaryTreeMap<Key, Value>::NodeAdapter::setNodeParent(NodeRef node, NodeRef parentToSet)
+	{
+		XAssert(node < entryCount);
+		XAssert(parentToSet < entryCount || parentToSet == ZeroNodeRef);
+		entries[node].aux &= ~NodeRefMaskU64;
+		entries[node].aux |= parentToSet;
+	}
+
+	template <typename Key, typename Value>
+	inline void FlatBinaryTreeMap<Key, Value>::NodeAdapter::setNodeChild(NodeRef node, uint8 childIndex, NodeRef childToSet)
+	{
+		XAssert(childIndex < 2);
+		XAssert(node < entryCount);
+		XAssert(childToSet < entryCount || childToSet == ZeroNodeRef);
+		const uint8 offset = (childIndex * 20 + 20);
+		entries[node].aux &= ~(NodeRefMaskU64 << offset);
+		entries[node].aux |= childToSet << offset;
+	}
+
+	template <typename Key, typename Value>
+	inline void FlatBinaryTreeMap<Key, Value>::NodeAdapter::setNodeBalanceFactor(NodeRef node, sint8 balanceFactor)
+	{
+		XAssert(node < entryCount);
+		XAssert(balanceFactor >= -1 && balanceFactor <= +1);
+		entries[node].aux &= ~(uint64(3) << 60);
+		entries[node].aux |= uint64(balanceFactor + 1) << 60;
+	}
+
+	template <typename Key, typename Value>
+	inline void FlatBinaryTreeMap<Key, Value>::NodeAdapter::
+		setNodeFull(NodeRef node, NodeRef parent, NodeRef leftChild, NodeRef rightChild, sint8 balanceFactor)
+	{
+		XAssert(node < entryCount);
+		XAssert(parent < entryCount || parent == ZeroNodeRef);
+		XAssert(leftChild < entryCount || leftChild == ZeroNodeRef);
+		XAssert(rightChild < entryCount || rightChild == ZeroNodeRef);
+		XAssert(balanceFactor >= -1 && balanceFactor <= +1);
+		const uint64 aux =
+			uint64(parent) |
+			(uint64(leftChild) << 20) |
+			(uint64(rightChild) << 40) |
+			(uint64(balanceFactor + 1) << 60);
+		entries[node].aux = entries;
+	}
+
+
+	// FlatBinaryTreeMap ///////////////////////////////////////////////////////////////////////////
+
+	template <typename Key, typename Value>
+	inline auto FlatBinaryTreeMap<Key, Value>::find(const Key& key) const -> Iterator
+	{
+		if (!size)
+			return Iterator;
+
+		NodeAdapter nodeAdapter(buffer, size);
+		const NodeAdapter::NodeRef foundNodeRef = TreeLogic::Find(nodeAdapter, rootNodeIndex, key);
+		if (foundNodeRef == NodeAdapter::ZeroNodeRef)
+			return Iterator;
+
+		XAssert(foundNodeRef < size);
+		return Iterator(this, foundNodeRef);
+	}
+
+	template <typename Key, typename Value>
+	inline auto FlatBinaryTreeMap<Key, Value>::findValue(const Key& key) const -> Value*
+	{
+		if (!size)
+			return nullptr;
+
+		NodeAdapter nodeAdapter(buffer, size);
+		const NodeAdapter::NodeRef foundNodeRef = TreeLogic::Find(nodeAdapter, rootNodeIndex, key);
+		if (foundNodeRef == NodeAdapter::ZeroNodeRef)
+			return nullptr;
+
+		XAssert(foundNodeRef < size);
+		return &buffer[foundNodeRef].data.value;
+	}
+
+	template <typename Key, typename Value>
+	inline auto FlatBinaryTreeMap<Key, Value>::begin() const -> Iterator
+	{
+		if (!size)
+			return Iterator;
+
+		NodeAdapter nodeAdapter(buffer, size);
+		const NodeAdapter::NodeRef beginNodeRef = TreeLogic::FindExtreme(nodeAdapter, rootNodeIndex, 0);
+		XAssert(beginNodeRef < size);
+		return Iterator(this, beginNodeRef);
+	}
+
+	template <typename Key, typename Value>
+	inline auto FlatBinaryTreeMap<Key, Value>::end() const -> Iterator
+	{
+		return Iterator;
+	}
+
+
+	// FlatBinaryTreeMap::Iterator /////////////////////////////////////////////////////////////////
+
+	template <typename Key, typename Value>
+	inline void FlatBinaryTreeMap<Key, Value>::Iterator::operator ++ ()
+	{
+		XAssertUnreachableCode();
+	}
+
+	template <typename Key, typename Value>
+	inline void FlatBinaryTreeMap<Key, Value>::Iterator::operator -- ()
+	{
+		XAssertUnreachableCode();
+	}
+
+
 	// IntrusiveBinaryTree::NodeAdapter ////////////////////////////////////////////////////////////
 
 	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::* nodeHook), typename NodeComparator>
@@ -187,7 +365,7 @@ namespace XLib
 		inline sint8 getNodeBalanceFactor(Node* node) const;
 
 		inline void setNodeParent(Node* node, Node* parentToSet);
-		inline void setNodeChild(Node* parent, uint8 childIndex, Node* childToSet);
+		inline void setNodeChild(Node* node, uint8 childIndex, Node* childToSet);
 		inline void setNodeBalanceFactor(Node* node, sint8 balanceFactor);
 
 		inline void setNodeFull(Node* node, Node* parent, Node* leftChild, Node* rightChild, sint8 balanceFactor);
@@ -234,11 +412,11 @@ namespace XLib
 
 	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::* nodeHook), typename NodeComparator>
 	inline void IntrusiveBinaryTree<Node, nodeHook, NodeComparator>::NodeAdapter::
-		setNodeChild(Node* parent, uint8 childIndex, Node* childToSet)
+		setNodeChild(Node* node, uint8 childIndex, Node* childToSet)
 	{
 		XAssert(childIndex < 2);
 		XAssert((uintptr(childToSet) & ~NodePtrMask) == 0);
-		GetNodeHook(*parent).children[childIndex] = childToSet;
+		GetNodeHook(*node).children[childIndex] = childToSet;
 	}
 
 	template <typename Node, IntrusiveBinaryTreeNodeHook(Node::* nodeHook), typename NodeComparator>

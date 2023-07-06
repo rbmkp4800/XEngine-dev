@@ -31,18 +31,3 @@ FileTextWriter& XLib::GetStdErrTextWriter()
 		StdErrWriter.initialize(File::GetStdErr());
 	return StdErrWriter;
 }
-
-void MemoryTextReaderWithLocation::advanceLocation(uint32 c)
-{
-	// TODO: Handle end of file properly.
-
-	if (c == '\n')
-	{
-		lineNumber++;
-		columnNumber = 0;
-	}
-	else if (c != '\r')
-	{
-		columnNumber++;
-	}
-}

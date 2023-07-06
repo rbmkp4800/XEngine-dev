@@ -7,6 +7,7 @@
 // TODO: Decide what to do with `String::getCStr()` for empty string.
 // TODO: Do we need separate `pushBack()` and `append()`?
 // TODO: `DynamicString` (without type suffix) -> `DynamicStringBase`? And same for other types.
+// TODO: Do something about million template methods compiled for `InplaceString` instances.
 
 namespace XLib
 {
@@ -21,8 +22,8 @@ namespace XLib
 		StringView() = default;
 		~StringView() = default;
 
-		inline constexpr StringView(const CharType* data, uintptr length) : data(data), length(length) {}
-		inline constexpr StringView(const CharType* begin, const CharType* end) : data(begin), length(end - begin) {}
+		inline constexpr StringView(const CharType* data, uintptr length) : data(length ? data : nullptr), length(length) {}
+		inline constexpr StringView(const CharType* begin, const CharType* end) : data(end - begin ? begin : nullptr), length(end - begin) { XAssert(begin <= end); }
 		inline constexpr StringView(const CharType* cstr);
 
 		inline const CharType& operator [] (uintptr index) const { return data[index]; }
@@ -34,13 +35,13 @@ namespace XLib
 		inline const CharType* begin() const { return data; }
 		inline const CharType* end() const { return data + length; }
 
-		template <typename T>
-		inline bool operator == (const T& that) const;
+		inline bool operator == (const StringView<CharType>& that) const;
+		inline bool operator == (const CharType* thatCStr) const;
 
 		inline bool startsWith(const StringView<CharType>& prefix) const;
-		inline bool startsWith(const char* prefixCStr) const;
+		inline bool startsWith(const CharType* prefixCStr) const;
 		inline bool endsWith(const StringView<CharType>& suffix) const;
-		inline bool endsWith(const char* suffixCStr) const;
+		inline bool endsWith(const CharType* suffixCStr) const;
 
 		inline StringView<CharType> getSubString(uintptr begin, uintptr end = uintptr(-1)) const;
 	};
@@ -60,16 +61,16 @@ namespace XLib
 		inline InplaceString();
 		~InplaceString() = default;
 
-		inline InplaceString& operator = (StringView<CharType> that);
-		inline InplaceString& operator = (const CharType* thatCStr);
+		inline InplaceString& operator = (const StringView<CharType>& that) { copyFrom(that); return *this; }
+		inline InplaceString& operator = (const CharType* thatCStr) { copyFrom(thatCStr); return *this; }
 
 		inline bool copyFrom(StringView<CharType> string);
 		inline bool copyFrom(const CharType* cstr);
 
 		inline bool pushBack(CharType c);
 		inline bool append(CharType c) { return pushBack(c); }
-		inline bool append(StringView<CharType> string);
-		inline bool append(const CharType* cstr);
+		inline bool append(const StringView<CharType>& string);
+		inline bool append(const CharType* cstr) { return append(StringView<CharType>(cstr)); }
 
 		inline void resize(CounterType newLength, CharType c = CharType(0));
 		inline void resizeUnsafe(CounterType newLength);
@@ -83,19 +84,19 @@ namespace XLib
 		inline CounterType getLength() const { return length; }
 		inline operator StringView<CharType>() const { return getView(); }
 
+		inline bool isEmpty() const { return length == 0; }
+		inline bool isFull() const { return length + 1 == Capacity; }
+
 		inline CharType& operator [] (CounterType index) { return buffer[index]; }
 		inline CharType operator [] (CounterType index) const { return buffer[index]; }
 
-		template <typename T>
-		inline bool operator == (const T& that) const;
+		inline bool operator == (const StringView<CharType>& that) const;
+		inline bool operator == (const CharType* thatCStr) const;
 
 		inline bool startsWith(const StringView<CharType>& prefix) const;
-		inline bool startsWith(const char* prefixCStr) const;
+		inline bool startsWith(const CharType* prefixCStr) const;
 		inline bool endsWith(const StringView<CharType>& suffix) const;
-		inline bool endsWith(const char* suffixCStr) const;
-
-		inline bool isEmpty() const { return length == 0; }
-		inline bool isFull() const { return length + 1 == Capacity; }
+		inline bool endsWith(const CharType* suffixCStr) const;
 
 	public:
 		static constexpr CounterType GetCapacity() { return Capacity; }
@@ -124,16 +125,16 @@ namespace XLib
 		~DynamicString();
 
 		inline DynamicString(DynamicString&& that);
-		inline DynamicString(StringView<CharType> that);
-		inline DynamicString(const char* thatCStr);
+		inline DynamicString(const StringView<CharType>& that);
+		inline DynamicString(const CharType* thatCStr);
 
 		inline DynamicString& operator = (DynamicString&& that);
-		inline DynamicString& operator = (StringView<CharType> that);
-		inline DynamicString& operator = (const char* thatCStr);
+		inline DynamicString& operator = (const StringView<CharType>& that);
+		inline DynamicString& operator = (const CharType* thatCStr);
 
 		inline bool pushBack(CharType c);
 		inline bool append(CharType c) { return pushBack(c); }
-		inline bool append(StringView<CharType> string);
+		inline bool append(const StringView<CharType>& string);
 		inline bool append(const CharType* cstr);
 
 		inline void resize(CounterType newLength, CharType c = CharType(0));
@@ -146,11 +147,20 @@ namespace XLib
 		inline StringView<CharType> getView() const { return StringView<CharType>(buffer, length); }
 		inline CharType* getData() { return buffer; }
 		inline CounterType getLength() const { return length; }
+		inline operator StringView<CharType>() const { return getView(); }
+
 		inline bool isEmpty() const { return length == 0; }
 
 		inline CharType& operator [] (CounterType index) { return buffer[index]; }
 		inline CharType operator [] (CounterType index) const { return buffer[index]; }
-		inline operator StringView<CharType>() const { return getView(); }
+
+		inline bool operator == (const StringView<CharType>& that) const;
+		inline bool operator == (const CharType* thatCStr) const;
+
+		inline bool startsWith(const StringView<CharType>& prefix) const;
+		inline bool startsWith(const CharType* prefixCStr) const;
+		inline bool endsWith(const StringView<CharType>& suffix) const;
+		inline bool endsWith(const CharType* suffixCStr) const;
 	};
 
 
@@ -183,6 +193,12 @@ namespace XLib
 		template <typename CharType> static inline bool IsEqual(const StringView<CharType>& a, const StringView<CharType>& b);
 		template <typename CharType> static inline bool IsEqual(const StringView<CharType>& a, const CharType* bCStr);
 
+		template <typename CharType>
+		static inline ordering CompareOrdered(const StringView<CharType>& left, const StringView<CharType>& right);
+
+		template <typename CharType>
+		static inline bool IsLess(const StringView<CharType>& left, const StringView<CharType>& right);
+
 		template <typename CharType> static inline bool StartsWith(const StringView<CharType>& string, const StringView<CharType>& prefix);
 		template <typename CharType> static inline bool StartsWith(const StringView<CharType>& string, const CharType* prefixCStr);
 		template <typename CharType> static inline bool StartsWith(const CharType* stringCStr, const StringView<CharType>& prefix);
@@ -192,12 +208,6 @@ namespace XLib
 		template <typename CharType> static inline bool EndsWith(const StringView<CharType>& string, const CharType* suffixCStr);
 		template <typename CharType> static inline bool EndsWith(const CharType* stringCStr, const StringView<CharType>& suffix);
 		template <typename CharType> static inline bool EndsWith(const CharType* stringCStr, const CharType* suffixCStr);
-
-		template <typename CharType>
-		static inline ordering CompareOrdered(const StringView<CharType>& left, const StringView<CharType>& right);
-
-		template <typename CharType>
-		static inline bool IsLess(const StringView<CharType>& left, const StringView<CharType>& right);
 	};
 
 	template <typename TextWriter, typename CharType>
@@ -223,23 +233,22 @@ namespace XLib
 		: data(cstr), length(String::GetCStrLength(cstr)) {}
 
 	template <typename CharType>
-	template <typename T>
-	inline bool StringView<CharType>::operator == (const T& that) const
-	{
-		return String::IsEqual(*this, that);
-	}
+	inline bool StringView<CharType>::operator == (const StringView<CharType>& that) const { return String::IsEqual(*this, that); }
+
+	template <typename CharType>
+	inline bool StringView<CharType>::operator == (const CharType* thatCStr) const { return String::IsEqual(*this, thatCStr); }
 
 	template <typename CharType>
 	inline bool StringView<CharType>::startsWith(const StringView<CharType>& prefix) const { return String::StartsWith(*this, prefix); }
 
 	template <typename CharType>
-	inline bool StringView<CharType>::startsWith(const char* prefixCStr) const { return String::StartsWith(*this, prefixCStr); }
+	inline bool StringView<CharType>::startsWith(const CharType* prefixCStr) const { return String::StartsWith(*this, prefixCStr); }
 
 	template <typename CharType>
 	inline bool StringView<CharType>::endsWith(const StringView<CharType>& suffix) const { return String::EndsWith(*this, suffix); }
 
 	template <typename CharType>
-	inline bool StringView<CharType>::endsWith(const char* suffixCStr) const { return String::EndsWith(*this, suffixCStr); }
+	inline bool StringView<CharType>::endsWith(const CharType* suffixCStr) const { return String::EndsWith(*this, suffixCStr); }
 
 	template <typename CharType>
 	inline StringView<CharType> StringView<CharType>::getSubString(uintptr begin, uintptr end) const
@@ -256,13 +265,13 @@ namespace XLib
 	// InplaceString ///////////////////////////////////////////////////////////////////////////////
 
 	template <typename CharType, uintptr Capacity, typename CounterType>
-	InplaceString<CharType, Capacity, CounterType>::InplaceString()
+	inline InplaceString<CharType, Capacity, CounterType>::InplaceString()
 	{
 		buffer[0] = CharType(0);
 	}
 
 	template <typename CharType, uintptr Capacity, typename CounterType>
-	auto InplaceString<CharType, Capacity, CounterType>::
+	inline auto InplaceString<CharType, Capacity, CounterType>::
 		copyFrom(StringView<CharType> string) -> bool
 	{
 		const bool overflow = string.getLength() > GetMaxLength();
@@ -273,7 +282,7 @@ namespace XLib
 	}
 
 	template <typename CharType, uintptr Capacity, typename CounterType>
-	auto InplaceString<CharType, Capacity, CounterType>::
+	inline auto InplaceString<CharType, Capacity, CounterType>::
 		copyFrom(const CharType* cstr) -> bool
 	{
 		CounterType newLengthAccum = 0;
@@ -296,7 +305,7 @@ namespace XLib
 	}
 
 	template <typename CharType, uintptr Capacity, typename CounterType>
-	auto InplaceString<CharType, Capacity, CounterType>::
+	inline auto InplaceString<CharType, Capacity, CounterType>::
 		pushBack(CharType c) -> bool
 	{
 		if (isFull())
@@ -308,8 +317,8 @@ namespace XLib
 	}
 
 	template <typename CharType, uintptr Capacity, typename CounterType>
-	auto InplaceString<CharType, Capacity, CounterType>::
-		append(StringView<CharType> string) -> bool
+	inline auto InplaceString<CharType, Capacity, CounterType>::
+		append(const StringView<CharType>& string) -> bool
 	{
 		const CounterType fullLength = length + CounterType(string.getLength());
 		const bool overflow = fullLength > GetMaxLength();
@@ -321,12 +330,24 @@ namespace XLib
 	}
 
 	template <typename CharType, uintptr Capacity, typename CounterType>
-	auto InplaceString<CharType, Capacity, CounterType>::
+	inline auto InplaceString<CharType, Capacity, CounterType>::
 		clear() -> void
 	{
 		length = 0;
 		buffer[0] = CharType(0);
 	}
+
+	template <typename CharType, uintptr Capacity, typename CounterType>
+	inline bool InplaceString<CharType, Capacity, CounterType>::
+		operator == (const StringView<CharType>& that) const { return String::IsEqual(StringView<CharType>(*this), that); }
+
+	template <typename CharType, uintptr Capacity, typename CounterType>
+	inline bool InplaceString<CharType, Capacity, CounterType>::
+		operator == (const CharType* thatCStr) const { return String::IsEqual(StringView<CharType>(*this), thatCStr); }
+
+	template <typename CharType, uintptr Capacity, typename CounterType>
+	inline bool InplaceString<CharType, Capacity, CounterType>::
+		startsWith(const CharType* prefixCStr) const { return String::StartsWith(StringView<CharType>(*this), prefixCStr); }
 
 
 	// DynaicString ////////////////////////////////////////////////////////////////////////////////
@@ -354,11 +375,63 @@ namespace XLib
 	}
 
 	template <typename CharType, typename CounterType, typename AllocatorType>
+	inline DynamicString<CharType, CounterType, AllocatorType>::DynamicString(DynamicString&& that)
+	{
+		buffer = that.buffer;
+		capacity = that.capacity;
+		length = that.length;
+
+		that.buffer = nullptr;
+		that.capacity = 0;
+		that.length = 0;
+	}
+
+	template <typename CharType, typename CounterType, typename AllocatorType>
+	inline auto DynamicString<CharType, CounterType, AllocatorType>::operator = (DynamicString&& that) -> DynamicString&
+	{
+		if (buffer)
+			AllocatorBase::release(buffer);
+
+		buffer = that.buffer;
+		capacity = that.capacity;
+		length = that.length;
+
+		that.buffer = nullptr;
+		that.capacity = 0;
+		that.length = 0;
+
+		return *this;
+	}
+
+	template <typename CharType, typename CounterType, typename AllocatorType>
+	inline auto DynamicString<CharType, CounterType, AllocatorType>::operator = (const CharType* thatCStr) -> DynamicString&
+	{
+		// TODO: Assert for `CounterType` overflow.
+		const CounterType thatLength = CounterType(String::GetCStrLength(thatCStr));
+		ensureCapacity(thatLength);
+		memoryCopy(buffer, thatCStr, thatLength + 1);
+		length = thatLength;
+		return *this;
+	}
+
+	template <typename CharType, typename CounterType, typename AllocatorType>
 	inline bool DynamicString<CharType, CounterType, AllocatorType>::pushBack(CharType c)
 	{
 		ensureCapacity(length + 1);
 		buffer[length] = c;
 		length++;
+		buffer[length] = CharType(0);
+		return true;
+	}
+
+	template <typename CharType, typename CounterType, typename AllocatorType>
+	inline bool DynamicString<CharType, CounterType, AllocatorType>::append(const StringView<CharType>& string)
+	{
+		// TODO: Assert for `CounterType` overflow.
+		const CounterType stringToAppendLength = CounterType(string.getLength());
+		ensureCapacity(length + stringToAppendLength);
+		memoryCopy(buffer + length, string.getData(), stringToAppendLength);
+		length += stringToAppendLength;
 		buffer[length] = CharType(0);
 		return true;
 	}
@@ -416,16 +489,39 @@ namespace XLib
 		// TODO: Handle case for length == 0
 	}
 
+	template <typename CharType, typename CounterType, typename AllocatorType>
+	inline bool DynamicString<CharType, CounterType, AllocatorType>::
+		operator == (const StringView<CharType>& that) const { return String::IsEqual(StringView<CharType>(*this), that); }
+
+	template <typename CharType, typename CounterType, typename AllocatorType>
+	inline bool DynamicString<CharType, CounterType, AllocatorType>::
+		operator == (const CharType* thatCStr) const { return String::IsEqual(StringView<CharType>(*this), thatCStr); }
+
 
 	// String //////////////////////////////////////////////////////////////////////////////////////
 
 	template <typename CharType>
 	inline constexpr uintptr String::GetCStrLength(const CharType* cstr)
 	{
+		if (!cstr)
+			return 0;
 		const CharType* it = cstr;
 		while (*it)
 			it++;
 		return uintptr(it - cstr);
+	}
+
+	template <typename CharType>
+	inline bool String::IsEqual(const StringView<CharType>& a, const StringView<CharType>& b)
+	{
+		if (a.getLength() != b.getLength())
+			return false;
+		for (uintptr i = 0; i < a.getLength(); i++)
+		{
+			if (a[i] != b[i])
+				return false;
+		}
+		return true;
 	}
 
 	template <typename CharType>
@@ -458,6 +554,23 @@ namespace XLib
 		}
 
 		return leftLength == rightLength ? ordering::equivalent : ordering::less;
+	}
+
+	template <typename CharType>
+	inline bool String::IsLess(const StringView<CharType>& left, const StringView<CharType>& right)
+	{
+		const uintptr leftLength = left.getLength();
+		const uintptr rightLength = right.getLength();
+
+		for (uintptr i = 0; i < leftLength; i++)
+		{
+			if (i >= rightLength)
+				return false;
+			if (left[i] != right[i])
+				return left[i] < right[i];
+		}
+
+		return leftLength < rightLength;
 	}
 
 	template <typename CharType>

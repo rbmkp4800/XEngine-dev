@@ -10,6 +10,7 @@
 #include "XEngine.Render.HAL.ShaderCompiler.h"
 
 // TODO: Add '#line' directives support.
+// TODO: Lexer should not allow any calls after error.
 
 namespace XEngine::Render::HAL::ShaderCompiler
 {
@@ -59,6 +60,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 			inline Lexeme peekLexeme() const { return currentLexeme; }
 			inline bool hasLexeme() const { return currentLexeme.type != LexemeType(0); }
 			inline const char* getBeginPtr() const { return textReader.getBeginPtr(); }
+			inline const char* getEndPtr() const { return textReader.getEndPtr(); }
 		};
 
 		// Composes output via ranges of input data (via lexer) or user provided data.

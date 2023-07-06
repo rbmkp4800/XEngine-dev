@@ -62,7 +62,7 @@ inline ordering SourceCache::EntriesSearchTreeComparator::Compare(const Entry& l
 
 bool SourceCache::resolveText(XLib::StringViewASCII localPath, XLib::StringViewASCII& resultText)
 {
-	resultText = nullptr;
+	resultText = {};
 
 	XTODO("Proper path validation and normalization");
 	XTODO("Proper error reporting")

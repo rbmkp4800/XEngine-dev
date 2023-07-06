@@ -31,6 +31,36 @@ static bool ParseDepthStencilFormatString(StringViewASCII string, HAL::DepthSten
 	return false;
 }
 
+static HAL::ShaderCompiler::DescriptorSetLayout* LibFindDescriptorSetLayout(LibraryDefinition& lib, uint64 nameXSH)
+{
+	for (const auto& descriptorSetLayout : lib.descriptorSetLayouts)
+	{
+		if (descriptorSetLayout.nameXSH == nameXSH)
+			return descriptorSetLayout.ref.get();
+	}
+	return nullptr;
+}
+
+static HAL::ShaderCompiler::PipelineLayout* LibFindPipelineLayout(LibraryDefinition& lib, uint64 nameXSH)
+{
+	for (const auto& pipelineLayout : lib.pipelineLayouts)
+	{
+		if (pipelineLayout.nameXSH == nameXSH)
+			return pipelineLayout.ref.get();
+	}
+	return nullptr;
+}
+
+static Pipeline* LibFindPipeline(LibraryDefinition& lib, uint64 nameXSH)
+{
+	for (const auto& pipeline : lib.pipelines)
+	{
+		if (pipeline.nameXSH == nameXSH)
+			return pipeline.ref.get();
+	}
+	return nullptr;
+}
+
 void LibraryDefinitionLoader::reportError(const char* message, const XJSON::Location& location)
 {
 	TextWriteFmtStdOut(xjsonPath, ':',
@@ -123,17 +153,21 @@ bool LibraryDefinitionLoader::readDescriptorSetLayoutDeclaration(const XJSON::Ke
 		reportError("descriptor set layout name XSH = 0. This is not allowed", xjsonEntryDeclarationProperty.keyLocation);
 		return false;
 	}
-	if (libraryDefinition.descriptorSetLayouts.find(descriptorSetLayoutNameXSH))
+	//if (libraryDefinition.descriptorSetLayouts.find(descriptorSetLayoutNameXSH))
+	if (LibFindDescriptorSetLayout(libraryDefinition, descriptorSetLayoutNameXSH))
 	{
 		// TODO: We may give separate error for hash collision (that will never happen).
 		reportError("descriptor set layout redefinition", xjsonEntryDeclarationProperty.keyLocation);
 		return false;
 	}
 
+
 	const HAL::ShaderCompiler::DescriptorSetLayoutRef descriptorSetLayout =
 		HAL::ShaderCompiler::DescriptorSetLayout::Create(bindings, bindings.getSize());
 
-	libraryDefinition.descriptorSetLayouts.insert(descriptorSetLayoutNameXSH, descriptorSetLayout);
+	//libraryDefinition.descriptorSetLayouts.insert(descriptorSetLayoutNameXSH, descriptorSetLayout);
+	libraryDefinition.descriptorSetLayouts.pushBack(
+		LibraryDefinition::DescriptorSetLayout { descriptorSetLayoutNameXSH, descriptorSetLayout });
 
 	return true;
 }
@@ -210,8 +244,10 @@ bool LibraryDefinitionLoader::readPipelineLayoutDeclaration(const XJSON::KeyValu
 			XAssert(!descriptorSetLayoutName.isEmpty());
 			// TODO: Maybe check that `descriptorSetLayoutName` is legal XJSON identifier.
 
-			const HAL::ShaderCompiler::DescriptorSetLayoutRef* descriptorSetLayout =
-				libraryDefinition.descriptorSetLayouts.findValue(XSH::Compute(descriptorSetLayoutName));
+			//const HAL::ShaderCompiler::DescriptorSetLayoutRef* descriptorSetLayout =
+			//	libraryDefinition.descriptorSetLayouts.findValue(XSH::Compute(descriptorSetLayoutName));
+			const HAL::ShaderCompiler::DescriptorSetLayout* descriptorSetLayout =
+				LibFindDescriptorSetLayout(libraryDefinition, XSH::Compute(descriptorSetLayoutName));
 			if (!descriptorSetLayout)
 			{
 				reportError("undefined descriptor set layout", xjsonProperty.value.typeAnnotationLocation);
@@ -219,7 +255,8 @@ bool LibraryDefinitionLoader::readPipelineLayoutDeclaration(const XJSON::KeyValu
 			}
 
 			binding.type = HAL::PipelineBindingType::DescriptorSet;
-			binding.descriptorSetLayout = descriptorSetLayout->get();
+			//binding.descriptorSetLayout = descriptorSetLayout->get();
+			binding.descriptorSetLayout = descriptorSetLayout;
 		}
 		else
 		{
@@ -243,7 +280,8 @@ bool LibraryDefinitionLoader::readPipelineLayoutDeclaration(const XJSON::KeyValu
 		reportError("pipeline layout name XSH = 0. This is not allowed", xjsonEntryDeclarationProperty.keyLocation);
 		return false;
 	}
-	if (libraryDefinition.pipelineLayouts.find(pipelineLayoutNameXSH))
+	//if (libraryDefinition.pipelineLayouts.find(pipelineLayoutNameXSH))
+	if (LibFindPipelineLayout(libraryDefinition, pipelineLayoutNameXSH))
 	{
 		// TODO: We may give separate error for hash collision (that will never happen).
 		reportError("pipeline layout redefinition", xjsonEntryDeclarationProperty.keyLocation);
@@ -253,7 +291,9 @@ bool LibraryDefinitionLoader::readPipelineLayoutDeclaration(const XJSON::KeyValu
 	const HAL::ShaderCompiler::PipelineLayoutRef pipelineLayout =
 		HAL::ShaderCompiler::PipelineLayout::Create(bindings, bindings.getSize());
 
-	libraryDefinition.pipelineLayouts.insert(pipelineLayoutNameXSH, pipelineLayout);
+	//libraryDefinition.pipelineLayouts.insert(pipelineLayoutNameXSH, pipelineLayout);
+	libraryDefinition.pipelineLayouts.pushBack(
+		LibraryDefinition::PipelineLayout { pipelineLayoutNameXSH, pipelineLayout });
 
 	return true;
 }
@@ -440,7 +480,8 @@ bool LibraryDefinitionLoader::readGraphicsPipelineDeclaration(const XJSON::KeyVa
 		reportError("pipeline name XSH = 0. This is not allowed", xjsonEntryDeclarationProperty.keyLocation);
 		return false;
 	}
-	if (libraryDefinition.pipelines.find(pipelineNameXSH))
+	//if (libraryDefinition.pipelines.find(pipelineNameXSH))
+	if (LibFindPipeline(libraryDefinition, pipelineNameXSH))
 	{
 		// TODO: We may give separate error for hash collision (that will never happen).
 		reportError("pipeline redefinition", xjsonEntryDeclarationProperty.keyLocation);
@@ -454,7 +495,8 @@ bool LibraryDefinitionLoader::readGraphicsPipelineDeclaration(const XJSON::KeyVa
 	pipeline->graphics.settings = pipelineSettings;
 	pipeline->isGraphics = true;
 
-	libraryDefinition.pipelines.insert(pipelineNameXSH, pipeline);
+	//libraryDefinition.pipelines.insert(pipelineNameXSH, pipeline);
+	libraryDefinition.pipelines.pushBack(LibraryDefinition::Pipeline { pipelineNameXSH, pipeline });
 
 	return true;
 }
@@ -543,7 +585,8 @@ bool LibraryDefinitionLoader::readComputePipelineDeclaration(const XJSON::KeyVal
 		reportError("pipeline name XSH = 0. This is not allowed", xjsonEntryDeclarationProperty.keyLocation);
 		return false;
 	}
-	if (libraryDefinition.pipelines.find(pipelineNameXSH))
+	//if (libraryDefinition.pipelines.find(pipelineNameXSH))
+	if (LibFindPipeline(libraryDefinition, pipelineNameXSH))
 	{
 		// TODO: We may give separate error for hash collision (that will never happen).
 		reportError("pipeline redefinition", xjsonEntryDeclarationProperty.keyLocation);
@@ -556,7 +599,8 @@ bool LibraryDefinitionLoader::readComputePipelineDeclaration(const XJSON::KeyVal
 	pipeline->compute.shader = computeShader;
 	pipeline->isGraphics = false;
 
-	libraryDefinition.pipelines.insert(pipelineNameXSH, pipeline);
+	//libraryDefinition.pipelines.insert(pipelineNameXSH, pipeline);
+	libraryDefinition.pipelines.pushBack(LibraryDefinition::Pipeline { pipelineNameXSH, pipeline });
 
 	return true;
 }
@@ -571,8 +615,10 @@ bool LibraryDefinitionLoader::readPipelineLayoutSetupProperty(const XJSON::KeyVa
 	}
 
 	const uint64 pipelineLayoutNameXSH = XSH::Compute(xjsonOuterProperty.value.valueLiteral);
-	const HAL::ShaderCompiler::PipelineLayoutRef* foundPipelineLayout =
-		libraryDefinition.pipelineLayouts.findValue(pipelineLayoutNameXSH);
+	//const HAL::ShaderCompiler::PipelineLayoutRef* foundPipelineLayout =
+	//	libraryDefinition.pipelineLayouts.findValue(pipelineLayoutNameXSH);
+	HAL::ShaderCompiler::PipelineLayout* foundPipelineLayout =
+		LibFindPipelineLayout(libraryDefinition, pipelineLayoutNameXSH);
 	if (!foundPipelineLayout)
 	{
 		reportError("unknown pipeline layout", xjsonOuterProperty.value.valueLocation);
@@ -580,7 +626,8 @@ bool LibraryDefinitionLoader::readPipelineLayoutSetupProperty(const XJSON::KeyVa
 	}
 	// TODO: Additionally compare actual names to check for hash collision (that will never happen).
 
-	resultPipelineLayout = *foundPipelineLayout;
+	//resultPipelineLayout = *foundPipelineLayout;
+	resultPipelineLayout = foundPipelineLayout;
 	resultPipelineLayoutNameXSH = pipelineLayoutNameXSH;
 	XAssert(resultPipelineLayout);
 

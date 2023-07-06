@@ -38,6 +38,7 @@ namespace XLib
 		inline void setPosition(uintptr position);
 
 		inline const char* getBeginPtr() const { return begin; }
+		inline const char* getEndPtr() const { return end; }
 		inline const char* getCurrentPtr() const { return current; }
 		inline void setCurrentPtr(const char* newCurrentPtr) { XAssert(begin <= newCurrentPtr && newCurrentPtr < end); current = newCurrentPtr; }
 
@@ -73,6 +74,7 @@ namespace XLib
 		inline uintptr getAbsoluteOffset() const { return base.getPosition(); }
 
 		inline const char* getBeginPtr() const { return base.getBeginPtr(); }
+		inline const char* getEndPtr() const { return base.getEndPtr(); }
 		inline const char* getCurrentPtr() const { return base.getCurrentPtr(); }
 
 		inline uintptr getAvailableBytes() const { return base.getAvailableBytes(); }
@@ -309,6 +311,21 @@ namespace XLib
 
 namespace XLib
 {
+	inline void MemoryTextReaderWithLocation::advanceLocation(uint32 c)
+	{
+		// TODO: Handle end of file properly.
+
+		if (c == '\n')
+		{
+			lineNumber++;
+			columnNumber = 0;
+		}
+		else if (c != '\r')
+		{
+			columnNumber++;
+		}
+	}
+
 	inline bool MemoryTextWriter::append(char c)
 	{
 		if (!canAppend())

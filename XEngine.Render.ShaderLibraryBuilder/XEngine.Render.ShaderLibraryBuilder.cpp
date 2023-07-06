@@ -16,7 +16,7 @@ using namespace XLib;
 using namespace XEngine::Render;
 using namespace XEngine::Render::ShaderLibraryBuilder;
 
-static void StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const char* resultLibraryFilePath)
+static void StoreShaderLibrary(LibraryDefinition& libraryDefinition, const char* resultLibraryFilePath)
 {
 	ArrayList<ShaderLibraryFormat::DescriptorSetLayoutRecord> descriptorSetLayoutRecords;
 	ArrayList<ShaderLibraryFormat::PipelineLayoutRecord> pipelineLayoutRecords;
@@ -47,8 +47,8 @@ static void StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const
 
 	for (const auto& descriptorSetLayoutMapElement : libraryDefinition.descriptorSetLayouts) // Iterating in order of name hash increase.
 	{
-		const uint64 descriptorSetLayoutNameXSH = descriptorSetLayoutMapElement.key;
-		const HAL::ShaderCompiler::DescriptorSetLayout* descriptorSetLayout = descriptorSetLayoutMapElement.value.get();
+		const uint64 descriptorSetLayoutNameXSH = descriptorSetLayoutMapElement.nameXSH;
+		const HAL::ShaderCompiler::DescriptorSetLayout* descriptorSetLayout = descriptorSetLayoutMapElement.ref.get();
 
 		ShaderLibraryFormat::DescriptorSetLayoutRecord& descriptorSetLayoutRecord = descriptorSetLayoutRecords.emplaceBack();
 		descriptorSetLayoutRecord = {};
@@ -66,8 +66,8 @@ static void StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const
 
 	for (const auto& pipelineLayoutMapElement : libraryDefinition.pipelineLayouts) // Iterating in order of name hash increase.
 	{
-		const uint64 pipelineLayoutNameXSH = pipelineLayoutMapElement.key;
-		const HAL::ShaderCompiler::PipelineLayout* pipelineLayout = pipelineLayoutMapElement.value.get();
+		const uint64 pipelineLayoutNameXSH = pipelineLayoutMapElement.nameXSH;
+		const HAL::ShaderCompiler::PipelineLayout* pipelineLayout = pipelineLayoutMapElement.ref.get();
 
 		ShaderLibraryFormat::PipelineLayoutRecord& pipelineLayoutRecord = pipelineLayoutRecords.emplaceBack();
 		pipelineLayoutRecord = {};
@@ -85,8 +85,8 @@ static void StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const
 
 	for (const auto& pipelineMapElement : libraryDefinition.pipelines) // Iterating in order of name hash increase.
 	{
-		const uint64 pipelineNameXSH = pipelineMapElement.key;
-		const Pipeline* pipeline = pipelineMapElement.value.get();
+		const uint64 pipelineNameXSH = pipelineMapElement.nameXSH;
+		const Pipeline* pipeline = pipelineMapElement.ref.get();
 		const uint64 pipelineLayoutNameXSH = pipeline->pipelineLayoutNameXSH;
 		XAssert(pipelineLayoutNameXSH);
 
@@ -204,6 +204,23 @@ static void StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const
 	file.close();
 }
 
+PipelineRef Pipeline::Create(StringViewASCII name)
+{
+	const uint32 memoryBlockSize = XCheckedCastU32(sizeof(Pipeline) + name.getLength() + 1);
+	void* memoryBlock = SystemHeapAllocator::Allocate(memoryBlockSize);
+	memorySet(memoryBlock, 0, memoryBlockSize); // Just in case.
+
+	char* resultName = (char*)((Pipeline*)memoryBlock + 1);
+	memoryCopy(resultName, name.getData(), name.getLength());
+	resultName[name.getLength()] = 0;
+
+	Pipeline& resultObject = *(Pipeline*)memoryBlock;
+	construct(resultObject);
+	resultObject.name = StringViewASCII(resultName, name.getLength());
+
+	return PipelineRef(&resultObject);
+}
+
 int main()
 {
 	LibraryDefinition libraryDefinition;
@@ -216,7 +233,7 @@ int main()
 	ArrayList<Pipeline*> pipelinesToCompile;
 	pipelinesToCompile.reserve(libraryDefinition.pipelines.getSize());
 	for (const auto& pipelineMapElement : libraryDefinition.pipelines)
-		pipelinesToCompile.pushBack(pipelineMapElement.value.get());
+		pipelinesToCompile.pushBack(pipelineMapElement.ref.get());
 
 	QuickSort<Pipeline*>(pipelinesToCompile, pipelinesToCompile.getSize(),
 		[](const Pipeline* left, const Pipeline* right) -> bool { return String::IsLess(left->getName(), right->getName()); });
@@ -228,6 +245,10 @@ int main()
 	for (uint32 i = 0; i < pipelinesToCompile.getSize(); i++)
 	{
 		Pipeline& pipeline = *pipelinesToCompile[i];
+
+		InplaceStringASCIIx256 messageHeader;
+		TextWriteFmt(messageHeader, " [", i + 1, "/", pipelinesToCompile.getSize(), "] ", pipeline.getName());
+		TextWriteFmtStdOut(messageHeader, "\n");
 
 		if (pipeline.isGraphics)
 		{
