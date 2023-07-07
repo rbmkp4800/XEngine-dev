@@ -99,6 +99,8 @@
     </ProjectReference>
     <ProjectReference Include="..\XEngine.Render.Shaders\XEngine.Render.Shaders.vcxproj">
       <Project>{e6af7fdc-1839-4501-96b6-389ab9cafddb}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>false</Private>
     </ProjectReference>
     <ProjectReference Include="..\XEngine.XStringHash\XEngine.XStringHash.vcxproj">
       <Project>{ca640875-7c04-42ba-b081-8dac82c9f48d}</Project>

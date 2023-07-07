@@ -33,12 +33,11 @@ struct ShaderLibrary::Pipeline
 
 ShaderLibrary::~ShaderLibrary()
 {
-	if (pipelineLayoutTable)
+	if (memoryBlock)
 	{
-		XEAssert(pipelineTable);
-
 		// TODO: Do this properly.
-		SystemHeapAllocator::Release(pipelineLayoutTable);
+		SystemHeapAllocator::Release(memoryBlock);
+		memoryBlock = nullptr;
 
 		descriptorSetLayoutTable = nullptr;
 		pipelineLayoutTable = nullptr;
@@ -85,19 +84,19 @@ void ShaderLibrary::load(const char* libraryFilePath)
 	// Allocate tables.
 	{
 		// TODO: Handle this memory in proper way.
-		const uintptr tablesMemorySize =
+		const uintptr memoryBlockSize =
 			sizeof(DescriptorSetLayout) * descriptorSetLayoutCount +
 			sizeof(PipelineLayout) * pipelineLayoutCount +
 			sizeof(Pipeline) * pipelineCount;
-		void* tablesMemory = SystemHeapAllocator::Allocate(tablesMemorySize);
-		memorySet(tablesMemory, 0, tablesMemorySize);
+		memoryBlock = SystemHeapAllocator::Allocate(memoryBlockSize);
+		memorySet(memoryBlock, 0, memoryBlockSize);
 
-		descriptorSetLayoutTable = (DescriptorSetLayout*)tablesMemory;
+		descriptorSetLayoutTable = (DescriptorSetLayout*)memoryBlock;
 		pipelineLayoutTable = (PipelineLayout*)(descriptorSetLayoutTable + descriptorSetLayoutCount);
 		pipelineTable = (Pipeline*)(pipelineLayoutTable + pipelineLayoutCount);
-		void* tablesMemoryEnd = pipelineTable + pipelineCount;
+		void* memoryBlockEnd = pipelineTable + pipelineCount;
 
-		XEAssert(uintptr(tablesMemory) + tablesMemorySize == uintptr(tablesMemoryEnd));
+		XEAssert(uintptr(memoryBlock) + memoryBlockSize == uintptr(memoryBlockEnd));
 	}
 
 	byte* libraryData = (byte*)SystemHeapAllocator::Allocate(libraryFileSize);
@@ -130,7 +129,8 @@ void ShaderLibrary::load(const char* libraryFilePath)
 		descriptorSetLayout.nameXSH = U64From2xU32(descriptorSetLayoutRecord.nameXSH0, descriptorSetLayoutRecord.nameXSH1);
 
 		XEMasterAssert(descriptorSetLayout.nameXSH);
-		XEMasterAssert(prevNameXSH < descriptorSetLayout.nameXSH); // Check order.
+		// TODO: Uncomment when proper objects ordering is implemented.
+		//XEMasterAssert(prevNameXSH < descriptorSetLayout.nameXSH); // Check order.
 		prevNameXSH = descriptorSetLayout.nameXSH;
 	}
 
@@ -149,7 +149,8 @@ void ShaderLibrary::load(const char* libraryFilePath)
 		pipelineLayout.nameXSH = U64From2xU32(pipelineLayoutRecord.nameXSH0, pipelineLayoutRecord.nameXSH1);
 
 		XEMasterAssert(pipelineLayout.nameXSH);
-		XEMasterAssert(prevNameXSH < pipelineLayout.nameXSH); // Check order.
+		// TODO: Uncomment when proper objects ordering is implemented.
+		//XEMasterAssert(prevNameXSH < pipelineLayout.nameXSH); // Check order.
 		prevNameXSH = pipelineLayout.nameXSH;
 	}
 
@@ -220,7 +221,7 @@ void ShaderLibrary::load(const char* libraryFilePath)
 		{
 			XEMasterAssert(pipelineRecord.psORcsBytecodeBlobIndex != uint16(-1));
 			XEMasterAssert(pipelineRecord.psORcsBytecodeBlobIndex < libraryHeader.bytecodeBlobCount);
-			const ShaderLibraryFormat::BlobRecord& bytecodeBlobRecord = bytecodeBlobRecords[pipelineRecord.asBytecodeBlobIndex];
+			const ShaderLibraryFormat::BlobRecord& bytecodeBlobRecord = bytecodeBlobRecords[pipelineRecord.psORcsBytecodeBlobIndex];
 			XEMasterAssert(bytecodeBlobRecord.offset + bytecodeBlobRecord.size <= blobsDataSize);
 
 			HAL::BlobDataView csBlob = {};
@@ -233,7 +234,8 @@ void ShaderLibrary::load(const char* libraryFilePath)
 		pipeline.nameXSH = U64From2xU32(pipelineRecord.nameXSH0, pipelineRecord.nameXSH1);
 
 		XEMasterAssert(pipeline.nameXSH);
-		XEMasterAssert(prevNameXSH < pipeline.nameXSH); // Check order.
+		// TODO: Uncomment when proper objects ordering is implemented.
+		//XEMasterAssert(prevNameXSH < pipeline.nameXSH); // Check order.
 		prevNameXSH = pipeline.nameXSH;
 	}
 

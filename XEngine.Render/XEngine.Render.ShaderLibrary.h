@@ -14,6 +14,8 @@ namespace XEngine::Render
 		struct Pipeline;
 
 	private:
+		void* memoryBlock = nullptr;
+
 		DescriptorSetLayout* descriptorSetLayoutTable = nullptr;
 		PipelineLayout* pipelineLayoutTable = nullptr;
 		Pipeline* pipelineTable = nullptr;

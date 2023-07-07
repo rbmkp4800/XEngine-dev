@@ -10,5 +10,5 @@ void Host::Initialize()
 	HAL::Host::CreateDevice(halDevice);
 
 	// TODO: `shaderLibrary.load` assumes that `Render::Host` is fully initialized.
-	shaderLibrary.load("../Build/shaderpack");
+	shaderLibrary.load("../Build/XEngine.Render.Shaders.xeslib");
 }

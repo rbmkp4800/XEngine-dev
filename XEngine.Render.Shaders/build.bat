@@ -1,1 +1,1 @@
-..\Build\XEngine.Render.Shaders.Builder_x64.Debug.exe
+..\Build\XEngine.Render.ShaderLibraryBuilder_x64.Debug.exe

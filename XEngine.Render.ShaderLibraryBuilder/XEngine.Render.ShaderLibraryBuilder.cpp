@@ -10,6 +10,7 @@
 #include "XEngine.Render.ShaderLibraryBuilder.LibraryDefinitionLoader.h"
 #include "XEngine.Render.ShaderLibraryBuilder.SourceCache.h"
 
+// TODO: Library should contain objects in order of XSH increase.
 // TODO: Bytecode blobs deduplication (but probably we can just wait until we drop pipelines and move to separate shaders).
 
 using namespace XLib;
@@ -397,7 +398,7 @@ int main()
 	}
 
 	// Store compiled shader library.
-
+	TextWriteFmtStdOut("Storing shader library\n");
 	StoreShaderLibrary(libraryDefinition, "../Build/XEngine.Render.Shaders.xeslib");
 
 	return 0;

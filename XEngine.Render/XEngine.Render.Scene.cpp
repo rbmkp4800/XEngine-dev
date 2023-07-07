@@ -51,7 +51,7 @@ void SceneGeometryRenderer::AccumulateDeferredLightingPassExecutor(Scheduler::Pa
 	commandList.setViewport(0.0f, 0.0f, 1280.0f, 720.0f);
 	commandList.setScissor(0, 0, 1280, 720);
 
-	commandList.bindBuffer("ViewConstants"_xsh, BufferBindType::Constant, constantsAllocationInfo.gpuPointer);
+	commandList.bindBuffer("VIEW_CONSTANTS"_xsh, BufferBindType::Constant, constantsAllocationInfo.gpuPointer);
 	commandList.draw(3);
 
 	//commandList.popDebugMarker();
