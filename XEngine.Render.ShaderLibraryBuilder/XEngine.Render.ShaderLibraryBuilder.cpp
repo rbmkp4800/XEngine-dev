@@ -87,7 +87,7 @@ static void StoreShaderLibrary(LibraryDefinition& libraryDefinition, const char*
 	{
 		const uint64 pipelineNameXSH = pipelineMapElement.nameXSH;
 		const Pipeline* pipeline = pipelineMapElement.ref.get();
-		const uint64 pipelineLayoutNameXSH = pipeline->pipelineLayoutNameXSH;
+		const uint64 pipelineLayoutNameXSH = pipeline->getPipelineLayoutNameXSH();
 		XAssert(pipelineLayoutNameXSH);
 
 		ShaderLibraryFormat::PipelineRecord& pipelineRecord = pipelineRecords.emplaceBack();
@@ -102,9 +102,9 @@ static void StoreShaderLibrary(LibraryDefinition& libraryDefinition, const char*
 		pipelineRecord.msBytecodeBlobIndex = -1;
 		pipelineRecord.psORcsBytecodeBlobIndex = -1;
 
-		if (pipeline->isGraphics)
+		if (pipeline->isGraphicsPipeline())
 		{
-			const HAL::ShaderCompiler::Blob* stateBlob = pipeline->graphics.compiledBlobs.stateBlob.get();
+			const HAL::ShaderCompiler::Blob* stateBlob = pipeline->graphicsCompiledBlobs().stateBlob.get();
 
 			pipelineRecord.graphicsStateBlob.offset = nonBytecodeBlobsSizeAccum;
 			pipelineRecord.graphicsStateBlob.size = stateBlob->getSize();
@@ -113,22 +113,22 @@ static void StoreShaderLibrary(LibraryDefinition& libraryDefinition, const char*
 			nonBytecodeBlobsSizeAccum += stateBlob->getSize();
 			nonBytecodeBlobs.emplaceBack(BlobDataView { stateBlob->getData(), stateBlob->getSize() });
 
-			if (const HAL::ShaderCompiler::Blob* vsBlob = pipeline->graphics.compiledBlobs.vsBytecodeBlob.get())
+			if (const HAL::ShaderCompiler::Blob* vsBlob = pipeline->graphicsCompiledBlobs().vsBytecodeBlob.get())
 			{
 				pipelineRecord.vsBytecodeBlobIndex = XCheckedCastU16(bytecodeBlobs.getSize());
 				bytecodeBlobs.emplaceBack(BlobDataView { vsBlob->getData(), vsBlob->getSize(), vsBlob->getChecksum() });
 			}
-			if (const HAL::ShaderCompiler::Blob* asBlob = pipeline->graphics.compiledBlobs.asBytecodeBlob.get())
+			if (const HAL::ShaderCompiler::Blob* asBlob = pipeline->graphicsCompiledBlobs().asBytecodeBlob.get())
 			{
 				pipelineRecord.asBytecodeBlobIndex = XCheckedCastU16(bytecodeBlobs.getSize());
 				bytecodeBlobs.emplaceBack(BlobDataView { asBlob->getData(), asBlob->getSize(), asBlob->getChecksum() });
 			}
-			if (const HAL::ShaderCompiler::Blob* msBlob = pipeline->graphics.compiledBlobs.msBytecodeBlob.get())
+			if (const HAL::ShaderCompiler::Blob* msBlob = pipeline->graphicsCompiledBlobs().msBytecodeBlob.get())
 			{
 				pipelineRecord.msBytecodeBlobIndex = XCheckedCastU16(bytecodeBlobs.getSize());
 				bytecodeBlobs.emplaceBack(BlobDataView { msBlob->getData(), msBlob->getSize(), msBlob->getChecksum() });
 			}
-			if (const HAL::ShaderCompiler::Blob* psBlob = pipeline->graphics.compiledBlobs.psBytecodeBlob.get())
+			if (const HAL::ShaderCompiler::Blob* psBlob = pipeline->graphicsCompiledBlobs().psBytecodeBlob.get())
 			{
 				pipelineRecord.psORcsBytecodeBlobIndex = XCheckedCastU16(bytecodeBlobs.getSize());
 				bytecodeBlobs.emplaceBack(BlobDataView { psBlob->getData(), psBlob->getSize(), psBlob->getChecksum() });
@@ -136,7 +136,7 @@ static void StoreShaderLibrary(LibraryDefinition& libraryDefinition, const char*
 		}
 		else
 		{
-			const HAL::ShaderCompiler::Blob* csBlob = pipeline->compute.compiledBlob.get();
+			const HAL::ShaderCompiler::Blob* csBlob = pipeline->computeShaderCompiledBlob().get();
 			pipelineRecord.psORcsBytecodeBlobIndex = XCheckedCastU16(bytecodeBlobs.getSize());
 			bytecodeBlobs.emplaceBack(BlobDataView { csBlob->getData(), csBlob->getSize(), csBlob->getChecksum() });
 		}
@@ -204,19 +204,113 @@ static void StoreShaderLibrary(LibraryDefinition& libraryDefinition, const char*
 	file.close();
 }
 
-PipelineRef Pipeline::Create(StringViewASCII name)
+PipelineRef Pipeline::CreateGraphics(StringViewASCII name,
+	HAL::ShaderCompiler::PipelineLayout* pipelineLayout, uint64 pipelineLayoutNameXSH,
+	const HAL::ShaderCompiler::GraphicsPipelineShaders& shaders,
+	const HAL::ShaderCompiler::GraphicsPipelineSettings& settings)
 {
-	const uint32 memoryBlockSize = XCheckedCastU32(sizeof(Pipeline) + name.getLength() + 1);
-	void* memoryBlock = SystemHeapAllocator::Allocate(memoryBlockSize);
-	memorySet(memoryBlock, 0, memoryBlockSize); // Just in case.
+	// I should not be allowed to code. Sorry :(
 
-	char* resultName = (char*)((Pipeline*)memoryBlock + 1);
-	memoryCopy(resultName, name.getData(), name.getLength());
-	resultName[name.getLength()] = 0;
+	uint32 memoryBlockSizeAccum = sizeof(Pipeline);
+
+	const uint32 nameMemOffset = memoryBlockSizeAccum;
+	memoryBlockSizeAccum += name.getLength() + 1;
+
+	const uint32 vsSourcePathMemOffset = memoryBlockSizeAccum;
+	memoryBlockSizeAccum += shaders.vs.sourcePath.getLength() + 1;
+
+	const uint32 vsEntryPointNameMemOffset = memoryBlockSizeAccum;
+	memoryBlockSizeAccum += shaders.vs.entryPointName.getLength() + 1;
+
+	const uint32 asSourcePathMemOffset = memoryBlockSizeAccum;
+	memoryBlockSizeAccum += shaders.as.sourcePath.getLength() + 1;
+
+	const uint32 asEntryPointNameMemOffset = memoryBlockSizeAccum;
+	memoryBlockSizeAccum += shaders.as.entryPointName.getLength() + 1;
+
+	const uint32 msSourcePathMemOffset = memoryBlockSizeAccum;
+	memoryBlockSizeAccum += shaders.ms.sourcePath.getLength() + 1;
+
+	const uint32 msEntryPointNameMemOffset = memoryBlockSizeAccum;
+	memoryBlockSizeAccum += shaders.ms.entryPointName.getLength() + 1;
+
+	const uint32 psSourcePathMemOffset = memoryBlockSizeAccum;
+	memoryBlockSizeAccum += shaders.ps.sourcePath.getLength() + 1;
+
+	const uint32 psEntryPointNameMemOffset = memoryBlockSizeAccum;
+	memoryBlockSizeAccum += shaders.ps.entryPointName.getLength() + 1;
+
+	// TODO: Vertex input.
+
+	const uint32 memoryBlockSize = memoryBlockSizeAccum;
+	void* memoryBlock = SystemHeapAllocator::Allocate(memoryBlockSize);
+	memorySet(memoryBlock, 0, memoryBlockSize);
+
+	memoryCopy((char*)memoryBlock + nameMemOffset, name.getData(), name.getLength());
+	memoryCopy((char*)memoryBlock + vsSourcePathMemOffset, shaders.vs.sourcePath.getData(), shaders.vs.sourcePath.getLength());
+	memoryCopy((char*)memoryBlock + vsEntryPointNameMemOffset, shaders.vs.entryPointName.getData(), shaders.vs.entryPointName.getLength());
+	memoryCopy((char*)memoryBlock + asSourcePathMemOffset, shaders.as.sourcePath.getData(), shaders.as.sourcePath.getLength());
+	memoryCopy((char*)memoryBlock + asEntryPointNameMemOffset, shaders.as.entryPointName.getData(), shaders.as.entryPointName.getLength());
+	memoryCopy((char*)memoryBlock + msSourcePathMemOffset, shaders.ms.sourcePath.getData(), shaders.ms.sourcePath.getLength());
+	memoryCopy((char*)memoryBlock + msEntryPointNameMemOffset, shaders.ms.entryPointName.getData(), shaders.ms.entryPointName.getLength());
+	memoryCopy((char*)memoryBlock + psSourcePathMemOffset, shaders.ps.sourcePath.getData(), shaders.ps.sourcePath.getLength());
+	memoryCopy((char*)memoryBlock + psEntryPointNameMemOffset, shaders.ps.entryPointName.getData(), shaders.ps.entryPointName.getLength());
 
 	Pipeline& resultObject = *(Pipeline*)memoryBlock;
 	construct(resultObject);
-	resultObject.name = StringViewASCII(resultName, name.getLength());
+
+	resultObject.name = StringViewASCII((char*)memoryBlock + nameMemOffset, name.getLength());
+	resultObject.pipelineLayout = pipelineLayout;
+	resultObject.pipelineLayoutNameXSH = pipelineLayoutNameXSH;
+	resultObject.graphics.shaders.vs.sourcePath = StringView((char*)memoryBlock + vsSourcePathMemOffset, shaders.vs.sourcePath.getLength());
+	resultObject.graphics.shaders.vs.entryPointName = StringView((char*)memoryBlock + vsEntryPointNameMemOffset, shaders.vs.entryPointName.getLength());
+	resultObject.graphics.shaders.as.sourcePath = StringView((char*)memoryBlock + asSourcePathMemOffset, shaders.as.sourcePath.getLength());
+	resultObject.graphics.shaders.as.entryPointName = StringView((char*)memoryBlock + asEntryPointNameMemOffset, shaders.as.entryPointName.getLength());
+	resultObject.graphics.shaders.ms.sourcePath = StringView((char*)memoryBlock + msSourcePathMemOffset, shaders.ms.sourcePath.getLength());
+	resultObject.graphics.shaders.ms.entryPointName = StringView((char*)memoryBlock + msEntryPointNameMemOffset, shaders.ms.entryPointName.getLength());
+	resultObject.graphics.shaders.ps.sourcePath = StringView((char*)memoryBlock + psSourcePathMemOffset, shaders.ps.sourcePath.getLength());
+	resultObject.graphics.shaders.ps.entryPointName = StringView((char*)memoryBlock + psEntryPointNameMemOffset, shaders.ps.entryPointName.getLength());
+	// TODO: Vertex input.
+	memoryCopy(&resultObject.graphics.settings.renderTargetsFormats, &settings.renderTargetsFormats,
+		sizeof(resultObject.graphics.settings.renderTargetsFormats));
+	resultObject.graphics.settings.depthStencilFormat = settings.depthStencilFormat;
+	resultObject.isGraphics = true;
+
+	return PipelineRef(&resultObject);
+}
+
+PipelineRef Pipeline::CreateCompute(StringViewASCII name,
+	HAL::ShaderCompiler::PipelineLayout* pipelineLayout, uint64 pipelineLayoutNameXSH,
+	const HAL::ShaderCompiler::ShaderDesc& shader)
+{
+	uint32 memoryBlockSizeAccum = sizeof(Pipeline);
+
+	const uint32 nameMemOffset = memoryBlockSizeAccum;
+	memoryBlockSizeAccum += name.getLength() + 1;
+
+	const uint32 csSourcePathMemOffset = memoryBlockSizeAccum;
+	memoryBlockSizeAccum += shader.sourcePath.getLength() + 1;
+
+	const uint32 csEntryPointNameMemOffset = memoryBlockSizeAccum;
+	memoryBlockSizeAccum += shader.entryPointName.getLength() + 1;
+
+	const uint32 memoryBlockSize = memoryBlockSizeAccum;
+	void* memoryBlock = SystemHeapAllocator::Allocate(memoryBlockSize);
+	memorySet(memoryBlock, 0, memoryBlockSize);
+
+	memoryCopy((char*)memoryBlock + nameMemOffset, name.getData(), name.getLength());
+	memoryCopy((char*)memoryBlock + csSourcePathMemOffset, shader.sourcePath.getData(), shader.sourcePath.getLength());
+	memoryCopy((char*)memoryBlock + csEntryPointNameMemOffset, shader.entryPointName.getData(), shader.entryPointName.getLength());
+
+	Pipeline& resultObject = *(Pipeline*)memoryBlock;
+	construct(resultObject);
+
+	resultObject.name = StringViewASCII((char*)memoryBlock + nameMemOffset, name.getLength());
+	resultObject.pipelineLayout = pipelineLayout;
+	resultObject.pipelineLayoutNameXSH = pipelineLayoutNameXSH;
+	resultObject.compute.shader.sourcePath = StringView((char*)memoryBlock + csSourcePathMemOffset, shader.sourcePath.getLength());
+	resultObject.compute.shader.entryPointName = StringView((char*)memoryBlock + csEntryPointNameMemOffset, shader.entryPointName.getLength());
+	resultObject.isGraphics = false;
 
 	return PipelineRef(&resultObject);
 }
@@ -240,7 +334,7 @@ int main()
 
 	// Actual compilation.
 
-	SourceCache sourceCache("../XEngine.Render.Shaders/");
+	SourceCache sourceCache(StringView("../XEngine.Render.Shaders/"));
 
 	for (uint32 i = 0; i < pipelinesToCompile.getSize(); i++)
 	{
@@ -250,9 +344,10 @@ int main()
 		TextWriteFmt(messageHeader, " [", i + 1, "/", pipelinesToCompile.getSize(), "] ", pipeline.getName());
 		TextWriteFmtStdOut(messageHeader, "\n");
 
-		if (pipeline.isGraphics)
+		if (pipeline.isGraphicsPipeline())
 		{
-			HAL::ShaderCompiler::GraphicsPipelineShaders shaders = pipeline.graphics.shaders; // Source text is zero. Resolve it.
+			HAL::ShaderCompiler::GraphicsPipelineShaders shaders = pipeline.getGraphicsShaders();
+			// Source text is zero. Resolve it.
 
 			for (HAL::ShaderCompiler::ShaderDesc& shader : shaders.all)
 			{
@@ -268,7 +363,7 @@ int main()
 			HAL::ShaderCompiler::GraphicsPipelineCompilationArtifacts artifacts = {};
 
 			const bool result = HAL::ShaderCompiler::CompileGraphicsPipeline(
-				*pipeline.pipelineLayout, shaders, pipeline.graphics.settings, artifacts, pipeline.graphics.compiledBlobs);
+				*pipeline.getPipelineLayout(), shaders, pipeline.getGraphicsSettings(), artifacts, pipeline.graphicsCompiledBlobs());
 
 			if (!result)
 			{
@@ -279,7 +374,8 @@ int main()
 		}
 		else
 		{
-			HAL::ShaderCompiler::ShaderDesc shader = pipeline.compute.shader; // Source text is zero. Resolve it.
+			HAL::ShaderCompiler::ShaderDesc shader = pipeline.getComputeShader();
+			// Source text is zero. Resolve it.
 
 			if (!sourceCache.resolveText(shader.sourcePath, shader.sourceText))
 			{
@@ -289,7 +385,7 @@ int main()
 			HAL::ShaderCompiler::ShaderCompilationArtifactsRef artifacts = nullptr;
 
 			const bool result = HAL::ShaderCompiler::CompileComputePipeline(
-				*pipeline.pipelineLayout, shader, artifacts, pipeline.compute.compiledBlob);
+				*pipeline.getPipelineLayout(), shader, artifacts, pipeline.computeShaderCompiledBlob());
 
 			if (!result)
 			{

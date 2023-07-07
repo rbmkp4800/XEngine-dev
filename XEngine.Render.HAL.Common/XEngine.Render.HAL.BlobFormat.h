@@ -89,15 +89,13 @@ namespace XEngine::Render::HAL::BlobFormat::Data
 	};
 	static_assert(sizeof(GraphicsPipelineStateBlobBody) == 36);
 
-	static constexpr uint8 MaxVertexBindingNameLength = 13;
-
-	struct VertexBindingRecord // 16 bytes
+	struct VertexBindingRecord // 24 bytes
 	{
 		uint16 offset13_bufferIndex3;
 		TexelViewFormat format;
 		char name[MaxVertexBindingNameLength];
 	};
-	static_assert(sizeof(VertexBindingRecord) == 16);
+	static_assert(sizeof(VertexBindingRecord) == 24);
 
 	struct BytecodeBlobSubHeader
 	{
@@ -256,7 +254,7 @@ namespace XEngine::Render::HAL::BlobFormat
 		uint32 memoryBlockSize = 0;
 
 	public:
-		static constexpr uint8 MaxVertexBindingNameLength = Data::MaxVertexBindingNameLength;
+		static constexpr uint8 MaxVertexBindingNameLength = MaxVertexBindingNameLength;
 
 	public:
 		GraphicsPipelineStateBlobWriter() = default;

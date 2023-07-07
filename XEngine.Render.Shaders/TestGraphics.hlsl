@@ -1,4 +1,4 @@
-struct [[xe::export_cb_layout(XEngine::Render::Shaders::TestCB)]] TestCB
+struct /*[[xe::export_cb_layout(XEngine::Render::Shaders::TestCB)]]*/ TestCB
 {
 	float4 c;
 };

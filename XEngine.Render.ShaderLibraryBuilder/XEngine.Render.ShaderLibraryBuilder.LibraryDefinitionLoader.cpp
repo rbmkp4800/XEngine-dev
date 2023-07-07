@@ -488,12 +488,8 @@ bool LibraryDefinitionLoader::readGraphicsPipelineDeclaration(const XJSON::KeyVa
 		return false;
 	}
 
-	const PipelineRef pipeline = Pipeline::Create(xjsonEntryDeclarationProperty.key);
-	pipeline->pipelineLayout = asRValue(pipelineLayout);
-	pipeline->pipelineLayoutNameXSH = pipelineLayoutNameXSH;
-	pipeline->graphics.shaders = pipelineShaders;
-	pipeline->graphics.settings = pipelineSettings;
-	pipeline->isGraphics = true;
+	const PipelineRef pipeline = Pipeline::CreateGraphics(xjsonEntryDeclarationProperty.key,
+		pipelineLayout.get(), pipelineLayoutNameXSH, pipelineShaders, pipelineSettings);
 
 	//libraryDefinition.pipelines.insert(pipelineNameXSH, pipeline);
 	libraryDefinition.pipelines.pushBack(LibraryDefinition::Pipeline { pipelineNameXSH, pipeline });
@@ -593,11 +589,8 @@ bool LibraryDefinitionLoader::readComputePipelineDeclaration(const XJSON::KeyVal
 		return false;
 	}
 
-	PipelineRef pipeline = Pipeline::Create(xjsonEntryDeclarationProperty.key);
-	pipeline->pipelineLayout = asRValue(pipelineLayout);
-	pipeline->pipelineLayoutNameXSH = pipelineLayoutNameXSH;
-	pipeline->compute.shader = computeShader;
-	pipeline->isGraphics = false;
+	const PipelineRef pipeline = Pipeline::CreateCompute(xjsonEntryDeclarationProperty.key,
+		pipelineLayout.get(), pipelineLayoutNameXSH, computeShader);
 
 	//libraryDefinition.pipelines.insert(pipelineNameXSH, pipeline);
 	libraryDefinition.pipelines.pushBack(LibraryDefinition::Pipeline { pipelineNameXSH, pipeline });

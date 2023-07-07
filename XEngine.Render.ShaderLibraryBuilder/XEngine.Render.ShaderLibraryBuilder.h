@@ -21,18 +21,8 @@ namespace XEngine::Render::ShaderLibraryBuilder
 	private:
 		XLib::StringViewASCII name;
 
-	private:
-		Pipeline() = default;
-		virtual ~Pipeline() override = default;
-
-	public:
-		inline XLib::StringViewASCII getName() const { return name; }
-
-	public:
 		HAL::ShaderCompiler::PipelineLayoutRef pipelineLayout;
 		uint64 pipelineLayoutNameXSH = 0;
-
-		// NOTE: For all 'ShaderDesc's source text is zero. Only source path is valid.
 
 		struct
 		{
@@ -49,8 +39,40 @@ namespace XEngine::Render::ShaderLibraryBuilder
 
 		bool isGraphics = false;
 
+	private:
+		Pipeline() = default;
+		virtual ~Pipeline() override = default;
+
 	public:
-		static PipelineRef Create(XLib::StringViewASCII name);
+		inline XLib::StringViewASCII getName() const { return name; }
+
+		inline HAL::ShaderCompiler::PipelineLayout* getPipelineLayout() const { return pipelineLayout.get(); }
+		inline uint64 getPipelineLayoutNameXSH() const { return pipelineLayoutNameXSH; }
+
+		inline HAL::ShaderCompiler::ShaderDesc getComputeShader() const { return compute.shader; }
+		inline HAL::ShaderCompiler::BlobRef& computeShaderCompiledBlob() { return compute.compiledBlob; }
+		inline const HAL::ShaderCompiler::BlobRef& computeShaderCompiledBlob() const { return compute.compiledBlob; }
+
+		inline HAL::ShaderCompiler::GraphicsPipelineShaders getGraphicsShaders() const { return graphics.shaders; }
+		inline HAL::ShaderCompiler::GraphicsPipelineSettings getGraphicsSettings() const { return graphics.settings; }
+		inline HAL::ShaderCompiler::GraphicsPipelineCompiledBlobs& graphicsCompiledBlobs() { return graphics.compiledBlobs; }
+		inline const HAL::ShaderCompiler::GraphicsPipelineCompiledBlobs& graphicsCompiledBlobs() const { return graphics.compiledBlobs; }
+
+		inline bool isGraphicsPipeline() const { return this->isGraphics; }
+
+	public:
+
+		// These methods pull all arrays / strings from input and store them locally.
+		// Shader text is not stored.
+
+		static PipelineRef CreateGraphics(XLib::StringViewASCII name,
+			HAL::ShaderCompiler::PipelineLayout* pipelineLayout, uint64 pipelineLayoutNameXSH,
+			const HAL::ShaderCompiler::GraphicsPipelineShaders& shaders,
+			const HAL::ShaderCompiler::GraphicsPipelineSettings& settings);
+
+		static PipelineRef CreateCompute(XLib::StringViewASCII name,
+			HAL::ShaderCompiler::PipelineLayout* pipelineLayout, uint64 pipelineLayoutNameXSH,
+			const HAL::ShaderCompiler::ShaderDesc& shader);
 	};
 
 	struct LibraryDefinition

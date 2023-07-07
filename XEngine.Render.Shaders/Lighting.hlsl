@@ -3,7 +3,7 @@ struct ViewConstants
     float4 dummy;
 };
 
-ConstantBuffer<ViewConstants> c_viewConstants : @binding(VIEW_CONSTANTS);
+[[xe::binding(VIEW_CONSTANTS)]] ConstantBuffer<ViewConstants> c_viewConstants;
 
 float4 main() : SV_Target0
 {

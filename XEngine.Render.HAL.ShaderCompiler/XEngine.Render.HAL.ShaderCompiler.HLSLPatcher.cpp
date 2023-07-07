@@ -17,7 +17,7 @@ enum class HLSLPatcher::LexemeType : uint8
 	RightAngleBracket = '>',
 	LeftSquareBracket = '[',
 	RightSquareBracket = ']',
-	Semicolon = ':',
+	Semicolon = ';',
 	Comma = ',',
 
 	Identifier = 128,
@@ -277,6 +277,20 @@ bool HLSLPatcher::Lexer::advance(Error& error)
 		currentLexeme.location.lineNumber = lexemeBeginLineNumber;
 		currentLexeme.location.columnNumber = lexemeBeginColumnNumber;
 		currentLexeme.type = LexemeType::NumericLiteral;
+		return true;
+	}
+
+
+	if (textReader.getAvailableBytes() >= 2 &&
+		textReader.getCurrentPtr()[0] == ':' &&
+		textReader.getCurrentPtr()[1] == ':')
+	{
+		textReader.getChar();
+		textReader.getChar();
+		currentLexeme.string = StringViewASCII(lexemeBegin, textReader.getCurrentPtr());
+		currentLexeme.location.lineNumber = lexemeBeginLineNumber;
+		currentLexeme.location.columnNumber = lexemeBeginColumnNumber;
+		currentLexeme.type = LexemeType::DoubleColon;
 		return true;
 	}
 
@@ -576,9 +590,9 @@ bool HLSLPatcher::processVariableDefinitionForBinding(const BindingInfo& binding
 		const ResourceType type = bindingInfo.resource.type;
 		if (type == ResourceType::ConstantBuffer)
 			shaderRegisterChar = 'b';
-		if (type == ResourceType::Buffer || type == ResourceType::Texture || type == ResourceType::RaytracingAccelerationStructure)
+		else if (type == ResourceType::Buffer || type == ResourceType::Texture || type == ResourceType::RaytracingAccelerationStructure)
 			shaderRegisterChar = 't';
-		if (type == ResourceType::RWBuffer || type == ResourceType::RWTexture)
+		else if (type == ResourceType::RWBuffer || type == ResourceType::RWTexture)
 			shaderRegisterChar = 'u';
 		else
 			XAssertUnreachableCode();

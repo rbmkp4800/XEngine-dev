@@ -22,6 +22,7 @@ namespace XLib
 		inline RefCountedPtr(T* existingPtr);
 		inline RefCountedPtr(const RefCountedPtr<T>& that);
 		inline RefCountedPtr(RefCountedPtr<T>&& that);
+		inline ~RefCountedPtr();
 
 		RefCountedPtr& operator = (T* newPtr);
 		RefCountedPtr& operator = (const RefCountedPtr<T>& that);
@@ -79,6 +80,16 @@ namespace XLib
 	{
 		ptr = that.ptr;
 		that.ptr = nullptr;
+	}
+
+	template <typename T>
+	inline RefCountedPtr<T>::~RefCountedPtr()
+	{
+		if (ptr)
+		{
+			ptr->releaseReference();
+			ptr = nullptr;
+		}
 	}
 
 	template <typename T>

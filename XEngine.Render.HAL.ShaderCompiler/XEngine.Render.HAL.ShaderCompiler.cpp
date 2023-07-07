@@ -569,7 +569,9 @@ static bool CompileShaderDXC(const PipelineLayout& pipelineLayout, const ShaderD
 		if (!hlslPatcher.execute(patchedSource, hlslPatcherError))
 		{
 			// TODO: Store XE HLSL patcher errors in artifacts.
-			TextWriteFmtStdOut("xe-hlsl-patcher: ", hlslPatcherError.message);
+			TextWriteFmtStdOut(shader.sourcePath, ":",
+				hlslPatcherError.location.lineNumber, ":", hlslPatcherError.location.columnNumber,
+				": xe-hlsl-patcher: ", hlslPatcherError.message);
 			return false;
 		}
 	}
@@ -805,5 +807,5 @@ bool ShaderCompiler::CompileComputePipeline(
 	artifacts = nullptr;
 	compiledBlob = nullptr;
 
-	return CompileShaderDXC(pipelineLayout, computeShader, ShaderType::Pixel, artifacts, compiledBlob);
+	return CompileShaderDXC(pipelineLayout, computeShader, ShaderType::Compute, artifacts, compiledBlob);
 }

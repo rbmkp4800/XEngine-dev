@@ -24,7 +24,7 @@ namespace XLib
 
 		inline constexpr StringView(const CharType* data, uintptr length) : data(length ? data : nullptr), length(length) {}
 		inline constexpr StringView(const CharType* begin, const CharType* end) : data(end - begin ? begin : nullptr), length(end - begin) { XAssert(begin <= end); }
-		inline constexpr StringView(const CharType* cstr);
+		inline constexpr explicit StringView(const CharType* cstr);
 
 		inline const CharType& operator [] (uintptr index) const { return data[index]; }
 
