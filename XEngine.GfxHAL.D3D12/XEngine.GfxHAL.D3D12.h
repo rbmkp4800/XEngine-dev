@@ -6,7 +6,7 @@
 #include <XLib.Platform.COMPtr.h>
 #include <XLib.Containers.BitArray.h>
 
-#include <XEngine.Render.HAL.Common.h>
+#include <XEngine.GfxHAL.Common.h>
 
 // TODO: Check that viewport and scissor are set when rendering.
 // TODO: Check that scissor rect is not larget than render target.
@@ -35,7 +35,7 @@ struct ID3D12GraphicsCommandList7;
 struct ID3D12Device10;
 struct ID3D12Fence;
 
-namespace XEngine::Render::HAL
+namespace XEngine::GfxHAL
 {
 	class Device;
 	class Host;

@@ -5,11 +5,11 @@
 #include <XLib.RefCounted.h>
 #include <XLib.String.h>
 
-#include <XEngine.Render.HAL.Common.h>
+#include <XEngine.GfxHAL.Common.h>
 
 // TODO: Pipeline bindings shader visibility.
 
-namespace XEngine::Render::HAL::ShaderCompiler
+namespace XEngine::GfxHAL::ShaderCompiler
 {
 	constexpr uint16 MaxPipelineBindingNameLength = 254;
 	constexpr uint16 MaxDescriptorSetBindingNameLength = 254;
@@ -39,13 +39,13 @@ namespace XEngine::Render::HAL::ShaderCompiler
 	{
 		XLib::StringViewASCII name;
 		uint16 descriptorCount; // Not implemented. Should be 1 for now.
-		HAL::DescriptorType descriptorType;
+		GfxHAL::DescriptorType descriptorType;
 	};
 
 	struct PipelineBindingDesc
 	{
 		XLib::StringViewASCII name;
-		HAL::PipelineBindingType type;
+		GfxHAL::PipelineBindingType type;
 
 		union
 		{
@@ -70,7 +70,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 	{
 		XLib::StringViewASCII name;
 		uint16 offset;
-		HAL::TexelViewFormat format;
+		GfxHAL::TexelViewFormat format;
 		uint8 bufferIndex;
 	};
 
@@ -102,12 +102,12 @@ namespace XEngine::Render::HAL::ShaderCompiler
 
 	struct GraphicsPipelineSettings
 	{
-		VertexBufferDesc vertexBuffers[HAL::MaxVertexBufferCount];
+		VertexBufferDesc vertexBuffers[GfxHAL::MaxVertexBufferCount];
 		VertexBindingDesc* vertexBindings;
 		uint8 vertexBindingCount;
 
-		HAL::TexelViewFormat renderTargetsFormats[HAL::MaxRenderTargetCount];
-		HAL::DepthStencilFormat depthStencilFormat;
+		GfxHAL::TexelViewFormat renderTargetsFormats[GfxHAL::MaxRenderTargetCount];
+		GfxHAL::DepthStencilFormat depthStencilFormat;
 	};
 
 	class DescriptorSetLayout final : public XLib::RefCounted
@@ -119,7 +119,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 			uint16 nameLength;
 			uint32 descriptorOffset;
 			uint16 descriptorCount;
-			HAL::DescriptorType descriptorType;
+			GfxHAL::DescriptorType descriptorType;
 		};
 
 	private:
@@ -146,7 +146,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 
 		inline const void* getSerializedBlobData() const { return serializedBlobData; }
 		inline uint32 getSerializedBlobSize() const { return serializedBlobSize; }
-		uint32 getSerializedBlobChecksum() const; // Defined by 'HAL::BlobFormat'
+		uint32 getSerializedBlobChecksum() const; // Defined by 'GfxHAL::BlobFormat'
 
 	public:
 		static DescriptorSetLayoutRef Create(const DescriptorSetBindingDesc* bindings, uint16 bindingCount);
@@ -160,12 +160,12 @@ namespace XEngine::Render::HAL::ShaderCompiler
 			uint16 nameOffset;
 			uint16 nameLength;
 			uint32 baseShaderRegister;
-			HAL::PipelineBindingType type;
+			GfxHAL::PipelineBindingType type;
 		};
 
 	private:
 		// TODO: Replace with something like `XLib::Array` that supports external storage and calls destructors.
-		DescriptorSetLayoutRef descriptorSetLayoutTable[HAL::MaxPipelineBindingCount];
+		DescriptorSetLayoutRef descriptorSetLayoutTable[GfxHAL::MaxPipelineBindingCount];
 
 		const BindingDesc* bindings = nullptr;
 		XLib::StringViewASCII namesBuffer;
@@ -188,7 +188,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 
 		inline const void* getSerializedBlobData() const { return serializedBlobData; }
 		inline uint32 getSerializedBlobSize() const { return serializedBlobSize; }
-		uint32 getSerializedBlobChecksum() const; // Defined by 'HAL::BlobFormat'
+		uint32 getSerializedBlobChecksum() const; // Defined by 'GfxHAL::BlobFormat'
 
 	public:
 		static PipelineLayoutRef Create(const PipelineBindingDesc* bindings, uint16 bindingCount);
@@ -206,7 +206,7 @@ namespace XEngine::Render::HAL::ShaderCompiler
 	public:
 		inline const void* getData() const { return this + 1; }
 		inline uint32 getSize() const { return size; }
-		uint32 getChecksum() const; // Defined by 'HAL::BlobFormat'
+		uint32 getChecksum() const; // Defined by 'GfxHAL::BlobFormat'
 
 	public:
 		static BlobRef Create(uint32 size);

@@ -2,12 +2,12 @@
 
 #include <XLib.h>
 
-#include "XEngine.Render.HAL.Common.h"
+#include "XEngine.GfxHAL.Common.h"
 
 // TODO: Revisit `GraphicsPipelineStateBlob`. For now temporary dirty implementaion.
 // TODO: Probably we should remove all pseudo-error-reporting via `return false` from readers and just do master assert?
 
-namespace XEngine::Render::HAL::BlobFormat::Data
+namespace XEngine::GfxHAL::BlobFormat::Data
 {
 	constexpr uint32 GenericBlobSignature = 0x874C2131;
 	constexpr uint16 DescriptorSetLayoutBlobSignature	= 0xF1A6;
@@ -104,7 +104,7 @@ namespace XEngine::Render::HAL::BlobFormat::Data
 	};
 }
 
-namespace XEngine::Render::HAL::BlobFormat
+namespace XEngine::GfxHAL::BlobFormat
 {
 	struct DescriptorSetBindingInfo
 	{

@@ -1,7 +1,7 @@
-#include "XEngine.Render.HAL.ShaderCompiler.HLSLPatcher.h"
+#include "XEngine.GfxHAL.ShaderCompiler.HLSLPatcher.h"
 
 using namespace XLib;
-using namespace XEngine::Render::HAL::ShaderCompiler;
+using namespace XEngine::GfxHAL::ShaderCompiler;
 
 // TODO: Proper numeric literals lexing support.
 // TODO: Half of 'HLSLPatcher::Lexer' is copypasted from XJSON. Do something with it.
@@ -630,31 +630,31 @@ bool HLSLPatcher::ExtractBindingInfo(const PipelineLayout& pipelineLayout,
 	bool allowArray = false;
 	uint32 shaderRegister = 0;
 
-	if (pipelineBinding.type == HAL::PipelineBindingType::InplaceConstants)
+	if (pipelineBinding.type == GfxHAL::PipelineBindingType::InplaceConstants)
 	{
 		TextWriteFmt(error.message, "pipeline binding '", bindingRootName, "': inplace constants bindings are not supported for now");
 		error.location = bindingRootNameLocation;
 		return false;
 	}
-	else if (pipelineBinding.type == HAL::PipelineBindingType::ConstantBuffer)
+	else if (pipelineBinding.type == GfxHAL::PipelineBindingType::ConstantBuffer)
 	{
 		resourceType = ResourceType::ConstantBuffer;
 		allowArray = false;
 		shaderRegister = pipelineBindingBaseShaderRegiser;
 	}
-	else if (pipelineBinding.type == HAL::PipelineBindingType::ReadOnlyBuffer)
+	else if (pipelineBinding.type == GfxHAL::PipelineBindingType::ReadOnlyBuffer)
 	{
 		resourceType = ResourceType::Buffer;
 		allowArray = false;
 		shaderRegister = pipelineBindingBaseShaderRegiser;
 	}
-	else if (pipelineBinding.type == HAL::PipelineBindingType::ReadWriteBuffer)
+	else if (pipelineBinding.type == GfxHAL::PipelineBindingType::ReadWriteBuffer)
 	{
 		resourceType = ResourceType::RWBuffer;
 		allowArray = false;
 		shaderRegister = pipelineBindingBaseShaderRegiser;
 	}
-	else if (pipelineBinding.type == HAL::PipelineBindingType::DescriptorSet)
+	else if (pipelineBinding.type == GfxHAL::PipelineBindingType::DescriptorSet)
 	{
 		if (bindingNestedName.isEmpty())
 		{
@@ -680,11 +680,11 @@ bool HLSLPatcher::ExtractBindingInfo(const PipelineLayout& pipelineLayout,
 		ResourceType resourceType = ResourceType::Undefined;
 		switch (descriptorSetBindingDesc.descriptorType)
 		{
-			case HAL::DescriptorType::ReadOnlyBuffer:	resourceType = ResourceType::Buffer;	break;
-			case HAL::DescriptorType::ReadWriteBuffer:	resourceType = ResourceType::RWBuffer;	break;
-			case HAL::DescriptorType::ReadOnlyTexture:	resourceType = ResourceType::Texture;	break;
-			case HAL::DescriptorType::ReadWriteTexture:	resourceType = ResourceType::RWTexture;	break;
-			case HAL::DescriptorType::RaytracingAccelerationStructure: resourceType = ResourceType::RaytracingAccelerationStructure; break;
+			case GfxHAL::DescriptorType::ReadOnlyBuffer:	resourceType = ResourceType::Buffer;	break;
+			case GfxHAL::DescriptorType::ReadWriteBuffer:	resourceType = ResourceType::RWBuffer;	break;
+			case GfxHAL::DescriptorType::ReadOnlyTexture:	resourceType = ResourceType::Texture;	break;
+			case GfxHAL::DescriptorType::ReadWriteTexture:	resourceType = ResourceType::RWTexture;	break;
+			case GfxHAL::DescriptorType::RaytracingAccelerationStructure: resourceType = ResourceType::RaytracingAccelerationStructure; break;
 			default: XAssertUnreachableCode();
 		}
 
@@ -693,7 +693,7 @@ bool HLSLPatcher::ExtractBindingInfo(const PipelineLayout& pipelineLayout,
 		shaderRegister = pipelineBindingBaseShaderRegiser +
 			pipelineBinding.descriptorSetLayout->getBindingDescriptorOffset(descriptorSetBindingIndex);
 	}
-	else if (pipelineBinding.type == HAL::PipelineBindingType::DescriptorArray)
+	else if (pipelineBinding.type == GfxHAL::PipelineBindingType::DescriptorArray)
 	{
 		TextWriteFmt(error.message, "pipeline binding '", bindingRootName, "': descriptor array bindings are not supported for now");
 		error.location = bindingRootNameLocation;
@@ -702,7 +702,7 @@ bool HLSLPatcher::ExtractBindingInfo(const PipelineLayout& pipelineLayout,
 	else
 		XAssertUnreachableCode();
 
-	if (pipelineBinding.type != HAL::PipelineBindingType::DescriptorSet &&
+	if (pipelineBinding.type != GfxHAL::PipelineBindingType::DescriptorSet &&
 		!bindingNestedName.isEmpty())
 	{
 		TextWriteFmt(error.message, "pipeline binding '", bindingRootName, "': nested binding name is not expected");

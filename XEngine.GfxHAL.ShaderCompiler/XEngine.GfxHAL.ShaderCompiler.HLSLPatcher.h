@@ -5,14 +5,14 @@
 #include <XLib.String.h>
 #include <XLib.Text.h>
 
-#include <XEngine.Render.HAL.Common.h>
+#include <XEngine.GfxHAL.Common.h>
 
-#include "XEngine.Render.HAL.ShaderCompiler.h"
+#include "XEngine.GfxHAL.ShaderCompiler.h"
 
 // TODO: Add '#line' directives support.
 // TODO: Lexer should not allow any calls after error.
 
-namespace XEngine::Render::HAL::ShaderCompiler
+namespace XEngine::GfxHAL::ShaderCompiler
 {
 	class HLSLPatcher : public XLib::NonCopyable
 	{

@@ -112,10 +112,10 @@ xcopy /y $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\
     <ClInclude Include="XJSON.h" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\XEngine.Render.HAL.Common\XEngine.Render.HAL.Common.vcxproj">
+    <ProjectReference Include="..\XEngine.GfxHAL.Common\XEngine.GfxHAL.Common.vcxproj">
       <Project>{102d6f8c-faad-4fd3-9b3a-16923042465e}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\XEngine.Render.HAL.ShaderCompiler\XEngine.Render.HAL.ShaderCompiler.vcxproj">
+    <ProjectReference Include="..\XEngine.GfxHAL.ShaderCompiler\XEngine.GfxHAL.ShaderCompiler.vcxproj">
       <Project>{0e31d4f6-c1d4-4a6f-8c42-a0f7b2e4d9d9}</Project>
     </ProjectReference>
     <ProjectReference Include="..\XEngine.Render.ShaderLibraryFormat\XEngine.Render.ShaderLibraryFormat.vcxproj">

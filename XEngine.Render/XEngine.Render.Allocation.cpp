@@ -1,7 +1,7 @@
 #include "XEngine.Render.Allocation.h"
 
 using namespace XEngine::Render;
-using namespace XEngine::Render::HAL;
+using namespace XEngine::GfxHAL;
 
 bool CircularAllocatorWithGPUReleaseQueue::tryAllocate(uint16 size, uint16& resultAllocationHeadCounter)
 {
@@ -179,7 +179,7 @@ TransientUploadMemoryAllocator::~TransientUploadMemoryAllocator()
 	}
 }
 
-void TransientUploadMemoryAllocator::initialize(HAL::Device& device, uint8 poolSizeLog2)
+void TransientUploadMemoryAllocator::initialize(GfxHAL::Device& device, uint8 poolSizeLog2)
 {
 	// TODO: State asserts
 

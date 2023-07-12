@@ -99,10 +99,10 @@ xcopy /y $(SolutionDir)External\Microsoft.Direct3D.D3D12\bin\$(Platform)\*.pdb $
     <ProjectReference Include="..\XEngine.Core\XEngine.Core.vcxproj">
       <Project>{b8914a5b-a366-4b57-86fd-788a6dfd14f6}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\XEngine.Render.HAL.Common\XEngine.Render.HAL.Common.vcxproj">
+    <ProjectReference Include="..\XEngine.GfxHAL.Common\XEngine.GfxHAL.Common.vcxproj">
       <Project>{102d6f8c-faad-4fd3-9b3a-16923042465e}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\XEngine.Render.HAL.D3D12\XEngine.Render.HAL.D3D12.vcxproj">
+    <ProjectReference Include="..\XEngine.GfxHAL.D3D12\XEngine.GfxHAL.D3D12.vcxproj">
       <Project>{1ed495b0-b69b-4409-83fc-587f590eab29}</Project>
     </ProjectReference>
     <ProjectReference Include="..\XEngine.Render\XEngine.Render.vcxproj">

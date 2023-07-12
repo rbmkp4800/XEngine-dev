@@ -3,7 +3,7 @@
 #include <XLib.NonCopyable.h>
 #include <XLib.Vectors.h>
 
-#include <XEngine.Render.HAL.D3D12.h>
+#include <XEngine.GfxHAL.D3D12.h>
 
 #include "XEngine.Render.Scheduler.h"
 
@@ -54,7 +54,7 @@ namespace XEngine::Render
 		
 	private:
 		static void AccumulateDeferredLightingPassExecutor(Scheduler::PassExecutionContext& context,
-			HAL::Device& device, HAL::CommandList& commandList, const void* userDataPtr);
+			GfxHAL::Device& device, GfxHAL::CommandList& commandList, const void* userDataPtr);
 
 	public:
 		static void AddDrawDeferredGeometryPass(Scheduler::Schedule& schedule,

@@ -26,8 +26,8 @@ namespace XEngine::Render::ShaderLibraryBuilder
 		bool readComputePipelineDeclaration(const XJSON::KeyValue& xjsonEntryDeclarationProperty);
 
 		bool readPipelineLayoutSetupProperty(const XJSON::KeyValue& xjsonOuterProperty,
-			HAL::ShaderCompiler::PipelineLayoutRef& resultPipelineLayout, uint64& resultPipelineLayoutNameXSH);
-		bool readShaderSetupProperty(const XJSON::KeyValue& xjsonOuterProperty, HAL::ShaderCompiler::ShaderDesc& resultShader);
+			GfxHAL::ShaderCompiler::PipelineLayoutRef& resultPipelineLayout, uint64& resultPipelineLayoutNameXSH);
+		bool readShaderSetupProperty(const XJSON::KeyValue& xjsonOuterProperty, GfxHAL::ShaderCompiler::ShaderDesc& resultShader);
 
 	public:
 		inline LibraryDefinitionLoader(LibraryDefinition& libraryDefinition) : libraryDefinition(libraryDefinition) {}

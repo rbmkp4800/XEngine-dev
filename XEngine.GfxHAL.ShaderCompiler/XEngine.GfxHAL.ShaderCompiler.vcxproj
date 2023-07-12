@@ -22,7 +22,7 @@
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{0e31d4f6-c1d4-4a6f-8c42-a0f7b2e4d9d9}</ProjectGuid>
-    <RootNamespace>XEngineRenderHALShaderCompiler</RootNamespace>
+    <RootNamespace>XEngineGfxHALShaderCompiler</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -169,11 +169,11 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="XEngine.Render.HAL.ShaderCompiler.h" />
-    <ClInclude Include="XEngine.Render.HAL.ShaderCompiler.HLSLPatcher.h" />
+    <ClInclude Include="XEngine.GfxHAL.ShaderCompiler.h" />
+    <ClInclude Include="XEngine.GfxHAL.ShaderCompiler.HLSLPatcher.h" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\XEngine.Render.HAL.Common\XEngine.Render.HAL.Common.vcxproj">
+    <ProjectReference Include="..\XEngine.GfxHAL.Common\XEngine.GfxHAL.Common.vcxproj">
       <Project>{102d6f8c-faad-4fd3-9b3a-16923042465e}</Project>
     </ProjectReference>
     <ProjectReference Include="..\XEngine.XStringHash\XEngine.XStringHash.vcxproj">
@@ -184,8 +184,8 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="XEngine.Render.HAL.ShaderCompiler.cpp" />
-    <ClCompile Include="XEngine.Render.HAL.ShaderCompiler.HLSLPatcher.cpp" />
+    <ClCompile Include="XEngine.GfxHAL.ShaderCompiler.cpp" />
+    <ClCompile Include="XEngine.GfxHAL.ShaderCompiler.HLSLPatcher.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

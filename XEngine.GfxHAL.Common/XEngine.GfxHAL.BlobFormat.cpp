@@ -1,11 +1,11 @@
 #include <XLib.CRC.h>
 
-#include "XEngine.Render.HAL.BlobFormat.h"
+#include "XEngine.GfxHAL.BlobFormat.h"
 
 using namespace XLib;
-using namespace XEngine::Render::HAL;
-using namespace XEngine::Render::HAL::BlobFormat;
-using namespace XEngine::Render::HAL::BlobFormat::Data;
+using namespace XEngine::GfxHAL;
+using namespace XEngine::GfxHAL::BlobFormat;
+using namespace XEngine::GfxHAL::BlobFormat::Data;
 
 static inline void FillGenericBlobHeader(void* blobData, uint32 blobSize, uint16 specificSignature, uint16 version)
 {

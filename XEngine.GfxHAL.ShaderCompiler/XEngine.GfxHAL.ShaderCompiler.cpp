@@ -9,15 +9,15 @@
 #include <XLib.System.Threading.Atomics.h>
 #include <XLib.Text.h>
 
-#include <XEngine.Render.HAL.BlobFormat.h>
+#include <XEngine.GfxHAL.BlobFormat.h>
 #include <XEngine.XStringHash.h>
 
-#include "XEngine.Render.HAL.ShaderCompiler.h"
-#include "XEngine.Render.HAL.ShaderCompiler.HLSLPatcher.h"
+#include "XEngine.GfxHAL.ShaderCompiler.h"
+#include "XEngine.GfxHAL.ShaderCompiler.HLSLPatcher.h"
 
 using namespace XLib;
-using namespace XEngine::Render::HAL;
-using namespace XEngine::Render::HAL::ShaderCompiler;
+using namespace XEngine::GfxHAL;
+using namespace XEngine::GfxHAL::ShaderCompiler;
 
 static inline D3D12_DESCRIPTOR_RANGE_TYPE TranslateDescriptorTypeToD3D12DescriptorRangeType(DescriptorType type)
 {
@@ -497,7 +497,7 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 		dst.baseShaderRegister = bindingsDeducedInfo[i].baseShaderRegister;
 		dst.type = src.type;
 
-		if (src.type == HAL::PipelineBindingType::DescriptorSet)
+		if (src.type == GfxHAL::PipelineBindingType::DescriptorSet)
 			resultObject.descriptorSetLayoutTable[i] = (DescriptorSetLayout*)src.descriptorSetLayout;
 
 		memoryCopy(namesBuffer + dst.nameOffset, src.name.getData(), src.name.getLength());
@@ -515,7 +515,7 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 			blobBindingInfo.nameXSH = bindingsDeducedInfo[i].nameXSH;
 			blobBindingInfo.d3dRootParameterIndex = bindingsDeducedInfo[i].d3dRootParameterIndex;
 			blobBindingInfo.type = binding.type;
-			if (binding.type == HAL::PipelineBindingType::DescriptorSet)
+			if (binding.type == GfxHAL::PipelineBindingType::DescriptorSet)
 				blobBindingInfo.descriptorSetLayoutSourceHash = binding.descriptorSetLayout->getSourceHash();
 
 			serializedBlobWriter.writeBinding(i, blobBindingInfo);
@@ -741,7 +741,7 @@ bool ShaderCompiler::CompileGraphicsPipeline(
 			{
 				if (!ValidateTexelViewFormatValue(renderTargetFormat))
 					return false;
-				if (!HAL::DoesTexelViewFormatSupportColorRenderTargetUsage(renderTargetFormat))
+				if (!GfxHAL::DoesTexelViewFormatSupportColorRenderTargetUsage(renderTargetFormat))
 					return false;
 				stateBlobWriter.addRenderTarget(renderTargetFormat);
 			}
@@ -769,7 +769,7 @@ bool ShaderCompiler::CompileGraphicsPipeline(
 
 		if (binding.name.getLength() > stateBlobWriter.MaxVertexBindingNameLength)
 			return false;
-		if (!HAL::DoesTexelViewFormatSupportVertexInputUsage(binding.format))
+		if (!GfxHAL::DoesTexelViewFormatSupportVertexInputUsage(binding.format))
 			return false;
 		if (binding.offset >= MaxVertexBufferElementSize)
 			return false;

@@ -88,10 +88,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ProjectReference Include="..\XEngine.Render.HAL.Common\XEngine.Render.HAL.Common.vcxproj">
+    <ProjectReference Include="..\XEngine.GfxHAL.Common\XEngine.GfxHAL.Common.vcxproj">
       <Project>{102d6f8c-faad-4fd3-9b3a-16923042465e}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\XEngine.Render.HAL.D3D12\XEngine.Render.HAL.D3D12.vcxproj">
+    <ProjectReference Include="..\XEngine.GfxHAL.D3D12\XEngine.GfxHAL.D3D12.vcxproj">
       <Project>{1ed495b0-b69b-4409-83fc-587f590eab29}</Project>
     </ProjectReference>
     <ProjectReference Include="..\XEngine.Render.ShaderLibraryFormat\XEngine.Render.ShaderLibraryFormat.vcxproj">

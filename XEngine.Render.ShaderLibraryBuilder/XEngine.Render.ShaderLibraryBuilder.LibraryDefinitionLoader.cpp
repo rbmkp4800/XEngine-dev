@@ -6,32 +6,32 @@
 #include "XEngine.Render.ShaderLibraryBuilder.LibraryDefinitionLoader.h"
 
 using namespace XLib;
-using namespace XEngine::Render;
+using namespace XEngine;
 using namespace XEngine::Render::ShaderLibraryBuilder;
 
 XTODO("Any object name (DSL / pipeline layout / pipeline) should be valid filename");
 
-static bool ParseTexelViewFormatString(StringViewASCII string, HAL::TexelViewFormat& resultFormat)
+static bool ParseTexelViewFormatString(StringViewASCII string, GfxHAL::TexelViewFormat& resultFormat)
 {
 	if (string == "R8G8B8BA8_UNORM" || string == "R8G8B8BA8_Unorm")
 	{
-		resultFormat = HAL::TexelViewFormat::R8G8B8A8_UNORM;
+		resultFormat = GfxHAL::TexelViewFormat::R8G8B8A8_UNORM;
 		return true;
 	}
 	return false;
 }
 
-static bool ParseDepthStencilFormatString(StringViewASCII string, HAL::DepthStencilFormat& resultFormat)
+static bool ParseDepthStencilFormatString(StringViewASCII string, GfxHAL::DepthStencilFormat& resultFormat)
 {
 	if (string == "D32")
 	{
-		resultFormat = HAL::DepthStencilFormat::D32;
+		resultFormat = GfxHAL::DepthStencilFormat::D32;
 		return true;
 	}
 	return false;
 }
 
-static HAL::ShaderCompiler::DescriptorSetLayout* LibFindDescriptorSetLayout(LibraryDefinition& lib, uint64 nameXSH)
+static GfxHAL::ShaderCompiler::DescriptorSetLayout* LibFindDescriptorSetLayout(LibraryDefinition& lib, uint64 nameXSH)
 {
 	for (const auto& descriptorSetLayout : lib.descriptorSetLayouts)
 	{
@@ -41,7 +41,7 @@ static HAL::ShaderCompiler::DescriptorSetLayout* LibFindDescriptorSetLayout(Libr
 	return nullptr;
 }
 
-static HAL::ShaderCompiler::PipelineLayout* LibFindPipelineLayout(LibraryDefinition& lib, uint64 nameXSH)
+static GfxHAL::ShaderCompiler::PipelineLayout* LibFindPipelineLayout(LibraryDefinition& lib, uint64 nameXSH)
 {
 	for (const auto& pipelineLayout : lib.pipelineLayouts)
 	{
@@ -83,7 +83,7 @@ bool LibraryDefinitionLoader::readDescriptorSetLayoutDeclaration(const XJSON::Ke
 		return false;
 	}
 
-	InplaceArrayList<HAL::ShaderCompiler::DescriptorSetBindingDesc, HAL::MaxDescriptorSetBindingCount> bindings;
+	InplaceArrayList<GfxHAL::ShaderCompiler::DescriptorSetBindingDesc, GfxHAL::MaxDescriptorSetBindingCount> bindings;
 
 	xjsonParser.openObjectValueScope();
 	for (;;)
@@ -117,20 +117,20 @@ bool LibraryDefinitionLoader::readDescriptorSetLayoutDeclaration(const XJSON::Ke
 			return false;
 		}
 
-		HAL::ShaderCompiler::DescriptorSetBindingDesc binding = {};
+		GfxHAL::ShaderCompiler::DescriptorSetBindingDesc binding = {};
 		binding.name = xjsonProperty.key;
 		binding.descriptorCount = 1;
 
 		if (xjsonProperty.value.typeAnnotation == "read-only-buffer-descriptor")
-			binding.descriptorType = HAL::DescriptorType::ReadOnlyBuffer;
+			binding.descriptorType = GfxHAL::DescriptorType::ReadOnlyBuffer;
 		else if (xjsonProperty.value.typeAnnotation == "read-write-buffer-descriptor")
-			binding.descriptorType = HAL::DescriptorType::ReadWriteBuffer;
+			binding.descriptorType = GfxHAL::DescriptorType::ReadWriteBuffer;
 		else if (xjsonProperty.value.typeAnnotation == "read-only-texture-descriptor")
-			binding.descriptorType = HAL::DescriptorType::ReadOnlyTexture;
+			binding.descriptorType = GfxHAL::DescriptorType::ReadOnlyTexture;
 		else if (xjsonProperty.value.typeAnnotation == "read-write-texture-descriptor")
-			binding.descriptorType = HAL::DescriptorType::ReadWriteTexture;
+			binding.descriptorType = GfxHAL::DescriptorType::ReadWriteTexture;
 		else if (xjsonProperty.value.typeAnnotation == "raytracing-acceleration-structure-descriptor")
-			binding.descriptorType = HAL::DescriptorType::RaytracingAccelerationStructure;
+			binding.descriptorType = GfxHAL::DescriptorType::RaytracingAccelerationStructure;
 		else
 		{
 			reportError("unknown descriptor type", xjsonProperty.value.typeAnnotationLocation);
@@ -162,8 +162,8 @@ bool LibraryDefinitionLoader::readDescriptorSetLayoutDeclaration(const XJSON::Ke
 	}
 
 
-	const HAL::ShaderCompiler::DescriptorSetLayoutRef descriptorSetLayout =
-		HAL::ShaderCompiler::DescriptorSetLayout::Create(bindings, bindings.getSize());
+	const GfxHAL::ShaderCompiler::DescriptorSetLayoutRef descriptorSetLayout =
+		GfxHAL::ShaderCompiler::DescriptorSetLayout::Create(bindings, bindings.getSize());
 
 	//libraryDefinition.descriptorSetLayouts.insert(descriptorSetLayoutNameXSH, descriptorSetLayout);
 	libraryDefinition.descriptorSetLayouts.pushBack(
@@ -181,7 +181,7 @@ bool LibraryDefinitionLoader::readPipelineLayoutDeclaration(const XJSON::KeyValu
 		return false;
 	}
 
-	InplaceArrayList<HAL::ShaderCompiler::PipelineBindingDesc, HAL::MaxPipelineBindingCount> bindings;
+	InplaceArrayList<GfxHAL::ShaderCompiler::PipelineBindingDesc, GfxHAL::MaxPipelineBindingCount> bindings;
 
 	xjsonParser.openObjectValueScope();
 	for (;;)
@@ -215,17 +215,17 @@ bool LibraryDefinitionLoader::readPipelineLayoutDeclaration(const XJSON::KeyValu
 			return false;
 		}
 
-		HAL::ShaderCompiler::PipelineBindingDesc binding = {};
+		GfxHAL::ShaderCompiler::PipelineBindingDesc binding = {};
 		binding.name = xjsonProperty.key;
 
 		constexpr StringViewASCII descriptorSetTypeLiteral = StringViewASCII("descriptor-set");
 
 		if (xjsonProperty.value.typeAnnotation == "constant-buffer")
-			binding.type = HAL::PipelineBindingType::ConstantBuffer;
+			binding.type = GfxHAL::PipelineBindingType::ConstantBuffer;
 		else if (xjsonProperty.value.typeAnnotation == "read-only-buffer")
-			binding.type = HAL::PipelineBindingType::ReadOnlyBuffer;
+			binding.type = GfxHAL::PipelineBindingType::ReadOnlyBuffer;
 		else if (xjsonProperty.value.typeAnnotation == "read-write-buffer")
-			binding.type = HAL::PipelineBindingType::ReadWriteBuffer;
+			binding.type = GfxHAL::PipelineBindingType::ReadWriteBuffer;
 		else if (xjsonProperty.value.typeAnnotation.startsWith(descriptorSetTypeLiteral))
 		{
 			const StringViewASCII descriptorSetLayoutNameInBrackets =
@@ -244,9 +244,9 @@ bool LibraryDefinitionLoader::readPipelineLayoutDeclaration(const XJSON::KeyValu
 			XAssert(!descriptorSetLayoutName.isEmpty());
 			// TODO: Maybe check that `descriptorSetLayoutName` is legal XJSON identifier.
 
-			//const HAL::ShaderCompiler::DescriptorSetLayoutRef* descriptorSetLayout =
+			//const GfxHAL::ShaderCompiler::DescriptorSetLayoutRef* descriptorSetLayout =
 			//	libraryDefinition.descriptorSetLayouts.findValue(XSH::Compute(descriptorSetLayoutName));
-			const HAL::ShaderCompiler::DescriptorSetLayout* descriptorSetLayout =
+			const GfxHAL::ShaderCompiler::DescriptorSetLayout* descriptorSetLayout =
 				LibFindDescriptorSetLayout(libraryDefinition, XSH::Compute(descriptorSetLayoutName));
 			if (!descriptorSetLayout)
 			{
@@ -254,7 +254,7 @@ bool LibraryDefinitionLoader::readPipelineLayoutDeclaration(const XJSON::KeyValu
 				return false;
 			}
 
-			binding.type = HAL::PipelineBindingType::DescriptorSet;
+			binding.type = GfxHAL::PipelineBindingType::DescriptorSet;
 			//binding.descriptorSetLayout = descriptorSetLayout->get();
 			binding.descriptorSetLayout = descriptorSetLayout;
 		}
@@ -288,8 +288,8 @@ bool LibraryDefinitionLoader::readPipelineLayoutDeclaration(const XJSON::KeyValu
 		return false;
 	}
 
-	const HAL::ShaderCompiler::PipelineLayoutRef pipelineLayout =
-		HAL::ShaderCompiler::PipelineLayout::Create(bindings, bindings.getSize());
+	const GfxHAL::ShaderCompiler::PipelineLayoutRef pipelineLayout =
+		GfxHAL::ShaderCompiler::PipelineLayout::Create(bindings, bindings.getSize());
 
 	//libraryDefinition.pipelineLayouts.insert(pipelineLayoutNameXSH, pipelineLayout);
 	libraryDefinition.pipelineLayouts.pushBack(
@@ -307,10 +307,10 @@ bool LibraryDefinitionLoader::readGraphicsPipelineDeclaration(const XJSON::KeyVa
 		return false;
 	}
 
-	HAL::ShaderCompiler::PipelineLayoutRef pipelineLayout = nullptr;
+	GfxHAL::ShaderCompiler::PipelineLayoutRef pipelineLayout = nullptr;
 	uint64 pipelineLayoutNameXSH = 0;
-	HAL::ShaderCompiler::GraphicsPipelineShaders pipelineShaders = {};
-	HAL::ShaderCompiler::GraphicsPipelineSettings pipelineSettings = {};
+	GfxHAL::ShaderCompiler::GraphicsPipelineShaders pipelineShaders = {};
+	GfxHAL::ShaderCompiler::GraphicsPipelineSettings pipelineSettings = {};
 	bool renderTargetsAreSet = false;
 	bool depthStencilIsSet = false;
 
@@ -410,19 +410,19 @@ bool LibraryDefinitionLoader::readGraphicsPipelineDeclaration(const XJSON::KeyVa
 					return false;
 				}
 
-				HAL::TexelViewFormat renderTargetFormat = HAL::TexelViewFormat::Undefined;
+				GfxHAL::TexelViewFormat renderTargetFormat = GfxHAL::TexelViewFormat::Undefined;
 				if (!ParseTexelViewFormatString(xjsonRenderTargetValue.valueLiteral, renderTargetFormat))
 				{
 					reportError("unknown format", xjsonRenderTargetValue.valueLocation);
 					return false;
 				}
-				if (!HAL::DoesTexelViewFormatSupportColorRenderTargetUsage(renderTargetFormat))
+				if (!GfxHAL::DoesTexelViewFormatSupportColorRenderTargetUsage(renderTargetFormat))
 				{
 					reportError("format does not support render target usage", xjsonRenderTargetValue.valueLocation);
 					return false;
 				}
 
-				if (renderTargetCount >= HAL::MaxRenderTargetCount)
+				if (renderTargetCount >= GfxHAL::MaxRenderTargetCount)
 				{
 					reportError("render targets limit exceeded", xjsonProperty.value.valueLocation);
 					return false;
@@ -447,7 +447,7 @@ bool LibraryDefinitionLoader::readGraphicsPipelineDeclaration(const XJSON::KeyVa
 				return false;
 			}
 
-			HAL::DepthStencilFormat depthStencilFormat = HAL::DepthStencilFormat::Undefined;
+			GfxHAL::DepthStencilFormat depthStencilFormat = GfxHAL::DepthStencilFormat::Undefined;
 			if (!ParseDepthStencilFormatString(xjsonProperty.value.valueLiteral, depthStencilFormat))
 			{
 				reportError("unknown format", xjsonProperty.value.valueLocation);
@@ -506,9 +506,9 @@ bool LibraryDefinitionLoader::readComputePipelineDeclaration(const XJSON::KeyVal
 		return false;
 	}
 
-	HAL::ShaderCompiler::PipelineLayoutRef pipelineLayout = nullptr;
+	GfxHAL::ShaderCompiler::PipelineLayoutRef pipelineLayout = nullptr;
 	uint64 pipelineLayoutNameXSH = 0;
-	HAL::ShaderCompiler::ShaderDesc computeShader = {};
+	GfxHAL::ShaderCompiler::ShaderDesc computeShader = {};
 
 	xjsonParser.openObjectValueScope();
 	for (;;)
@@ -599,7 +599,7 @@ bool LibraryDefinitionLoader::readComputePipelineDeclaration(const XJSON::KeyVal
 }
 
 bool LibraryDefinitionLoader::readPipelineLayoutSetupProperty(const XJSON::KeyValue& xjsonOuterProperty,
-	HAL::ShaderCompiler::PipelineLayoutRef& resultPipelineLayout, uint64& resultPipelineLayoutNameXSH)
+	GfxHAL::ShaderCompiler::PipelineLayoutRef& resultPipelineLayout, uint64& resultPipelineLayoutNameXSH)
 {
 	if (xjsonOuterProperty.value.valueType != XJSON::ValueType::Literal)
 	{
@@ -608,9 +608,9 @@ bool LibraryDefinitionLoader::readPipelineLayoutSetupProperty(const XJSON::KeyVa
 	}
 
 	const uint64 pipelineLayoutNameXSH = XSH::Compute(xjsonOuterProperty.value.valueLiteral);
-	//const HAL::ShaderCompiler::PipelineLayoutRef* foundPipelineLayout =
+	//const GfxHAL::ShaderCompiler::PipelineLayoutRef* foundPipelineLayout =
 	//	libraryDefinition.pipelineLayouts.findValue(pipelineLayoutNameXSH);
-	HAL::ShaderCompiler::PipelineLayout* foundPipelineLayout =
+	GfxHAL::ShaderCompiler::PipelineLayout* foundPipelineLayout =
 		LibFindPipelineLayout(libraryDefinition, pipelineLayoutNameXSH);
 	if (!foundPipelineLayout)
 	{
@@ -628,7 +628,7 @@ bool LibraryDefinitionLoader::readPipelineLayoutSetupProperty(const XJSON::KeyVa
 }
 
 bool LibraryDefinitionLoader::readShaderSetupProperty(const XJSON::KeyValue& xjsonOuterProperty,
-	HAL::ShaderCompiler::ShaderDesc& resultShader)
+	GfxHAL::ShaderCompiler::ShaderDesc& resultShader)
 {
 	if (xjsonOuterProperty.value.valueType != XJSON::ValueType::Object)
 	{

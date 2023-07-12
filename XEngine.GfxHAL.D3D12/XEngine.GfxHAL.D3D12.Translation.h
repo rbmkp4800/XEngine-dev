@@ -3,7 +3,7 @@
 // NOTE: This file should not be included directly by HAL users.
 // Assumes that d3d12 and dxgi are included above.
 
-namespace XEngine::Render::HAL
+namespace XEngine::GfxHAL
 {
 	inline DXGI_FORMAT TranslateTextureFormatToDXGIFormat(TextureFormat format)
 	{

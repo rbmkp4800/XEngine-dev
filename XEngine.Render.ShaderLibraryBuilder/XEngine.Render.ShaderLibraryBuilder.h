@@ -6,8 +6,8 @@
 #include <XLib.String.h>
 #include <XLib.RefCounted.h>
 
-#include <XEngine.Render.HAL.Common.h>
-#include <XEngine.Render.HAL.ShaderCompiler.h>
+#include <XEngine.GfxHAL.Common.h>
+#include <XEngine.GfxHAL.ShaderCompiler.h>
 
 // TODO: Use hash maps in LibraryDefinition. Yes, I am retarded.
 
@@ -21,20 +21,20 @@ namespace XEngine::Render::ShaderLibraryBuilder
 	private:
 		XLib::StringViewASCII name;
 
-		HAL::ShaderCompiler::PipelineLayoutRef pipelineLayout;
+		GfxHAL::ShaderCompiler::PipelineLayoutRef pipelineLayout;
 		uint64 pipelineLayoutNameXSH = 0;
 
 		struct
 		{
-			HAL::ShaderCompiler::ShaderDesc shader;
-			HAL::ShaderCompiler::BlobRef compiledBlob;
+			GfxHAL::ShaderCompiler::ShaderDesc shader;
+			GfxHAL::ShaderCompiler::BlobRef compiledBlob;
 		} compute = {};
 
 		struct
 		{
-			HAL::ShaderCompiler::GraphicsPipelineShaders shaders;
-			HAL::ShaderCompiler::GraphicsPipelineSettings settings;
-			HAL::ShaderCompiler::GraphicsPipelineCompiledBlobs compiledBlobs;
+			GfxHAL::ShaderCompiler::GraphicsPipelineShaders shaders;
+			GfxHAL::ShaderCompiler::GraphicsPipelineSettings settings;
+			GfxHAL::ShaderCompiler::GraphicsPipelineCompiledBlobs compiledBlobs;
 		} graphics = {};
 
 		bool isGraphics = false;
@@ -46,19 +46,19 @@ namespace XEngine::Render::ShaderLibraryBuilder
 	public:
 		inline XLib::StringViewASCII getName() const { return name; }
 
-		inline HAL::ShaderCompiler::PipelineLayout* getPipelineLayout() const { return pipelineLayout.get(); }
+		inline GfxHAL::ShaderCompiler::PipelineLayout* getPipelineLayout() const { return pipelineLayout.get(); }
 		inline uint64 getPipelineLayoutNameXSH() const { return pipelineLayoutNameXSH; }
 
-		inline HAL::ShaderCompiler::ShaderDesc getComputeShader() const { return compute.shader; }
-		inline HAL::ShaderCompiler::BlobRef& computeShaderCompiledBlob() { return compute.compiledBlob; }
-		inline const HAL::ShaderCompiler::BlobRef& computeShaderCompiledBlob() const { return compute.compiledBlob; }
+		inline GfxHAL::ShaderCompiler::ShaderDesc getComputeShader() const { return compute.shader; }
+		inline GfxHAL::ShaderCompiler::BlobRef& computeShaderCompiledBlob() { return compute.compiledBlob; }
+		inline const GfxHAL::ShaderCompiler::BlobRef& computeShaderCompiledBlob() const { return compute.compiledBlob; }
 
-		inline HAL::ShaderCompiler::GraphicsPipelineShaders getGraphicsShaders() const { return graphics.shaders; }
-		inline HAL::ShaderCompiler::GraphicsPipelineSettings getGraphicsSettings() const { return graphics.settings; }
-		inline HAL::ShaderCompiler::GraphicsPipelineCompiledBlobs& graphicsCompiledBlobs() { return graphics.compiledBlobs; }
-		inline const HAL::ShaderCompiler::GraphicsPipelineCompiledBlobs& graphicsCompiledBlobs() const { return graphics.compiledBlobs; }
+		inline GfxHAL::ShaderCompiler::GraphicsPipelineShaders getGraphicsShaders() const { return graphics.shaders; }
+		inline GfxHAL::ShaderCompiler::GraphicsPipelineSettings getGraphicsSettings() const { return graphics.settings; }
+		inline GfxHAL::ShaderCompiler::GraphicsPipelineCompiledBlobs& graphicsCompiledBlobs() { return graphics.compiledBlobs; }
+		inline const GfxHAL::ShaderCompiler::GraphicsPipelineCompiledBlobs& graphicsCompiledBlobs() const { return graphics.compiledBlobs; }
 
-		inline bool isGraphicsPipeline() const { return this->isGraphics; }
+		inline bool isGraphicsPipeline() const { return isGraphics; }
 
 	public:
 
@@ -66,13 +66,13 @@ namespace XEngine::Render::ShaderLibraryBuilder
 		// Shader text is not stored.
 
 		static PipelineRef CreateGraphics(XLib::StringViewASCII name,
-			HAL::ShaderCompiler::PipelineLayout* pipelineLayout, uint64 pipelineLayoutNameXSH,
-			const HAL::ShaderCompiler::GraphicsPipelineShaders& shaders,
-			const HAL::ShaderCompiler::GraphicsPipelineSettings& settings);
+			GfxHAL::ShaderCompiler::PipelineLayout* pipelineLayout, uint64 pipelineLayoutNameXSH,
+			const GfxHAL::ShaderCompiler::GraphicsPipelineShaders& shaders,
+			const GfxHAL::ShaderCompiler::GraphicsPipelineSettings& settings);
 
 		static PipelineRef CreateCompute(XLib::StringViewASCII name,
-			HAL::ShaderCompiler::PipelineLayout* pipelineLayout, uint64 pipelineLayoutNameXSH,
-			const HAL::ShaderCompiler::ShaderDesc& shader);
+			GfxHAL::ShaderCompiler::PipelineLayout* pipelineLayout, uint64 pipelineLayoutNameXSH,
+			const GfxHAL::ShaderCompiler::ShaderDesc& shader);
 	};
 
 	struct LibraryDefinition
@@ -80,13 +80,13 @@ namespace XEngine::Render::ShaderLibraryBuilder
 		struct DescriptorSetLayout
 		{
 			uint64 nameXSH;
-			HAL::ShaderCompiler::DescriptorSetLayoutRef ref;
+			GfxHAL::ShaderCompiler::DescriptorSetLayoutRef ref;
 		};
 
 		struct PipelineLayout
 		{
 			uint64 nameXSH;
-			HAL::ShaderCompiler::PipelineLayoutRef ref;
+			GfxHAL::ShaderCompiler::PipelineLayoutRef ref;
 		};
 
 		struct Pipeline

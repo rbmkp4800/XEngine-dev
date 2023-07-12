@@ -21,8 +21,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{102d6f8c-faad-4fd3-9b3a-16923042465e}</ProjectGuid>
-    <RootNamespace>XEngineRenderHALCommon</RootNamespace>
+    <ProjectGuid>{1ed495b0-b69b-4409-83fc-587f590eab29}</ProjectGuid>
+    <RootNamespace>XEngineGfxHALD3D12</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -74,17 +74,17 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IntDir>$(SolutionDir)Build.Intermediate\$(PlatformName).$(Configuration)\$(ProjectName)\</IntDir>
-    <OutDir>$(SolutionDir)Build\</OutDir>
-    <TargetName>$(ProjectName)_$(PlatformName).$(Configuration)</TargetName>
     <PublicIncludeDirectories>$(ProjectDir);$(PublicIncludeDirectories)</PublicIncludeDirectories>
+    <OutDir>$(SolutionDir)Build\</OutDir>
+    <IntDir>$(SolutionDir)Build.Intermediate\$(PlatformName).$(Configuration)\$(ProjectName)\</IntDir>
+    <TargetName>$(ProjectName)_$(PlatformName).$(Configuration)</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IntDir>$(SolutionDir)Build.Intermediate\$(PlatformName).$(Configuration)\$(ProjectName)\</IntDir>
-    <OutDir>$(SolutionDir)Build\</OutDir>
-    <TargetName>$(ProjectName)_$(PlatformName).$(Configuration)</TargetName>
     <PublicIncludeDirectories>$(ProjectDir);$(PublicIncludeDirectories)</PublicIncludeDirectories>
+    <OutDir>$(SolutionDir)Build\</OutDir>
+    <IntDir>$(SolutionDir)Build.Intermediate\$(PlatformName).$(Configuration)\$(ProjectName)\</IntDir>
+    <TargetName>$(ProjectName)_$(PlatformName).$(Configuration)</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -131,6 +131,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <Optimization>Disabled</Optimization>
       <WholeProgramOptimization>false</WholeProgramOptimization>
+      <AdditionalIncludeDirectories>$(SolutionDir)External\Microsoft.Direct3D.D3D12\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -139,6 +140,9 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <Lib>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -149,6 +153,7 @@
       <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)External\Microsoft.Direct3D.D3D12\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -157,19 +162,25 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <Lib>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="D3D12Helpers.h" />
+    <ClInclude Include="XEngine.GfxHAL.D3D12.h" />
+    <ClInclude Include="XEngine.GfxHAL.D3D12.Translation.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\XEngine.GfxHAL.Common\XEngine.GfxHAL.Common.vcxproj">
+      <Project>{102d6f8c-faad-4fd3-9b3a-16923042465e}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\XLib\XLib.vcxproj">
       <Project>{df81a513-72e3-4b74-b866-97f3bb61d45f}</Project>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="XEngine.Render.HAL.Common.h" />
-    <ClInclude Include="XEngine.Render.HAL.BlobFormat.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="XEngine.Render.HAL.BlobFormat.cpp" />
-    <ClCompile Include="XEngine.Render.HAL.Common.cpp" />
+    <ClCompile Include="XEngine.GfxHAL.D3D12.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

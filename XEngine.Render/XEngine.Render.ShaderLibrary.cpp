@@ -7,6 +7,7 @@
 #include "XEngine.Render.ShaderLibrary.h"
 
 using namespace XLib;
+using namespace XEngine;
 using namespace XEngine::Render;
 
 XTODO("Use hash maps instead of linear search");
@@ -16,19 +17,19 @@ static inline uint64 U64From2xU32(uint32 lo, uint32 hi) { return uint64(lo) | (u
 struct ShaderLibrary::DescriptorSetLayout
 {
 	uint64 nameXSH;
-	HAL::DescriptorSetLayoutHandle halDescriptorSetLayout;
+	GfxHAL::DescriptorSetLayoutHandle halDescriptorSetLayout;
 };
 
 struct ShaderLibrary::PipelineLayout
 {
 	uint64 nameXSH;
-	HAL::PipelineLayoutHandle halPipelineLayout;
+	GfxHAL::PipelineLayoutHandle halPipelineLayout;
 };
 
 struct ShaderLibrary::Pipeline
 {
 	uint64 nameXSH;
-	HAL::PipelineHandle halPipeline;
+	GfxHAL::PipelineHandle halPipeline;
 };
 
 ShaderLibrary::~ShaderLibrary()
@@ -52,7 +53,7 @@ void ShaderLibrary::load(const char* libraryFilePath)
 {
 	// TODO: Refactor this method.
 
-	HAL::Device& halDevice = Host::GetDevice();
+	GfxHAL::Device& halDevice = Host::GetDevice();
 
 	File libraryFile;
 	libraryFile.open(libraryFilePath, FileAccessMode::Read, FileOpenMode::OpenExisting);
@@ -121,7 +122,7 @@ void ShaderLibrary::load(const char* libraryFilePath)
 		const ShaderLibraryFormat::DescriptorSetLayoutRecord& descriptorSetLayoutRecord = descriptorSetLayoutRecords[descriptorSetLayoutIndex];
 		DescriptorSetLayout& descriptorSetLayout = descriptorSetLayoutTable[descriptorSetLayoutIndex];
 
-		HAL::BlobDataView descriptorSetLayoutBlob = {};
+		GfxHAL::BlobDataView descriptorSetLayoutBlob = {};
 		descriptorSetLayoutBlob.data = blobsDataBegin + descriptorSetLayoutRecord.blob.offset;
 		descriptorSetLayoutBlob.size = descriptorSetLayoutRecord.blob.size;
 
@@ -141,7 +142,7 @@ void ShaderLibrary::load(const char* libraryFilePath)
 		const ShaderLibraryFormat::PipelineLayoutRecord& pipelineLayoutRecord = pipelineLayoutRecords[pipelineLayoutIndex];
 		PipelineLayout& pipelineLayout = pipelineLayoutTable[pipelineLayoutIndex];
 
-		HAL::BlobDataView pipelineLayoutBlob = {};
+		GfxHAL::BlobDataView pipelineLayoutBlob = {};
 		pipelineLayoutBlob.data = blobsDataBegin + pipelineLayoutRecord.blob.offset;
 		pipelineLayoutBlob.size = pipelineLayoutRecord.blob.size;
 
@@ -178,7 +179,7 @@ void ShaderLibrary::load(const char* libraryFilePath)
 		{
 			XEMasterAssert(pipelineRecord.graphicsStateBlob.offset + pipelineRecord.graphicsStateBlob.size <= blobsDataSize);
 
-			HAL::GraphicsPipelineBlobs graphicsBlobs = {};
+			GfxHAL::GraphicsPipelineBlobs graphicsBlobs = {};
 			graphicsBlobs.state.data = blobsDataBegin + pipelineRecord.graphicsStateBlob.offset;
 			graphicsBlobs.state.size = pipelineRecord.graphicsStateBlob.size;
 
@@ -224,7 +225,7 @@ void ShaderLibrary::load(const char* libraryFilePath)
 			const ShaderLibraryFormat::BlobRecord& bytecodeBlobRecord = bytecodeBlobRecords[pipelineRecord.psORcsBytecodeBlobIndex];
 			XEMasterAssert(bytecodeBlobRecord.offset + bytecodeBlobRecord.size <= blobsDataSize);
 
-			HAL::BlobDataView csBlob = {};
+			GfxHAL::BlobDataView csBlob = {};
 			csBlob.data = blobsDataBegin + bytecodeBlobRecord.offset;
 			csBlob.size = bytecodeBlobRecord.size;
 
@@ -242,7 +243,7 @@ void ShaderLibrary::load(const char* libraryFilePath)
 	SystemHeapAllocator::Release(libraryData);
 }
 
-HAL::DescriptorSetLayoutHandle ShaderLibrary::getDescriptorSetLayout(uint64 nameXSH) const
+GfxHAL::DescriptorSetLayoutHandle ShaderLibrary::getDescriptorSetLayout(uint64 nameXSH) const
 {
 	for (uint32 i = 0; i < descriptorSetLayoutCount; i++)
 	{
@@ -251,10 +252,10 @@ HAL::DescriptorSetLayoutHandle ShaderLibrary::getDescriptorSetLayout(uint64 name
 	}
 
 	XEMasterAssertUnreachableCode();
-	return HAL::DescriptorSetLayoutHandle::Zero;
+	return GfxHAL::DescriptorSetLayoutHandle::Zero;
 }
 
-HAL::PipelineLayoutHandle ShaderLibrary::getPipelineLayout(uint64 nameXSH) const
+GfxHAL::PipelineLayoutHandle ShaderLibrary::getPipelineLayout(uint64 nameXSH) const
 {
 	for (uint32 i = 0; i < pipelineLayoutCount; i++)
 	{
@@ -263,10 +264,10 @@ HAL::PipelineLayoutHandle ShaderLibrary::getPipelineLayout(uint64 nameXSH) const
 	}
 
 	XEMasterAssertUnreachableCode();
-	return HAL::PipelineLayoutHandle::Zero;
+	return GfxHAL::PipelineLayoutHandle::Zero;
 }
 
-HAL::PipelineHandle ShaderLibrary::getPipeline(uint64 nameXSH) const
+GfxHAL::PipelineHandle ShaderLibrary::getPipeline(uint64 nameXSH) const
 {
 	for (uint32 i = 0; i < pipelineCount; i++)
 	{
@@ -275,5 +276,5 @@ HAL::PipelineHandle ShaderLibrary::getPipeline(uint64 nameXSH) const
 	}
 
 	XEMasterAssertUnreachableCode();
-	return HAL::PipelineHandle::Zero;
+	return GfxHAL::PipelineHandle::Zero;
 }

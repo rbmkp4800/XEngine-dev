@@ -2,7 +2,7 @@
 
 #include <XLib.h>
 
-#include <XEngine.Render.HAL.D3D12.h>
+#include <XEngine.GfxHAL.D3D12.h>
 
 namespace XEngine::Render
 {
@@ -30,8 +30,8 @@ namespace XEngine::Render
 		void load(const char* libraryFilePath);
 		void reload(const char* libraryFilePath);
 
-		HAL::DescriptorSetLayoutHandle getDescriptorSetLayout(uint64 nameXSH) const;
-		HAL::PipelineLayoutHandle getPipelineLayout(uint64 nameXSH) const;
-		HAL::PipelineHandle getPipeline(uint64 nameXSH) const;
+		GfxHAL::DescriptorSetLayoutHandle getDescriptorSetLayout(uint64 nameXSH) const;
+		GfxHAL::PipelineLayoutHandle getPipelineLayout(uint64 nameXSH) const;
+		GfxHAL::PipelineHandle getPipeline(uint64 nameXSH) const;
 	};
 }

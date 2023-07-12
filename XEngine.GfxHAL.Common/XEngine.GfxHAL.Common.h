@@ -2,7 +2,7 @@
 
 #include <XLib.h>
 
-namespace XEngine::Render::HAL
+namespace XEngine::GfxHAL
 {
 	static constexpr uint8 MaxPipelineBindingCount = 32;
 	static constexpr uint8 MaxDescriptorSetBindingCount = 32;

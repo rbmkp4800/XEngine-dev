@@ -14,6 +14,7 @@
 // TODO: Bytecode blobs deduplication (but probably we can just wait until we drop pipelines and move to separate shaders).
 
 using namespace XLib;
+using namespace XEngine;
 using namespace XEngine::Render;
 using namespace XEngine::Render::ShaderLibraryBuilder;
 
@@ -49,7 +50,7 @@ static void StoreShaderLibrary(LibraryDefinition& libraryDefinition, const char*
 	for (const auto& descriptorSetLayoutMapElement : libraryDefinition.descriptorSetLayouts) // Iterating in order of name hash increase.
 	{
 		const uint64 descriptorSetLayoutNameXSH = descriptorSetLayoutMapElement.nameXSH;
-		const HAL::ShaderCompiler::DescriptorSetLayout* descriptorSetLayout = descriptorSetLayoutMapElement.ref.get();
+		const GfxHAL::ShaderCompiler::DescriptorSetLayout* descriptorSetLayout = descriptorSetLayoutMapElement.ref.get();
 
 		ShaderLibraryFormat::DescriptorSetLayoutRecord& descriptorSetLayoutRecord = descriptorSetLayoutRecords.emplaceBack();
 		descriptorSetLayoutRecord = {};
@@ -68,7 +69,7 @@ static void StoreShaderLibrary(LibraryDefinition& libraryDefinition, const char*
 	for (const auto& pipelineLayoutMapElement : libraryDefinition.pipelineLayouts) // Iterating in order of name hash increase.
 	{
 		const uint64 pipelineLayoutNameXSH = pipelineLayoutMapElement.nameXSH;
-		const HAL::ShaderCompiler::PipelineLayout* pipelineLayout = pipelineLayoutMapElement.ref.get();
+		const GfxHAL::ShaderCompiler::PipelineLayout* pipelineLayout = pipelineLayoutMapElement.ref.get();
 
 		ShaderLibraryFormat::PipelineLayoutRecord& pipelineLayoutRecord = pipelineLayoutRecords.emplaceBack();
 		pipelineLayoutRecord = {};
@@ -105,7 +106,7 @@ static void StoreShaderLibrary(LibraryDefinition& libraryDefinition, const char*
 
 		if (pipeline->isGraphicsPipeline())
 		{
-			const HAL::ShaderCompiler::Blob* stateBlob = pipeline->graphicsCompiledBlobs().stateBlob.get();
+			const GfxHAL::ShaderCompiler::Blob* stateBlob = pipeline->graphicsCompiledBlobs().stateBlob.get();
 
 			pipelineRecord.graphicsStateBlob.offset = nonBytecodeBlobsSizeAccum;
 			pipelineRecord.graphicsStateBlob.size = stateBlob->getSize();
@@ -114,22 +115,22 @@ static void StoreShaderLibrary(LibraryDefinition& libraryDefinition, const char*
 			nonBytecodeBlobsSizeAccum += stateBlob->getSize();
 			nonBytecodeBlobs.emplaceBack(BlobDataView { stateBlob->getData(), stateBlob->getSize() });
 
-			if (const HAL::ShaderCompiler::Blob* vsBlob = pipeline->graphicsCompiledBlobs().vsBytecodeBlob.get())
+			if (const GfxHAL::ShaderCompiler::Blob* vsBlob = pipeline->graphicsCompiledBlobs().vsBytecodeBlob.get())
 			{
 				pipelineRecord.vsBytecodeBlobIndex = XCheckedCastU16(bytecodeBlobs.getSize());
 				bytecodeBlobs.emplaceBack(BlobDataView { vsBlob->getData(), vsBlob->getSize(), vsBlob->getChecksum() });
 			}
-			if (const HAL::ShaderCompiler::Blob* asBlob = pipeline->graphicsCompiledBlobs().asBytecodeBlob.get())
+			if (const GfxHAL::ShaderCompiler::Blob* asBlob = pipeline->graphicsCompiledBlobs().asBytecodeBlob.get())
 			{
 				pipelineRecord.asBytecodeBlobIndex = XCheckedCastU16(bytecodeBlobs.getSize());
 				bytecodeBlobs.emplaceBack(BlobDataView { asBlob->getData(), asBlob->getSize(), asBlob->getChecksum() });
 			}
-			if (const HAL::ShaderCompiler::Blob* msBlob = pipeline->graphicsCompiledBlobs().msBytecodeBlob.get())
+			if (const GfxHAL::ShaderCompiler::Blob* msBlob = pipeline->graphicsCompiledBlobs().msBytecodeBlob.get())
 			{
 				pipelineRecord.msBytecodeBlobIndex = XCheckedCastU16(bytecodeBlobs.getSize());
 				bytecodeBlobs.emplaceBack(BlobDataView { msBlob->getData(), msBlob->getSize(), msBlob->getChecksum() });
 			}
-			if (const HAL::ShaderCompiler::Blob* psBlob = pipeline->graphicsCompiledBlobs().psBytecodeBlob.get())
+			if (const GfxHAL::ShaderCompiler::Blob* psBlob = pipeline->graphicsCompiledBlobs().psBytecodeBlob.get())
 			{
 				pipelineRecord.psORcsBytecodeBlobIndex = XCheckedCastU16(bytecodeBlobs.getSize());
 				bytecodeBlobs.emplaceBack(BlobDataView { psBlob->getData(), psBlob->getSize(), psBlob->getChecksum() });
@@ -137,7 +138,7 @@ static void StoreShaderLibrary(LibraryDefinition& libraryDefinition, const char*
 		}
 		else
 		{
-			const HAL::ShaderCompiler::Blob* csBlob = pipeline->computeShaderCompiledBlob().get();
+			const GfxHAL::ShaderCompiler::Blob* csBlob = pipeline->computeShaderCompiledBlob().get();
 			pipelineRecord.psORcsBytecodeBlobIndex = XCheckedCastU16(bytecodeBlobs.getSize());
 			bytecodeBlobs.emplaceBack(BlobDataView { csBlob->getData(), csBlob->getSize(), csBlob->getChecksum() });
 		}
@@ -206,9 +207,9 @@ static void StoreShaderLibrary(LibraryDefinition& libraryDefinition, const char*
 }
 
 PipelineRef Pipeline::CreateGraphics(StringViewASCII name,
-	HAL::ShaderCompiler::PipelineLayout* pipelineLayout, uint64 pipelineLayoutNameXSH,
-	const HAL::ShaderCompiler::GraphicsPipelineShaders& shaders,
-	const HAL::ShaderCompiler::GraphicsPipelineSettings& settings)
+	GfxHAL::ShaderCompiler::PipelineLayout* pipelineLayout, uint64 pipelineLayoutNameXSH,
+	const GfxHAL::ShaderCompiler::GraphicsPipelineShaders& shaders,
+	const GfxHAL::ShaderCompiler::GraphicsPipelineSettings& settings)
 {
 	// I should not be allowed to code. Sorry :(
 
@@ -281,8 +282,8 @@ PipelineRef Pipeline::CreateGraphics(StringViewASCII name,
 }
 
 PipelineRef Pipeline::CreateCompute(StringViewASCII name,
-	HAL::ShaderCompiler::PipelineLayout* pipelineLayout, uint64 pipelineLayoutNameXSH,
-	const HAL::ShaderCompiler::ShaderDesc& shader)
+	GfxHAL::ShaderCompiler::PipelineLayout* pipelineLayout, uint64 pipelineLayoutNameXSH,
+	const GfxHAL::ShaderCompiler::ShaderDesc& shader)
 {
 	uint32 memoryBlockSizeAccum = sizeof(Pipeline);
 
@@ -347,10 +348,10 @@ int main()
 
 		if (pipeline.isGraphicsPipeline())
 		{
-			HAL::ShaderCompiler::GraphicsPipelineShaders shaders = pipeline.getGraphicsShaders();
+			GfxHAL::ShaderCompiler::GraphicsPipelineShaders shaders = pipeline.getGraphicsShaders();
 			// Source text is zero. Resolve it.
 
-			for (HAL::ShaderCompiler::ShaderDesc& shader : shaders.all)
+			for (GfxHAL::ShaderCompiler::ShaderDesc& shader : shaders.all)
 			{
 				if (shader.sourcePath.isEmpty())
 					continue;
@@ -361,9 +362,9 @@ int main()
 				}
 			}
 
-			HAL::ShaderCompiler::GraphicsPipelineCompilationArtifacts artifacts = {};
+			GfxHAL::ShaderCompiler::GraphicsPipelineCompilationArtifacts artifacts = {};
 
-			const bool result = HAL::ShaderCompiler::CompileGraphicsPipeline(
+			const bool result = GfxHAL::ShaderCompiler::CompileGraphicsPipeline(
 				*pipeline.getPipelineLayout(), shaders, pipeline.getGraphicsSettings(), artifacts, pipeline.graphicsCompiledBlobs());
 
 			if (!result)
@@ -375,7 +376,7 @@ int main()
 		}
 		else
 		{
-			HAL::ShaderCompiler::ShaderDesc shader = pipeline.getComputeShader();
+			GfxHAL::ShaderCompiler::ShaderDesc shader = pipeline.getComputeShader();
 			// Source text is zero. Resolve it.
 
 			if (!sourceCache.resolveText(shader.sourcePath, shader.sourceText))
@@ -383,9 +384,9 @@ int main()
 				return 1;
 			}
 
-			HAL::ShaderCompiler::ShaderCompilationArtifactsRef artifacts = nullptr;
+			GfxHAL::ShaderCompiler::ShaderCompilationArtifactsRef artifacts = nullptr;
 
-			const bool result = HAL::ShaderCompiler::CompileComputePipeline(
+			const bool result = GfxHAL::ShaderCompiler::CompileComputePipeline(
 				*pipeline.getPipelineLayout(), shader, artifacts, pipeline.computeShaderCompiledBlob());
 
 			if (!result)

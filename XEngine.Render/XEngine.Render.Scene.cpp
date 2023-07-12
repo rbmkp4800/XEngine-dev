@@ -5,7 +5,7 @@
 #include "XEngine.Render.h"
 
 using namespace XEngine::Render;
-using namespace XEngine::Render::HAL;
+using namespace XEngine::GfxHAL;
 
 struct SceneGeometryRenderer::AccumulateDeferredLightingPassUserData
 {
@@ -22,7 +22,7 @@ void SceneGeometryRenderer::AccumulateDeferredLightingPassExecutor(Scheduler::Pa
 	const PipelineHandle accumulateDeferredLightingPipeline =
 		Host::GetShaders().getPipeline("AccumulateDeferredLighting"_xsh);
 
-	const HAL::TextureHandle halOutputLuminanceTexture = context.resolveTexture(userData.outputLuminanceTexture);
+	const GfxHAL::TextureHandle halOutputLuminanceTexture = context.resolveTexture(userData.outputLuminanceTexture);
 
 	const RenderTargetViewHandle RT = context.createTransientRenderTargetView(halOutputLuminanceTexture,
 		// TODO: ...

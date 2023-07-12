@@ -7,17 +7,17 @@
 #include <XLib.ByteStream.h>
 #include <XLib.SystemHeapAllocator.h>
 
-#include <XEngine.Render.HAL.BlobFormat.h>
+#include <XEngine.GfxHAL.BlobFormat.h>
 
-#include "XEngine.Render.HAL.D3D12.h"
-#include "XEngine.Render.HAL.D3D12.Translation.h"
+#include "XEngine.GfxHAL.D3D12.h"
+#include "XEngine.GfxHAL.D3D12.Translation.h"
 
 extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = D3D12_SDK_VERSION; }
 extern "C" { __declspec(dllexport) extern const char* D3D12SDKPath = ".\\D3D12\\"; }
 
 using namespace XLib;
 using namespace XLib::Platform;
-using namespace XEngine::Render::HAL;
+using namespace XEngine::GfxHAL;
 
 static_assert(Device::ConstantBufferBindAlignment >= D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 
