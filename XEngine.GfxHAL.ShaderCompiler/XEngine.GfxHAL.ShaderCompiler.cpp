@@ -252,7 +252,8 @@ uint32 PipelineLayout::getSerializedBlobChecksum() const
 	return ((BlobFormat::Data::GenericBlobHeader*)getSerializedBlobData())->checksum;
 }
 
-PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, uint16 bindingCount)
+PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, uint16 bindingCount,
+	const StaticSamplerDesc* staticSamplers, uint8 staticSamplerCount)
 {
 	// NOTE: I am retarded, so I put all the data in a single heap allocation :autistic_face:
 
@@ -433,8 +434,10 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 		// Compile root signature.
 		D3D12_VERSIONED_ROOT_SIGNATURE_DESC d3dRootSignatureDesc = {};
 		d3dRootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
-		d3dRootSignatureDesc.Desc_1_1.pParameters = d3dRootParams.getData();
 		d3dRootSignatureDesc.Desc_1_1.NumParameters = d3dRootParams.getSize();
+		d3dRootSignatureDesc.Desc_1_1.pParameters = d3dRootParams.getData();
+		//d3dRootSignatureDesc.Desc_1_1.NumStaticSamplers = ...;
+		//d3dRootSignatureDesc.Desc_1_1.pStaticSamplers = ...;
 		d3dRootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
 		// TODO: D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED
 		// TODO: D3D12_ROOT_SIGNATURE_FLAG_DENY_*_SHADER_ROOT_ACCESS
@@ -754,11 +757,11 @@ bool ShaderCompiler::CompileGraphicsPipeline(
 	// Validate and register vertex input layout.
 	for (uint8 i = 0; i < MaxVertexBufferCount; i++)
 	{
-		switch (settings.vertexBuffers[i].type)
+		switch (settings.vertexBuffers[i].stepRate)
 		{
-			case VertexBufferType::Undefined:	break;
-			case VertexBufferType::PerVertex:	stateBlobWriter.enableVertexBuffer(i, false); break;
-			case VertexBufferType::PerInstance:	stateBlobWriter.enableVertexBuffer(i, true);  break;
+			case VertexBufferStepRate::Undefined:	break;
+			case VertexBufferStepRate::PerVertex:	stateBlobWriter.enableVertexBuffer(i, false); break;
+			case VertexBufferStepRate::PerInstance:	stateBlobWriter.enableVertexBuffer(i, true);  break;
 			default: return false;
 		}
 	}
@@ -777,7 +780,7 @@ bool ShaderCompiler::CompileGraphicsPipeline(
 			return false;
 
 		const VertexBufferDesc& buffer = settings.vertexBuffers[binding.bufferIndex];
-		if (buffer.type != VertexBufferType::PerVertex && buffer.type != VertexBufferType::PerInstance)
+		if (buffer.stepRate != VertexBufferStepRate::PerVertex && buffer.stepRate != VertexBufferStepRate::PerInstance)
 			return false;
 
 		stateBlobWriter.addVertexBinding(binding.name.getData(), binding.name.getLength(),

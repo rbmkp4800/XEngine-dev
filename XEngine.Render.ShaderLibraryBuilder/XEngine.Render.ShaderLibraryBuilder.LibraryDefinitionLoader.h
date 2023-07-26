@@ -1,9 +1,12 @@
 #pragma once
 
 #include <XLib.h>
+#include <XLib.Containers.ArrayList.h>
+#include <XLib.JSON.h>
 #include <XLib.NonCopyable.h>
 
-#include "XJSON.h"
+#include <XEngine.GfxHAL.ShaderCompiler.h>
+
 #include "XEngine.Render.ShaderLibraryBuilder.h"
 
 namespace XEngine::Render::ShaderLibraryBuilder
@@ -11,28 +14,53 @@ namespace XEngine::Render::ShaderLibraryBuilder
 	class LibraryDefinitionLoader : public XLib::NonCopyable
 	{
 	private:
-		LibraryDefinition& libraryDefinition;
+		struct Cursor
+		{
+			uint32 lineNumber;
+			uint32 columnNumber;
+		};
 
-		XJSON::MemoryStreamParser xjsonParser;
-		const char* xjsonPath = nullptr;
+		struct VertexInputLayoutDesc
+		{
+			XLib::StringViewASCII name;
+			GfxHAL::ShaderCompiler::VertexBufferDesc vertexBuffers[GfxHAL::MaxVertexBufferCount];
+			uint32 vertexBindingsOffset;
+			uint8 vertexBindingCount;
+		};
 
 	private:
-		void reportError(const char* message, const XJSON::Location& location);
-		void reportXJSONError(const XJSON::ParserError& xjsonError);
+		LibraryDefinition& libraryDefinition;
 
-		bool readDescriptorSetLayoutDeclaration(const XJSON::KeyValue& xjsonEntryDeclarationProperty);
-		bool readPipelineLayoutDeclaration(const XJSON::KeyValue& xjsonEntryDeclarationProperty);
-		bool readGraphicsPipelineDeclaration(const XJSON::KeyValue& xjsonEntryDeclarationProperty);
-		bool readComputePipelineDeclaration(const XJSON::KeyValue& xjsonEntryDeclarationProperty);
+		XLib::JSONReader jsonReader;
+		const char* jsonPath = nullptr;
 
-		bool readPipelineLayoutSetupProperty(const XJSON::KeyValue& xjsonOuterProperty,
-			GfxHAL::ShaderCompiler::PipelineLayoutRef& resultPipelineLayout, uint64& resultPipelineLayoutNameXSH);
-		bool readShaderSetupProperty(const XJSON::KeyValue& xjsonOuterProperty, GfxHAL::ShaderCompiler::ShaderDesc& resultShader);
+		XLib::ArrayList<VertexInputLayoutDesc> vertexInputLayouts;
+		XLib::ArrayList<GfxHAL::ShaderCompiler::VertexBindingDesc> vertexBindings;
+
+	private:
+		void reportError(const char* message, Cursor jsonCursor);
+		void reportJSONError();
+
+		bool consumeKeyWithObjectValue(XLib::StringViewASCII& resultKey);
+		bool consumeSpecificKeyWithStringValue(const char* expectedKey, XLib::StringViewASCII& resultStringValue);
+		bool consumeSpecificKeyWithObjectValue(const char* expectedKey);
+
+		bool readStaticSampler(XLib::StringViewASCII staticSamplerName, Cursor jsonStaticSamplerNameCursor);
+		bool readVertexInputLayout(XLib::StringViewASCII vertexInputLayoutName, Cursor jsonVertexInputLayoutNameCursor);
+		bool readDescriptorSetLayout(XLib::StringViewASCII descriptorSetLayoutName, Cursor jsonDescriptorSetLayoutNameCursor);
+		bool readPipelineLayout(XLib::StringViewASCII pipelineLayoutName, Cursor jsonPipelineLayoutNameCursor);
+		bool readGraphicsPipeline(XLib::StringViewASCII graphicsPipelineName, Cursor jsonGraphicsPipelineNameCursor);
+		bool readComputePipeline(XLib::StringViewASCII computePipelineName, Cursor jsonComputePipelineNameCursor);
+
+		bool readPipelineLayoutSetupProperty(GfxHAL::ShaderCompiler::PipelineLayoutRef& resultPipelineLayout, uint64& resultPipelineLayoutNameXSH);
+		bool readShaderSetupObject(GfxHAL::ShaderCompiler::ShaderDesc& resultShader);
+
+		inline Cursor getJSONCursor() const { return Cursor { jsonReader.getLineNumer(), jsonReader.getColumnNumer() }; };
 
 	public:
 		inline LibraryDefinitionLoader(LibraryDefinition& libraryDefinition) : libraryDefinition(libraryDefinition) {}
 		~LibraryDefinitionLoader() = default;
 
-		bool load(const char* xjsonPathCStr);
+		bool load(const char* jsonPathCStr);
 	};
 }

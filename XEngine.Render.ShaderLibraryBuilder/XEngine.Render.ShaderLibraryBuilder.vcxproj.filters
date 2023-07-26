@@ -4,12 +4,10 @@
     <ClCompile Include="XEngine.Render.ShaderLibraryBuilder.cpp" />
     <ClCompile Include="XEngine.Render.ShaderLibraryBuilder.LibraryDefinitionLoader.cpp" />
     <ClCompile Include="XEngine.Render.ShaderLibraryBuilder.SourceCache.cpp" />
-    <ClCompile Include="XJSON.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="XEngine.Render.ShaderLibraryBuilder.h" />
     <ClInclude Include="XEngine.Render.ShaderLibraryBuilder.LibraryDefinitionLoader.h" />
     <ClInclude Include="XEngine.Render.ShaderLibraryBuilder.SourceCache.h" />
-    <ClInclude Include="XJSON.h" />
   </ItemGroup>
 </Project>

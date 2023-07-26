@@ -35,6 +35,37 @@ namespace XEngine::GfxHAL::ShaderCompiler
 		//Prospero,
 	};
 
+	enum class SamplerFilterMode : uint8
+	{
+		Undefined = 0,
+		Nearest,
+		Linear,
+	};
+
+	enum class SamplerAddressMode : uint8
+	{
+		Undefined = 0,
+		Wrap,
+		Mirror,
+		Clamp,
+		BorderZero,
+	};
+
+	struct StaticSamplerDesc
+	{
+		XLib::StringViewASCII bindingName;
+
+		SamplerFilterMode filterMin;
+		SamplerFilterMode filterMag;
+		SamplerFilterMode filterMip;
+		SamplerAddressMode addressU;
+		SamplerAddressMode addressV;
+		SamplerAddressMode addressW;
+		float32 logBias;
+		float32 lodMin;
+		float32 lodMax;
+	};
+
 	struct DescriptorSetBindingDesc
 	{
 		XLib::StringViewASCII name;
@@ -54,7 +85,7 @@ namespace XEngine::GfxHAL::ShaderCompiler
 		};
 	};
 
-	enum class VertexBufferType : uint8
+	enum class VertexBufferStepRate : uint8
 	{
 		Undefined = 0,
 		PerVertex,
@@ -63,7 +94,7 @@ namespace XEngine::GfxHAL::ShaderCompiler
 
 	struct VertexBufferDesc
 	{
-		VertexBufferType type;
+		VertexBufferStepRate stepRate;
 	};
 
 	struct VertexBindingDesc
@@ -191,7 +222,8 @@ namespace XEngine::GfxHAL::ShaderCompiler
 		uint32 getSerializedBlobChecksum() const; // Defined by 'GfxHAL::BlobFormat'
 
 	public:
-		static PipelineLayoutRef Create(const PipelineBindingDesc* bindings, uint16 bindingCount);
+		static PipelineLayoutRef Create(const PipelineBindingDesc* bindings, uint16 bindingCount,
+			const StaticSamplerDesc* staticSamplers, uint8 staticSamplerCount);
 	};
 
 	class Blob : public XLib::RefCounted

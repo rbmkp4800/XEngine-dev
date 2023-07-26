@@ -1,0 +1,57 @@
+{
+	/*"Test.Sampler": {
+		"type": "static_sampler",
+		"filter_min": "linear",
+		"filter_mag": "linear",
+		"filter_mip": "linear",
+		"address_u": "wrap",
+		"address_v": "wrap",
+		//filter_min_mag_mip: linear,
+		//address_uvw: wrap,
+	},
+
+	"Test.VertexInputLayout": {
+		"type": "vertex_input_layout",
+		"buffers": [
+			{
+				"step_rate": "per_vertex",
+				"bindings": [
+					{ "name": "POSITION", "type": "R32G32B32_FLOAT" }
+				]
+			}
+		]
+	},*/
+
+	"Test.DescriptorSetLayout": {
+		"type": "descriptor_set_layout",
+		"bindings": {
+			"TEST_TEXTURE" : { "type": "read_only_texture_descriptor" }
+		}
+	},
+
+	"Test.PipelineLayout" : {
+		"type": "pipeline_layout",
+		"bindings": {
+			"SOME_CONSTANT_BUFFER":	{ "type": "constant_buffer" },
+			"SOME_BUFFER":			{ "type": "read_only_buffer" },
+			"SOME_RW_BUFFER" :		{ "type": "read_write_buffer" },
+			"TEST_DS" :				{ "type": "descriptor_set", "dsl": "Test.DescriptorSetLayout" }
+		}
+	},
+
+	"Test.GraphicsPipeline": {
+		"type": "graphics_pipeline",
+		"layout": "Test.PipelineLayout",
+		"vs": { "path": "TestGraphics.hlsl", "entry": "MainVS" },
+		"ps": { "path": "TestGraphics.hlsl", "entry": "MainPS" },
+		"render_targets": [ "R8G8B8BA8_Unorm" ]
+		//force_generate_d3d_pdbs: true,
+		//override_optimization: "disable",
+	},
+
+	"Test.ComputePipeline": {
+		"type": "compute_pipeline",
+		"layout": "Test.PipelineLayout",
+		"cs": { "path": "TestCompute.hlsl", "entry" :"MainCS" }
+	}
+}
