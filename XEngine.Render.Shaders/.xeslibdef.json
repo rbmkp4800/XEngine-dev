@@ -1,14 +1,12 @@
 {
 	/*"Test.Sampler": {
 		"type": "static_sampler",
-		"filter_min": "linear",
-		"filter_mag": "linear",
-		"filter_mip": "linear",
-		"address_u": "wrap",
-		"address_v": "wrap",
-		//filter_min_mag_mip: linear,
-		//address_uvw: wrap,
-	},
+		"filter": "linear",
+		"address": "wrap",
+		"lod_min": 0,
+		"lod_max": 1,
+		"lod_bias": 0
+	},*/
 
 	"Test.VertexInputLayout": {
 		"type": "vertex_input_layout",
@@ -16,11 +14,11 @@
 			{
 				"step_rate": "per_vertex",
 				"bindings": [
-					{ "name": "POSITION", "type": "R32G32B32_FLOAT" }
+					{ "name": "POSITION", "format": "R32G32B32_FLOAT" }
 				]
 			}
 		]
-	},*/
+	},
 
 	"Test.DescriptorSetLayout": {
 		"type": "descriptor_set_layout",
@@ -44,7 +42,7 @@
 		"layout": "Test.PipelineLayout",
 		"vs": { "path": "TestGraphics.hlsl", "entry": "MainVS" },
 		"ps": { "path": "TestGraphics.hlsl", "entry": "MainPS" },
-		"render_targets": [ "R8G8B8BA8_Unorm" ]
+		"render_targets": [ "R8G8B8A8_UNORM" ]
 		//force_generate_d3d_pdbs: true,
 		//override_optimization: "disable",
 	},

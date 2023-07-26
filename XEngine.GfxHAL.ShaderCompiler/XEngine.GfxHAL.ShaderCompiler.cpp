@@ -742,9 +742,9 @@ bool ShaderCompiler::CompileGraphicsPipeline(
 				undefinedRenderTargetFound = true;
 			else
 			{
-				if (!ValidateTexelViewFormatValue(renderTargetFormat))
+				if (!TexelViewFormatUtils::IsValidAndDefined(renderTargetFormat))
 					return false;
-				if (!GfxHAL::DoesTexelViewFormatSupportColorRenderTargetUsage(renderTargetFormat))
+				if (!TexelViewFormatUtils::SupportsRenderTargetUsage(renderTargetFormat))
 					return false;
 				stateBlobWriter.addRenderTarget(renderTargetFormat);
 			}
@@ -772,7 +772,7 @@ bool ShaderCompiler::CompileGraphicsPipeline(
 
 		if (binding.name.getLength() > stateBlobWriter.MaxVertexBindingNameLength)
 			return false;
-		if (!GfxHAL::DoesTexelViewFormatSupportVertexInputUsage(binding.format))
+		if (!TexelViewFormatUtils::SupportsVertexInputUsage(binding.format))
 			return false;
 		if (binding.offset >= MaxVertexBufferElementSize)
 			return false;

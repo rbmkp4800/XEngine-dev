@@ -46,6 +46,7 @@ namespace XEngine::GfxHAL
 	enum class TextureFormat : uint8
 	{
 		Undefined = 0,
+
 		R8,
 		R8G8,
 		R8G8B8A8,
@@ -60,6 +61,8 @@ namespace XEngine::GfxHAL
 		D32,
 		D24S8,
 		D32S8,
+
+		ValueCount,
 	};
 
 	enum class TexelViewFormat : uint8
@@ -126,14 +129,68 @@ namespace XEngine::GfxHAL
 		D24S8,
 		D32S8,
 	};
+
+	enum class SamplerFilterMode : uint8
+	{
+		Undefined = 0,
+		MinPnt_MagPnt_MipPnt,
+		MinPnt_MagPnt_MipLin,
+		MinPnt_MagLin_MipPnt,
+		MinPnt_MagLin_MipLin,
+		MinLin_MagPnt_MipPnt,
+		MinLin_MagPnt_MipLin,
+		MinLin_MagLin_MipPnt,
+		MinLin_MagLin_MipLin,
+		Anisotropic,
+	};
+
+	enum class SamplerReductionMode : uint8
+	{
+		Undefined = 0,
+		WeightedAverage,
+		WeightedAverageOfComparisonResult,
+		Min,
+		Max,
+	};
+
+	enum class SamplerAddressMode : uint8
+	{
+		Undefined = 0,
+		Wrap,
+		Mirror,
+		Clamp,
+		BorderZero,
+	};
+
+	struct SamplerDesc
+	{
+		SamplerFilterMode filterMode;
+		SamplerReductionMode reductionMode;
+		uint8 maxAnisotropy;
+		SamplerAddressMode addressModeU;
+		SamplerAddressMode addressModeV;
+		SamplerAddressMode addressModeW;
+		float32 lodBias;
+		float32 lodMin;
+		float32 lodMax;
+	};
 	
-	bool ValidateTextureFormatValue(TextureFormat textureFormat);
-	bool ValidateTexelViewFormatValue(TexelViewFormat texelViewFormat);
+	class TextureFormatUtils abstract final
+	{
+	public:
+		static inline bool IsValid(TextureFormat format) { return format < TextureFormat::ValueCount; }
+		static inline bool IsValidAndDefined(TextureFormat format) { return IsValid(format) && format != TextureFormat::Undefined; }
+		static bool SupportsRenderTargetUsage(TextureFormat format);
+		static bool SupportsDepthStencilUsage(TextureFormat format);
+	};
 
-	bool DoesTextureFormatSupportRenderTargetUsage(TextureFormat textureFormat);
-	bool DoesTextureFormatSupportColorRenderTargetUsage(TextureFormat textureFormat);
-	bool DoesTextureFormatSupportDepthRenderTargetUsage(TextureFormat textureFormat);
-
-	bool DoesTexelViewFormatSupportColorRenderTargetUsage(TexelViewFormat texelViewFormat);
-	bool DoesTexelViewFormatSupportVertexInputUsage(TexelViewFormat texelViewFormat);
+	class TexelViewFormatUtils abstract final
+	{
+	public:
+		static inline bool IsValid(TexelViewFormat format) { return format < TexelViewFormat::ValueCount; }
+		static inline bool IsValidAndDefined(TexelViewFormat format) { return IsValid(format) && format != TexelViewFormat::Undefined; }
+		static bool SupportsRenderTargetUsage(TexelViewFormat format);
+		static bool SupportsVertexInputUsage(TexelViewFormat format);
+		static uint8 GetByteSize(TexelViewFormat format); // Provided formats should support linear storage.
+	};
 }

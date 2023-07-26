@@ -17,68 +17,142 @@ using namespace XLib;
 using namespace XEngine;
 using namespace XEngine::Render::ShaderLibraryBuilder;
 
+
+// GfxHAL values parsers ///////////////////////////////////////////////////////////////////////////
+
+static GfxHAL::TexelViewFormat ParseTexelViewFormatString(StringViewASCII string)
+{
+	if (string == "R8_UNORM")			return GfxHAL::TexelViewFormat::R8_UNORM;
+	if (string == "R8_SNORM")			return GfxHAL::TexelViewFormat::R8_SNORM;
+	if (string == "R8_UINT")			return GfxHAL::TexelViewFormat::R8_UINT;
+	if (string == "R8_SINT")			return GfxHAL::TexelViewFormat::R8_SINT;
+	if (string == "R8G8_UNORM")			return GfxHAL::TexelViewFormat::R8G8_UNORM;
+	if (string == "R8G8_SNORM")			return GfxHAL::TexelViewFormat::R8G8_SNORM;
+	if (string == "R8G8_UINT")			return GfxHAL::TexelViewFormat::R8G8_UINT;
+	if (string == "R8G8_SINT")			return GfxHAL::TexelViewFormat::R8G8_SINT;
+	if (string == "R8G8B8A8_UNORM")		return GfxHAL::TexelViewFormat::R8G8B8A8_UNORM;
+	if (string == "R8G8B8A8_SNORM")		return GfxHAL::TexelViewFormat::R8G8B8A8_SNORM;
+	if (string == "R8G8B8A8_UINT")		return GfxHAL::TexelViewFormat::R8G8B8A8_UINT;
+	if (string == "R8G8B8A8_SINT")		return GfxHAL::TexelViewFormat::R8G8B8A8_SINT;
+	if (string == "R8G8B8A8_SRGB")		return GfxHAL::TexelViewFormat::R8G8B8A8_SRGB;
+	if (string == "R16_FLOAT")			return GfxHAL::TexelViewFormat::R16_FLOAT;
+	if (string == "R16_UNORM")			return GfxHAL::TexelViewFormat::R16_UNORM;
+	if (string == "R16_SNORM")			return GfxHAL::TexelViewFormat::R16_SNORM;
+	if (string == "R16_UINT")			return GfxHAL::TexelViewFormat::R16_UINT;
+	if (string == "R16_SINT")			return GfxHAL::TexelViewFormat::R16_SINT;
+	if (string == "R16G16_FLOAT")		return GfxHAL::TexelViewFormat::R16G16_FLOAT;
+	if (string == "R16G16_UNORM")		return GfxHAL::TexelViewFormat::R16G16_UNORM;
+	if (string == "R16G16_SNORM")		return GfxHAL::TexelViewFormat::R16G16_SNORM;
+	if (string == "R16G16_UINT")		return GfxHAL::TexelViewFormat::R16G16_UINT;
+	if (string == "R16G16_SINT")		return GfxHAL::TexelViewFormat::R16G16_SINT;
+	if (string == "R16G16B16A16_FLOAT")	return GfxHAL::TexelViewFormat::R16G16B16A16_FLOAT;
+	if (string == "R16G16B16A16_UNORM")	return GfxHAL::TexelViewFormat::R16G16B16A16_UNORM;
+	if (string == "R16G16B16A16_SNORM")	return GfxHAL::TexelViewFormat::R16G16B16A16_SNORM;
+	if (string == "R16G16B16A16_UINT")	return GfxHAL::TexelViewFormat::R16G16B16A16_UINT;
+	if (string == "R16G16B16A16_SINT")	return GfxHAL::TexelViewFormat::R16G16B16A16_SINT;
+	if (string == "R32_FLOAT")			return GfxHAL::TexelViewFormat::R32_FLOAT;
+	if (string == "R32_UNORM")			return GfxHAL::TexelViewFormat::R32_UNORM;
+	if (string == "R32_SNORM")			return GfxHAL::TexelViewFormat::R32_SNORM;
+	if (string == "R32_UINT")			return GfxHAL::TexelViewFormat::R32_UINT;
+	if (string == "R32_SINT")			return GfxHAL::TexelViewFormat::R32_SINT;
+	if (string == "R32G32_FLOAT")		return GfxHAL::TexelViewFormat::R32G32_FLOAT;
+	if (string == "R32G32_UNORM")		return GfxHAL::TexelViewFormat::R32G32_UNORM;
+	if (string == "R32G32_SNORM")		return GfxHAL::TexelViewFormat::R32G32_SNORM;
+	if (string == "R32G32_UINT")		return GfxHAL::TexelViewFormat::R32G32_UINT;
+	if (string == "R32G32_SINT")		return GfxHAL::TexelViewFormat::R32G32_SINT;
+	if (string == "R32G32B32A32_FLOAT")	return GfxHAL::TexelViewFormat::R32G32B32A32_FLOAT;
+	if (string == "R32G32B32A32_UNORM")	return GfxHAL::TexelViewFormat::R32G32B32A32_UNORM;
+	if (string == "R32G32B32A32_SNORM")	return GfxHAL::TexelViewFormat::R32G32B32A32_SNORM;
+	if (string == "R32G32B32A32_UINT")	return GfxHAL::TexelViewFormat::R32G32B32A32_UINT;
+	if (string == "R32G32B32A32_SINT")	return GfxHAL::TexelViewFormat::R32G32B32A32_SINT;
+	if (string == "R24_UNORM_X8")		return GfxHAL::TexelViewFormat::R24_UNORM_X8;
+	if (string == "X24_G8_UINT")		return GfxHAL::TexelViewFormat::X24_G8_UINT;
+	if (string == "R32_FLOAT_X8")		return GfxHAL::TexelViewFormat::R32_FLOAT_X8;
+	if (string == "X32_G8_UINT")		return GfxHAL::TexelViewFormat::X32_G8_UINT;
+	return GfxHAL::TexelViewFormat::Undefined;
+}
+
+static GfxHAL::DepthStencilFormat ParseDepthStencilFormatString(StringViewASCII string)
+{
+	if (string == "D16")	return GfxHAL::DepthStencilFormat::D16;
+	if (string == "D32")	return GfxHAL::DepthStencilFormat::D32;
+	if (string == "D24S8")	return GfxHAL::DepthStencilFormat::D24S8;
+	if (string == "D32S8")	return GfxHAL::DepthStencilFormat::D32S8;
+	return GfxHAL::DepthStencilFormat::Undefined;
+}
+
+static GfxHAL::ShaderType ParseShaderTypeString(StringViewASCII string)
+{
+	if (string == "cs") return GfxHAL::ShaderType::Compute;
+	if (string == "vs") return GfxHAL::ShaderType::Vertex;
+	if (string == "as") return GfxHAL::ShaderType::Amplification;
+	if (string == "ms") return GfxHAL::ShaderType::Mesh;
+	if (string == "ps") return GfxHAL::ShaderType::Pixel;
+	return GfxHAL::ShaderType::Undefined;
+}
+
+static GfxHAL::SamplerFilterMode ParseSamplerFilterModeString(StringViewASCII string)
+{
+	if (string == "min_pnt_mag_pnt_mip_pnt") return GfxHAL::SamplerFilterMode::MinPnt_MagPnt_MipPnt;
+	if (string == "min_pnt_mag_pnt_mip_lin") return GfxHAL::SamplerFilterMode::MinPnt_MagPnt_MipLin;
+	if (string == "min_pnt_mag_lin_mip_pnt") return GfxHAL::SamplerFilterMode::MinPnt_MagLin_MipPnt;
+	if (string == "min_pnt_mag_lin_mip_lin") return GfxHAL::SamplerFilterMode::MinPnt_MagLin_MipLin;
+	if (string == "min_lin_mag_pnt_mip_pnt") return GfxHAL::SamplerFilterMode::MinLin_MagPnt_MipPnt;
+	if (string == "min_lin_mag_pnt_mip_lin") return GfxHAL::SamplerFilterMode::MinLin_MagPnt_MipLin;
+	if (string == "min_lin_mag_lin_mip_pnt") return GfxHAL::SamplerFilterMode::MinLin_MagLin_MipPnt;
+	if (string == "min_lin_mag_lin_mip_lin") return GfxHAL::SamplerFilterMode::MinLin_MagLin_MipLin;
+	if (string == "point")	return GfxHAL::SamplerFilterMode::MinPnt_MagPnt_MipPnt;
+	if (string == "linear")	return GfxHAL::SamplerFilterMode::MinPnt_MagPnt_MipPnt;
+	if (string == "aniso") return GfxHAL::SamplerFilterMode::Anisotropic;
+	return GfxHAL::SamplerFilterMode::Anisotropic;
+}
+
+static GfxHAL::SamplerReductionMode ParseSamplerReductionModeString(StringViewASCII string)
+{
+	if (string == "weighted_avg")		return GfxHAL::SamplerReductionMode::WeightedAverage;
+	if (string == "weighted_avg_cmp")	return GfxHAL::SamplerReductionMode::WeightedAverageOfComparisonResult;
+	if (string == "min")				return GfxHAL::SamplerReductionMode::Min;
+	if (string == "max")				return GfxHAL::SamplerReductionMode::Max;
+	return GfxHAL::SamplerReductionMode::Undefined;
+}
+
+static GfxHAL::SamplerAddressMode ParseSamplerAddressModeString(StringViewASCII string)
+{
+	if (string == "wrap")			return GfxHAL::SamplerAddressMode::Wrap;
+	if (string == "mirror")			return GfxHAL::SamplerAddressMode::Mirror;
+	if (string == "clamp")			return GfxHAL::SamplerAddressMode::Clamp;
+	if (string == "border_zero")	return GfxHAL::SamplerAddressMode::BorderZero;
+	return GfxHAL::SamplerAddressMode::Undefined;
+}
+
+static GfxHAL::ShaderCompiler::VertexBufferStepRate ParseVertexBufferStepRateString(StringViewASCII string)
+{
+	if (string == "per_vertex")		return GfxHAL::ShaderCompiler::VertexBufferStepRate::PerVertex;
+	if (string == "per_instance")	return GfxHAL::ShaderCompiler::VertexBufferStepRate::PerInstance;
+	return GfxHAL::ShaderCompiler::VertexBufferStepRate::Undefined;
+}
+
 static GfxHAL::DescriptorType ParseDescriptorTypeString(StringViewASCII string)
 {
-	if (string == "read_only_buffer_descriptor")
-		return GfxHAL::DescriptorType::ReadOnlyBuffer;
-	if (string == "read_write_buffer_descriptor")
-		return GfxHAL::DescriptorType::ReadWriteBuffer;
-	if (string == "read_only_texture_descriptor")
-		return GfxHAL::DescriptorType::ReadOnlyTexture;
-	if (string == "read_write_texture_descriptor")
-		return GfxHAL::DescriptorType::ReadWriteTexture;
-	if (string == "raytracing_acceleration_structure_descriptor")
-		return GfxHAL::DescriptorType::RaytracingAccelerationStructure;
+	if (string == "read_only_buffer_descriptor")					return GfxHAL::DescriptorType::ReadOnlyBuffer;
+	if (string == "read_write_buffer_descriptor")					return GfxHAL::DescriptorType::ReadWriteBuffer;
+	if (string == "read_only_texture_descriptor")					return GfxHAL::DescriptorType::ReadOnlyTexture;
+	if (string == "read_write_texture_descriptor")					return GfxHAL::DescriptorType::ReadWriteTexture;
+	if (string == "raytracing_acceleration_structure_descriptor")	return GfxHAL::DescriptorType::RaytracingAccelerationStructure;
 	return GfxHAL::DescriptorType::Undefined;
 }
 
 static GfxHAL::PipelineBindingType ParsePipelineBindingTypeString(StringViewASCII string)
 {
-	if (string == "constant_buffer")
-		return GfxHAL::PipelineBindingType::ConstantBuffer;
-	if (string == "read_only_buffer")
-		return GfxHAL::PipelineBindingType::ReadOnlyBuffer;
-	if (string == "read_write_buffer")
-		return GfxHAL::PipelineBindingType::ReadWriteBuffer;
-	if (string == "descriptor_set")
-		return GfxHAL::PipelineBindingType::DescriptorSet;
+	if (string == "constant_buffer")	return GfxHAL::PipelineBindingType::ConstantBuffer;
+	if (string == "read_only_buffer")	return GfxHAL::PipelineBindingType::ReadOnlyBuffer;
+	if (string == "read_write_buffer")	return GfxHAL::PipelineBindingType::ReadWriteBuffer;
+	if (string == "descriptor_set")		return GfxHAL::PipelineBindingType::DescriptorSet;
 	return GfxHAL::PipelineBindingType::Undefined;
 }
 
-static bool ParseTexelViewFormatString(StringViewASCII string, GfxHAL::TexelViewFormat& resultFormat)
-{
-	if (string == "R8G8B8BA8_UNORM" || string == "R8G8B8BA8_Unorm")
-	{
-		resultFormat = GfxHAL::TexelViewFormat::R8G8B8A8_UNORM;
-		return true;
-	}
-	return false;
-}
 
-static bool ParseDepthStencilFormatString(StringViewASCII string, GfxHAL::DepthStencilFormat& resultFormat)
-{
-	if (string == "D32")
-	{
-		resultFormat = GfxHAL::DepthStencilFormat::D32;
-		return true;
-	}
-	return false;
-}
-
-static GfxHAL::ShaderType ParseShaderTypeString(StringViewASCII string)
-{
-	if (string == "cs")
-		return GfxHAL::ShaderType::Compute;
-	if (string == "vs")
-		return GfxHAL::ShaderType::Vertex;
-	if (string == "as")
-		return GfxHAL::ShaderType::Amplification;
-	if (string == "ms")
-		return GfxHAL::ShaderType::Mesh;
-	if (string == "ps")
-		return GfxHAL::ShaderType::Pixel;
-	return GfxHAL::ShaderType::Undefined;
-}
+// JSON string validators //////////////////////////////////////////////////////////////////////////
 
 static bool ValidateRootEntryName(StringViewASCII name)
 {
@@ -140,6 +214,9 @@ static bool ValidateShaderEntryPointName(StringViewASCII name)
 	return true;
 }
 
+
+// LibraryDefinition utils /////////////////////////////////////////////////////////////////////////
+
 static GfxHAL::ShaderCompiler::DescriptorSetLayout* LibFindDescriptorSetLayout(LibraryDefinition& lib, uint64 nameXSH)
 {
 	for (const auto& descriptorSetLayout : lib.descriptorSetLayouts)
@@ -176,8 +253,8 @@ static Pipeline* LibFindPipeline(LibraryDefinition& lib, uint64 nameXSH)
 void LibraryDefinitionLoader::reportError(const char* message, Cursor jsonCursor)
 {
 	// TODO: Print absolute path.
-	TextWriteFmtStdOut(jsonPath, ':',
-		jsonCursor.lineNumber, ':', jsonCursor.columnNumber, ": error: ", message, '\n');
+	TextWriteFmtStdOut(jsonPath, ':', jsonCursor.lineNumber, ':', jsonCursor.columnNumber,
+		": error: ", message, '\n');
 }
 
 void LibraryDefinitionLoader::reportJSONError()
@@ -186,8 +263,7 @@ void LibraryDefinitionLoader::reportJSONError()
 	XAssert(jsonError != JSONErrorCode::Success);
 
 	// TODO: Print absolute path.
-	TextWriteFmtStdOut(jsonPath, ':',
-		jsonReader.getLineNumer(), ':', jsonReader.getColumnNumer(),
+	TextWriteFmtStdOut(jsonPath, ':', jsonReader.getLineNumer(), ':', jsonReader.getColumnNumer(),
 		": error: JSON: ", JSONErrorCodeToString(jsonError), '\n');
 }
 
@@ -257,15 +333,221 @@ bool LibraryDefinitionLoader::consumeSpecificKeyWithObjectValue(const char* expe
 	return true;
 }
 
+bool LibraryDefinitionLoader::consumeSpecificKeyWithArrayValue(const char* expectedKey)
+{
+	InplaceStringASCIIx128 propertyExpectedErrorMessage;
+	TextWriteFmt(propertyExpectedErrorMessage, '\'', expectedKey, "' property expected");
+
+	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!jsonReader.isEndOfObject(), propertyExpectedErrorMessage.getCStr(), getJSONCursor());
+
+	JSONString jsonKey = {};
+	const Cursor jsonKeyCursor = getJSONCursor();
+	jsonReader.readKey(jsonKey);
+	IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
+
+	JSONValue jsonValue = {};
+	const Cursor jsonValueCursor = getJSONCursor();
+	jsonReader.readValue(jsonValue);
+	IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
+
+	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonKey.string == expectedKey, propertyExpectedErrorMessage.getCStr(), jsonKeyCursor);
+	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonValue.type == JSONValueType::Array, "array expected", jsonValueCursor);
+
+	return true;
+}
+
 bool LibraryDefinitionLoader::readStaticSampler(StringViewASCII staticSamplerName, Cursor jsonStaticSamplerNameCursor)
 {
+	XTODO("Check duplicate static sampler name");
+
+	GfxHAL::SamplerDesc samplerDesc = {};
+
+	while (!jsonReader.isEndOfObject())
+	{
+		JSONString jsonKey = {};
+		const Cursor jsonKeyCursor = getJSONCursor();
+		jsonReader.readKey(jsonKey);
+		IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
+
+		JSONValue jsonValue = {};
+		const Cursor jsonValueCursor = getJSONCursor();
+		jsonReader.readValue(jsonValue);
+		IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
+
+		if (jsonKey.string == "filter")
+		{
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.filterMode == GfxHAL::SamplerFilterMode::Undefined, "filter mode already set", jsonKeyCursor);
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonValue.type == JSONValueType::String, "string expected", jsonValueCursor);
+
+			samplerDesc.filterMode = ParseSamplerFilterModeString(jsonValue.string.string);
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.filterMode != GfxHAL::SamplerFilterMode::Undefined, "invalid filter mode", jsonValueCursor);
+		}
+		else if (jsonKey.string == "reduction")
+		{
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.reductionMode == GfxHAL::SamplerReductionMode::Undefined, "reduction mode already set", jsonKeyCursor);
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonValue.type == JSONValueType::String, "string expected", jsonValueCursor);
+
+			samplerDesc.reductionMode = ParseSamplerReductionModeString(jsonValue.string.string);
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.reductionMode != GfxHAL::SamplerReductionMode::Undefined, "invalid reduction mode", jsonValueCursor);
+		}
+		else if (jsonKey.string == "max_anisotropy")
+		{
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.filterMode == GfxHAL::SamplerFilterMode::Anisotropic, "filter mode should be set to aniso", jsonKeyCursor);
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.maxAnisotropy == 0, "max anisotropy already set", jsonKeyCursor);
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonValue.type == JSONValueType::Number, "integer 1..16 expected", jsonValueCursor);
+
+			XAssertNotImplemented();
+		}
+		else if (jsonKey.string == "address")
+		{
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.addressModeU == GfxHAL::SamplerAddressMode::Undefined, "address mode already set", jsonKeyCursor);
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonValue.type == JSONValueType::String, "string expected", jsonValueCursor);
+
+			samplerDesc.addressModeU = ParseSamplerAddressModeString(jsonValue.string.string);
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.addressModeU != GfxHAL::SamplerAddressMode::Undefined, "invalid address mode", jsonValueCursor);
+		}
+		else if (jsonKey.string == "lod_bias")
+		{
+			XAssertNotImplemented();
+		}
+		else if (jsonKey.string == "lod_min")
+		{
+			XAssertNotImplemented();
+		}
+		else if (jsonKey.string == "lod_max")
+		{
+			XAssertNotImplemented();
+		}
+		else
+		{
+			reportError("invalid sampler property", jsonKeyCursor);
+			return false;
+		}
+	}
+
+	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.filterMode != GfxHAL::SamplerFilterMode::Undefined, "filter mode not set", jsonStaticSamplerNameCursor);
+	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.reductionMode != GfxHAL::SamplerReductionMode::Undefined, "reduction mode not set", jsonStaticSamplerNameCursor);
+	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.addressModeU != GfxHAL::SamplerAddressMode::Undefined, "address mode not set", jsonStaticSamplerNameCursor);
+
+	if (samplerDesc.filterMode == GfxHAL::SamplerFilterMode::Anisotropic)
+		IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.maxAnisotropy > 0, "max anisotropy not set", jsonStaticSamplerNameCursor);
+
+	samplerDesc.addressModeV = samplerDesc.addressModeU;
+	samplerDesc.addressModeW = samplerDesc.addressModeU;
+	samplerDesc.lodBias = 0.0f;
+	samplerDesc.lodMin = -100.0f;
+	samplerDesc.lodMax = +100.0f;
+
 	XAssertNotImplemented();
+
 	return false;
 }
 
 bool LibraryDefinitionLoader::readVertexInputLayout(StringViewASCII vertexInputLayoutName, Cursor jsonVertexInputLayoutNameCursor)
 {
-	XAssertNotImplemented();
+	XTODO("Check duplicate vertex inout layout name");
+	
+	VertexInputLayoutDesc vertexInputLayoutDesc = {};
+	vertexInputLayoutDesc.name = vertexInputLayoutName;
+	vertexInputLayoutDesc.bindingsOffset = vertexBindings.getSize();
+	vertexInputLayoutDesc.bindingCount = 0;
+
+	IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithArrayValue("buffers"));
+
+	jsonReader.openArray();
+	IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
+
+	uint8 vertexBufferCount = 0;
+	while (!jsonReader.isEndOfArray())
+	{
+		JSONValue jsonBufferValue = {};
+		const Cursor jsonBufferValueCursor = getJSONCursor();
+		jsonReader.readValue(jsonBufferValue);
+		IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
+		IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonBufferValue.type == JSONValueType::Object, "object expected", jsonBufferValueCursor);
+
+		jsonReader.openObject();
+		IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
+		{
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(vertexBufferCount < GfxHAL::MaxVertexBufferCount, "vertex buffers limit exceeded", jsonBufferValueCursor);
+			const uint8 vertexBufferIndex = vertexBufferCount;
+			vertexBufferCount++;
+
+			GfxHAL::ShaderCompiler::VertexBufferDesc& vertexBufferDesc = vertexInputLayoutDesc.buffers[vertexBufferIndex];
+
+			StringViewASCII stepRateString = {};
+			const Cursor jsonStepRateStringCursor = getJSONCursor();
+			IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("step_rate", stepRateString));
+
+			vertexBufferDesc.stepRate = ParseVertexBufferStepRateString(stepRateString);
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(vertexBufferDesc.stepRate != GfxHAL::ShaderCompiler::VertexBufferStepRate::Undefined,
+				"invalid vertex buffer step rate", jsonStepRateStringCursor);
+
+			IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithArrayValue("bindings"));
+
+			jsonReader.openArray();
+			IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
+
+			uint16 vertexBindingDataOffset = 0;
+			while (!jsonReader.isEndOfArray())
+			{
+				JSONValue jsonBindingValue = {};
+				const Cursor jsonBindingValueCursor = getJSONCursor();
+				jsonReader.readValue(jsonBindingValue);
+				IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
+				IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonBindingValue.type == JSONValueType::Object, "object expected", jsonBindingValueCursor);
+
+				GfxHAL::ShaderCompiler::VertexBindingDesc vertexBindingDesc = {};
+
+				jsonReader.openObject();
+				IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
+				{
+					StringViewASCII bindingName = {};
+					const Cursor jsonBindingNameCursor = getJSONCursor();
+					IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("name", bindingName));
+					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(ValidateBindingName(bindingName), "invalid binding name", jsonBindingNameCursor);
+					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(bindingName.getLength() > GfxHAL::MaxVertexBindingNameLength, "binding name is too long", jsonBindingNameCursor);
+
+					StringViewASCII bindingFormatStr = {};
+					const Cursor jsonBindingFormatCursor = getJSONCursor();
+					IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("format", bindingFormatStr));
+
+					const GfxHAL::TexelViewFormat bindingFormat = ParseTexelViewFormatString(bindingFormatStr);
+					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(bindingFormat != GfxHAL::TexelViewFormat::Undefined, "invalid format", jsonBindingFormatCursor);
+					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(GfxHAL::TexelViewFormatUtils::SupportsVertexInputUsage(bindingFormat),
+						"format does not support vertex input usage", jsonBindingFormatCursor);
+
+					vertexBindingDesc.name = bindingName;
+					vertexBindingDesc.offset = vertexBindingDataOffset;
+					vertexBindingDesc.format = bindingFormat;
+					vertexBindingDesc.bufferIndex = vertexBufferIndex;
+
+					XTODO("Add padding");
+					vertexBindingDataOffset += GfxHAL::TexelViewFormatUtils::GetByteSize(bindingFormat);
+				}
+				jsonReader.closeObject();
+				IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
+
+				IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(vertexInputLayoutDesc.bindingCount < GfxHAL::MaxVertexBindingCount, "vertex bindings limit exceeded", jsonBindingValueCursor);
+				const uint8 localVertexBindingIndex = vertexInputLayoutDesc.bindingCount;
+				vertexInputLayoutDesc.bindingCount++;
+
+				vertexBindings.pushBack(vertexBindingDesc);
+				XAssert(vertexInputLayoutDesc.bindingsOffset + vertexInputLayoutDesc.bindingCount == vertexBindings.getSize());
+			}
+
+			jsonReader.closeArray();
+			IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
+		}
+		jsonReader.closeObject();
+		IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
+	}
+
+	jsonReader.closeArray();
+	IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
+
+	vertexInputLayouts.pushBack(vertexInputLayoutDesc);
+
 	return false;
 }
 
@@ -464,11 +746,18 @@ bool LibraryDefinitionLoader::readGraphicsPipeline(StringViewASCII graphicsPipel
 				const Cursor jsonRTValueCursor = getJSONCursor();
 				jsonReader.readValue(jsonRTValue);
 				IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
-				IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonRTValue.type == JSONValueType::String, "string expected", jsonRTValueCursor);
 
 				GfxHAL::TexelViewFormat renderTargetFormat = GfxHAL::TexelViewFormat::Undefined;
-				IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(ParseTexelViewFormatString(jsonRTValue.string.string, renderTargetFormat), "invalid format", jsonRTValueCursor);
-				IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(GfxHAL::DoesTexelViewFormatSupportColorRenderTargetUsage(renderTargetFormat), "format does not support render target usage", jsonRTValueCursor);
+				if (jsonRTValue.type != JSONValueType::Null)
+				{
+					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonRTValue.type == JSONValueType::String, "string or null expected", jsonRTValueCursor);
+
+					renderTargetFormat = ParseTexelViewFormatString(jsonRTValue.string.string);
+					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(renderTargetFormat != GfxHAL::TexelViewFormat::Undefined, "invalid format", jsonRTValueCursor);
+					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(GfxHAL::TexelViewFormatUtils::SupportsRenderTargetUsage(renderTargetFormat),
+						"format does not support render target usage", jsonRTValueCursor);
+				}
+
 				IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(renderTargetCount < GfxHAL::MaxRenderTargetCount, "render targets limit exceeded", jsonRTValueCursor);
 
 				pipelineSettings.renderTargetsFormats[renderTargetCount] = renderTargetFormat;
@@ -485,8 +774,8 @@ bool LibraryDefinitionLoader::readGraphicsPipeline(StringViewASCII graphicsPipel
 			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!depthStencilIsSet, "depth stencil already set", jsonKeyCursor);
 			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonValue.type == JSONValueType::String, "string expected", jsonValueCursor);
 
-			GfxHAL::DepthStencilFormat depthStencilFormat = GfxHAL::DepthStencilFormat::Undefined;
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(ParseDepthStencilFormatString(jsonValue.string.string, depthStencilFormat), "invalid format", jsonValueCursor);
+			const GfxHAL::DepthStencilFormat depthStencilFormat = ParseDepthStencilFormatString(jsonValue.string.string);
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(depthStencilFormat != GfxHAL::DepthStencilFormat::Undefined, "invalid format", jsonValueCursor);
 
 			pipelineSettings.depthStencilFormat = depthStencilFormat;
 			depthStencilIsSet = true;
@@ -497,6 +786,8 @@ bool LibraryDefinitionLoader::readGraphicsPipeline(StringViewASCII graphicsPipel
 			return false;
 		}
 	}
+
+	XTODO("Validate shader combination");
 
 	const uint64 pipelineNameXSH = XSH::Compute(graphicsPipelineName);
 	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(pipelineNameXSH != 0,

@@ -35,35 +35,10 @@ namespace XEngine::GfxHAL::ShaderCompiler
 		//Prospero,
 	};
 
-	enum class SamplerFilterMode : uint8
-	{
-		Undefined = 0,
-		Nearest,
-		Linear,
-	};
-
-	enum class SamplerAddressMode : uint8
-	{
-		Undefined = 0,
-		Wrap,
-		Mirror,
-		Clamp,
-		BorderZero,
-	};
-
 	struct StaticSamplerDesc
 	{
 		XLib::StringViewASCII bindingName;
-
-		SamplerFilterMode filterMin;
-		SamplerFilterMode filterMag;
-		SamplerFilterMode filterMip;
-		SamplerAddressMode addressU;
-		SamplerAddressMode addressV;
-		SamplerAddressMode addressW;
-		float32 logBias;
-		float32 lodMin;
-		float32 lodMax;
+		GfxHAL::SamplerDesc desc;
 	};
 
 	struct DescriptorSetBindingDesc
