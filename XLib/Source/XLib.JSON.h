@@ -1,178 +1,123 @@
 #pragma once
 
 #include "XLib.h"
-#include "XLib.Containers.ArrayList.h"
+#include "XLib.Containers.BitArray.h"
 #include "XLib.NonCopyable.h"
 #include "XLib.String.h"
 #include "XLib.Text.h"
 
 namespace XLib
 {
+	enum class JSONErrorCode : uint8
+	{
+		Success = 0,
+		UnexpectedEndOfFile,
+		InvalidCharacter,
+		InvalidStringEscape,
+		InvalidKeyFormat,
+		InvalidValueFormat,
+		ExpectedColon,
+		ExpectedCommaOrCurlyBracket,
+		ExpectedCommaOrSquareBracket,
+		MaximumNestingDepthReached,
+		UnexpectedTextAfterRootElement,
+		UnicodeSupportNotImplemented,
+	};
+
 	enum class JSONValueType : uint8
 	{
-		None = 0,
+		Undefined = 0,
 		Object,
 		Array,
 		String,
 		Number,
-		Bool,
+		Boolean,
 		Null,
 	};
 
-	class JSONDocumentTree : public NonCopyable
+	struct JSONString
 	{
-	private:
-		struct Node;
-		using NodesList = ArrayList<Node, uint32, false>;
+		StringViewASCII string;
+		uintptr unescapedLength;
+		bool isEscaped;
 
-	private:
-		NodesList nodes;
-		const char* sourceText = nullptr;
-		uint64 sourceTextLength = 0;
-
-	private:
-		//static inline JSONValueType getNodeType(const Node& node);
-
-	public:
-		using NodeId = uint32;
-		static constexpr NodeId RootNodeId = NodeId(0);
-		static constexpr NodeId InvalidNodeId = NodeId(-1);
-
-		using ObjectPropsIterator = uint32;
-		static constexpr ObjectPropsIterator InvalidObjectPropsIterator = ObjectPropsIterator(0);
-
-		struct ObjectProperty
-		{
-			StringView key;
-			NodeId value;
-		};
-
-	public:
-		JSONDocumentTree() = default;
-		inline ~JSONDocumentTree() { clear(); }
-
-		bool parse(const char* text, uint64 length = uint64(-1));
-		inline void clear();
-
-		inline bool isEmpty() const { return nodes.getSize() == 0; }
-		inline bool isValidNode(NodeId id) const { return uint32(id) < nodes.getSize(); }
-		inline JSONValueType getNodeType(NodeId nodeId) const;
-
-		NodeId getProperty(NodeId objectNodeId, const char* key) const;
-		NodeId getByPointer(const char* pointer);
-
-		inline ObjectPropsIterator getObjectPropsBegin(NodeId objectNodeId) const;
-		inline ObjectPropsIterator getObjectPropsNext(ObjectPropsIterator objectIterator) const;
-		inline ObjectProperty resolveObjectPropsIterator(ObjectPropsIterator objectIterator) const;
-
-		inline NodeId getArrayBegin(NodeId arrayNodeId) const;
-		inline NodeId getArrayNext(NodeId arrayElementNodeId) const;
-
-		inline bool isObject(NodeId nodeId) const;
-		inline bool isArray(NodeId nodeId) const;
-		inline bool isString(NodeId nodeId) const;
-		inline bool isNumber(NodeId nodeId) const;
-		inline bool isBool(NodeId nodeId) const;
-		inline bool isNull(NodeId nodeId) const;
-
-		inline bool getStringProperty(NodeId objectNodeId, const char* n, StringView& result);
-
-		inline StringView asString(NodeId nodeId) const;
-		inline uint64 asNumberI64(NodeId nodeId) const;
-		inline float64 asNumberF64(NodeId nodeId) const;
-		inline bool asBool(NodeId nodeId) const;
-	};
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Definition //////////////////////////////////////////////////////////////////////////////////////
-
-namespace XLib
-{
-	struct JSONDocumentTree::Node
-	{
-		uint64 a;
-		uint64 b;
+		void unescape(char* result);
 	};
 
-	bool JSONDocumentTree::parse(const char* text, const uint64 length)
+	struct JSONNumber
 	{
-		clear();
-
-		sourceText = text;
-		sourceTextLength = length;
-
-		using Reader = FormatReader<TextStreamReader>;
-
-		TextStreamReader baseReader;
-		Reader fmtReader(baseReader);
-
-		// returns false if syntax is incorrect (unexpected symbol)
-		auto SkipWhitespacesAndComments = [](Reader& reader) -> bool
+		union
 		{
-			for (;;)
-			{
-				reader.skipWhitespaces();
-				if (reader.peek() != '/')
-					return true;
+			float64 floatingPoint;
+			sint64 integet;
+		};
+	};
 
-				reader.get();
-
-				char c = reader.peek();
-				if (c == '/')
-				{
-					// single line comment
-					reader.skipToNewLine();
-				}
-				else if (c == '*')
-				{
-					// multiline comment 
-					reader.get();
-					for (;;)
-					{
-						reader.skipToChar('*');
-						if (reader.endOfStream())
-							return false;
-						if (reader.get() == '/')
-							break;
-					}
-				}
-				else
-					return false;
-			}
+	struct JSONValue
+	{
+		union
+		{
+			JSONString string;
+			JSONNumber number;
+			bool boolean;
 		};
 
-		for (;;)
-		{
-			if (!SkipWhitespacesAndComments(fmtReader))
-			{
+		JSONValueType type;
+	};
 
-			}
-
-			char c = baseReader.get();
-			if (c == '{')
-			{
-
-			}
-			else if (c == '[')
-			{
-
-			}
-			else if (c == '\"')
-			{
-
-			}
-			else if (c == '\0')
-			{
-
-			}
-		}
-	}
-
-	inline void JSONDocumentTree::clear()
+	class JSONReader : public NonCopyable
 	{
-		nodes.clear();
-		sourceText = nullptr;
-		sourceTextLength = 0;
-	}
+	private:
+		enum class State : uint8;
+
+	private:
+		MemoryTextReaderWithLocation textReader;
+		InplaceBitArray<64> nestingStackBits; // Each bit is one nested scope. 0 - object, 1 - array.
+		uint8 nestingStackSize = 0;
+		State state = State(0);
+		JSONErrorCode errorCode = JSONErrorCode::Success;
+
+	private:
+		bool tryConsumeChar(char c);
+		bool skipWhitespaceAndComments();
+
+		bool parseString(JSONString& result);			// Caller side should guarantee that next char is '\"'.
+		bool parseIdentifier(StringViewASCII& result);	// Caller side should guarantee that next char is valid identifier start char.
+		bool parseNumber(JSONNumber& result);			// Caller side should guarantee that next char is valid number start char.
+
+		bool parseKey(JSONString& result);
+		bool parseLiteralValue(JSONValue& result);
+
+		bool consumeCommaAndSkipToNextElementOrPrepareScopeClose(); // Makes state trainsition.
+
+	public:
+		JSONReader() = default;
+		~JSONReader() = default;
+
+		bool openDocument(const char* text, uintptr length);
+
+		bool readKey(JSONString& result);
+		bool readValue(JSONValue& result);
+
+		bool openObject();
+		bool closeObject();
+
+		bool openArray();
+		bool closeArray();
+
+		bool isEndOfObject() const;
+		bool isEndOfArray() const;
+		bool isEndOfDocument() const;
+
+		bool isInsideObjectScope() const;
+		bool isInsideArrayScope() const;
+		bool isInsideRootScope() const;
+
+		inline JSONErrorCode getErrorCode() const { return errorCode; }
+		inline uint32 getLineNumer() const { return textReader.getLineNumber(); }
+		inline uint32 getColumnNumer() const { return textReader.getColumnNumber(); }
+		inline uintptr getOffset() const { return textReader.getOffset(); }
+	};
+
+	const char* JSONErrorCodeToString(JSONErrorCode code);
 }

@@ -71,7 +71,7 @@ namespace XLib
 
 		inline uint32 getLineNumber() const { return lineNumber + 1; }
 		inline uint32 getColumnNumber() const { return columnNumber + 1; }
-		inline uintptr getAbsoluteOffset() const { return base.getPosition(); }
+		inline uintptr getOffset() const { return base.getPosition(); }
 
 		inline const char* getBeginPtr() const { return base.getBeginPtr(); }
 		inline const char* getEndPtr() const { return base.getEndPtr(); }

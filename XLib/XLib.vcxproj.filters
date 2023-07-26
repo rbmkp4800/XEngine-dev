@@ -79,5 +79,6 @@
     <ClCompile Include="Source\XLib.Platform.COMPtr.cpp" />
     <ClCompile Include="Source\XLib.Text.cpp" />
     <ClCompile Include="Source\XLib.Path.cpp" />
+    <ClCompile Include="Source\XLib.JSON.cpp" />
   </ItemGroup>
 </Project>

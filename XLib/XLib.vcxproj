@@ -77,6 +77,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\XLib.CRC.cpp" />
+    <ClCompile Include="Source\XLib.JSON.cpp" />
     <ClCompile Include="Source\XLib.Path.cpp" />
     <ClCompile Include="Source\XLib.Platform.COMPtr.cpp" />
     <ClCompile Include="Source\XLib.Program.cpp" />
