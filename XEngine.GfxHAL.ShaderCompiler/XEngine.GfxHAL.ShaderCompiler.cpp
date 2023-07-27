@@ -565,18 +565,14 @@ static bool CompileShaderDXC(const PipelineLayout& pipelineLayout, const ShaderD
 
 	// Patch source text.
 	DynamicStringASCII patchedSource;
+	HLSLPatcher::Error hlslPatcherError = {};
+	if (!HLSLPatcher::Patch(shader.sourceText, pipelineLayout, patchedSource, hlslPatcherError))
 	{
-		HLSLPatcher hlslPatcher(shader.sourceText, pipelineLayout);
-		HLSLPatcher::Error hlslPatcherError = {};
-
-		if (!hlslPatcher.execute(patchedSource, hlslPatcherError))
-		{
-			// TODO: Store XE HLSL patcher errors in artifacts.
-			TextWriteFmtStdOut(shader.sourcePath, ":",
-				hlslPatcherError.location.lineNumber, ":", hlslPatcherError.location.columnNumber,
-				": xe-hlsl-patcher: ", hlslPatcherError.message);
-			return false;
-		}
+		// TODO: Store XE HLSL patcher errors in artifacts.
+		TextWriteFmtStdOut(shader.sourcePath, ":",
+			hlslPatcherError.location.lineNumber, ":", hlslPatcherError.location.columnNumber,
+			": xe-hlsl-patcher: ", hlslPatcherError.message);
+		return false;
 	}
 
 	// Build arguments list.

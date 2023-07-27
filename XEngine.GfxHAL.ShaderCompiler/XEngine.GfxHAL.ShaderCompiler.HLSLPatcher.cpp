@@ -721,7 +721,7 @@ bool HLSLPatcher::ExtractBindingInfo(const PipelineLayout& pipelineLayout,
 HLSLPatcher::HLSLPatcher(StringViewASCII sourceText, const PipelineLayout& pipelineLayout)
 	: lexer(sourceText), composer(lexer), pipelineLayout(pipelineLayout) { }
 
-bool HLSLPatcher::execute(DynamicStringASCII& result, Error& error)
+bool HLSLPatcher::patch(DynamicStringASCII& result, Error& error)
 {
 	if (!lexer.advance(error))
 		return false;
@@ -813,4 +813,11 @@ bool HLSLPatcher::execute(DynamicStringASCII& result, Error& error)
 	result = composer.composeOuput();
 	error = {};
 	return true;
+}
+
+bool HLSLPatcher::Patch(StringViewASCII sourceText, const PipelineLayout& pipelineLayout,
+	DynamicStringASCII& result, Error& error)
+{
+	HLSLPatcher patcher(sourceText, pipelineLayout);
+	return patcher.patch(result, error);
 }

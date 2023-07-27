@@ -984,3 +984,9 @@ bool LibraryDefinitionLoader::load(const char* jsonPathCStr)
 
 	return true;
 }
+
+bool LibraryDefinitionLoader::Load(LibraryDefinition& libraryDefinition, const char* jsonPathCStr)
+{
+	LibraryDefinitionLoader loader(libraryDefinition);
+	return loader.load(jsonPathCStr);
+}

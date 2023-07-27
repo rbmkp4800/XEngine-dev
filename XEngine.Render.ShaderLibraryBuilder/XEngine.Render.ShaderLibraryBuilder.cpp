@@ -320,12 +320,8 @@ PipelineRef Pipeline::CreateCompute(StringViewASCII name,
 int main()
 {
 	LibraryDefinition libraryDefinition;
-
-	{
-		LibraryDefinitionLoader libraryDefinitionLoader(libraryDefinition);
-		if (!libraryDefinitionLoader.load("../XEngine.Render.Shaders/.xeslibdef.json"))
-			return 0;
-	}
+	if (!LibraryDefinitionLoader::Load(libraryDefinition, "../XEngine.Render.Shaders/.xeslibdef.json"))
+		return 0;
 
 	// Sort pipelines by actual name, so log looks nice :sparkles:
 

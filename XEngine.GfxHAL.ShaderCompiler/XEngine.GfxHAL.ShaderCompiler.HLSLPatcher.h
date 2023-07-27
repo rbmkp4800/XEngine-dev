@@ -99,10 +99,14 @@ namespace XEngine::GfxHAL::ShaderCompiler
 			XLib::StringViewASCII bindingNestedName, Location bindingNestedNameLocation,
 			BindingInfo& resultBindingInfo, Error& error);
 
-	public:
+	private:
 		HLSLPatcher(XLib::StringViewASCII sourceText, const PipelineLayout& pipelineLayout);
 		~HLSLPatcher() = default;
 
-		bool execute(XLib::DynamicStringASCII& result, Error& error);
+		bool patch(XLib::DynamicStringASCII& result, Error& error);
+
+	public:
+		static bool Patch(XLib::StringViewASCII sourceText, const PipelineLayout& pipelineLayout,
+			XLib::DynamicStringASCII& result, Error& error);
 	};
 }

@@ -65,10 +65,13 @@ namespace XEngine::Render::ShaderLibraryBuilder
 
 		inline Cursor getJSONCursor() const { return Cursor { jsonReader.getLineNumer(), jsonReader.getColumnNumer() }; };
 
-	public:
+	private:
 		inline LibraryDefinitionLoader(LibraryDefinition& libraryDefinition) : libraryDefinition(libraryDefinition) {}
 		~LibraryDefinitionLoader() = default;
 
 		bool load(const char* jsonPathCStr);
+
+	public:
+		static bool Load(LibraryDefinition& libraryDefinition, const char* jsonPathCStr);
 	};
 }
