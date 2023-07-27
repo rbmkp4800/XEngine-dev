@@ -91,9 +91,10 @@ namespace XEngine::GfxHAL::BlobFormat::Data
 
 	struct VertexBindingRecord // 24 bytes
 	{
-		uint16 offset13_bufferIndex3;
+		char name[20];
+		uint16 offset;
 		TexelViewFormat format;
-		char name[MaxVertexBindingNameLength];
+		uint8 bufferIndex;
 	};
 	static_assert(sizeof(VertexBindingRecord) == 24);
 
@@ -126,14 +127,7 @@ namespace XEngine::GfxHAL::BlobFormat
 		};
 	};
 
-	struct VertexBindingInfo
-	{
-		const char* name;
-		uintptr nameLength;
-		uint16 offset;
-		TexelViewFormat format;
-		uint8 bufferIndex;
-	};
+	using VertexBindingInfo = Data::VertexBindingRecord;
 
 	class GenericBlobReader
 	{
@@ -254,9 +248,6 @@ namespace XEngine::GfxHAL::BlobFormat
 		uint32 memoryBlockSize = 0;
 
 	public:
-		static constexpr uint8 MaxVertexBindingNameLength = MaxVertexBindingNameLength;
-
-	public:
 		GraphicsPipelineStateBlobWriter() = default;
 		~GraphicsPipelineStateBlobWriter() = default;
 
@@ -265,7 +256,7 @@ namespace XEngine::GfxHAL::BlobFormat
 		void addRenderTarget(TexelViewFormat format);
 		void setDepthStencilFormat(DepthStencilFormat format);
 		void enableVertexBuffer(uint8 index, bool perInstance);
-		void addVertexBinding(const char* name, uintptr nameLength, TexelViewFormat format, uint16 offset, uint8 bufferIndex);
+		void addVertexBinding(const VertexBindingInfo& bindingInfo);
 		void endInitialization();
 
 		uint32 getMemoryBlockSize() const;

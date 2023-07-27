@@ -50,7 +50,7 @@ enum class HLSLPatcher::BindingType : uint8
 	Undefined = 0,
 	Resource,
 	Constant,
-	//Sampler, ???
+	StaticSampler,
 };
 
 struct HLSLPatcher::Attribute
@@ -85,6 +85,11 @@ struct HLSLPatcher::BindingInfo
 		{
 
 		} constant;
+
+		struct
+		{
+			uint32 shaderRegister;
+		} staticSampler;
 	};
 
 	BindingType type;
@@ -486,6 +491,52 @@ bool HLSLPatcher::processAttribute(Attribute& attribute, Error& error)
 
 bool HLSLPatcher::processVariableDefinitionForBinding(const BindingInfo& bindingInfo, Error& error)
 {
+	if (bindingInfo.type == BindingType::StaticSampler)
+	{
+		const Lexeme samplerStateLexeme = lexer.peekLexeme();
+		if (!lexer.advance(error))
+			return false;
+
+		if (samplerStateLexeme.string != "SamplerState")
+		{
+			error.message = "expected 'SamplerState'";
+			error.location = samplerStateLexeme.location;
+			return false;
+		}
+
+		const Lexeme samplerVarNameLexeme = lexer.peekLexeme();
+		if (!lexer.advance(error))
+			return false;
+
+		if (samplerVarNameLexeme.type != LexemeType::Identifier)
+		{
+			error.message = "expected identifier";
+			error.location = samplerVarNameLexeme.location;
+			return false;
+		}
+
+		composer.copyInputRangeUpToCurrentPosition();
+
+		const Lexeme semicolonLexeme = lexer.peekLexeme();
+		if (!lexer.advance(error))
+			return false;
+
+		if (semicolonLexeme.type != LexemeType::Semicolon)
+		{
+			error.message = "expected ';' ('xe::binding' syntax requirement)";
+			error.location = semicolonLexeme.location;
+			return false;
+		}
+
+		// Write ':register(s#);' to output.
+		InplaceStringASCIIx32 registerString;
+		TextWriteFmt(registerString, ":register(s", bindingInfo.staticSampler.shaderRegister, ");");
+		composer.write(registerString);
+		composer.blankOutInputRangeUpToCurrentPosition();
+
+		return true;
+	}
+
 	XAssert(bindingInfo.type == BindingType::Resource);
 
 	const Lexeme resourceTypeLexeme = lexer.peekLexeme();
@@ -615,6 +666,21 @@ bool HLSLPatcher::ExtractBindingInfo(const PipelineLayout& pipelineLayout,
 	StringViewASCII bindingNestedName, Location bindingNestedNameLocation,
 	BindingInfo& resultBindingInfo, Error& error)
 {
+	const sint16 staticSamplerIndex = pipelineLayout.findStaticSampler(bindingRootName);
+	if (staticSamplerIndex >= 0)
+	{
+		if (!bindingNestedName.isEmpty())
+		{
+			TextWriteFmt(error.message, "pipeline binding '", bindingRootName, "': nested binding name is not expected");
+			error.location = bindingNestedNameLocation;
+			return false;
+		}
+
+		resultBindingInfo.type = BindingType::StaticSampler;
+		resultBindingInfo.staticSampler.shaderRegister = pipelineLayout.getStaticSamplerShaderRegister(staticSamplerIndex);
+		return true;
+	}
+
 	const sint16 pipelineBindingIndex = pipelineLayout.findBinding(bindingRootName);
 	if (pipelineBindingIndex < 0)
 	{

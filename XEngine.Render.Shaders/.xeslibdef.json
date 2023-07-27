@@ -35,8 +35,9 @@
 			"SOME_BUFFER":			{ "type": "read_only_buffer" },
 			"SOME_RW_BUFFER" :		{ "type": "read_write_buffer" },
 			"TEST_DS" :				{ "type": "descriptor_set", "dsl": "Test.DescriptorSetLayout" },
-			"TEST_SAMPLER":			{ "type": "static_sampler", "static_sampler": "Test.Sampler" }
+			//"TEST_SAMPLER":			{ "type": "static_sampler", "static_sampler": "Test.Sampler" }
 		}
+		// "flags" : [ "block_as", "block_ms", "block_vertex_input" ], // Or 'allow' insead of 'block'?
 	},
 
 	"Test.GraphicsPipeline": {

@@ -11,6 +11,7 @@
 
 namespace XEngine::GfxHAL::ShaderCompiler
 {
+	constexpr uint16 MaxPipelineStaticSamplerCount = 8;
 	constexpr uint16 MaxPipelineBindingNameLength = 254;
 	constexpr uint16 MaxDescriptorSetBindingNameLength = 254;
 
@@ -33,6 +34,11 @@ namespace XEngine::GfxHAL::ShaderCompiler
 		Vulkan,
 		//Scarlett,
 		//Prospero,
+	};
+
+	struct GenericErrorMessage
+	{
+		XLib::InplaceStringASCIIx256 text;
 	};
 
 	struct StaticSamplerDesc
@@ -74,7 +80,7 @@ namespace XEngine::GfxHAL::ShaderCompiler
 
 	struct VertexBindingDesc
 	{
-		XLib::StringViewASCII name;
+		char name[20];
 		uint16 offset;
 		GfxHAL::TexelViewFormat format;
 		uint8 bufferIndex;
@@ -116,20 +122,30 @@ namespace XEngine::GfxHAL::ShaderCompiler
 		GfxHAL::DepthStencilFormat depthStencilFormat;
 	};
 
+	struct GraphicsPipelineCompilationArtifacts
+	{
+		ShaderCompilationArtifactsRef vs;
+		ShaderCompilationArtifactsRef as;
+		ShaderCompilationArtifactsRef ms;
+		ShaderCompilationArtifactsRef ps;
+	};
+
+	struct GraphicsPipelineCompiledBlobs
+	{
+		BlobRef stateBlob;
+		BlobRef vsBytecodeBlob;
+		BlobRef asBytecodeBlob;
+		BlobRef msBytecodeBlob;
+		BlobRef psBytecodeBlob;
+	};
+
 	class DescriptorSetLayout final : public XLib::RefCounted
 	{
 	private:
-		struct BindingDesc
-		{
-			uint16 nameOffset;
-			uint16 nameLength;
-			uint32 descriptorOffset;
-			uint16 descriptorCount;
-			GfxHAL::DescriptorType descriptorType;
-		};
+		struct InternalBindingDesc;
 
 	private:
-		const BindingDesc* bindings = nullptr;
+		const InternalBindingDesc* bindings = nullptr;
 		XLib::StringViewASCII namesBuffer;
 		const void* serializedBlobData = nullptr;
 		uint32 serializedBlobSize = 0;
@@ -155,30 +171,28 @@ namespace XEngine::GfxHAL::ShaderCompiler
 		uint32 getSerializedBlobChecksum() const; // Defined by 'GfxHAL::BlobFormat'
 
 	public:
-		static DescriptorSetLayoutRef Create(const DescriptorSetBindingDesc* bindings, uint16 bindingCount);
+		static DescriptorSetLayoutRef Create(const DescriptorSetBindingDesc* bindings, uint16 bindingCount,
+			GenericErrorMessage& errorMessage);
 	};
 
 	class PipelineLayout final : public XLib::RefCounted
 	{
 	private:
-		struct BindingDesc
-		{
-			uint16 nameOffset;
-			uint16 nameLength;
-			uint32 baseShaderRegister;
-			GfxHAL::PipelineBindingType type;
-		};
+		struct InternalBindingDesc;
+		struct InternalStaticSamplerDesc;
 
 	private:
-		// TODO: Replace with something like `XLib::Array` that supports external storage and calls destructors.
+		// TODO: Replace with something like 'XLib::InplaceArrayList' / 'XLib::Array' that supports external storage and calls destructors.
 		DescriptorSetLayoutRef descriptorSetLayoutTable[GfxHAL::MaxPipelineBindingCount];
 
-		const BindingDesc* bindings = nullptr;
+		const InternalBindingDesc* bindings = nullptr;
+		const InternalStaticSamplerDesc* staticSamplers = nullptr;
 		XLib::StringViewASCII namesBuffer;
 		const void* serializedBlobData = nullptr;
 		uint32 serializedBlobSize = 0;
 		uint32 sourceHash = 0;
 		uint16 bindingCount = 0;
+		uint16 staticSamplerCount = 0;
 
 	private:
 		PipelineLayout() = default;
@@ -189,8 +203,10 @@ namespace XEngine::GfxHAL::ShaderCompiler
 		inline uint32 getSourceHash() const { return sourceHash; }
 
 		sint16 findBinding(XLib::StringViewASCII name) const; // Returns negative number on failure.
+		sint16 findStaticSampler(XLib::StringViewASCII bindingName) const; // Returns negative number on failure.
 		PipelineBindingDesc getBindingDesc(uint16 bindingIndex) const;
 		uint32 getBindingBaseShaderRegister(uint16 bindingIndex) const;
+		uint32 getStaticSamplerShaderRegister(uint16 staticSamplerIndex) const;
 
 		inline const void* getSerializedBlobData() const { return serializedBlobData; }
 		inline uint32 getSerializedBlobSize() const { return serializedBlobSize; }
@@ -198,7 +214,8 @@ namespace XEngine::GfxHAL::ShaderCompiler
 
 	public:
 		static PipelineLayoutRef Create(const PipelineBindingDesc* bindings, uint16 bindingCount,
-			const StaticSamplerDesc* staticSamplers, uint8 staticSamplerCount);
+			const StaticSamplerDesc* staticSamplers, uint16 staticSamplerCount,
+			GenericErrorMessage& errorMessage);
 	};
 
 	class Blob : public XLib::RefCounted
@@ -247,30 +264,18 @@ namespace XEngine::GfxHAL::ShaderCompiler
 		XLib::StringViewASCII getOutput() const;
 	};
 
-	struct GraphicsPipelineCompilationArtifacts
-	{
-		ShaderCompilationArtifactsRef vs;
-		ShaderCompilationArtifactsRef as;
-		ShaderCompilationArtifactsRef ms;
-		ShaderCompilationArtifactsRef ps;
-		XLib::DynamicStringASCII pipelineCompilationOutput;
-	};
-
-	struct GraphicsPipelineCompiledBlobs
-	{
-		BlobRef stateBlob;
-		BlobRef vsBytecodeBlob;
-		BlobRef asBytecodeBlob;
-		BlobRef msBytecodeBlob;
-		BlobRef psBytecodeBlob;
-	};
+	bool ValidateVertexBindingName(XLib::StringViewASCII name);
+	bool ValidateDescriptorSetBindingName(XLib::StringViewASCII name);
+	bool ValidatePipelineBindingName(XLib::StringViewASCII name);
+	bool ValidateShaderEntryPointName(XLib::StringViewASCII name);
 
 	bool CompileGraphicsPipeline(
 		const PipelineLayout& pipelineLayout,
 		const GraphicsPipelineShaders& shaders,
 		const GraphicsPipelineSettings& settings,
 		GraphicsPipelineCompilationArtifacts& artifacts,
-		GraphicsPipelineCompiledBlobs& compiledBlobs);
+		GraphicsPipelineCompiledBlobs& compiledBlobs,
+		GenericErrorMessage& errorMessage);
 
 	bool CompileComputePipeline(
 		const PipelineLayout& pipelineLayout,

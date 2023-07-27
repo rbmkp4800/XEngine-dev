@@ -50,8 +50,8 @@ namespace XLib
 	template <typename CharType, uintptr Capacity, typename CounterType = uint16>
 	class InplaceString
 	{
-		static_assert(Capacity > 1); // At least one character.
-		// TODO: Check that capacity is less then counter max value.
+		static_assert(Capacity > 1); // At least one character (+1 for cstr zero terminator).
+		static_assert(Capacity == uintptr(CounterType(Capacity)));
 
 	private:
 		CounterType length = 0;

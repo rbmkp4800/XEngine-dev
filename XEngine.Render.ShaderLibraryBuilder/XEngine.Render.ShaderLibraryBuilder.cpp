@@ -242,7 +242,12 @@ PipelineRef Pipeline::CreateGraphics(StringViewASCII name,
 	const uint32 psEntryPointNameMemOffset = memoryBlockSizeAccum;
 	memoryBlockSizeAccum += shaders.ps.entryPointName.getLength() + 1;
 
-	// TODO: Vertex input.
+	const uint32 vertexBindingsMemOffset = memoryBlockSizeAccum;
+	memoryBlockSizeAccum += sizeof(GfxHAL::ShaderCompiler::VertexBindingDesc) * settings.vertexBindingCount;
+
+	// NOTE: This code actually assumes that 'GfxHAL::ShaderCompiler::VertexBindingDesc::name' is inplace char array.
+	// Because of this, we do not need to explicitly allocate memory for vertex binding names as they are stored inplace.
+	XAssert(countof(settings.vertexBindings[0].name) == sizeof(settings.vertexBindings[0].name));
 
 	const uint32 memoryBlockSize = memoryBlockSizeAccum;
 	void* memoryBlock = SystemHeapAllocator::Allocate(memoryBlockSize);
@@ -258,6 +263,9 @@ PipelineRef Pipeline::CreateGraphics(StringViewASCII name,
 	memoryCopy((char*)memoryBlock + psSourcePathMemOffset, shaders.ps.sourcePath.getData(), shaders.ps.sourcePath.getLength());
 	memoryCopy((char*)memoryBlock + psEntryPointNameMemOffset, shaders.ps.entryPointName.getData(), shaders.ps.entryPointName.getLength());
 
+	GfxHAL::ShaderCompiler::VertexBindingDesc* internalVertexBindings = (GfxHAL::ShaderCompiler::VertexBindingDesc*)(uintptr(memoryBlock) + vertexBindingsMemOffset);
+	memoryCopy(internalVertexBindings, settings.vertexBindings, sizeof(GfxHAL::ShaderCompiler::VertexBindingDesc) * settings.vertexBindingCount);
+
 	Pipeline& resultObject = *(Pipeline*)memoryBlock;
 	construct(resultObject);
 
@@ -272,9 +280,12 @@ PipelineRef Pipeline::CreateGraphics(StringViewASCII name,
 	resultObject.graphics.shaders.ms.entryPointName = StringView((char*)memoryBlock + msEntryPointNameMemOffset, shaders.ms.entryPointName.getLength());
 	resultObject.graphics.shaders.ps.sourcePath = StringView((char*)memoryBlock + psSourcePathMemOffset, shaders.ps.sourcePath.getLength());
 	resultObject.graphics.shaders.ps.entryPointName = StringView((char*)memoryBlock + psEntryPointNameMemOffset, shaders.ps.entryPointName.getLength());
-	// TODO: Vertex input.
-	memoryCopy(&resultObject.graphics.settings.renderTargetsFormats, &settings.renderTargetsFormats,
-		sizeof(resultObject.graphics.settings.renderTargetsFormats));
+
+	memoryCopy(&resultObject.graphics.settings.vertexBuffers, &settings.vertexBuffers, sizeof(resultObject.graphics.settings.vertexBuffers));
+	resultObject.graphics.settings.vertexBindings = settings.vertexBindingCount > 0 ? internalVertexBindings : nullptr;
+	resultObject.graphics.settings.vertexBindingCount = settings.vertexBindingCount;
+
+	memoryCopy(&resultObject.graphics.settings.renderTargetsFormats, &settings.renderTargetsFormats, sizeof(resultObject.graphics.settings.renderTargetsFormats));
 	resultObject.graphics.settings.depthStencilFormat = settings.depthStencilFormat;
 	resultObject.isGraphics = true;
 
@@ -362,12 +373,15 @@ int main()
 			}
 
 			GfxHAL::ShaderCompiler::GraphicsPipelineCompilationArtifacts artifacts = {};
+			GfxHAL::ShaderCompiler::GenericErrorMessage compilationErrorMessage = {};
 
 			const bool result = GfxHAL::ShaderCompiler::CompileGraphicsPipeline(
-				*pipeline.getPipelineLayout(), shaders, pipeline.getGraphicsSettings(), artifacts, pipeline.graphicsCompiledBlobs());
+				*pipeline.getPipelineLayout(), shaders, pipeline.getGraphicsSettings(),
+				artifacts, pipeline.graphicsCompiledBlobs(), compilationErrorMessage);
 
 			if (!result)
 			{
+				TextWriteFmtStdOut("graphics pipeline compilation error: ", compilationErrorMessage.text);
 				return 1;
 			}
 

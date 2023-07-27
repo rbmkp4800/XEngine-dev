@@ -169,22 +169,6 @@ static bool ValidateRootEntryName(StringViewASCII name)
 	return true;
 }
 
-static bool ValidateBindingName(StringViewASCII name)
-{
-	if (name.isEmpty())
-		return false;
-	if (!Char::IsUpper(name[0]) && name[0] != '_')
-		return false;
-
-	for (uintptr i = 1; i < name.getLength(); i++)
-	{
-		const char c = name[i];
-		if (!Char::IsUpper(c) && !Char::IsDigit(c) && c != '_')
-			return false;
-	}
-	return true;
-}
-
 static bool ValidateShaderSourcePath(StringViewASCII path)
 {
 	if (path.isEmpty())
@@ -194,22 +178,6 @@ static bool ValidateShaderSourcePath(StringViewASCII path)
 
 	// TODO: Add some actual validation here.
 
-	return true;
-}
-
-static bool ValidateShaderEntryPointName(StringViewASCII name)
-{
-	if (name.isEmpty())
-		return false;
-	if (!Char::IsLetter(name[0]) && name[0] != '_')
-		return false;
-
-	for (uintptr i = 1; i < name.getLength(); i++)
-	{
-		const char c = name[i];
-		if (!Char::IsLetterOrDigit(c) && c != '_')
-			return false;
-	}
 	return true;
 }
 
@@ -525,8 +493,8 @@ bool LibraryDefinitionLoader::readVertexInputLayout(StringViewASCII vertexInputL
 					StringViewASCII bindingName = {};
 					const Cursor jsonBindingNameCursor = getJSONCursor();
 					IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("name", bindingName));
-					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(ValidateBindingName(bindingName), "invalid vertex binding name", jsonBindingNameCursor);
-					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(bindingName.getLength() <= GfxHAL::MaxVertexBindingNameLength, "vertex binding name is too long", jsonBindingNameCursor);
+					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(GfxHAL::ShaderCompiler::ValidateVertexBindingName(bindingName), "invalid vertex binding name", jsonBindingNameCursor);
+					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(bindingName.getLength() <= countof(vertexBindingDesc.name), "vertex binding name length limit exceeded", jsonBindingNameCursor);
 
 					StringViewASCII bindingFormatStr = {};
 					const Cursor jsonBindingFormatCursor = getJSONCursor();
@@ -537,7 +505,7 @@ bool LibraryDefinitionLoader::readVertexInputLayout(StringViewASCII vertexInputL
 					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(GfxHAL::TexelViewFormatUtils::SupportsVertexInputUsage(bindingFormat),
 						"format does not support vertex input usage", jsonBindingFormatCursor);
 
-					vertexBindingDesc.name = bindingName;
+					memoryCopy(vertexBindingDesc.name, bindingName.getData(), bindingName.getLength());
 					vertexBindingDesc.offset = vertexBindingDataOffset;
 					vertexBindingDesc.format = bindingFormat;
 					vertexBindingDesc.bufferIndex = vertexBufferIndex;
@@ -593,7 +561,7 @@ bool LibraryDefinitionLoader::readDescriptorSetLayout(StringViewASCII descriptor
 
 		const Cursor jsonBindingNameCursor = getJSONCursor();
 		IF_FALSE_RETURN_FALSE(consumeKeyWithObjectValue(binding.name));
-		IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(ValidateBindingName(binding.name), "invalid binding name", jsonBindingNameCursor);
+		IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(GfxHAL::ShaderCompiler::ValidateDescriptorSetBindingName(binding.name), "invalid binding name", jsonBindingNameCursor);
 
 		jsonReader.openObject();
 		IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
@@ -629,8 +597,12 @@ bool LibraryDefinitionLoader::readDescriptorSetLayout(StringViewASCII descriptor
 		"descriptor set layout redefinition", jsonDescriptorSetLayoutNameCursor);
 	// TODO: We may give separate error for hash collision (that will never happen).
 
+	GfxHAL::ShaderCompiler::GenericErrorMessage objectCreationErrorMessage;
+
 	const GfxHAL::ShaderCompiler::DescriptorSetLayoutRef descriptorSetLayout =
-		GfxHAL::ShaderCompiler::DescriptorSetLayout::Create(bindings, bindings.getSize());
+		GfxHAL::ShaderCompiler::DescriptorSetLayout::Create(bindings, bindings.getSize(), objectCreationErrorMessage);
+
+	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(descriptorSetLayout, objectCreationErrorMessage.text.getCStr(), jsonDescriptorSetLayoutNameCursor);
 
 	//libraryDefinition.descriptorSetLayouts.insert(descriptorSetLayoutNameXSH, descriptorSetLayout);
 	libraryDefinition.descriptorSetLayouts.pushBack(
@@ -644,17 +616,17 @@ bool LibraryDefinitionLoader::readPipelineLayout(StringViewASCII pipelineLayoutN
 	IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithObjectValue("bindings"));
 
 	InplaceArrayList<GfxHAL::ShaderCompiler::PipelineBindingDesc, GfxHAL::MaxPipelineBindingCount> bindings;
+	InplaceArrayList<GfxHAL::ShaderCompiler::StaticSamplerDesc, GfxHAL::ShaderCompiler::MaxPipelineStaticSamplerCount> pipelineLayoutStaticSamplers;
 
 	jsonReader.openObject();
 	IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
 
 	while (!jsonReader.isEndOfObject())
 	{
-		GfxHAL::ShaderCompiler::PipelineBindingDesc binding = {};
-
+		StringViewASCII bindingName = {};
 		const Cursor jsonBindingNameCursor = getJSONCursor();
-		IF_FALSE_RETURN_FALSE(consumeKeyWithObjectValue(binding.name));
-		IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(ValidateBindingName(binding.name), "invalid binding name", jsonBindingNameCursor);
+		IF_FALSE_RETURN_FALSE(consumeKeyWithObjectValue(bindingName));
+		IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(GfxHAL::ShaderCompiler::ValidatePipelineBindingName(bindingName), "invalid binding name", jsonBindingNameCursor);
 
 		jsonReader.openObject();
 		IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
@@ -663,34 +635,63 @@ bool LibraryDefinitionLoader::readPipelineLayout(StringViewASCII pipelineLayoutN
 			const Cursor jsonBindingTypeCursor = getJSONCursor();
 			IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("type", bindingTypeStr));
 
-			binding.type = ParsePipelineBindingTypeString(bindingTypeStr);
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(binding.type != GfxHAL::PipelineBindingType::Undefined,
-				"invalid pipeline binding type", jsonBindingTypeCursor);
-
-			if (binding.type == GfxHAL::PipelineBindingType::DescriptorSet)
+			if (bindingTypeStr == "static_sampler") // NOTE: Static sampler is not real pipeline binding.
 			{
-				StringViewASCII descriptorSetLayoutName = {};
-				const Cursor jsonDescriptorSetLayoutNameCursor = getJSONCursor();
-				IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("dsl", descriptorSetLayoutName));
+				StringViewASCII staticSamplerName = {};
+				const Cursor jsonStaticSamplerNameCursor = getJSONCursor();
+				IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("static_sampler", staticSamplerName));
 
-				//const GfxHAL::ShaderCompiler::DescriptorSetLayoutRef* descriptorSetLayout =
-				//	libraryDefinition.descriptorSetLayouts.findValue(XSH::Compute(descriptorSetLayoutName));
-				const GfxHAL::ShaderCompiler::DescriptorSetLayout* descriptorSetLayout =
-					LibFindDescriptorSetLayout(libraryDefinition, XSH::Compute(descriptorSetLayoutName));
+				const StaticSamplerDesc* internalStaticSampler = nullptr;
+				for (StaticSamplerDesc& i : staticSamplers)
+				{
+					if (staticSamplerName == i.name)
+					{
+						internalStaticSampler = &i;
+						break;
+					}
+				}
+				IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(internalStaticSampler, "undefined static sampler", jsonStaticSamplerNameCursor);
 
-				IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(descriptorSetLayout, "undefined descriptor set layout", jsonDescriptorSetLayoutNameCursor);
+				GfxHAL::ShaderCompiler::StaticSamplerDesc staticSampler = {};
+				staticSampler.bindingName = bindingName;
+				staticSampler.desc = internalStaticSampler->desc;
 
-				//binding.descriptorSetLayout = descriptorSetLayout->get();
-				binding.descriptorSetLayout = descriptorSetLayout;
+				IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!pipelineLayoutStaticSamplers.isFull(), "pipeline layout static samplers limit exceeded", jsonBindingNameCursor);
+				pipelineLayoutStaticSamplers.pushBack(staticSampler);
+			}
+			else
+			{
+				GfxHAL::ShaderCompiler::PipelineBindingDesc binding = {};
+				binding.name = bindingName;
+				binding.type = ParsePipelineBindingTypeString(bindingTypeStr);
+				IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(binding.type != GfxHAL::PipelineBindingType::Undefined,
+					"invalid pipeline binding type", jsonBindingTypeCursor);
+
+				if (binding.type == GfxHAL::PipelineBindingType::DescriptorSet)
+				{
+					StringViewASCII descriptorSetLayoutName = {};
+					const Cursor jsonDescriptorSetLayoutNameCursor = getJSONCursor();
+					IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("dsl", descriptorSetLayoutName));
+
+					//const GfxHAL::ShaderCompiler::DescriptorSetLayoutRef* descriptorSetLayout =
+					//	libraryDefinition.descriptorSetLayouts.findValue(XSH::Compute(descriptorSetLayoutName));
+					const GfxHAL::ShaderCompiler::DescriptorSetLayout* descriptorSetLayout =
+						LibFindDescriptorSetLayout(libraryDefinition, XSH::Compute(descriptorSetLayoutName));
+
+					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(descriptorSetLayout, "undefined descriptor set layout", jsonDescriptorSetLayoutNameCursor);
+
+					//binding.descriptorSetLayout = descriptorSetLayout->get();
+					binding.descriptorSetLayout = descriptorSetLayout;
+				}
+
+				IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!bindings.isFull(), "pipeline layout bindings limit exceeded", jsonBindingNameCursor);
+				bindings.pushBack(binding);
 			}
 
 			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonReader.isEndOfObject(), "end of object expected", getJSONCursor());
 		}
 		jsonReader.closeObject();
 		IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
-
-		IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!bindings.isFull(), "pipeline layout bindings limit exceeded", jsonBindingNameCursor);
-		bindings.pushBack(binding);
 	}
 
 	jsonReader.closeObject();
@@ -707,8 +708,13 @@ bool LibraryDefinitionLoader::readPipelineLayout(StringViewASCII pipelineLayoutN
 		"pipeline layout redefinition", jsonPipelineLayoutNameCursor);
 	// TODO: We may give separate error for hash collision (that will never happen).
 
+	GfxHAL::ShaderCompiler::GenericErrorMessage objectCreationErrorMessage;
+
 	const GfxHAL::ShaderCompiler::PipelineLayoutRef pipelineLayout =
-		GfxHAL::ShaderCompiler::PipelineLayout::Create(bindings, bindings.getSize(), nullptr, 0);
+		GfxHAL::ShaderCompiler::PipelineLayout::Create(bindings, bindings.getSize(),
+			pipelineLayoutStaticSamplers, pipelineLayoutStaticSamplers.getSize(), objectCreationErrorMessage);
+
+	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(pipelineLayout, objectCreationErrorMessage.text.getCStr(), jsonPipelineLayoutNameCursor);
 
 	//libraryDefinition.pipelineLayouts.insert(pipelineLayoutNameXSH, pipelineLayout);
 	libraryDefinition.pipelineLayouts.pushBack(
@@ -767,13 +773,12 @@ bool LibraryDefinitionLoader::readGraphicsPipeline(StringViewASCII graphicsPipel
 			const VertexInputLayoutDesc* vertexInputLayout = nullptr;
 			for (VertexInputLayoutDesc& i : vertexInputLayouts)
 			{
-				if (i.name == jsonValue.string.string)
+				if (jsonValue.string.string == i.name)
 				{
 					vertexInputLayout = &i;
 					break;
 				}
 			}
-
 			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(vertexInputLayout, "undefined vertex input layout", jsonKeyCursor);
 
 			memoryCopy(pipelineSettings.vertexBuffers, vertexInputLayout->buffers, sizeof(pipelineSettings.vertexBuffers));
@@ -941,7 +946,7 @@ bool LibraryDefinitionLoader::readShaderSetupObject(GfxHAL::ShaderCompiler::Shad
 		{
 			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(entryPointName.isEmpty(), "shader entry point name already set", jsonKeyCursor);
 			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonValue.type == JSONValueType::String, "string expected", jsonValueCursor);
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(ValidateShaderEntryPointName(jsonValue.string.string), "invalid shader entry point name", jsonValueCursor);
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(GfxHAL::ShaderCompiler::ValidateShaderEntryPointName(jsonValue.string.string), "invalid shader entry point name", jsonValueCursor);
 			entryPointName = jsonValue.string.string;
 		}
 		else

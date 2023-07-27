@@ -16,28 +16,43 @@
 #include "XEngine.GfxHAL.ShaderCompiler.HLSLPatcher.h"
 
 using namespace XLib;
-using namespace XEngine::GfxHAL;
+using namespace XEngine;
 using namespace XEngine::GfxHAL::ShaderCompiler;
 
-static inline D3D12_DESCRIPTOR_RANGE_TYPE TranslateDescriptorTypeToD3D12DescriptorRangeType(DescriptorType type)
+static inline D3D12_DESCRIPTOR_RANGE_TYPE TranslateDescriptorTypeToD3D12DescriptorRangeType(GfxHAL::DescriptorType type)
 {
 	switch (type)
 	{
-		case DescriptorType::ReadOnlyBuffer:
-		case DescriptorType::ReadOnlyTexture:
-		case DescriptorType::RaytracingAccelerationStructure:
+		case GfxHAL::DescriptorType::ReadOnlyBuffer:
+		case GfxHAL::DescriptorType::ReadOnlyTexture:
+		case GfxHAL::DescriptorType::RaytracingAccelerationStructure:
 			return D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 
-		case DescriptorType::ReadWriteBuffer:
-		case DescriptorType::ReadWriteTexture:
+		case GfxHAL::DescriptorType::ReadWriteBuffer:
+		case GfxHAL::DescriptorType::ReadWriteTexture:
 			return D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
 	}
 	XAssertUnreachableCode();
 	return D3D12_DESCRIPTOR_RANGE_TYPE(-1);
 }
 
+static inline bool TranslateSamplerDescToD3D12StaticSamplerDesc(const GfxHAL::SamplerDesc& srcSamplerDesc, D3D12_STATIC_SAMPLER_DESC& d3dResultSamplerDesc)
+{
+	XAssertNotImplemented();
+	return false;
+}
+
 
 // DescriptorSetLayout /////////////////////////////////////////////////////////////////////////////
+
+struct DescriptorSetLayout::InternalBindingDesc
+{
+	uint16 nameOffset;
+	uint16 nameLength;
+	uint32 descriptorOffset;
+	uint16 descriptorCount;
+	GfxHAL::DescriptorType descriptorType;
+};
 
 sint16 DescriptorSetLayout::findBinding(StringViewASCII name) const
 {
@@ -52,7 +67,7 @@ sint16 DescriptorSetLayout::findBinding(StringViewASCII name) const
 DescriptorSetBindingDesc DescriptorSetLayout::getBindingDesc(uint16 bindingIndex) const
 {
 	XAssert(bindingIndex < bindingCount);
-	const BindingDesc& internalDesc = bindings[bindingIndex];
+	const InternalBindingDesc& internalDesc = bindings[bindingIndex];
 
 	DescriptorSetBindingDesc result = {};
 	result.name = namesBuffer.getSubString(internalDesc.nameOffset, internalDesc.nameLength);
@@ -72,11 +87,16 @@ uint32 DescriptorSetLayout::getSerializedBlobChecksum() const
 	return ((BlobFormat::Data::GenericBlobHeader*)getSerializedBlobData())->checksum;
 }
 
-DescriptorSetLayoutRef DescriptorSetLayout::Create(const DescriptorSetBindingDesc* bindings, uint16 bindingCount)
+DescriptorSetLayoutRef DescriptorSetLayout::Create(const DescriptorSetBindingDesc* bindings, uint16 bindingCount,
+	GenericErrorMessage& errorMessage)
 {
 	// NOTE: I am retarded, so I put all the data in a single heap allocation :autistic_face:
 
-	XAssert(bindingCount <= MaxDescriptorSetBindingCount);
+	if (bindingCount > GfxHAL::MaxDescriptorSetBindingCount)
+	{
+		errorMessage.text = "bindings limit exceeded";
+		return nullptr;
+	}
 
 	struct BindingDeducedInfo
 	{
@@ -84,7 +104,7 @@ DescriptorSetLayoutRef DescriptorSetLayout::Create(const DescriptorSetBindingDes
 		uint32 descriptorOffset;
 		uint16 nameOffset;
 	};
-	BindingDeducedInfo bindingsDeducedInfo[MaxDescriptorSetBindingCount] = {};
+	BindingDeducedInfo bindingsDeducedInfo[GfxHAL::MaxDescriptorSetBindingCount] = {};
 
 	// Generic checks for each binding.
 	// Calculate bindings deduced info.
@@ -96,12 +116,30 @@ DescriptorSetLayoutRef DescriptorSetLayout::Create(const DescriptorSetBindingDes
 	{
 		const DescriptorSetBindingDesc& binding = bindings[i];
 
-		XAssert(!binding.name.isEmpty());
-		XAssert(binding.name.getLength() <= MaxDescriptorSetBindingNameLength);
-		XAssert(binding.descriptorCount == 1);
-		// TODO: Validate `binding.descriptorType` value.
+		const uint64 bindingNameXSH = XSH::Compute(binding.name);
 
-		bindingsDeducedInfo[i].nameXSH = XSH::Compute(binding.name);
+		if (!ValidateDescriptorSetBindingName(binding.name))
+		{
+			errorMessage.text = "invalid binding name";
+			return nullptr;
+		}
+		if (uint32(bindingNameXSH) == 0)
+		{
+			errorMessage.text = "descriptor set binding name XSH = 0. This is not allowed";
+			return nullptr;
+		}
+		if (binding.descriptorCount != 1)
+		{
+			errorMessage.text = "only one descriptor per binding supported for now";
+			return nullptr;
+		}
+		if (binding.descriptorType == DescriptorType::Undefined || binding.descriptorType >= DescriptorType::ValueCount)
+		{
+			errorMessage.text = "invalid descriptor type";
+			return nullptr;
+		}
+
+		bindingsDeducedInfo[i].nameXSH = bindingNameXSH;
 		bindingsDeducedInfo[i].descriptorOffset = descriptorCount;
 		bindingsDeducedInfo[i].nameOffset = XCheckedCastU16(namesBufferSize);
 
@@ -120,14 +158,13 @@ DescriptorSetLayoutRef DescriptorSetLayout::Create(const DescriptorSetBindingDes
 
 			if (bindings[i].name == bindings[j].name)
 			{
-				XTODO("Proper error report")
+				errorMessage.text = "duplicate binding name";
 				return nullptr;
 			}
 
-			// NOTE: IDK how many XSH bits I will use in the end but not less than 32.
 			if (uint32(bindingsDeducedInfo[i].nameXSH) == uint32(bindingsDeducedInfo[j].nameXSH))
 			{
-				XTODO("Proper error report")
+				errorMessage.text = "binding name XSH collision o_O";
 				return nullptr;
 			}
 		}
@@ -148,8 +185,8 @@ DescriptorSetLayoutRef DescriptorSetLayout::Create(const DescriptorSetBindingDes
 	uint32 memoryBlockSizeAccum = sizeof(DescriptorSetLayout);
 	memoryBlockSizeAccum = alignUp<uint32>(memoryBlockSizeAccum, 16);
 
-	const uint32 bindingsRelativeOffset = memoryBlockSizeAccum;
-	memoryBlockSizeAccum += sizeof(DescriptorSetLayout::BindingDesc) * bindingCount;
+	const uint32 internalBindingsRelativeOffset = memoryBlockSizeAccum;
+	memoryBlockSizeAccum += sizeof(DescriptorSetLayout::InternalBindingDesc) * bindingCount;
 
 	const uint32 namesBufferRelativeOffset = memoryBlockSizeAccum;
 	memoryBlockSizeAccum += namesBufferSize;
@@ -165,7 +202,7 @@ DescriptorSetLayoutRef DescriptorSetLayout::Create(const DescriptorSetBindingDes
 
 	// Populate memory block.
 	DescriptorSetLayout& resultObject = *(DescriptorSetLayout*)memoryBlock;
-	DescriptorSetLayout::BindingDesc* internalBindings = (DescriptorSetLayout::BindingDesc*)(uintptr(memoryBlock) + bindingsRelativeOffset);
+	DescriptorSetLayout::InternalBindingDesc* internalBindings = (DescriptorSetLayout::InternalBindingDesc*)(uintptr(memoryBlock) + internalBindingsRelativeOffset);
 	char* namesBuffer = (char*)(uintptr(memoryBlock) + namesBufferRelativeOffset);
 	void* serializedBlob = (void*)(uintptr(memoryBlock) + serializedBlobRelativeOffset);
 
@@ -185,7 +222,7 @@ DescriptorSetLayoutRef DescriptorSetLayout::Create(const DescriptorSetBindingDes
 	for (uint16 i = 0; i < bindingCount; i++)
 	{
 		const DescriptorSetBindingDesc& src = bindings[i];
-		DescriptorSetLayout::BindingDesc& dst = internalBindings[i];
+		DescriptorSetLayout::InternalBindingDesc& dst = internalBindings[i];
 
 		dst.nameOffset = bindingsDeducedInfo[i].nameOffset;
 		dst.nameLength = XCheckedCastU16(src.name.getLength());
@@ -220,6 +257,21 @@ DescriptorSetLayoutRef DescriptorSetLayout::Create(const DescriptorSetBindingDes
 
 // PipelineLayout //////////////////////////////////////////////////////////////////////////////////
 
+struct PipelineLayout::InternalBindingDesc
+{
+	uint16 nameOffset;
+	uint16 nameLength;
+	uint32 baseShaderRegister;
+	GfxHAL::PipelineBindingType type;
+};
+
+struct PipelineLayout::InternalStaticSamplerDesc
+{
+	uint16 bindingNameOffset;
+	uint16 bindingNameLength;
+	uint32 baseShaderRegister;
+};
+
 sint16 PipelineLayout::findBinding(StringViewASCII name) const
 {
 	for (uint16 i = 0; i < bindingCount; i++)
@@ -230,10 +282,20 @@ sint16 PipelineLayout::findBinding(StringViewASCII name) const
 	return -1;
 }
 
+sint16 PipelineLayout::findStaticSampler(StringViewASCII bindingName) const
+{
+	for (uint16 i = 0; i < staticSamplerCount; i++)
+	{
+		if (namesBuffer.getSubString(staticSamplers[i].bindingNameOffset, staticSamplers[i].bindingNameLength) == bindingName)
+			return i;
+	}
+	return -1;
+}
+
 PipelineBindingDesc PipelineLayout::getBindingDesc(uint16 bindingIndex) const
 {
 	XAssert(bindingIndex < bindingCount);
-	const BindingDesc& internalDesc = bindings[bindingIndex];
+	const InternalBindingDesc& internalDesc = bindings[bindingIndex];
 
 	PipelineBindingDesc result = {};
 	result.name = namesBuffer.getSubString(internalDesc.nameOffset, internalDesc.nameLength);
@@ -247,17 +309,32 @@ uint32 PipelineLayout::getBindingBaseShaderRegister(uint16 bindingIndex) const
 	return bindings[bindingIndex].baseShaderRegister;
 }
 
+uint32 PipelineLayout::getStaticSamplerShaderRegister(uint16 staticSamplerIndex) const
+{
+	XAssert(staticSamplerIndex < staticSamplerCount);
+	return staticSamplers[staticSamplerIndex].baseShaderRegister;
+}
+
 uint32 PipelineLayout::getSerializedBlobChecksum() const
 {
 	return ((BlobFormat::Data::GenericBlobHeader*)getSerializedBlobData())->checksum;
 }
 
 PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, uint16 bindingCount,
-	const StaticSamplerDesc* staticSamplers, uint8 staticSamplerCount)
+	const StaticSamplerDesc* staticSamplers, uint16 staticSamplerCount, GenericErrorMessage& errorMessage)
 {
 	// NOTE: I am retarded, so I put all the data in a single heap allocation :autistic_face:
 
-	XAssert(bindingCount <= MaxPipelineBindingCount);
+	if (bindingCount > GfxHAL::MaxPipelineBindingCount)
+	{
+		errorMessage.text = "bindings limit exceeded";
+		return nullptr;
+	}
+	if (staticSamplerCount > GfxHAL::ShaderCompiler::MaxPipelineStaticSamplerCount)
+	{
+		errorMessage.text = "static samplers limit exceeded";
+		return nullptr;
+	}
 
 	struct BindingDeducedInfo
 	{
@@ -266,46 +343,104 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 		uint16 d3dRootParameterIndex;
 		uint16 nameOffset;
 	};
-	BindingDeducedInfo bindingsDeducedInfo[MaxPipelineBindingCount] = {};
+	BindingDeducedInfo bindingsDeducedInfo[GfxHAL::MaxPipelineBindingCount] = {};
+
+	struct StaticSamplerDeducedInfo
+	{
+		uint16 nameOffset;
+	};
+	StaticSamplerDeducedInfo staticSamplersDeducedInfo[GfxHAL::ShaderCompiler::MaxPipelineStaticSamplerCount] = {};
+
+	D3D12_STATIC_SAMPLER_DESC d3dStaticSamplers[GfxHAL::ShaderCompiler::MaxPipelineStaticSamplerCount] = {};
+
+	struct BindingNameInfo
+	{
+		StringViewASCII str;
+		uint64 strXSH; // This should be zero for static samplers as we do not use XSH for these.
+	};
+
+	constexpr uint32 maxBindingNameCount = GfxHAL::MaxPipelineBindingCount + GfxHAL::ShaderCompiler::MaxPipelineStaticSamplerCount;
+	InplaceArrayList<BindingNameInfo, maxBindingNameCount> allBindingNames; // Real pipeline bindings + static samplers.
 
 	// Generic checks for each binding.
 	// Calculate bindings deduced info (name XSH, name offset)
 	// Calculate names buffer length.
 	uint32 namesBufferSize = 0;
+
 	for (uint16 i = 0; i < bindingCount; i++)
 	{
 		const PipelineBindingDesc& binding = bindings[i];
 
-		XAssert(!binding.name.isEmpty());
-		XAssert(binding.name.getLength() <= MaxPipelineBindingNameLength);
-		// TODO: Validate `binding.type` value.
-		// TODO: Validate `binding.descriptorSetLayout` value.
+		const uint64 bindingNameXSH = XSH::Compute(binding.name);
 
-		bindingsDeducedInfo[i].nameXSH = XSH::Compute(binding.name);
+		if (!ValidatePipelineBindingName(binding.name))
+		{
+			errorMessage.text = "invalid binding name";
+			return nullptr;
+		}
+		if (uint32(bindingNameXSH) == 0)
+		{
+			errorMessage.text = "pipeline binding name XSH = 0. This is not allowed";
+			return nullptr;
+		}
+		if (binding.type == PipelineBindingType::Undefined || binding.type >= PipelineBindingType::ValueCount)
+		{
+			errorMessage.text = "invalid binding type";
+			return nullptr;
+		}
+		XAssert(imply(binding.type == PipelineBindingType::DescriptorSet, binding.descriptorSetLayout));
+
+		bindingsDeducedInfo[i].nameXSH = bindingNameXSH;
 		bindingsDeducedInfo[i].nameOffset = XCheckedCastU16(namesBufferSize);
 
 		namesBufferSize += XCheckedCastU16(binding.name.getLength() + 1); // +1 for zero terminator.
+
+		allBindingNames.pushBack(BindingNameInfo { binding.name, bindingNameXSH });
+	}
+
+	for (uint16 i = 0; i < staticSamplerCount; i++)
+	{
+		const StaticSamplerDesc& sampler = staticSamplers[i];
+
+		if (!ValidatePipelineBindingName(sampler.bindingName))
+		{
+			errorMessage.text = "invalid static sampler name";
+			return nullptr;
+		}
+		if (!TranslateSamplerDescToD3D12StaticSamplerDesc(sampler.desc, d3dStaticSamplers[i]))
+		{
+			errorMessage.text = "invalid static sampler state";
+			return nullptr;
+		}
+
+		staticSamplersDeducedInfo[i].nameOffset = XCheckedCastU16(namesBufferSize);
+
+		namesBufferSize += XCheckedCastU16(sampler.bindingName.getLength() + 1); // +1 for zero terminator.
+
+		allBindingNames.pushBack(BindingNameInfo { sampler.bindingName, 0 });
 	}
 
 	// Check for duplicate names / hash collisions.
 	// Using O(N^2) because I am lazy.
-	for (uint16 i = 0; i < bindingCount; i++)
+	for (uint16 i = 0; i < allBindingNames.getSize(); i++)
 	{
-		for (uint16 j = 0; j < bindingCount; j++)
+		for (uint16 j = 0; j < allBindingNames.getSize(); j++)
 		{
 			if (i == j)
 				continue;
 
-			if (bindings[i].name == bindings[j].name)
+			if (allBindingNames[i].str == allBindingNames[j].str)
 			{
-				XTODO("Proper error report")
+				errorMessage.text = "duplicate binding name";
 				return nullptr;
 			}
 
-			// NOTE: IDK how many XSH bits I will use in the end but not less than 32.
-			if (uint32(bindingsDeducedInfo[i].nameXSH) == uint32(bindingsDeducedInfo[j].nameXSH))
+			// We are checking XSH collisions only for real bindings, not for static samplers.
+			// For static samplers XSH is set to zero.
+			if (uint32(allBindingNames[i].strXSH) && uint32(allBindingNames[j].strXSH) &&
+				uint32(allBindingNames[i].strXSH) == uint32(allBindingNames[j].strXSH))
 			{
-				XTODO("Proper error report")
+				errorMessage.text = "binding name XSH collision o_O";
 				return nullptr;
 			}
 		}
@@ -322,128 +457,141 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 	// Calculate bindings deduced info (D3D root parameter index, shader register)
 	Microsoft::WRL::ComPtr<ID3DBlob> d3dRootSignature;
 	Microsoft::WRL::ComPtr<ID3DBlob> d3dError;
+
+	InplaceArrayList<D3D12_ROOT_PARAMETER1, MaxPipelineBindingCount> d3dRootParams;
+	InplaceArrayList<D3D12_DESCRIPTOR_RANGE1, 128> d3dDescriptorRanges; // TODO: Use ExpandableInplaceArrayList here.
+
+	uint32 shaderRegisterCounter = StartShaderRegiserIndex;
+	for (uint16 pipelineBindindIndex = 0; pipelineBindindIndex < bindingCount; pipelineBindindIndex++)
 	{
-		InplaceArrayList<D3D12_ROOT_PARAMETER1, MaxPipelineBindingCount> d3dRootParams;
-		InplaceArrayList<D3D12_DESCRIPTOR_RANGE1, 128> d3dDescriptorRanges; // TODO: Use ExpandableInplaceArrayList here.
+		const PipelineBindingDesc& binding = bindings[pipelineBindindIndex];
 
-		uint32 shaderRegisterCounter = StartShaderRegiserIndex;
-		for (uint16 pipelineBindindIndex = 0; pipelineBindindIndex < bindingCount; pipelineBindindIndex++)
+		if (binding.type == PipelineBindingType::InplaceConstants)
 		{
-			const PipelineBindingDesc& binding = bindings[pipelineBindindIndex];
-
-			if (binding.type == PipelineBindingType::InplaceConstants)
-			{
-				// TODO: Implement it.
-				XAssertUnreachableCode();
-				continue;
-			}
-
-			const uint16 d3dRootParameterIndex = d3dRootParams.getSize();
-			D3D12_ROOT_PARAMETER1& d3dRootParameter = d3dRootParams.emplaceBack();
-			d3dRootParameter = {};
-
-			bindingsDeducedInfo[pipelineBindindIndex].baseShaderRegister = shaderRegisterCounter;
-			bindingsDeducedInfo[pipelineBindindIndex].d3dRootParameterIndex = d3dRootParameterIndex;
-
-			if (binding.type == PipelineBindingType::ConstantBuffer)
-			{
-				d3dRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-				d3dRootParameter.Descriptor.ShaderRegister = shaderRegisterCounter;
-				d3dRootParameter.Descriptor.RegisterSpace = 0;
-				d3dRootParameter.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE;
-				shaderRegisterCounter++;
-			}
-			else if (binding.type == PipelineBindingType::ReadOnlyBuffer)
-			{
-				d3dRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
-				d3dRootParameter.Descriptor.ShaderRegister = shaderRegisterCounter;
-				d3dRootParameter.Descriptor.RegisterSpace = 0;
-				d3dRootParameter.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE;
-				shaderRegisterCounter++;
-			}
-			else if (binding.type == PipelineBindingType::ReadWriteBuffer)
-			{
-				d3dRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_UAV;
-				d3dRootParameter.Descriptor.ShaderRegister = shaderRegisterCounter;
-				d3dRootParameter.Descriptor.RegisterSpace = 0;
-				d3dRootParameter.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE;
-				shaderRegisterCounter++;
-			}
-			else if (binding.type == PipelineBindingType::DescriptorSet)
-			{
-				const uint32 descriptorSetBaseShaderRegister = shaderRegisterCounter;
-				const uint32 descriptorSetBaseRangeIndex = d3dDescriptorRanges.getSize();
-
-				D3D12_DESCRIPTOR_RANGE1 d3dCurrentRange = {};
-				bool currentRangeInitialized = false;
-
-				for (uint16 i = 0; i < binding.descriptorSetLayout->getBindingCount(); i++)
-				{
-					const DescriptorSetBindingDesc descriptorSetBinding = binding.descriptorSetLayout->getBindingDesc(i);
-					const uint32 descriptorSetBindingDescriptorOffset = binding.descriptorSetLayout->getBindingDescriptorOffset(i);
-
-					const D3D12_DESCRIPTOR_RANGE_TYPE d3dRequiredRangeType =
-						TranslateDescriptorTypeToD3D12DescriptorRangeType(descriptorSetBinding.descriptorType);
-
-					if (!currentRangeInitialized || d3dCurrentRange.RangeType != d3dRequiredRangeType)
-					{
-						// Finalize previous range and start new one.
-						if (currentRangeInitialized)
-						{
-							// Submit current range.
-							d3dCurrentRange.NumDescriptors =
-								descriptorSetBindingDescriptorOffset - d3dCurrentRange.OffsetInDescriptorsFromTableStart;
-
-							XAssert(!d3dDescriptorRanges.isFull());
-							d3dDescriptorRanges.pushBack(d3dCurrentRange);
-						}
-
-						d3dCurrentRange = {};
-						d3dCurrentRange.RangeType = d3dRequiredRangeType;
-						d3dCurrentRange.NumDescriptors = 0;
-						d3dCurrentRange.BaseShaderRegister = descriptorSetBaseShaderRegister + descriptorSetBindingDescriptorOffset;
-						d3dCurrentRange.RegisterSpace = 0;
-						d3dCurrentRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
-						d3dCurrentRange.OffsetInDescriptorsFromTableStart = descriptorSetBindingDescriptorOffset;
-						currentRangeInitialized = true;
-					}
-				}
-
-				// Submit final range.
-				XAssert(currentRangeInitialized);
-				{
-					XAssert(binding.descriptorSetLayout->getDescriptorCount() > d3dCurrentRange.OffsetInDescriptorsFromTableStart);
-					d3dCurrentRange.NumDescriptors =
-						binding.descriptorSetLayout->getDescriptorCount() - d3dCurrentRange.OffsetInDescriptorsFromTableStart;
-
-					XAssert(!d3dDescriptorRanges.isFull());
-					d3dDescriptorRanges.pushBack(d3dCurrentRange);
-				}
-
-				d3dRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-				d3dRootParameter.DescriptorTable.NumDescriptorRanges = d3dDescriptorRanges.getSize() - descriptorSetBaseRangeIndex;
-				d3dRootParameter.DescriptorTable.pDescriptorRanges = &d3dDescriptorRanges[descriptorSetBaseRangeIndex];
-				shaderRegisterCounter += binding.descriptorSetLayout->getDescriptorCount();
-			}
-			else
-				XAssertUnreachableCode();
-
-			d3dRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL; // TODO: ...
+			// TODO: Implement it.
+			XAssertUnreachableCode();
+			continue;
 		}
 
-		// Compile root signature.
-		D3D12_VERSIONED_ROOT_SIGNATURE_DESC d3dRootSignatureDesc = {};
-		d3dRootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
-		d3dRootSignatureDesc.Desc_1_1.NumParameters = d3dRootParams.getSize();
-		d3dRootSignatureDesc.Desc_1_1.pParameters = d3dRootParams.getData();
-		//d3dRootSignatureDesc.Desc_1_1.NumStaticSamplers = ...;
-		//d3dRootSignatureDesc.Desc_1_1.pStaticSamplers = ...;
-		d3dRootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
-		// TODO: D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED
-		// TODO: D3D12_ROOT_SIGNATURE_FLAG_DENY_*_SHADER_ROOT_ACCESS
+		const uint16 d3dRootParameterIndex = d3dRootParams.getSize();
+		D3D12_ROOT_PARAMETER1& d3dRootParameter = d3dRootParams.emplaceBack();
+		d3dRootParameter = {};
 
-		D3D12SerializeVersionedRootSignature(&d3dRootSignatureDesc, &d3dRootSignature, &d3dError);
-		// TODO: Check HRESULT.
+		bindingsDeducedInfo[pipelineBindindIndex].baseShaderRegister = shaderRegisterCounter;
+		bindingsDeducedInfo[pipelineBindindIndex].d3dRootParameterIndex = d3dRootParameterIndex;
+
+		if (binding.type == PipelineBindingType::ConstantBuffer)
+		{
+			d3dRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+			d3dRootParameter.Descriptor.ShaderRegister = shaderRegisterCounter;
+			d3dRootParameter.Descriptor.RegisterSpace = 0;
+			d3dRootParameter.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE;
+			shaderRegisterCounter++;
+		}
+		else if (binding.type == PipelineBindingType::ReadOnlyBuffer)
+		{
+			d3dRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+			d3dRootParameter.Descriptor.ShaderRegister = shaderRegisterCounter;
+			d3dRootParameter.Descriptor.RegisterSpace = 0;
+			d3dRootParameter.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE;
+			shaderRegisterCounter++;
+		}
+		else if (binding.type == PipelineBindingType::ReadWriteBuffer)
+		{
+			d3dRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_UAV;
+			d3dRootParameter.Descriptor.ShaderRegister = shaderRegisterCounter;
+			d3dRootParameter.Descriptor.RegisterSpace = 0;
+			d3dRootParameter.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE;
+			shaderRegisterCounter++;
+		}
+		else if (binding.type == PipelineBindingType::DescriptorSet)
+		{
+			const uint32 descriptorSetBaseShaderRegister = shaderRegisterCounter;
+			const uint32 descriptorSetBaseRangeIndex = d3dDescriptorRanges.getSize();
+
+			D3D12_DESCRIPTOR_RANGE1 d3dCurrentRange = {};
+			bool currentRangeInitialized = false;
+
+			for (uint16 i = 0; i < binding.descriptorSetLayout->getBindingCount(); i++)
+			{
+				const DescriptorSetBindingDesc descriptorSetBinding = binding.descriptorSetLayout->getBindingDesc(i);
+				const uint32 descriptorSetBindingDescriptorOffset = binding.descriptorSetLayout->getBindingDescriptorOffset(i);
+
+				const D3D12_DESCRIPTOR_RANGE_TYPE d3dRequiredRangeType =
+					TranslateDescriptorTypeToD3D12DescriptorRangeType(descriptorSetBinding.descriptorType);
+
+				if (!currentRangeInitialized || d3dCurrentRange.RangeType != d3dRequiredRangeType)
+				{
+					// Finalize previous range and start new one.
+					if (currentRangeInitialized)
+					{
+						// Submit current range.
+						d3dCurrentRange.NumDescriptors =
+							descriptorSetBindingDescriptorOffset - d3dCurrentRange.OffsetInDescriptorsFromTableStart;
+
+						XAssert(!d3dDescriptorRanges.isFull());
+						d3dDescriptorRanges.pushBack(d3dCurrentRange);
+					}
+
+					d3dCurrentRange = {};
+					d3dCurrentRange.RangeType = d3dRequiredRangeType;
+					d3dCurrentRange.NumDescriptors = 0;
+					d3dCurrentRange.BaseShaderRegister = descriptorSetBaseShaderRegister + descriptorSetBindingDescriptorOffset;
+					d3dCurrentRange.RegisterSpace = 0;
+					d3dCurrentRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
+					d3dCurrentRange.OffsetInDescriptorsFromTableStart = descriptorSetBindingDescriptorOffset;
+					currentRangeInitialized = true;
+				}
+			}
+
+			// Submit final range.
+			XAssert(currentRangeInitialized);
+			{
+				XAssert(binding.descriptorSetLayout->getDescriptorCount() > d3dCurrentRange.OffsetInDescriptorsFromTableStart);
+				d3dCurrentRange.NumDescriptors =
+					binding.descriptorSetLayout->getDescriptorCount() - d3dCurrentRange.OffsetInDescriptorsFromTableStart;
+
+				XAssert(!d3dDescriptorRanges.isFull());
+				d3dDescriptorRanges.pushBack(d3dCurrentRange);
+			}
+
+			d3dRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+			d3dRootParameter.DescriptorTable.NumDescriptorRanges = d3dDescriptorRanges.getSize() - descriptorSetBaseRangeIndex;
+			d3dRootParameter.DescriptorTable.pDescriptorRanges = &d3dDescriptorRanges[descriptorSetBaseRangeIndex];
+			shaderRegisterCounter += binding.descriptorSetLayout->getDescriptorCount();
+		}
+		else
+			XAssertUnreachableCode();
+
+		d3dRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL; // TODO: ...
+	}
+
+	for (uint16 i = 0; i < staticSamplerCount; i++)
+	{
+		d3dStaticSamplers[i].ShaderRegister = shaderRegisterCounter;
+		d3dStaticSamplers[i].RegisterSpace = shaderRegisterCounter;
+		d3dStaticSamplers[i].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		shaderRegisterCounter++;
+	}
+
+	// Compile root signature.
+	D3D12_VERSIONED_ROOT_SIGNATURE_DESC d3dRootSignatureDesc = {};
+	d3dRootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
+	d3dRootSignatureDesc.Desc_1_1.NumParameters = d3dRootParams.getSize();
+	d3dRootSignatureDesc.Desc_1_1.pParameters = d3dRootParams.getData();
+	d3dRootSignatureDesc.Desc_1_1.NumStaticSamplers = staticSamplerCount;
+	d3dRootSignatureDesc.Desc_1_1.pStaticSamplers = staticSamplerCount ? d3dStaticSamplers : nullptr;
+	d3dRootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+
+	// TODO: D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED, D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED
+	// TODO: D3D12_ROOT_SIGNATURE_FLAG_DENY_*_SHADER_ROOT_ACCESS
+	// TODO: D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
+
+	const HRESULT hResult = D3D12SerializeVersionedRootSignature(&d3dRootSignatureDesc, &d3dRootSignature, &d3dError);
+	if (FAILED(hResult))
+	{
+		errorMessage.text = "'D3D12SerializeVersionedRootSignature' failed";
+		return nullptr;
 	}
 
 	const void* platformData = d3dRootSignature->GetBufferPointer();
@@ -457,8 +605,11 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 	uint32 memoryBlockSizeAccum = sizeof(PipelineLayout);
 	memoryBlockSizeAccum = alignUp<uint32>(memoryBlockSizeAccum, 16);
 
-	const uint32 bindingsRelativeOffset = memoryBlockSizeAccum;
-	memoryBlockSizeAccum += sizeof(PipelineLayout::BindingDesc) * bindingCount;
+	const uint32 internalBindingsRelativeOffset = memoryBlockSizeAccum;
+	memoryBlockSizeAccum += sizeof(PipelineLayout::InternalBindingDesc) * bindingCount;
+
+	const uint32 staticSamplersRelativeOffset = memoryBlockSizeAccum;
+	memoryBlockSizeAccum += sizeof(PipelineLayout::InternalStaticSamplerDesc) * staticSamplerCount;
 
 	const uint32 namesBufferRelativeOffset = memoryBlockSizeAccum;
 	memoryBlockSizeAccum += namesBufferSize;
@@ -474,7 +625,8 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 
 	// Populate memory block.
 	PipelineLayout& resultObject = *(PipelineLayout*)memoryBlock;
-	PipelineLayout::BindingDesc* internalBindings = (PipelineLayout::BindingDesc*)(uintptr(memoryBlock) + bindingsRelativeOffset);
+	PipelineLayout::InternalBindingDesc* internalBindings = (PipelineLayout::InternalBindingDesc*)(uintptr(memoryBlock) + internalBindingsRelativeOffset);
+	PipelineLayout::InternalStaticSamplerDesc* internalStaticSamplers = (PipelineLayout::InternalStaticSamplerDesc*)(uintptr(memoryBlock) + staticSamplersRelativeOffset);
 	char* namesBuffer = (char*)(uintptr(memoryBlock) + namesBufferRelativeOffset);
 	void* serializedBlob = (void*)(uintptr(memoryBlock) + serializedBlobRelativeOffset);
 
@@ -482,18 +634,20 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 	{
 		construct(resultObject);
 		resultObject.bindings = internalBindings;
+		resultObject.staticSamplers = internalStaticSamplers;
 		resultObject.namesBuffer = StringViewASCII(namesBuffer, namesBufferSize);
 		resultObject.serializedBlobData = serializedBlob;
 		resultObject.serializedBlobSize = serializedBlobSize;
 		resultObject.sourceHash = sourceHash;
 		resultObject.bindingCount = bindingCount;
+		resultObject.staticSamplerCount = staticSamplerCount;
 	}
 
 	// Populate internal bindings & names buffer.
 	for (uint16 i = 0; i < bindingCount; i++)
 	{
 		const PipelineBindingDesc& src = bindings[i];
-		PipelineLayout::BindingDesc& dst = internalBindings[i];
+		PipelineLayout::InternalBindingDesc& dst = internalBindings[i];
 
 		dst.nameOffset = bindingsDeducedInfo[i].nameOffset;
 		dst.nameLength = XCheckedCastU16(src.name.getLength());
@@ -505,6 +659,20 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 
 		memoryCopy(namesBuffer + dst.nameOffset, src.name.getData(), src.name.getLength());
 		*(namesBuffer + dst.nameOffset + src.name.getLength()) = 0;
+	}
+
+	// Populate internal static samplers & names buffer.
+	for (uint16 i = 0; i < staticSamplerCount; i++)
+	{
+		const StaticSamplerDesc& src = staticSamplers[i];
+		PipelineLayout::InternalStaticSamplerDesc& dst = internalStaticSamplers[i];
+
+		dst.bindingNameOffset = staticSamplersDeducedInfo[i].nameOffset;
+		dst.bindingNameLength = XCheckedCastU16(src.bindingName.getLength());
+		dst.baseShaderRegister = d3dStaticSamplers[i].ShaderRegister;
+
+		memoryCopy(namesBuffer + dst.bindingNameOffset, src.bindingName.getData(), src.bindingName.getLength());
+		*(namesBuffer + dst.bindingNameOffset + src.bindingName.getLength()) = 0;
 	}
 
 	// Populate serialized blob.
@@ -554,7 +722,54 @@ BlobRef Blob::Create(uint32 size)
 
 // ShaderCompiler //////////////////////////////////////////////////////////////////////////////////
 
-static bool CompileShaderDXC(const PipelineLayout& pipelineLayout, const ShaderDesc& shader, ShaderType shaderType,
+static bool ValidateGenericBindingName(StringViewASCII name)
+{
+	if (name.isEmpty())
+		return false;
+	if (!Char::IsUpper(name[0]) && name[0] != '_')
+		return false;
+
+	for (uintptr i = 1; i < name.getLength(); i++)
+	{
+		const char c = name[i];
+		if (!Char::IsUpper(c) && !Char::IsDigit(c) && c != '_')
+			return false;
+	}
+	return true;
+}
+
+bool GfxHAL::ShaderCompiler::ValidateVertexBindingName(StringViewASCII name)
+{
+	return ValidateGenericBindingName(name);
+}
+
+bool GfxHAL::ShaderCompiler::ValidateDescriptorSetBindingName(StringViewASCII name)
+{
+	return ValidateGenericBindingName(name) && name.getLength() <= GfxHAL::ShaderCompiler::MaxDescriptorSetBindingNameLength;
+}
+
+bool GfxHAL::ShaderCompiler::ValidatePipelineBindingName(StringViewASCII name)
+{
+	return ValidateGenericBindingName(name) && name.getLength() <= GfxHAL::ShaderCompiler::MaxPipelineBindingNameLength;
+}
+
+bool GfxHAL::ShaderCompiler::ValidateShaderEntryPointName(StringViewASCII name)
+{
+	if (name.isEmpty())
+		return false;
+	if (!Char::IsLetter(name[0]) && name[0] != '_')
+		return false;
+
+	for (uintptr i = 1; i < name.getLength(); i++)
+	{
+		const char c = name[i];
+		if (!Char::IsLetterOrDigit(c) && c != '_')
+			return false;
+	}
+	return true;
+}
+
+static bool CompileShaderDXC(const PipelineLayout& pipelineLayout, const ShaderDesc& shader, GfxHAL::ShaderType shaderType,
 	ShaderCompilationArtifactsRef& artifacts, BlobRef& compiledBytecodeBlob)
 {
 	artifacts = nullptr;
@@ -588,11 +803,11 @@ static bool CompileShaderDXC(const PipelineLayout& pipelineLayout, const ShaderD
 		LPCWSTR dxcProfile = nullptr;
 		switch (shaderType)
 		{
-			case ShaderType::Compute:		dxcProfile = L"-Tcs_6_6"; break;
-			case ShaderType::Vertex:		dxcProfile = L"-Tvs_6_6"; break;
-			case ShaderType::Amplification: dxcProfile = L"-Tas_6_6"; break;
-			case ShaderType::Mesh:			dxcProfile = L"-Tms_6_6"; break;
-			case ShaderType::Pixel:			dxcProfile = L"-Tps_6_6"; break;
+			case GfxHAL::ShaderType::Compute:		dxcProfile = L"-Tcs_6_6"; break;
+			case GfxHAL::ShaderType::Vertex:		dxcProfile = L"-Tvs_6_6"; break;
+			case GfxHAL::ShaderType::Amplification: dxcProfile = L"-Tas_6_6"; break;
+			case GfxHAL::ShaderType::Mesh:			dxcProfile = L"-Tms_6_6"; break;
+			case GfxHAL::ShaderType::Pixel:			dxcProfile = L"-Tps_6_6"; break;
 		}
 		XAssert(dxcProfile);
 		dxcArgsList.pushBack(dxcProfile);
@@ -638,7 +853,7 @@ static bool CompileShaderDXC(const PipelineLayout& pipelineLayout, const ShaderD
 	XAssert(dxcBytecodeBlob != nullptr && dxcBytecodeBlob->GetBufferSize() > 0);
 
 	// Compose compiled blob.
-	BlobFormat::BytecodeBlobWriter blobWriter;
+	GfxHAL::BlobFormat::BytecodeBlobWriter blobWriter;
 	blobWriter.initialize(uint32(dxcBytecodeBlob->GetBufferSize()));
 
 	BlobRef blob = Blob::Create(blobWriter.getMemoryBlockSize());
@@ -651,12 +866,13 @@ static bool CompileShaderDXC(const PipelineLayout& pipelineLayout, const ShaderD
 	return true;
 }
 
-bool ShaderCompiler::CompileGraphicsPipeline(
+bool GfxHAL::ShaderCompiler::CompileGraphicsPipeline(
 	const PipelineLayout& pipelineLayout,
 	const GraphicsPipelineShaders& shaders,
 	const GraphicsPipelineSettings& settings,
 	GraphicsPipelineCompilationArtifacts& artifacts,
-	GraphicsPipelineCompiledBlobs& compiledBlobs)
+	GraphicsPipelineCompiledBlobs& compiledBlobs,
+	GenericErrorMessage& errorMessage)
 {
 	artifacts = {};
 	compiledBlobs = {};
@@ -666,27 +882,22 @@ bool ShaderCompiler::CompileGraphicsPipeline(
 	const bool msEnabled = !shaders.ms.sourcePath.isEmpty();
 	const bool psEnabled = !shaders.ps.sourcePath.isEmpty();
 
-	if (vsEnabled) XAssert(!shaders.vs.sourceText.isEmpty());
-	if (asEnabled) XAssert(!shaders.as.sourceText.isEmpty());
-	if (msEnabled) XAssert(!shaders.ms.sourceText.isEmpty());
-	if (psEnabled) XAssert(!shaders.ps.sourceText.isEmpty());
-
 	// Verify enabled shader stages combination.
 	if ((vsEnabled == msEnabled) || (!vsEnabled && !msEnabled) || (asEnabled && !msEnabled))
 	{
-		artifacts.pipelineCompilationOutput = "invalid shader stages combination";
+		errorMessage.text = "invalid enabled shader stages combination";
 		return false;
 	}
 
 	if (settings.vertexBindingCount > 0 && !vsEnabled)
 	{
-		artifacts.pipelineCompilationOutput = "vertex input but vertex shader disabled";
+		errorMessage.text = "vertex input enabled but vertex shader disabled";
 		return false;
 	}
 
-	if (settings.vertexBindingCount > MaxVertexBindingCount)
+	if (settings.vertexBindingCount > GfxHAL::MaxVertexBindingCount)
 	{
-		artifacts.pipelineCompilationOutput = "vertex bindings limit exceeded";
+		errorMessage.text = "vertex input: bindings limit exceeded";
 		return false;
 	}
 
@@ -698,50 +909,68 @@ bool ShaderCompiler::CompileGraphicsPipeline(
 
 	if (vsEnabled)
 	{
-		if (!CompileShaderDXC(pipelineLayout, shaders.vs, ShaderType::Vertex, artifacts.vs, vsBlob))
+		if (!CompileShaderDXC(pipelineLayout, shaders.vs, GfxHAL::ShaderType::Vertex, artifacts.vs, vsBlob))
+		{
+			errorMessage.text = "VS compilation failed";
 			return false;
+		}
 	}
 	if (asEnabled)
 	{
-		if (!CompileShaderDXC(pipelineLayout, shaders.as, ShaderType::Amplification, artifacts.as, asBlob))
+		if (!CompileShaderDXC(pipelineLayout, shaders.as, GfxHAL::ShaderType::Amplification, artifacts.as, asBlob))
+		{
+			errorMessage.text = "AS compilation failed";
 			return false;
+		}
 	}
 	if (msEnabled)
 	{
-		if (!CompileShaderDXC(pipelineLayout, shaders.ms, ShaderType::Mesh, artifacts.ms, msBlob))
+		if (!CompileShaderDXC(pipelineLayout, shaders.ms, GfxHAL::ShaderType::Mesh, artifacts.ms, msBlob))
+		{
+			errorMessage.text = "MS compilation failed";
 			return false;
+		}
 	}
 	if (psEnabled)
 	{
-		if (!CompileShaderDXC(pipelineLayout, shaders.ps, ShaderType::Pixel, artifacts.ps, psBlob))
+		if (!CompileShaderDXC(pipelineLayout, shaders.ps, GfxHAL::ShaderType::Pixel, artifacts.ps, psBlob))
+		{
+			errorMessage.text = "PS compilation failed";
 			return false;
+		}
 	}
 
 	// Compose state blob.
 
-	BlobFormat::GraphicsPipelineStateBlobWriter stateBlobWriter;
+	GfxHAL::BlobFormat::GraphicsPipelineStateBlobWriter stateBlobWriter;
 	stateBlobWriter.beginInitialization();
 
-	if (vsEnabled) stateBlobWriter.registerBytecodeBlob(ShaderType::Vertex, vsBlob->getChecksum());
-	if (asEnabled) stateBlobWriter.registerBytecodeBlob(ShaderType::Amplification, asBlob->getChecksum());
-	if (msEnabled) stateBlobWriter.registerBytecodeBlob(ShaderType::Mesh, msBlob->getChecksum());
-	if (psEnabled) stateBlobWriter.registerBytecodeBlob(ShaderType::Pixel, psBlob->getChecksum());
+	if (vsEnabled) stateBlobWriter.registerBytecodeBlob(GfxHAL::ShaderType::Vertex, vsBlob->getChecksum());
+	if (asEnabled) stateBlobWriter.registerBytecodeBlob(GfxHAL::ShaderType::Amplification, asBlob->getChecksum());
+	if (msEnabled) stateBlobWriter.registerBytecodeBlob(GfxHAL::ShaderType::Mesh, msBlob->getChecksum());
+	if (psEnabled) stateBlobWriter.registerBytecodeBlob(GfxHAL::ShaderType::Pixel, psBlob->getChecksum());
 
 	// Validate and register render targets.
 	{
 		bool undefinedRenderTargetFound = false;
-		for (TexelViewFormat renderTargetFormat : settings.renderTargetsFormats)
+		for (GfxHAL::TexelViewFormat renderTargetFormat : settings.renderTargetsFormats)
 		{
 			if (undefinedRenderTargetFound)
 				XAssert(renderTargetFormat == TexelViewFormat::Undefined);
-			else if (renderTargetFormat == TexelViewFormat::Undefined)
+			else if (renderTargetFormat == GfxHAL::TexelViewFormat::Undefined)
 				undefinedRenderTargetFound = true;
 			else
 			{
-				if (!TexelViewFormatUtils::IsValidAndDefined(renderTargetFormat))
+				if (!GfxHAL::TexelViewFormatUtils::IsValidAndDefined(renderTargetFormat))
+				{
+					errorMessage.text = "render targets: invalid format";
 					return false;
-				if (!TexelViewFormatUtils::SupportsRenderTargetUsage(renderTargetFormat))
+				}
+				if (!GfxHAL::TexelViewFormatUtils::SupportsRenderTargetUsage(renderTargetFormat))
+				{
+					errorMessage.text = "render targets: format does not support render target usage";
 					return false;
+				}
 				stateBlobWriter.addRenderTarget(renderTargetFormat);
 			}
 		}
@@ -751,14 +980,16 @@ bool ShaderCompiler::CompileGraphicsPipeline(
 	stateBlobWriter.setDepthStencilFormat(settings.depthStencilFormat);
 
 	// Validate and register vertex input layout.
-	for (uint8 i = 0; i < MaxVertexBufferCount; i++)
+	for (uint8 i = 0; i < GfxHAL::MaxVertexBufferCount; i++)
 	{
 		switch (settings.vertexBuffers[i].stepRate)
 		{
 			case VertexBufferStepRate::Undefined:	break;
 			case VertexBufferStepRate::PerVertex:	stateBlobWriter.enableVertexBuffer(i, false); break;
 			case VertexBufferStepRate::PerInstance:	stateBlobWriter.enableVertexBuffer(i, true);  break;
-			default: return false;
+			default:
+				errorMessage.text = "vertex input: invalid buffer step rate";
+				return false;
 		}
 	}
 
@@ -766,21 +997,46 @@ bool ShaderCompiler::CompileGraphicsPipeline(
 	{
 		const VertexBindingDesc& binding = settings.vertexBindings[i];
 
-		if (binding.name.getLength() > stateBlobWriter.MaxVertexBindingNameLength)
+		uint32 bindingNameLength = 0;
+		while (bindingNameLength < countof(binding.name) && binding.name[bindingNameLength])
+			bindingNameLength++;
+
+		if (!ValidateVertexBindingName(StringViewASCII(binding.name, bindingNameLength)))
+		{
+			errorMessage.text = "vertex input: invalid binding name";
 			return false;
-		if (!TexelViewFormatUtils::SupportsVertexInputUsage(binding.format))
+		}
+		if (!GfxHAL::TexelViewFormatUtils::SupportsVertexInputUsage(binding.format))
+		{
+			errorMessage.text = "vertex input: binding format does not support vertex input usage";
 			return false;
-		if (binding.offset >= MaxVertexBufferElementSize)
+		}
+		if (binding.offset + GfxHAL::TexelViewFormatUtils::GetByteSize(binding.format) > GfxHAL::MaxVertexBufferElementSize)
+		{
+			errorMessage.text = "vertex input: buffer element size limit exceeded";
 			return false;
-		if (binding.bufferIndex >= MaxVertexBindingCount)
+		}
+		if (binding.bufferIndex >= GfxHAL::MaxVertexBufferCount)
+		{
+			errorMessage.text = "vertex input: invalid vertex buffer index";
 			return false;
+		}
 
 		const VertexBufferDesc& buffer = settings.vertexBuffers[binding.bufferIndex];
 		if (buffer.stepRate != VertexBufferStepRate::PerVertex && buffer.stepRate != VertexBufferStepRate::PerInstance)
+		{
+			errorMessage.text = "vertex input: invalid vertex buffer index";
 			return false;
+		}
 
-		stateBlobWriter.addVertexBinding(binding.name.getData(), binding.name.getLength(),
-			binding.format, binding.offset, binding.bufferIndex);
+		GfxHAL::BlobFormat::VertexBindingInfo blobBindingInfo = {};
+		static_assert(sizeof(blobBindingInfo.name) >= sizeof(binding.name));
+		memoryCopy(blobBindingInfo.name, binding.name, bindingNameLength);
+		blobBindingInfo.offset = binding.offset;
+		blobBindingInfo.format = binding.format;
+		blobBindingInfo.bufferIndex = binding.bufferIndex;
+
+		stateBlobWriter.addVertexBinding(blobBindingInfo);
 	}
 
 	stateBlobWriter.endInitialization();
@@ -797,7 +1053,7 @@ bool ShaderCompiler::CompileGraphicsPipeline(
 	return true;
 }
 
-bool ShaderCompiler::CompileComputePipeline(
+bool GfxHAL::ShaderCompiler::CompileComputePipeline(
 	const PipelineLayout& pipelineLayout,
 	const ShaderDesc& computeShader,
 	ShaderCompilationArtifactsRef& artifacts,
@@ -806,5 +1062,5 @@ bool ShaderCompiler::CompileComputePipeline(
 	artifacts = nullptr;
 	compiledBlob = nullptr;
 
-	return CompileShaderDXC(pipelineLayout, computeShader, ShaderType::Compute, artifacts, compiledBlob);
+	return CompileShaderDXC(pipelineLayout, computeShader, GfxHAL::ShaderType::Compute, artifacts, compiledBlob);
 }

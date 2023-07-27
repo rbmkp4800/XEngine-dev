@@ -4,13 +4,12 @@
 
 namespace XEngine::GfxHAL
 {
-	static constexpr uint8 MaxPipelineBindingCount = 32;
-	static constexpr uint8 MaxDescriptorSetBindingCount = 32;
-	static constexpr uint8 MaxVertexBufferCount = 8;
-	static constexpr uint8 MaxVertexBindingCount = 32;
-	static constexpr uint8 MaxVertexBindingNameLength = 21; // Deduced from `BlobFormat::VertexBindingRecord`.
-	static constexpr uint16 MaxVertexBufferElementSize = 8192;
-	static constexpr uint8 MaxRenderTargetCount = 8;
+	constexpr uint8 MaxDescriptorSetBindingCount = 32;
+	constexpr uint8 MaxPipelineBindingCount = 32;
+	constexpr uint8 MaxVertexBufferCount = 8;
+	constexpr uint8 MaxVertexBindingCount = 32;
+	constexpr uint16 MaxVertexBufferElementSize = 8192;
+	constexpr uint8 MaxRenderTargetCount = 8;
 
 	enum class ShaderType : uint8
 	{
@@ -31,6 +30,8 @@ namespace XEngine::GfxHAL
 		ReadWriteBuffer,
 		DescriptorSet,
 		DescriptorArray,
+
+		ValueCount,
 	};
 
 	enum class DescriptorType : uint8
@@ -41,6 +42,8 @@ namespace XEngine::GfxHAL
 		ReadOnlyTexture,
 		ReadWriteTexture,
 		RaytracingAccelerationStructure,
+
+		ValueCount,
 	};
 
 	enum class TextureFormat : uint8

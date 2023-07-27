@@ -345,38 +345,19 @@ void GraphicsPipelineStateBlobWriter::enableVertexBuffer(uint8 index, bool perIn
 	vertexBuffersPerInstanceFlagBits |= perInstance ? bit : 0;
 }
 
-void GraphicsPipelineStateBlobWriter::addVertexBinding(const char* name, uintptr nameLength, TexelViewFormat format, uint16 offset, uint8 bufferIndex)
+void GraphicsPipelineStateBlobWriter::addVertexBinding(const VertexBindingInfo& bindingInfo)
 {
 	XAssert(initializationInProgress);
-	XAssert(nameLength > 0 && nameLength <= MaxVertexBindingNameLength);
-	XAssert(offset < MaxVertexBufferElementSize);
-	XAssert(bufferIndex < MaxVertexBufferCount);
+	XAssert(bindingInfo.offset < MaxVertexBufferElementSize);
+	XAssert(bindingInfo.bufferIndex < MaxVertexBufferCount);
 
-	const uint8 bufferBit = 1 << bufferIndex;
+	const uint8 bufferBit = 1 << bindingInfo.bufferIndex;
 	XAssert((vertexBuffersEnabledFlagBits & bufferBit) != 0); // Buffer should be enabled previously
 	vertexBuffersUsedFlagBits |= bufferBit;
 
 	XAssert(vertexBindingCount < MaxVertexBindingCount);
-	VertexBindingRecord& vertexBindingRecord = vertexBindingRecords[vertexBindingCount];
+	vertexBindingRecords[vertexBindingCount] = bindingInfo;
 	vertexBindingCount++;
-
-	static_assert(MaxVertexBufferElementSize <= (1 << 13));
-	static_assert(MaxVertexBufferCount <= (1 << 3));
-	XAssert((offset & 0b1110'0000'0000'0000) == 0);
-	XAssert((bufferIndex & 0b0111) == 0);
-	vertexBindingRecord.offset13_bufferIndex3 = offset | (uint16(bufferIndex) << 13);
-	vertexBindingRecord.format = format;
-
-	for (uintptr i = 0; i < countof(vertexBindingRecord.name); i++)
-	{
-		if (i < nameLength)
-		{
-			XAssert(name[i] > 0 && name[i] < 128);
-			vertexBindingRecord.name[i] = name[i];
-		}
-		else
-			vertexBindingRecord.name[i] = 0;
-	}
 }
 
 void GraphicsPipelineStateBlobWriter::endInitialization()
@@ -484,24 +465,7 @@ uint32 GraphicsPipelineStateBlobReader::getRenderTargetCount() const
 VertexBindingInfo GraphicsPipelineStateBlobReader::getVertexBinding(uint8 bindingIndex) const
 {
 	XAssert(bindingIndex < body->vertexBindingCount);
-	const VertexBindingRecord& record = vertexBindingRecords[bindingIndex];
-
-	uintptr nameLength = 0;
-	for (char c : record.name)
-	{
-		if (c > 0)
-			nameLength++;
-		else
-			break;
-	}
-
-	VertexBindingInfo result = {};
-	result.name = record.name;
-	result.nameLength = nameLength;
-	result.offset = record.offset13_bufferIndex3 & 0x1FFF;
-	result.format = record.format;
-	result.bufferIndex = record.offset13_bufferIndex3 >> 13;
-	return result;
+	return vertexBindingRecords[bindingIndex];
 }
 
 // BytecodeBlobWriter //////////////////////////////////////////////////////////////////////////////

@@ -76,6 +76,9 @@ namespace XLib
 	template <typename Type, uintptr Capacity, typename CounterType = uint16, bool IsSafe = true>
 	class InplaceArrayList
 	{
+		static_assert(Capacity > 0);
+		static_assert(Capacity == uintptr(CounterType(Capacity)));
+
 	private:
 		Type buffer[Capacity];
 		CounterType size = 0;
