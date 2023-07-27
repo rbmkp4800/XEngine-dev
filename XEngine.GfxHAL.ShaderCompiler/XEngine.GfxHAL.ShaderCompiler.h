@@ -8,6 +8,7 @@
 #include <XEngine.GfxHAL.Common.h>
 
 // TODO: Pipeline bindings shader visibility.
+// TODO: Vertex input binding can be dropped from pipeline blob, if VS reflection shows that it is not used.
 
 namespace XEngine::GfxHAL::ShaderCompiler
 {
@@ -80,7 +81,7 @@ namespace XEngine::GfxHAL::ShaderCompiler
 
 	struct VertexBindingDesc
 	{
-		char name[20];
+		char nameCStr[20];
 		uint16 offset;
 		GfxHAL::TexelViewFormat format;
 		uint8 bufferIndex;

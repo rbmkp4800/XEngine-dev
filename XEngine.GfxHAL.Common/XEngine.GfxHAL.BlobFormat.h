@@ -91,7 +91,7 @@ namespace XEngine::GfxHAL::BlobFormat::Data
 
 	struct VertexBindingRecord // 24 bytes
 	{
-		char name[20];
+		char nameCStr[20];
 		uint16 offset;
 		TexelViewFormat format;
 		uint8 bufferIndex;
@@ -288,8 +288,10 @@ namespace XEngine::GfxHAL::BlobFormat
 		uint32 getRenderTargetCount() const;
 		TexelViewFormat getRenderTargetFormat(uint32 index) const { XAssert(index < MaxRenderTargetCount); return body->renderTargetFormats[index]; }
 		DepthStencilFormat getDepthStencilFormat() const { return body->depthStencilFormat; }
+		bool isVertexBufferUsed(uint8 vertexBufferIndex) const { return (body->vertexBuffersUsedFlagBits >> vertexBufferIndex) & 1; }
+		bool isVertexBufferPerInstance(uint8 vertexBufferIndex) const { return (body->vertexBuffersPerInstanceFlagBits >> vertexBufferIndex) & 1; }
 		uint8 getVertexBindingCount() const { return body->vertexBindingCount; }
-		VertexBindingInfo getVertexBinding(uint8 bindingIndex) const;
+		const VertexBindingInfo* getVertexBindingInplace(uint8 bindingIndex) const;
 	};
 
 	class BytecodeBlobWriter

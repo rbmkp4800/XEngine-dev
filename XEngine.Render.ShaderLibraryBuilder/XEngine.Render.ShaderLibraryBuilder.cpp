@@ -247,7 +247,7 @@ PipelineRef Pipeline::CreateGraphics(StringViewASCII name,
 
 	// NOTE: This code actually assumes that 'GfxHAL::ShaderCompiler::VertexBindingDesc::name' is inplace char array.
 	// Because of this, we do not need to explicitly allocate memory for vertex binding names as they are stored inplace.
-	XAssert(countof(settings.vertexBindings[0].name) == sizeof(settings.vertexBindings[0].name));
+	XAssert(countof(settings.vertexBindings[0].nameCStr) == sizeof(settings.vertexBindings[0].nameCStr));
 
 	const uint32 memoryBlockSize = memoryBlockSizeAccum;
 	void* memoryBlock = SystemHeapAllocator::Allocate(memoryBlockSize);

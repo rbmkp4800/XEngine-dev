@@ -494,7 +494,7 @@ bool LibraryDefinitionLoader::readVertexInputLayout(StringViewASCII vertexInputL
 					const Cursor jsonBindingNameCursor = getJSONCursor();
 					IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("name", bindingName));
 					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(GfxHAL::ShaderCompiler::ValidateVertexBindingName(bindingName), "invalid vertex binding name", jsonBindingNameCursor);
-					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(bindingName.getLength() <= countof(vertexBindingDesc.name), "vertex binding name length limit exceeded", jsonBindingNameCursor);
+					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(bindingName.getLength() < countof(vertexBindingDesc.nameCStr), "vertex binding name length limit exceeded", jsonBindingNameCursor);
 
 					StringViewASCII bindingFormatStr = {};
 					const Cursor jsonBindingFormatCursor = getJSONCursor();
@@ -505,7 +505,7 @@ bool LibraryDefinitionLoader::readVertexInputLayout(StringViewASCII vertexInputL
 					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(GfxHAL::TexelViewFormatUtils::SupportsVertexInputUsage(bindingFormat),
 						"format does not support vertex input usage", jsonBindingFormatCursor);
 
-					memoryCopy(vertexBindingDesc.name, bindingName.getData(), bindingName.getLength());
+					memoryCopy(vertexBindingDesc.nameCStr, bindingName.getData(), bindingName.getLength());
 					vertexBindingDesc.offset = vertexBindingDataOffset;
 					vertexBindingDesc.format = bindingFormat;
 					vertexBindingDesc.bufferIndex = vertexBufferIndex;

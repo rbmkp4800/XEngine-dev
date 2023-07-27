@@ -998,10 +998,15 @@ bool GfxHAL::ShaderCompiler::CompileGraphicsPipeline(
 		const VertexBindingDesc& binding = settings.vertexBindings[i];
 
 		uint32 bindingNameLength = 0;
-		while (bindingNameLength < countof(binding.name) && binding.name[bindingNameLength])
+		while (bindingNameLength < countof(binding.nameCStr) && binding.nameCStr[bindingNameLength])
 			bindingNameLength++;
 
-		if (!ValidateVertexBindingName(StringViewASCII(binding.name, bindingNameLength)))
+		if (bindingNameLength == countof(binding.nameCStr)) // No zero terminator
+		{
+			errorMessage.text = "vertex input: binding name is too long (buffer overrun)";
+			return false;
+		}
+		if (!ValidateVertexBindingName(StringViewASCII(binding.nameCStr, bindingNameLength)))
 		{
 			errorMessage.text = "vertex input: invalid binding name";
 			return false;
@@ -1030,8 +1035,8 @@ bool GfxHAL::ShaderCompiler::CompileGraphicsPipeline(
 		}
 
 		GfxHAL::BlobFormat::VertexBindingInfo blobBindingInfo = {};
-		static_assert(sizeof(blobBindingInfo.name) >= sizeof(binding.name));
-		memoryCopy(blobBindingInfo.name, binding.name, bindingNameLength);
+		static_assert(sizeof(blobBindingInfo.nameCStr) >= sizeof(binding.nameCStr));
+		memoryCopy(blobBindingInfo.nameCStr, binding.nameCStr, bindingNameLength);
 		blobBindingInfo.offset = binding.offset;
 		blobBindingInfo.format = binding.format;
 		blobBindingInfo.bufferIndex = binding.bufferIndex;

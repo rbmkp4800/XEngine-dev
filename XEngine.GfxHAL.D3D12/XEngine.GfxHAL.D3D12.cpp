@@ -332,7 +332,7 @@ inline CommandList::BindingResolveResult CommandList::ResolveBindingByNameXSH(
 
 CommandList::~CommandList()
 {
-	XEAssertUnreachableCode(); // Not implemented.
+	XAssertNotImplemented();
 }
 
 void CommandList::open()
@@ -996,9 +996,9 @@ TextureHandle Device::createTexture(const TextureDesc& desc,
 	if (desc.allowRenderTarget)
 	{
 		// TODO: Deduce from format type of RT (Color/Depth).
-		if (DoesTextureFormatSupportColorRenderTargetUsage(desc.format))
+		if (TextureFormatUtils::SupportsRenderTargetUsage(desc.format))
 			d3dResourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-		else if (DoesTextureFormatSupportDepthRenderTargetUsage(desc.format))
+		else if (TextureFormatUtils::SupportsDepthStencilUsage(desc.format))
 			d3dResourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 		else
 			XEMasterAssertUnreachableCode();
@@ -1272,6 +1272,7 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 	XEMasterAssert(stateBlobReader.open(blobs.state.data, blobs.state.size));
 	XEMasterAssert(stateBlobReader.getPipelineLayoutSourceHash() == pipelineLayout.sourceHash);
 
+	// Process shaders.
 	D3D12_SHADER_BYTECODE d3dVS = {};
 	D3D12_SHADER_BYTECODE d3dAS = {};
 	D3D12_SHADER_BYTECODE d3dMS = {};
@@ -1336,6 +1337,38 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 	if (d3dMS.pShaderBytecode)
 		XEMasterAssert(!d3dVS.pShaderBytecode);
 
+	// Process vertex input bindings (input layout elements).
+	D3D12_INPUT_ELEMENT_DESC d3dILElements[MaxVertexBindingCount];
+	if (stateBlobReader.getVertexBindingCount() > 0)
+	{
+		XEMasterAssert(d3dVS.pShaderBytecode);
+		XEMasterAssert(stateBlobReader.getVertexBindingCount() < MaxVertexBindingCount);
+
+		for (uint8 i = 0; i < stateBlobReader.getVertexBindingCount(); i++)
+		{
+			// NOTE: We need all this "inplace" stuff, so 'D3D12_INPUT_ELEMENT_DESC::SemanticName' can point directly into blob data.
+			const BlobFormat::VertexBindingInfo* bindingInfo = stateBlobReader.getVertexBindingInplace(i);
+
+			// Check zero terminator to make sure this is valid cstr.
+			// All chars after first zero should also be zero, so checking only the last one is ok.
+			XEMasterAssert(bindingInfo->nameCStr[countof(bindingInfo->nameCStr) - 1] == '\0');
+
+			XEMasterAssert(bindingInfo->bufferIndex < MaxVertexBufferCount);
+			XEMasterAssert(stateBlobReader.isVertexBufferUsed(bindingInfo->bufferIndex));
+
+			const bool perIstance = stateBlobReader.isVertexBufferPerInstance(bindingInfo->bufferIndex);
+
+			d3dILElements[i] = {};
+			d3dILElements[i].SemanticName = bindingInfo->nameCStr;
+			d3dILElements[i].SemanticIndex = 0;
+			d3dILElements[i].Format = TranslateTexelViewFormatToDXGIFormat(bindingInfo->format);
+			d3dILElements[i].InputSlot = bindingInfo->bufferIndex;
+			d3dILElements[i].AlignedByteOffset = bindingInfo->offset;
+			d3dILElements[i].InputSlotClass = perIstance ? D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA : D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+			d3dILElements[i].InstanceDataStepRate = perIstance ? 1 : 0;
+		}
+	}
+
 	// Compose D3D12 Pipeline State stream.
 
 	byte d3dPSOStreamBuffer[1024]; // TODO: Proper size
@@ -1393,6 +1426,15 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 		d3dDepthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_ALWAYS;
 	}
 #endif
+
+	// Input layout
+	{
+		D3D12Helpers::PipelineStateSubobjectInputLayout& d3dSubobjectIL =
+			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectInputLayout>(sizeof(void*));
+		d3dSubobjectIL.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_INPUT_LAYOUT;
+		d3dSubobjectIL.desc.pInputElementDescs = d3dILElements;
+		d3dSubobjectIL.desc.NumElements = stateBlobReader.getVertexBindingCount();
+	}
 
 	// Primitive topology
 	{
@@ -1608,10 +1650,10 @@ void Device::writeDescriptor(DescriptorSetReference descriptorSetReference,
 	XEAssertUnreachableCode();
 }
 
-void submitSyncPointWait(DeviceQueue queue, DeviceQueueSyncPoint syncPoint)
+void Device::submitSyncPointWait(DeviceQueue queue, DeviceQueueSyncPoint syncPoint)
 {
 	// TODO: Assert that syncPoint can not be for same queue.
-	XEAssertUnreachableCode(); // Not implemented.
+	XAssertNotImplemented();
 }
 
 void Device::submitWorkload(DeviceQueue queue, CommandList& commandList)

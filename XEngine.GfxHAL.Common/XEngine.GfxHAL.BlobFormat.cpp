@@ -462,10 +462,10 @@ uint32 GraphicsPipelineStateBlobReader::getRenderTargetCount() const
 	return MaxRenderTargetCount;
 }
 
-VertexBindingInfo GraphicsPipelineStateBlobReader::getVertexBinding(uint8 bindingIndex) const
+const VertexBindingInfo* GraphicsPipelineStateBlobReader::getVertexBindingInplace(uint8 bindingIndex) const
 {
 	XAssert(bindingIndex < body->vertexBindingCount);
-	return vertexBindingRecords[bindingIndex];
+	return &vertexBindingRecords[bindingIndex];
 }
 
 // BytecodeBlobWriter //////////////////////////////////////////////////////////////////////////////
