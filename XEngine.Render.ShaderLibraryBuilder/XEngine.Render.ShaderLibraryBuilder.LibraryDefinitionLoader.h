@@ -30,7 +30,7 @@ namespace XEngine::Render::ShaderLibraryBuilder
 		{
 			XLib::StringViewASCII name;
 			GfxHAL::ShaderCompiler::VertexBufferDesc buffers[GfxHAL::MaxVertexBufferCount];
-			uint32 bindingsOffset;
+			uint32 bindingsOffsetInAccumBuffer;
 			uint8 bindingCount;
 		};
 
@@ -40,9 +40,9 @@ namespace XEngine::Render::ShaderLibraryBuilder
 		XLib::JSONReader jsonReader;
 		const char* jsonPath = nullptr;
 
-		XLib::ArrayList<StaticSamplerDesc> staticSamplers;
-		XLib::ArrayList<VertexInputLayoutDesc> vertexInputLayouts;
-		XLib::ArrayList<GfxHAL::ShaderCompiler::VertexBindingDesc> vertexBindings;
+		XLib::ArrayList<StaticSamplerDesc> staticSamplers;	// TODO: Replace with FlatHashMap.
+		XLib::ArrayList<VertexInputLayoutDesc> vertexInputLayouts;	// TODO: Replace with FlatHashMap.
+		XLib::ArrayList<GfxHAL::ShaderCompiler::VertexBindingDesc> vertexBindingsAccumBuffer;
 
 	private:
 		void reportError(const char* message, Cursor jsonCursor);
@@ -69,9 +69,9 @@ namespace XEngine::Render::ShaderLibraryBuilder
 		inline LibraryDefinitionLoader(LibraryDefinition& libraryDefinition) : libraryDefinition(libraryDefinition) {}
 		~LibraryDefinitionLoader() = default;
 
-		bool load(const char* jsonPathCStr);
+		bool load(const char* jsonPath);
 
 	public:
-		static bool Load(LibraryDefinition& libraryDefinition, const char* jsonPathCStr);
+		static bool Load(LibraryDefinition& libraryDefinition, const char* jsonPath);
 	};
 }

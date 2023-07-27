@@ -18,7 +18,7 @@ using namespace XEngine;
 using namespace XEngine::Render::ShaderLibraryBuilder;
 
 
-// GfxHAL values parsers ///////////////////////////////////////////////////////////////////////////
+// GfxHAL value parsers ////////////////////////////////////////////////////////////////////////////
 
 static GfxHAL::TexelViewFormat ParseTexelViewFormatString(StringViewASCII string)
 {
@@ -56,13 +56,12 @@ static GfxHAL::TexelViewFormat ParseTexelViewFormatString(StringViewASCII string
 	if (string == "R32_UINT")			return GfxHAL::TexelViewFormat::R32_UINT;
 	if (string == "R32_SINT")			return GfxHAL::TexelViewFormat::R32_SINT;
 	if (string == "R32G32_FLOAT")		return GfxHAL::TexelViewFormat::R32G32_FLOAT;
-	if (string == "R32G32_UNORM")		return GfxHAL::TexelViewFormat::R32G32_UNORM;
-	if (string == "R32G32_SNORM")		return GfxHAL::TexelViewFormat::R32G32_SNORM;
 	if (string == "R32G32_UINT")		return GfxHAL::TexelViewFormat::R32G32_UINT;
 	if (string == "R32G32_SINT")		return GfxHAL::TexelViewFormat::R32G32_SINT;
+	if (string == "R32G32B32_FLOAT")	return GfxHAL::TexelViewFormat::R32G32B32_FLOAT;
+	if (string == "R32G32B32_UINT")		return GfxHAL::TexelViewFormat::R32G32B32_UINT;
+	if (string == "R32G32B32_SINT")		return GfxHAL::TexelViewFormat::R32G32B32_SINT;
 	if (string == "R32G32B32A32_FLOAT")	return GfxHAL::TexelViewFormat::R32G32B32A32_FLOAT;
-	if (string == "R32G32B32A32_UNORM")	return GfxHAL::TexelViewFormat::R32G32B32A32_UNORM;
-	if (string == "R32G32B32A32_SNORM")	return GfxHAL::TexelViewFormat::R32G32B32A32_SNORM;
 	if (string == "R32G32B32A32_UINT")	return GfxHAL::TexelViewFormat::R32G32B32A32_UINT;
 	if (string == "R32G32B32A32_SINT")	return GfxHAL::TexelViewFormat::R32G32B32A32_SINT;
 	if (string == "R24_UNORM_X8")		return GfxHAL::TexelViewFormat::R24_UNORM_X8;
@@ -358,9 +357,17 @@ bool LibraryDefinitionLoader::consumeSpecificKeyWithArrayValue(const char* expec
 
 bool LibraryDefinitionLoader::readStaticSampler(StringViewASCII staticSamplerName, Cursor jsonStaticSamplerNameCursor)
 {
-	XTODO("Check duplicate static sampler name");
+	for (StaticSamplerDesc& i : staticSamplers)
+	{
+		if (i.name == staticSamplerName)
+		{
+			reportError("static sampler redefinition", jsonStaticSamplerNameCursor);
+			return false;
+		}
+	}
 
-	GfxHAL::SamplerDesc samplerDesc = {};
+	StaticSamplerDesc samplerDesc = {};
+	samplerDesc.name = staticSamplerName;
 
 	while (!jsonReader.isEndOfObject())
 	{
@@ -376,35 +383,35 @@ bool LibraryDefinitionLoader::readStaticSampler(StringViewASCII staticSamplerNam
 
 		if (jsonKey.string == "filter")
 		{
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.filterMode == GfxHAL::SamplerFilterMode::Undefined, "filter mode already set", jsonKeyCursor);
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.desc.filterMode == GfxHAL::SamplerFilterMode::Undefined, "filter mode already set", jsonKeyCursor);
 			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonValue.type == JSONValueType::String, "string expected", jsonValueCursor);
 
-			samplerDesc.filterMode = ParseSamplerFilterModeString(jsonValue.string.string);
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.filterMode != GfxHAL::SamplerFilterMode::Undefined, "invalid filter mode", jsonValueCursor);
+			samplerDesc.desc.filterMode = ParseSamplerFilterModeString(jsonValue.string.string);
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.desc.filterMode != GfxHAL::SamplerFilterMode::Undefined, "invalid filter mode", jsonValueCursor);
 		}
 		else if (jsonKey.string == "reduction")
 		{
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.reductionMode == GfxHAL::SamplerReductionMode::Undefined, "reduction mode already set", jsonKeyCursor);
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.desc.reductionMode == GfxHAL::SamplerReductionMode::Undefined, "reduction mode already set", jsonKeyCursor);
 			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonValue.type == JSONValueType::String, "string expected", jsonValueCursor);
 
-			samplerDesc.reductionMode = ParseSamplerReductionModeString(jsonValue.string.string);
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.reductionMode != GfxHAL::SamplerReductionMode::Undefined, "invalid reduction mode", jsonValueCursor);
+			samplerDesc.desc.reductionMode = ParseSamplerReductionModeString(jsonValue.string.string);
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.desc.reductionMode != GfxHAL::SamplerReductionMode::Undefined, "invalid reduction mode", jsonValueCursor);
 		}
 		else if (jsonKey.string == "max_anisotropy")
 		{
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.filterMode == GfxHAL::SamplerFilterMode::Anisotropic, "filter mode should be set to aniso", jsonKeyCursor);
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.maxAnisotropy == 0, "max anisotropy already set", jsonKeyCursor);
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.desc.filterMode == GfxHAL::SamplerFilterMode::Anisotropic, "filter mode should be set to aniso", jsonKeyCursor);
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.desc.maxAnisotropy == 0, "max anisotropy already set", jsonKeyCursor);
 			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonValue.type == JSONValueType::Number, "integer 1..16 expected", jsonValueCursor);
 
 			XAssertNotImplemented();
 		}
 		else if (jsonKey.string == "address")
 		{
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.addressModeU == GfxHAL::SamplerAddressMode::Undefined, "address mode already set", jsonKeyCursor);
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.desc.addressModeU == GfxHAL::SamplerAddressMode::Undefined, "address mode already set", jsonKeyCursor);
 			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonValue.type == JSONValueType::String, "string expected", jsonValueCursor);
 
-			samplerDesc.addressModeU = ParseSamplerAddressModeString(jsonValue.string.string);
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.addressModeU != GfxHAL::SamplerAddressMode::Undefined, "invalid address mode", jsonValueCursor);
+			samplerDesc.desc.addressModeU = ParseSamplerAddressModeString(jsonValue.string.string);
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.desc.addressModeU != GfxHAL::SamplerAddressMode::Undefined, "invalid address mode", jsonValueCursor);
 		}
 		else if (jsonKey.string == "lod_bias")
 		{
@@ -425,31 +432,38 @@ bool LibraryDefinitionLoader::readStaticSampler(StringViewASCII staticSamplerNam
 		}
 	}
 
-	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.filterMode != GfxHAL::SamplerFilterMode::Undefined, "filter mode not set", jsonStaticSamplerNameCursor);
-	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.reductionMode != GfxHAL::SamplerReductionMode::Undefined, "reduction mode not set", jsonStaticSamplerNameCursor);
-	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.addressModeU != GfxHAL::SamplerAddressMode::Undefined, "address mode not set", jsonStaticSamplerNameCursor);
+	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.desc.filterMode != GfxHAL::SamplerFilterMode::Undefined, "filter mode not set", jsonStaticSamplerNameCursor);
+	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.desc.reductionMode != GfxHAL::SamplerReductionMode::Undefined, "reduction mode not set", jsonStaticSamplerNameCursor);
+	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.desc.addressModeU != GfxHAL::SamplerAddressMode::Undefined, "address mode not set", jsonStaticSamplerNameCursor);
 
-	if (samplerDesc.filterMode == GfxHAL::SamplerFilterMode::Anisotropic)
-		IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.maxAnisotropy > 0, "max anisotropy not set", jsonStaticSamplerNameCursor);
+	if (samplerDesc.desc.filterMode == GfxHAL::SamplerFilterMode::Anisotropic)
+		IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.desc.maxAnisotropy > 0, "max anisotropy not set", jsonStaticSamplerNameCursor);
 
-	samplerDesc.addressModeV = samplerDesc.addressModeU;
-	samplerDesc.addressModeW = samplerDesc.addressModeU;
-	samplerDesc.lodBias = 0.0f;
-	samplerDesc.lodMin = -100.0f;
-	samplerDesc.lodMax = +100.0f;
+	samplerDesc.desc.addressModeV = samplerDesc.desc.addressModeU;
+	samplerDesc.desc.addressModeW = samplerDesc.desc.addressModeU;
+	samplerDesc.desc.lodBias = 0.0f;
+	samplerDesc.desc.lodMin = -100.0f;
+	samplerDesc.desc.lodMax = +100.0f;
 
-	XAssertNotImplemented();
+	staticSamplers.pushBack(samplerDesc);
 
-	return false;
+	return true;
 }
 
 bool LibraryDefinitionLoader::readVertexInputLayout(StringViewASCII vertexInputLayoutName, Cursor jsonVertexInputLayoutNameCursor)
 {
-	XTODO("Check duplicate vertex inout layout name");
+	for (VertexInputLayoutDesc& i : vertexInputLayouts)
+	{
+		if (i.name == vertexInputLayoutName)
+		{
+			reportError("vertex inout layout redefinition", jsonVertexInputLayoutNameCursor);
+			return false;
+		}
+	}
 	
 	VertexInputLayoutDesc vertexInputLayoutDesc = {};
 	vertexInputLayoutDesc.name = vertexInputLayoutName;
-	vertexInputLayoutDesc.bindingsOffset = vertexBindings.getSize();
+	vertexInputLayoutDesc.bindingsOffsetInAccumBuffer = vertexBindingsAccumBuffer.getSize();
 	vertexInputLayoutDesc.bindingCount = 0;
 
 	IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithArrayValue("buffers"));
@@ -464,17 +478,21 @@ bool LibraryDefinitionLoader::readVertexInputLayout(StringViewASCII vertexInputL
 		const Cursor jsonBufferValueCursor = getJSONCursor();
 		jsonReader.readValue(jsonBufferValue);
 		IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
-		IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonBufferValue.type == JSONValueType::Object, "object expected", jsonBufferValueCursor);
+
+		IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(vertexBufferCount < GfxHAL::MaxVertexBufferCount, "vertex buffers limit exceeded", jsonBufferValueCursor);
+		const uint8 vertexBufferIndex = vertexBufferCount;
+		vertexBufferCount++;
+
+		if (jsonBufferValue.type == JSONValueType::Null)
+			continue;
+
+		IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonBufferValue.type == JSONValueType::Object, "object or null expected", jsonBufferValueCursor);
+
+		GfxHAL::ShaderCompiler::VertexBufferDesc& vertexBufferDesc = vertexInputLayoutDesc.buffers[vertexBufferIndex];
 
 		jsonReader.openObject();
 		IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
 		{
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(vertexBufferCount < GfxHAL::MaxVertexBufferCount, "vertex buffers limit exceeded", jsonBufferValueCursor);
-			const uint8 vertexBufferIndex = vertexBufferCount;
-			vertexBufferCount++;
-
-			GfxHAL::ShaderCompiler::VertexBufferDesc& vertexBufferDesc = vertexInputLayoutDesc.buffers[vertexBufferIndex];
-
 			StringViewASCII stepRateString = {};
 			const Cursor jsonStepRateStringCursor = getJSONCursor();
 			IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("step_rate", stepRateString));
@@ -483,11 +501,13 @@ bool LibraryDefinitionLoader::readVertexInputLayout(StringViewASCII vertexInputL
 			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(vertexBufferDesc.stepRate != GfxHAL::ShaderCompiler::VertexBufferStepRate::Undefined,
 				"invalid vertex buffer step rate", jsonStepRateStringCursor);
 
+			const Cursor jsonBindingsArrayCursor = getJSONCursor();
 			IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithArrayValue("bindings"));
 
 			jsonReader.openArray();
 			IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
 
+			bool atLeastOneBindingConsumed = false;
 			uint16 vertexBindingDataOffset = 0;
 			while (!jsonReader.isEndOfArray())
 			{
@@ -505,15 +525,15 @@ bool LibraryDefinitionLoader::readVertexInputLayout(StringViewASCII vertexInputL
 					StringViewASCII bindingName = {};
 					const Cursor jsonBindingNameCursor = getJSONCursor();
 					IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("name", bindingName));
-					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(ValidateBindingName(bindingName), "invalid binding name", jsonBindingNameCursor);
-					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(bindingName.getLength() > GfxHAL::MaxVertexBindingNameLength, "binding name is too long", jsonBindingNameCursor);
+					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(ValidateBindingName(bindingName), "invalid vertex binding name", jsonBindingNameCursor);
+					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(bindingName.getLength() <= GfxHAL::MaxVertexBindingNameLength, "vertex binding name is too long", jsonBindingNameCursor);
 
 					StringViewASCII bindingFormatStr = {};
 					const Cursor jsonBindingFormatCursor = getJSONCursor();
 					IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("format", bindingFormatStr));
 
 					const GfxHAL::TexelViewFormat bindingFormat = ParseTexelViewFormatString(bindingFormatStr);
-					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(bindingFormat != GfxHAL::TexelViewFormat::Undefined, "invalid format", jsonBindingFormatCursor);
+					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(bindingFormat != GfxHAL::TexelViewFormat::Undefined, "invalid vertex binding format", jsonBindingFormatCursor);
 					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(GfxHAL::TexelViewFormatUtils::SupportsVertexInputUsage(bindingFormat),
 						"format does not support vertex input usage", jsonBindingFormatCursor);
 
@@ -524,6 +544,8 @@ bool LibraryDefinitionLoader::readVertexInputLayout(StringViewASCII vertexInputL
 
 					XTODO("Add padding");
 					vertexBindingDataOffset += GfxHAL::TexelViewFormatUtils::GetByteSize(bindingFormat);
+
+					atLeastOneBindingConsumed = true;
 				}
 				jsonReader.closeObject();
 				IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
@@ -532,9 +554,11 @@ bool LibraryDefinitionLoader::readVertexInputLayout(StringViewASCII vertexInputL
 				const uint8 localVertexBindingIndex = vertexInputLayoutDesc.bindingCount;
 				vertexInputLayoutDesc.bindingCount++;
 
-				vertexBindings.pushBack(vertexBindingDesc);
-				XAssert(vertexInputLayoutDesc.bindingsOffset + vertexInputLayoutDesc.bindingCount == vertexBindings.getSize());
+				vertexBindingsAccumBuffer.pushBack(vertexBindingDesc);
+				XAssert(vertexInputLayoutDesc.bindingsOffsetInAccumBuffer + vertexInputLayoutDesc.bindingCount == vertexBindingsAccumBuffer.getSize());
 			}
+
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(atLeastOneBindingConsumed, "no bindings defined for buffer", jsonBindingsArrayCursor);
 
 			jsonReader.closeArray();
 			IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
@@ -546,9 +570,11 @@ bool LibraryDefinitionLoader::readVertexInputLayout(StringViewASCII vertexInputL
 	jsonReader.closeArray();
 	IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
 
+	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(vertexInputLayoutDesc.bindingCount > 0, "vertex input layout has no bindings", jsonVertexInputLayoutNameCursor);
+
 	vertexInputLayouts.pushBack(vertexInputLayoutDesc);
 
-	return false;
+	return true;
 }
 
 bool LibraryDefinitionLoader::readDescriptorSetLayout(StringViewASCII descriptorSetLayoutName, Cursor jsonDescriptorSetLayoutNameCursor)
@@ -585,7 +611,7 @@ bool LibraryDefinitionLoader::readDescriptorSetLayout(StringViewASCII descriptor
 		jsonReader.closeObject();
 		IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
 
-		IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!bindings.isFull(), "bindings limit exceeded", jsonBindingNameCursor);
+		IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!bindings.isFull(), "descriptor set layout bindings limit exceeded", jsonBindingNameCursor);
 		bindings.pushBack(binding);
 	}
 
@@ -663,7 +689,7 @@ bool LibraryDefinitionLoader::readPipelineLayout(StringViewASCII pipelineLayoutN
 		jsonReader.closeObject();
 		IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
 
-		IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!bindings.isFull(), "bindings limit exceeded", jsonBindingNameCursor);
+		IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!bindings.isFull(), "pipeline layout bindings limit exceeded", jsonBindingNameCursor);
 		bindings.pushBack(binding);
 	}
 
@@ -695,8 +721,10 @@ bool LibraryDefinitionLoader::readGraphicsPipeline(StringViewASCII graphicsPipel
 {
 	GfxHAL::ShaderCompiler::PipelineLayoutRef pipelineLayout = nullptr;
 	uint64 pipelineLayoutNameXSH = 0;
+
 	GfxHAL::ShaderCompiler::GraphicsPipelineShaders pipelineShaders = {};
 	GfxHAL::ShaderCompiler::GraphicsPipelineSettings pipelineSettings = {};
+	bool vertexInputLayoutIsSet = false;
 	bool renderTargetsAreSet = false;
 	bool depthStencilIsSet = false;
 
@@ -730,6 +758,29 @@ bool LibraryDefinitionLoader::readGraphicsPipeline(StringViewASCII graphicsPipel
 			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(shader->sourceText.isEmpty(), "shader already set", jsonKeyCursor);
 			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonValue.type == JSONValueType::Object, "object expected", jsonValueCursor);
 			IF_FALSE_RETURN_FALSE(readShaderSetupObject(*shader));
+		}
+		else if (jsonKey.string == "vertex_input_layout")
+		{
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!vertexInputLayoutIsSet, "vertex input layout already set", jsonKeyCursor);
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonValue.type == JSONValueType::String, "string expected", jsonValueCursor);
+
+			const VertexInputLayoutDesc* vertexInputLayout = nullptr;
+			for (VertexInputLayoutDesc& i : vertexInputLayouts)
+			{
+				if (i.name == jsonValue.string.string)
+				{
+					vertexInputLayout = &i;
+					break;
+				}
+			}
+
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(vertexInputLayout, "undefined vertex input layout", jsonKeyCursor);
+
+			memoryCopy(pipelineSettings.vertexBuffers, vertexInputLayout->buffers, sizeof(pipelineSettings.vertexBuffers));
+			pipelineSettings.vertexBindings = &vertexBindingsAccumBuffer[vertexInputLayout->bindingsOffsetInAccumBuffer];
+			pipelineSettings.vertexBindingCount = vertexInputLayout->bindingCount;
+
+			vertexInputLayoutIsSet = true;
 		}
 		else if (jsonKey.string == "render_targets")
 		{
@@ -811,6 +862,7 @@ bool LibraryDefinitionLoader::readComputePipeline(StringViewASCII computePipelin
 {
 	GfxHAL::ShaderCompiler::PipelineLayoutRef pipelineLayout = nullptr;
 	uint64 pipelineLayoutNameXSH = 0;
+
 	GfxHAL::ShaderCompiler::ShaderDesc computeShader = {};
 
 	IF_FALSE_RETURN_FALSE(readPipelineLayoutSetupProperty(pipelineLayout, pipelineLayoutNameXSH));
@@ -908,9 +960,9 @@ bool LibraryDefinitionLoader::readShaderSetupObject(GfxHAL::ShaderCompiler::Shad
 	return true;
 }
 
-bool LibraryDefinitionLoader::load(const char* jsonPathCStr)
+bool LibraryDefinitionLoader::load(const char* jsonPath)
 {
-	jsonPath = jsonPathCStr;
+	this->jsonPath = jsonPath;
 
 	DynamicStringASCII text;
 
@@ -985,8 +1037,8 @@ bool LibraryDefinitionLoader::load(const char* jsonPathCStr)
 	return true;
 }
 
-bool LibraryDefinitionLoader::Load(LibraryDefinition& libraryDefinition, const char* jsonPathCStr)
+bool LibraryDefinitionLoader::Load(LibraryDefinition& libraryDefinition, const char* jsonPath)
 {
 	LibraryDefinitionLoader loader(libraryDefinition);
-	return loader.load(jsonPathCStr);
+	return loader.load(jsonPath);
 }
