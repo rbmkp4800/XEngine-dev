@@ -1,14 +1,7 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
   <ItemGroup Label="ProjectConfigurations">
-    <ProjectConfiguration Include="Debug|Win32">
-      <Configuration>Debug</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Release|Win32">
-      <Configuration>Release</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
@@ -18,76 +11,111 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <ProjectGuid>{DF81A513-72E3-4B74-B866-97F3BB61D45F}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>XLib</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <Import Project="$(ProjectDefaultsPropsPath)" Condition="'$(ProjectDefaultsPropsPath)' != ''"/>
+
+  <PropertyGroup>
+    <IntDir>$(SolutionDir)Build.Intermediate\$(PlatformName).$(Configuration)\$(ProjectName)\</IntDir>
+    <OutDir>$(SolutionDir)Build\</OutDir>
+    <TargetName>$(ProjectName)_$(PlatformName).$(Configuration)</TargetName>
+    <PublicIncludeDirectories>$(ProjectDir)Source;$(PublicIncludeDirectories)</PublicIncludeDirectories>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup>
+    <Lib>
+      <AdditionalDependencies>
+        ws2_32.lib;
+        Mswsock.lib;
+        %(AdditionalDependencies)
+      </AdditionalDependencies>
+    </Lib>
+  </ItemDefinitionGroup>
+
   <ItemGroup>
+    <ClInclude Include="Source\XLib.Algorithm.QuickSort.h" />
     <ClInclude Include="Source\XLib.Allocation.h" />
     <ClInclude Include="Source\XLib.AllocatorAdapterBase.h" />
     <ClInclude Include="Source\XLib.ByteStream.h" />
     <ClInclude Include="Source\XLib.Color.h" />
-    <ClInclude Include="Source\XLib.Containers.BitArray.h" />
-    <ClInclude Include="Source\XLib.Containers.HashMap.h" />
-    <ClInclude Include="Source\XLib.Containers.DoublyLinkedList.h" />
-    <ClInclude Include="Source\XLib.RefCounted.h" />
-    <ClInclude Include="Source\XLib.Text.h" />
-    <ClInclude Include="Source\XLib.JSON.h" />
-    <ClInclude Include="Source\XLib.Math.Quaternion.h" />
-    <ClInclude Include="Source\XLib.Algorithm.QuickSort.h" />
+    <ClInclude Include="Source\XLib.Containers.ArrayList.h" />
+    <ClInclude Include="Source\XLib.Containers.AVLTreeLogic.h" />
     <ClInclude Include="Source\XLib.Containers.BinaryHeap.h" />
-    <ClInclude Include="Source\XLib.Containers.CyclicQueue.h" />
     <ClInclude Include="Source\XLib.Containers.BinaryTree.h" />
+    <ClInclude Include="Source\XLib.Containers.BitArray.h" />
+    <ClInclude Include="Source\XLib.Containers.CyclicQueue.h" />
+    <ClInclude Include="Source\XLib.Containers.DoublyLinkedList.h" />
+    <ClInclude Include="Source\XLib.Containers.HashMap.h" />
     <ClInclude Include="Source\XLib.CRC.h" />
     <ClInclude Include="Source\XLib.Delegate.h" />
+    <ClInclude Include="Source\XLib.FileSystem.h" />
+    <ClInclude Include="Source\XLib.Float.Conversion.h" />
+    <ClInclude Include="Source\XLib.h" />
+    <ClInclude Include="Source\XLib.JSON.h" />
+    <ClInclude Include="Source\XLib.Math.h" />
+    <ClInclude Include="Source\XLib.Math.Matrix2x3.h" />
     <ClInclude Include="Source\XLib.Math.Matrix3x4.h" />
+    <ClInclude Include="Source\XLib.Math.Matrix4x4.h" />
+    <ClInclude Include="Source\XLib.Math.Quaternion.h" />
+    <ClInclude Include="Source\XLib.NonCopyable.h" />
     <ClInclude Include="Source\XLib.Path.h" />
     <ClInclude Include="Source\XLib.Platform.COMPtr.h" />
     <ClInclude Include="Source\XLib.Platform.D3D11.Helpers.h" />
     <ClInclude Include="Source\XLib.Platform.D3D12.Helpers.h" />
     <ClInclude Include="Source\XLib.Platform.DXGI.Helpers.h" />
     <ClInclude Include="Source\XLib.Program.h" />
-    <ClInclude Include="Source\XLib.Float.Conversion.h" />
-    <ClInclude Include="Source\XLib.SystemHeapAllocator.h" />
-    <ClInclude Include="Source\XLib.Containers.ArrayList.h" />
-    <ClInclude Include="Source\XLib.Math.Matrix2x3.h" />
-    <ClInclude Include="Source\XLib.Math.Matrix4x4.h" />
-    <ClInclude Include="Source\XLib.NonCopyable.h" />
-    <ClInclude Include="Source\XLib.Math.h" />
     <ClInclude Include="Source\XLib.Random.h" />
+    <ClInclude Include="Source\XLib.RefCounted.h" />
     <ClInclude Include="Source\XLib.String.h" />
     <ClInclude Include="Source\XLib.System.AsyncIO.h" />
     <ClInclude Include="Source\XLib.System.File.h" />
-    <ClInclude Include="Source\XLib.FileSystem.h" />
     <ClInclude Include="Source\XLib.System.NamedPipe.h" />
     <ClInclude Include="Source\XLib.System.Network.h" />
     <ClInclude Include="Source\XLib.System.Network.Socket.h" />
     <ClInclude Include="Source\XLib.System.Threading.Atomics.h" />
     <ClInclude Include="Source\XLib.System.Threading.Barrier.h" />
-    <ClInclude Include="Source\XLib.System.Threading.MTCircularQueue.h" />
     <ClInclude Include="Source\XLib.System.Threading.Event.h" />
     <ClInclude Include="Source\XLib.System.Threading.h" />
     <ClInclude Include="Source\XLib.System.Threading.Lock.h" />
+    <ClInclude Include="Source\XLib.System.Threading.MTCircularQueue.h" />
     <ClInclude Include="Source\XLib.System.Threading.ReadersWriterLock.h" />
     <ClInclude Include="Source\XLib.System.Timer.h" />
     <ClInclude Include="Source\XLib.System.VirtualMemory.h" />
     <ClInclude Include="Source\XLib.System.Window.h" />
+    <ClInclude Include="Source\XLib.SystemHeapAllocator.h" />
+    <ClInclude Include="Source\XLib.Text.h" />
     <ClInclude Include="Source\XLib.Time.h" />
-    <ClInclude Include="Source\XLib.h" />
     <ClInclude Include="Source\XLib.Vectors.Arithmetics.h" />
     <ClInclude Include="Source\XLib.Vectors.h" />
     <ClInclude Include="Source\XLib.Vectors.Math.h" />
-    <ClInclude Include="Source\XLib.Containers.AVLTreeLogic.h" />
-  </ItemGroup>
-  <ItemGroup>
+
+    <ClCompile Include="Source\XLib.cpp" />
     <ClCompile Include="Source\XLib.CRC.cpp" />
+    <ClCompile Include="Source\XLib.FileSystem.cpp" />
     <ClCompile Include="Source\XLib.JSON.cpp" />
+    <ClCompile Include="Source\XLib.Math.cpp" />
     <ClCompile Include="Source\XLib.Path.cpp" />
     <ClCompile Include="Source\XLib.Platform.COMPtr.cpp" />
     <ClCompile Include="Source\XLib.Program.cpp" />
-    <ClCompile Include="Source\XLib.SystemHeapAllocator.cpp" />
-    <ClCompile Include="Source\XLib.Math.cpp" />
     <ClCompile Include="Source\XLib.Random.cpp" />
     <ClCompile Include="Source\XLib.String.cpp" />
     <ClCompile Include="Source\XLib.System.AsyncIO.cpp" />
     <ClCompile Include="Source\XLib.System.File.cpp" />
-    <ClCompile Include="Source\XLib.FileSystem.cpp" />
     <ClCompile Include="Source\XLib.System.NamedPipe.cpp" />
     <ClCompile Include="Source\XLib.System.Network.cpp" />
     <ClCompile Include="Source\XLib.System.Network.Socket.cpp" />
@@ -96,159 +124,11 @@
     <ClCompile Include="Source\XLib.System.Threading.Event.cpp" />
     <ClCompile Include="Source\XLib.System.Timer.cpp" />
     <ClCompile Include="Source\XLib.System.Window.cpp" />
-    <ClCompile Include="Source\XLib.cpp" />
+    <ClCompile Include="Source\XLib.SystemHeapAllocator.cpp" />
     <ClCompile Include="Source\XLib.Text.cpp" />
   </ItemGroup>
-  <PropertyGroup Label="Globals">
-    <ProjectGuid>{DF81A513-72E3-4B74-B866-97F3BB61D45F}</ProjectGuid>
-    <Keyword>Win32Proj</Keyword>
-    <RootNamespace>XLib</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-  </PropertyGroup>
-  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
-    <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
-    <CharacterSet>Unicode</CharacterSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
-    <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>Unicode</CharacterSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
-    <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
-    <CharacterSet>Unicode</CharacterSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
-    <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>Unicode</CharacterSet>
-  </PropertyGroup>
-  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
-  <ImportGroup Label="ExtensionSettings">
-  </ImportGroup>
-  <ImportGroup Label="Shared">
-  </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
-  <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IntDir>$(SolutionDir)Build.Intermediate\$(PlatformName).$(Configuration)\$(ProjectName)\</IntDir>
-    <OutDir>$(SolutionDir)Build\</OutDir>
-    <TargetName>$(ProjectName).$(PlatformName).$(Configuration)</TargetName>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IntDir>$(SolutionDir)Build.Intermediate\$(PlatformName).$(Configuration)\$(ProjectName)\</IntDir>
-    <OutDir>$(SolutionDir)Build\</OutDir>
-    <TargetName>$(ProjectName).$(PlatformName).$(Configuration)</TargetName>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IntDir>$(SolutionDir)Build.Intermediate\$(PlatformName).$(Configuration)\$(ProjectName)\</IntDir>
-    <OutDir>$(SolutionDir)Build\</OutDir>
-    <TargetName>$(ProjectName)_$(PlatformName).$(Configuration)</TargetName>
-    <PublicIncludeDirectories>$(ProjectDir)Source;$(PublicIncludeDirectories)</PublicIncludeDirectories>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IntDir>$(SolutionDir)Build.Intermediate\$(PlatformName).$(Configuration)\$(ProjectName)\</IntDir>
-    <OutDir>$(SolutionDir)Build\</OutDir>
-    <TargetName>$(ProjectName)_$(PlatformName).$(Configuration)</TargetName>
-    <PublicIncludeDirectories>$(ProjectDir)Source;$(PublicIncludeDirectories)</PublicIncludeDirectories>
-  </PropertyGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <ClCompile>
-      <PrecompiledHeader>
-      </PrecompiledHeader>
-      <WarningLevel>Level3</WarningLevel>
-      <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <LanguageStandard>stdcpp20</LanguageStandard>
-    </ClCompile>
-    <Link>
-      <SubSystem>Windows</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
-    </Link>
-    <Lib>
-      <AdditionalDependencies>ws2_32.lib;Mswsock.lib;</AdditionalDependencies>
-    </Lib>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <ClCompile>
-      <PrecompiledHeader>
-      </PrecompiledHeader>
-      <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <LanguageStandard>stdcpp20</LanguageStandard>
-      <IntrinsicFunctions>false</IntrinsicFunctions>
-    </ClCompile>
-    <Link>
-      <SubSystem>Windows</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
-    </Link>
-    <Lib>
-      <AdditionalDependencies>ws2_32.lib;Mswsock.lib;</AdditionalDependencies>
-    </Lib>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
-      <PrecompiledHeader>
-      </PrecompiledHeader>
-      <Optimization>MaxSpeed</Optimization>
-      <FunctionLevelLinking>true</FunctionLevelLinking>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <LanguageStandard>stdcpp20</LanguageStandard>
-    </ClCompile>
-    <Link>
-      <SubSystem>Windows</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <OptimizeReferences>true</OptimizeReferences>
-    </Link>
-    <Lib>
-      <AdditionalDependencies>ws2_32.lib;Mswsock.lib;</AdditionalDependencies>
-    </Lib>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
-      <PrecompiledHeader>
-      </PrecompiledHeader>
-      <Optimization>MaxSpeed</Optimization>
-      <FunctionLevelLinking>true</FunctionLevelLinking>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <LanguageStandard>stdcpp20</LanguageStandard>
-    </ClCompile>
-    <Link>
-      <SubSystem>Windows</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <OptimizeReferences>true</OptimizeReferences>
-    </Link>
-    <Lib>
-      <AdditionalDependencies>ws2_32.lib;Mswsock.lib;</AdditionalDependencies>
-    </Lib>
-  </ItemDefinitionGroup>
+
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <ImportGroup Label="ExtensionTargets">
-  </ImportGroup>
+  <ImportGroup Label="ExtensionTargets" />
+
 </Project>
