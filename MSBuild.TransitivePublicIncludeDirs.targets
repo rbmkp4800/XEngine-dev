@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <Target Name="GetTransitivePublicIncludeDirsForReference" Returns="@(TransitivePublicIncludeDirsForReference)" DependsOnTargets="GetReferencedVCProjectsTransitivePublicIncludeDirs">
+    <ItemGroup>
+      <TransitivePublicIncludeDirsForReference Include="$(PublicIncludeDirectories);@(ReferencedVCProjectsTransitivePublicIncludeDirs)"/>
+    </ItemGroup>
+    <!-- <Message Importance="High" Text="#### GetTransitivePublicIncludeDirsForReference($(ProjectName)|$(Configuration)|$(Platform)): @(TransitivePublicIncludeDirsForReference)"/> -->
+  </Target>
+
+  <Target Name="GetReferencedVCProjectsTransitivePublicIncludeDirs">
+    <MSBuild
+        Projects="@(ProjectReference)"
+        Targets="GetTransitivePublicIncludeDirsForReference"
+        BuildInParallel="false"
+        Properties="%(_MSBuildProjectReferenceExistent.SetConfiguration); %(_MSBuildProjectReferenceExistent.SetPlatform)"
+        Condition="'%(ProjectReference.Extension)' == '.vcxproj'"
+        ContinueOnError="false"
+        RemoveProperties="%(_MSBuildProjectReferenceExistent.GlobalPropertiesToRemove)">
+      <Output TaskParameter="TargetOutputs" ItemName="UnfilteredReferencedVCProjectsTransitivePublicIncludeDirs"/>
+    </MSBuild>
+    <RemoveDuplicates Inputs="@(UnfilteredReferencedVCProjectsTransitivePublicIncludeDirs)">
+        <Output TaskParameter="Filtered" ItemName="ReferencedVCProjectsTransitivePublicIncludeDirs"/>
+    </RemoveDuplicates>
+  </Target>
+
+  <Target Name="ComputeTransitivePublicIncludeDirs" DependsOnTargets="GetReferencedVCProjectsTransitivePublicIncludeDirs">
+    <ItemGroup>
+      <ClCompile>
+        <AdditionalIncludeDirectories>%(CLCompile.AdditionalIncludeDirectories);@(ReferencedVCProjectsTransitivePublicIncludeDirs)</AdditionalIncludeDirectories>
+      </ClCompile>
+    </ItemGroup>
+    <!-- <Message Importance="High" Text="#### ComputeTransitivePublicIncludeDirs($(ProjectName)|$(Configuration)|$(Platform)): @(ReferencedVCProjectsTransitivePublicIncludeDirs)"/> -->
+  </Target>
+
+  <PropertyGroup>
+    <ComputeCompileInputsTargets>$(ComputeCompileInputsTargets);ComputeTransitivePublicIncludeDirs</ComputeCompileInputsTargets>
+  </PropertyGroup>
+
+</Project>
