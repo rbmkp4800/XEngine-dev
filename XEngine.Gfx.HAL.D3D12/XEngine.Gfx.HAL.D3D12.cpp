@@ -720,7 +720,7 @@ void CommandList::copyTexture(TextureHandle dstTextureHandle, TextureSubresource
 	const D3D12_BOX d3dSrcBox = srcRegion ?
 		D3D12BoxFromOffsetAndSize(srcRegion->offset, srcRegion->size) :
 		D3D12BoxFromOffsetAndSize(uint16x3(0, 0, 0),
-			Host::CalculateMipLevelSize(srcTexture.textureDesc.size, srcSubresource.mipLevel));
+			Device::CalculateMipLevelSize(srcTexture.textureDesc.size, srcSubresource.mipLevel));
 
 	// TODO: Add texture subresource bounds validation.
 
@@ -741,7 +741,7 @@ void CommandList::copyBufferTexture(CopyBufferTextureDirection direction,
 	XEAssert(texture.type == ResourceType::Texture && texture.d3dResource);
 
 	const uint16x3 textureRegionSize = textureRegion ?
-		textureRegion->size : Host::CalculateMipLevelSize(texture.textureDesc.size, textureSubresource.mipLevel);
+		textureRegion->size : Device::CalculateMipLevelSize(texture.textureDesc.size, textureSubresource.mipLevel);
 
 	D3D12_TEXTURE_COPY_LOCATION d3dBufferLocation = {};
 	d3dBufferLocation.pResource = buffer.d3dResource;
@@ -774,7 +774,7 @@ void CommandList::copyBufferTexture(CopyBufferTextureDirection direction,
 		d3dSrcBox = textureRegion ?
 			D3D12BoxFromOffsetAndSize(textureRegion->offset, textureRegion->size) :
 			D3D12BoxFromOffsetAndSize(uint16x3(0, 0, 0),
-				Host::CalculateMipLevelSize(texture.textureDesc.size, textureSubresource.mipLevel));
+				Device::CalculateMipLevelSize(texture.textureDesc.size, textureSubresource.mipLevel));
 		p_d3dSrcBox = &d3dSrcBox;
 	}
 
@@ -1752,9 +1752,7 @@ uint32 Device::getSwapChainCurrentBackBufferIndex(SwapChainHandle swapChainHandl
 	return backBufferIndex;
 }
 
-// Host ////////////////////////////////////////////////////////////////////////////////////////////
-
-void Host::CreateDevice(Device& device)
+void Device::Create(Device& device)
 {
 	if (!dxgiFactory.isInitialized())
 		CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, dxgiFactory.uuid(), dxgiFactory.voidInitRef());
@@ -1778,7 +1776,7 @@ void Host::CreateDevice(Device& device)
 	d3dDevice->Release();
 }
 
-uint16x3 Host::CalculateMipLevelSize(uint16x3 srcSize, uint8 mipLevel)
+uint16x3 Device::CalculateMipLevelSize(uint16x3 srcSize, uint8 mipLevel)
 {
 	uint16x3 size = srcSize;
 	size.x >>= mipLevel;

@@ -15,7 +15,6 @@
 // TODO: Probably we can state that Texture2D is equivalent to Texture2DArray[1].
 // TODO: `TextureDesc` can be packed into 8 bytes.
 // TODO: Handle should be 18+10+4 or 17+11+4 instead of 20+8+4.
-// TODO: Probably move all the `Host` stuff to `Device` itself.
 // TODO: Setting pipeline type should not clear pipeline layout as one layout could work for graphics and compute.
 // TODO: Depth-stencil state, rasterizer state, blend state should be provided in runtime. We assume that these settings have nothing to do with shader bytecode.
 
@@ -38,7 +37,6 @@ struct ID3D12Fence;
 namespace XEngine::Gfx::HAL
 {
 	class Device;
-	class Host;
 
 	enum class DeviceMemoryAllocationHandle	: uint32 { Zero = 0 };
 	enum class BufferHandle					: uint32 { Zero = 0 };
@@ -319,7 +317,6 @@ namespace XEngine::Gfx::HAL
 	class Device : public XLib::NonCopyable
 	{
 		friend CommandList;
-		friend Host;
 
 	private:
 		static constexpr uint32 MaxMemoryAllocationCount = 1024;
@@ -445,12 +442,6 @@ namespace XEngine::Gfx::HAL
 		void initialize(ID3D12Device10* d3dDevice);
 
 	public:
-		static constexpr uint32 ConstantBufferSizeLimit = 64 * 1024;
-		static constexpr uint16 ConstantBufferBindAlignmentLog2 = 8;
-		static constexpr uint16 ConstantBufferBindAlignment = 1 << ConstantBufferBindAlignmentLog2;
-		static constexpr uint16 TextureArraySizeLimit = 2048;
-
-	public:
 		Device() = default;
 		~Device() = default;
 
@@ -537,12 +528,14 @@ namespace XEngine::Gfx::HAL
 		uint32 getSwapChainCurrentBackBufferIndex(SwapChainHandle swapChainHandle) const;
 
 		const char* getName() const;
-	};
 
-	class Host abstract final
-	{
 	public:
-		static void CreateDevice(Device& device);
+		static constexpr uint32 ConstantBufferSizeLimit = 64 * 1024;
+		static constexpr uint16 ConstantBufferBindAlignmentLog2 = 8;
+		static constexpr uint16 ConstantBufferBindAlignment = 1 << ConstantBufferBindAlignmentLog2;
+		static constexpr uint16 TextureArraySizeLimit = 2048;
+
+		static void Create(Device& device);
 		static uint16x3 CalculateMipLevelSize(uint16x3 srcSize, uint8 mipLevel);
 	};
 }
