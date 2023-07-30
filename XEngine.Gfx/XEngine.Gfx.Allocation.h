@@ -3,11 +3,11 @@
 #include <XLib.h>
 #include <XLib.NonCopyable.h>
 
-#include <XEngine.GfxHAL.D3D12.h>
+#include <XEngine.Gfx.HAL.D3D12.h>
 
 // TODO: All this code should probably be thread safe or assert single-thread usage.
 
-namespace XEngine::Render
+namespace XEngine::Gfx
 {
 	class CircularAllocatorWithGPUReleaseQueue : public XLib::NonCopyable
 	{
@@ -18,10 +18,10 @@ namespace XEngine::Render
 		static_assert(ReleaseQueueBufferSizeLog2 < 16);
 
 	private:
-		GfxHAL::DeviceQueueSyncPoint releaseQueueSyncPoints[ReleaseQueueBufferSize];
+		HAL::DeviceQueueSyncPoint releaseQueueSyncPoints[ReleaseQueueBufferSize];
 		uint16 releaseQueueRangeCounters[ReleaseQueueBufferSize];
 
-		GfxHAL::Device* device = nullptr;
+		HAL::Device* device = nullptr;
 		uint8 poolSizeLog2 = 0;
 
 		uint16 allocatedRangeHeadCounter = 0;
@@ -41,12 +41,12 @@ namespace XEngine::Render
 		CircularAllocatorWithGPUReleaseQueue() = default;
 		~CircularAllocatorWithGPUReleaseQueue() = default;
 
-		void initialize(GfxHAL::Device& device, uint8 poolSizeLog2);
+		void initialize(HAL::Device& device, uint8 poolSizeLog2);
 
 		uint16 allocate(uint16 size);
-		void enqueueRelease(GfxHAL::DeviceQueueSyncPoint syncPoint);
+		void enqueueRelease(HAL::DeviceQueueSyncPoint syncPoint);
 
-		inline GfxHAL::Device* getDevice() { return device; }
+		inline HAL::Device* getDevice() { return device; }
 	};
 
 	class TransientDescriptorAllocator : public XLib::NonCopyable
@@ -54,21 +54,21 @@ namespace XEngine::Render
 	private:
 		CircularAllocatorWithGPUReleaseQueue baseAllocator;
 
-		GfxHAL::DescriptorAddress descriptorPoolBaseAddress = 0;
+		HAL::DescriptorAddress descriptorPoolBaseAddress = 0;
 
 	public:
 		TransientDescriptorAllocator() = default;
 		~TransientDescriptorAllocator() = default;
 
-		void initialize(GfxHAL::Device& device, GfxHAL::DescriptorAddress descriptorPoolBaseAddress, uint8 descriptorPoolSizeLog2);
+		void initialize(HAL::Device& device, HAL::DescriptorAddress descriptorPoolBaseAddress, uint8 descriptorPoolSizeLog2);
 
-		inline GfxHAL::DescriptorAddress allocate(uint16 size) { return baseAllocator.allocate(size); }
-		inline void enqueueRelease(GfxHAL::DeviceQueueSyncPoint syncPoint) { baseAllocator.enqueueRelease(syncPoint); }
+		inline HAL::DescriptorAddress allocate(uint16 size) { return baseAllocator.allocate(size); }
+		inline void enqueueRelease(HAL::DeviceQueueSyncPoint syncPoint) { baseAllocator.enqueueRelease(syncPoint); }
 	};
 
 	struct UploadMemoryAllocationInfo
 	{
-		GfxHAL::BufferPointer gpuPointer;
+		HAL::BufferPointer gpuPointer;
 		void* cpuPointer;
 	};
 
@@ -77,19 +77,19 @@ namespace XEngine::Render
 	private:
 		CircularAllocatorWithGPUReleaseQueue baseAllocator;
 
-		GfxHAL::BufferHandle uploadMemoryPoolBuffer = GfxHAL::BufferHandle::Zero;
+		HAL::BufferHandle uploadMemoryPoolBuffer = HAL::BufferHandle::Zero;
 		byte* mappedUploadMemoryPoolBuffer = nullptr;
 
 	public:
-		static constexpr uint32 AllocationAlignment = GfxHAL::Device::ConstantBufferBindAlignment;
+		static constexpr uint32 AllocationAlignment = HAL::Device::ConstantBufferBindAlignment;
 
 	public:
 		TransientUploadMemoryAllocator() = default;
 		~TransientUploadMemoryAllocator();
 
-		void initialize(GfxHAL::Device& device, uint8 poolSizeLog2);
+		void initialize(HAL::Device& device, uint8 poolSizeLog2);
 
 		UploadMemoryAllocationInfo allocate(uint32 size);
-		void enqueueRelease(GfxHAL::DeviceQueueSyncPoint syncPoint) { baseAllocator.enqueueRelease(syncPoint); }
+		void enqueueRelease(HAL::DeviceQueueSyncPoint syncPoint) { baseAllocator.enqueueRelease(syncPoint); }
 	};
 }

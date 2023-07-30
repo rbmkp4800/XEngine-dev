@@ -15,8 +15,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{25b57cc9-0f71-4901-ba27-3ea9952fa23c}</ProjectGuid>
-    <RootNamespace>XEngineRender</RootNamespace>
+    <ProjectGuid>{b22f5870-0471-414e-bbdf-7a7ab5e46b83}</ProjectGuid>
+    <RootNamespace>XEngineGfx</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
 
@@ -33,31 +33,26 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ClInclude Include="XEngine.Render.Bloom.h" />
-    <ClInclude Include="XEngine.Render.h" />
-    <ClInclude Include="XEngine.Render.PostComposition.h" />
-    <ClInclude Include="XEngine.Render.Scene.h" />
+    <ClInclude Include="XEngine.Gfx.Allocation.h" />
+    <ClInclude Include="XEngine.Gfx.Scheduler.h" />
+    <ClInclude Include="XEngine.Gfx.ShaderLibrary.h" />
   </ItemGroup>
 
   <ItemGroup>
-    <ClCompile Include="XEngine.Render.Bloom.cpp" />
-    <ClCompile Include="XEngine.Render.cpp" />
-    <ClCompile Include="XEngine.Render.PostComposition.cpp" />
-    <ClCompile Include="XEngine.Render.Scene.cpp" />
+    <ClCompile Include="XEngine.Gfx.Allocation.cpp" />
+    <ClCompile Include="XEngine.Gfx.Scheduler.cpp" />
+    <ClCompile Include="XEngine.Gfx.ShaderLibrary.cpp" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\XLib\XLib.vcxproj">
+    <ProjectReference Include="..\XLib\XLib.vcxproj" >
       <Project>{df81a513-72e3-4b74-b866-97f3bb61d45f}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\XEngine.XStringHash\XEngine.XStringHash.vcxproj" >
-      <Project>{ca640875-7c04-42ba-b081-8dac82c9f48d}</Project>
     </ProjectReference>
     <ProjectReference Include="..\XEngine.Gfx.HAL.D3D12\XEngine.Gfx.HAL.D3D12.vcxproj">
       <Project>{1ed495b0-b69b-4409-83fc-587f590eab29}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\XEngine.Render.Shaders\XEngine.Render.Shaders.vcxproj">
-      <Project>{e6af7fdc-1839-4501-96b6-389ab9cafddb}</Project>
+    <ProjectReference Include="..\XEngine.Gfx.ShaderLibraryFormat\XEngine.Gfx.ShaderLibraryFormat.vcxproj">
+      <Project>{e41c3648-b10a-4c33-a052-d98f8ed51ab0}</Project>
     </ProjectReference>
   </ItemGroup>
 

@@ -4,13 +4,13 @@
 #include <XLib.NonCopyable.h>
 #include <XLib.Containers.ArrayList.h> // TODO: Remove
 
-#include <XEngine.GfxHAL.D3D12.h>
+#include <XEngine.Gfx.HAL.D3D12.h>
 
-#include "XEngine.Render.Allocation.h"
+#include "XEngine.Gfx.Allocation.h"
 
 // NOTE: This is dummy "placeholder" implementation just to get interface working.
 
-namespace XEngine::Render::Scheduler
+namespace XEngine::Gfx::Scheduler
 {
 	class Schedule;
 	class PassExecutionContext;
@@ -34,34 +34,34 @@ namespace XEngine::Render::Scheduler
 			{
 				struct
 				{
-					GfxHAL::BufferHandle bufferHandle;
+					HAL::BufferHandle bufferHandle;
 				} buffer;
 
 				struct
 				{
-					GfxHAL::TextureHandle textureHandle;
+					HAL::TextureHandle textureHandle;
 				} texture;
 
 				struct
 				{
-					GfxHAL::ResourceViewHandle resourceViewHandle;
+					HAL::ResourceViewHandle resourceViewHandle;
 				} descriptor;
 
 				struct
 				{
-					GfxHAL::RenderTargetViewHandle renderTargetViewHandle;
+					HAL::RenderTargetViewHandle renderTargetViewHandle;
 				} renderTarget;
 
 				struct
 				{
-					GfxHAL::DepthStencilViewHandle depthStencilViewHandle;
+					HAL::DepthStencilViewHandle depthStencilViewHandle;
 				} depthRenderTarget;
 			};
 		};
 
 	private:
-		GfxHAL::Device* device = nullptr;
-		GfxHAL::DeviceMemoryAllocationHandle deviceMemoryPool = GfxHAL::DeviceMemoryAllocationHandle::Zero;
+		HAL::Device* device = nullptr;
+		HAL::DeviceMemoryAllocationHandle deviceMemoryPool = HAL::DeviceMemoryAllocationHandle::Zero;
 		uint64 deviceMemoryPoolSize = 0;
 
 		//Entry* entries = nullptr;
@@ -72,12 +72,12 @@ namespace XEngine::Render::Scheduler
 		TransientResourcePool() = default;
 		~TransientResourcePool() = default;
 
-		void initialize(GfxHAL::Device& device, GfxHAL::DeviceMemoryAllocationHandle deviceMemoryPool, uint64 deviceMemoryPoolSize);
+		void initialize(HAL::Device& device, HAL::DeviceMemoryAllocationHandle deviceMemoryPool, uint64 deviceMemoryPoolSize);
 
 		// NOTE: Temporary
 		void reset();
 
-		//inline GfxHAL::DeviceMemoryAllocationHandle getMemoryPool() const { return deviceMemoryPool; }
+		//inline HAL::DeviceMemoryAllocationHandle getMemoryPool() const { return deviceMemoryPool; }
 	};
 
 	class PassExecutionContext : public XLib::NonCopyable
@@ -85,14 +85,14 @@ namespace XEngine::Render::Scheduler
 		friend Schedule;
 
 	private:
-		GfxHAL::Device& device;
+		HAL::Device& device;
 		const Schedule& schedule;
 		TransientResourcePool& transientResourcePool;
 		TransientDescriptorAllocator& transientDescriptorAllocator;
 		TransientUploadMemoryAllocator& transientUploadMemoryAllocator;
 
 	private:
-		inline PassExecutionContext(GfxHAL::Device& device,
+		inline PassExecutionContext(HAL::Device& device,
 			const Schedule& schedule,
 			TransientResourcePool& transientResourcePool,
 			TransientDescriptorAllocator& transientDescriptorAllocator,
@@ -106,25 +106,25 @@ namespace XEngine::Render::Scheduler
 		~PassExecutionContext() = default;
 
 	public:
-		GfxHAL::DescriptorAddress allocateTransientDescriptors(uint16 descriptorCount);
-		GfxHAL::DescriptorSetReference allocateTransientDescriptorSet(GfxHAL::DescriptorSetLayoutHandle descriptorSetLayout);
+		HAL::DescriptorAddress allocateTransientDescriptors(uint16 descriptorCount);
+		HAL::DescriptorSetReference allocateTransientDescriptorSet(HAL::DescriptorSetLayoutHandle descriptorSetLayout);
 		UploadMemoryAllocationInfo allocateTransientUploadMemory(uint32 size); // Aligned up to `Device::ConstantBufferBindAlignment`.
 
-		GfxHAL::BufferHandle resolveBuffer(Scheduler::BufferHandle buffer);
-		GfxHAL::TextureHandle resolveTexture(Scheduler::TextureHandle texture);
+		HAL::BufferHandle resolveBuffer(Scheduler::BufferHandle buffer);
+		HAL::TextureHandle resolveTexture(Scheduler::TextureHandle texture);
 
-		GfxHAL::ResourceViewHandle createTransientBufferView(GfxHAL::BufferHandle buffer);
-		GfxHAL::ResourceViewHandle createTransientTextureView(GfxHAL::TextureHandle texture,
-			GfxHAL::TexelViewFormat format = GfxHAL::TexelViewFormat::Undefined,
-			bool writable = false, const GfxHAL::TextureSubresourceRange& subresourceRange = {});
-		GfxHAL::RenderTargetViewHandle createTransientRenderTargetView(GfxHAL::TextureHandle texture,
-			GfxHAL::TexelViewFormat format, uint8 mipLevel = 0, uint16 arrayIndex = 0);
-		GfxHAL::DepthStencilViewHandle createTransientDepthStencilView(GfxHAL::TextureHandle texture,
+		HAL::ResourceViewHandle createTransientBufferView(HAL::BufferHandle buffer);
+		HAL::ResourceViewHandle createTransientTextureView(HAL::TextureHandle texture,
+			HAL::TexelViewFormat format = HAL::TexelViewFormat::Undefined,
+			bool writable = false, const HAL::TextureSubresourceRange& subresourceRange = {});
+		HAL::RenderTargetViewHandle createTransientRenderTargetView(HAL::TextureHandle texture,
+			HAL::TexelViewFormat format, uint8 mipLevel = 0, uint16 arrayIndex = 0);
+		HAL::DepthStencilViewHandle createTransientDepthStencilView(HAL::TextureHandle texture,
 			bool writableDepth, bool writableStencil, uint8 mipLevel = 0, uint16 arrayIndex = 0);
 	};
 
 	using PassExecutorFunc = void(*)(PassExecutionContext& executionBroker,
-		GfxHAL::Device& device, GfxHAL::CommandList& commandList, const void* userData);
+		HAL::Device& device, HAL::CommandList& commandList, const void* userData);
 
 	enum class BufferAccess : uint8
 	{
@@ -228,15 +228,15 @@ namespace XEngine::Render::Scheduler
 
 		struct Resource
 		{
-			GfxHAL::ResourceType type;
+			HAL::ResourceType type;
 			ResourceLifetime lifetime;
 
 			union
 			{
 				uint32 transientBufferSize;
-				GfxHAL::TextureDesc transientTextureDesc;
-				GfxHAL::BufferHandle externalBufferHandle;
-				GfxHAL::TextureHandle externalTextureHandle;
+				HAL::TextureDesc transientTextureDesc;
+				HAL::BufferHandle externalBufferHandle;
+				HAL::TextureHandle externalTextureHandle;
 			};
 
 			uint32 transientResourcePoolEntryIndex;
@@ -249,8 +249,8 @@ namespace XEngine::Render::Scheduler
 		};
 
 	private:
-		GfxHAL::Device* device = nullptr;
-		GfxHAL::CommandList commandList;
+		HAL::Device* device = nullptr;
+		HAL::CommandList commandList;
 
 		XLib::ArrayList<Resource> resources;
 		XLib::ArrayList<Pass> passes;
@@ -259,13 +259,13 @@ namespace XEngine::Render::Scheduler
 		Schedule() = default;
 		~Schedule() = default;
 
-		void initialize(GfxHAL::Device& device);
+		void initialize(HAL::Device& device);
 
 		BufferHandle createTransientBuffer(uint32 size);
-		TextureHandle createTransientTexture(const GfxHAL::TextureDesc& textureDesc);
+		TextureHandle createTransientTexture(const HAL::TextureDesc& textureDesc);
 
-		BufferHandle importExternalBuffer(GfxHAL::BufferHandle buffer);
-		TextureHandle importExternalTexture(GfxHAL::TextureHandle texture);
+		BufferHandle importExternalBuffer(HAL::BufferHandle buffer);
+		TextureHandle importExternalTexture(HAL::TextureHandle texture);
 
 		void* allocateUserData(uint32 size);
 

@@ -1,7 +1,6 @@
-#include "XEngine.Render.Allocation.h"
+#include "XEngine.Gfx.Allocation.h"
 
-using namespace XEngine::Render;
-using namespace XEngine::GfxHAL;
+using namespace XEngine::Gfx;
 
 bool CircularAllocatorWithGPUReleaseQueue::tryAllocate(uint16 size, uint16& resultAllocationHeadCounter)
 {
@@ -89,7 +88,7 @@ inline bool CircularAllocatorWithGPUReleaseQueue::isPendingReleaseRangeEmpty() c
 	return pendingReleaseRangeHeadCounter == allocatedRangeTailCounter;
 }
 
-void CircularAllocatorWithGPUReleaseQueue::initialize(Device& device, uint8 poolSizeLog2)
+void CircularAllocatorWithGPUReleaseQueue::initialize(HAL::Device& device, uint8 poolSizeLog2)
 {
 	XEAssert(!this->device);
 	XEAssert(poolSizeLog2 <= 16); // As we use uint16 for counters everywhere
@@ -127,7 +126,7 @@ uint16 CircularAllocatorWithGPUReleaseQueue::allocate(uint16 size)
 	return resultAllocationHeadCounter;
 }
 
-void CircularAllocatorWithGPUReleaseQueue::enqueueRelease(DeviceQueueSyncPoint syncPoint)
+void CircularAllocatorWithGPUReleaseQueue::enqueueRelease(HAL::DeviceQueueSyncPoint syncPoint)
 {
 	XEAssert(device);
 
@@ -157,8 +156,8 @@ void CircularAllocatorWithGPUReleaseQueue::enqueueRelease(DeviceQueueSyncPoint s
 	}
 }
 
-void TransientDescriptorAllocator::initialize(Device& device,
-	DescriptorAddress descriptorPoolBaseAddress, uint8 descriptorPoolSizeLog2)
+void TransientDescriptorAllocator::initialize(HAL::Device& device,
+	HAL::DescriptorAddress descriptorPoolBaseAddress, uint8 descriptorPoolSizeLog2)
 {
 	// TODO: State asserts
 	// TODO: Assert that allocator descriptor pool fits into global device descriptor pool.
@@ -170,25 +169,25 @@ void TransientDescriptorAllocator::initialize(Device& device,
 
 TransientUploadMemoryAllocator::~TransientUploadMemoryAllocator()
 {
-	if (uploadMemoryPoolBuffer != BufferHandle::Zero)
+	if (uploadMemoryPoolBuffer != HAL::BufferHandle::Zero)
 	{
 		baseAllocator.getDevice()->destroyBuffer(uploadMemoryPoolBuffer);
 
-		uploadMemoryPoolBuffer = BufferHandle::Zero;
+		uploadMemoryPoolBuffer = HAL::BufferHandle::Zero;
 		mappedUploadMemoryPoolBuffer = nullptr;
 	}
 }
 
-void TransientUploadMemoryAllocator::initialize(GfxHAL::Device& device, uint8 poolSizeLog2)
+void TransientUploadMemoryAllocator::initialize(HAL::Device& device, uint8 poolSizeLog2)
 {
 	// TODO: State asserts
 
-	XEAssert(poolSizeLog2 > Device::ConstantBufferBindAlignmentLog2);
+	XEAssert(poolSizeLog2 > HAL::Device::ConstantBufferBindAlignmentLog2);
 
-	baseAllocator.initialize(device, poolSizeLog2 - Device::ConstantBufferBindAlignmentLog2);
+	baseAllocator.initialize(device, poolSizeLog2 - HAL::Device::ConstantBufferBindAlignmentLog2);
 
 	const uint32 poolSize = uint32(1) << poolSizeLog2;
-	uploadMemoryPoolBuffer = device.createBuffer(poolSize, false, BufferMemoryType::Upload);
+	uploadMemoryPoolBuffer = device.createBuffer(poolSize, false, HAL::BufferMemoryType::Upload);
 	mappedUploadMemoryPoolBuffer = (byte*)device.mapBuffer(uploadMemoryPoolBuffer);
 }
 

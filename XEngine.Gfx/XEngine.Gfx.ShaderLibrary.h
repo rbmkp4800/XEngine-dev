@@ -1,10 +1,11 @@
 #pragma once
 
 #include <XLib.h>
+#include <XLib.NonCopyable.h>
 
-#include <XEngine.GfxHAL.D3D12.h>
+#include <XEngine.Gfx.HAL.D3D12.h>
 
-namespace XEngine::Render
+namespace XEngine::Gfx
 {
 	class ShaderLibrary : public XLib::NonCopyable
 	{
@@ -30,8 +31,8 @@ namespace XEngine::Render
 		void load(const char* libraryFilePath);
 		void reload(const char* libraryFilePath);
 
-		GfxHAL::DescriptorSetLayoutHandle getDescriptorSetLayout(uint64 nameXSH) const;
-		GfxHAL::PipelineLayoutHandle getPipelineLayout(uint64 nameXSH) const;
-		GfxHAL::PipelineHandle getPipeline(uint64 nameXSH) const;
+		HAL::DescriptorSetLayoutHandle getDescriptorSetLayout(uint64 nameXSH) const;
+		HAL::PipelineLayoutHandle getPipelineLayout(uint64 nameXSH) const;
+		HAL::PipelineHandle getPipeline(uint64 nameXSH) const;
 	};
 }

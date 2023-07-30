@@ -1,9 +1,7 @@
-#include "XEngine.Render.Scheduler.h"
+#include "XEngine.Gfx.Scheduler.h"
 
-using namespace XLib; // TODO: Remove
-using namespace XEngine;
-using namespace XEngine::Render;
-using namespace XEngine::Render::Scheduler;
+using namespace XEngine::Gfx;
+using namespace XEngine::Gfx::Scheduler;
 
 enum class TransientResourcePool::EntryType : uint8
 {
@@ -15,8 +13,8 @@ enum class TransientResourcePool::EntryType : uint8
 	DepthRenderTarget,
 };
 
-void TransientResourcePool::initialize(GfxHAL::Device& device,
-	GfxHAL::DeviceMemoryAllocationHandle deviceMemoryPool, uint64 deviceMemoryPoolSize)
+void TransientResourcePool::initialize(HAL::Device& device,
+	HAL::DeviceMemoryAllocationHandle deviceMemoryPool, uint64 deviceMemoryPoolSize)
 {
 	// TODO: State asserts
 
@@ -37,7 +35,7 @@ void TransientResourcePool::reset()
 
 			case EntryType::Texture:
 				device->destroyTexture(entry.texture.textureHandle);
-				entry.texture.textureHandle = GfxHAL::TextureHandle::Zero;
+				entry.texture.textureHandle = HAL::TextureHandle::Zero;
 				break;
 
 			case EntryType::Descriptor:
@@ -46,7 +44,7 @@ void TransientResourcePool::reset()
 
 			case EntryType::RenderTarget:
 				device->destroyRenderTargetView(entry.renderTarget.renderTargetViewHandle);
-				entry.renderTarget.renderTargetViewHandle = GfxHAL::RenderTargetViewHandle::Zero;
+				entry.renderTarget.renderTargetViewHandle = HAL::RenderTargetViewHandle::Zero;
 				break;
 
 			case EntryType::DepthRenderTarget:
@@ -60,17 +58,17 @@ void TransientResourcePool::reset()
 	entries.clear();
 }
 
-GfxHAL::DescriptorAddress PassExecutionContext::allocateTransientDescriptors(uint16 descriptorCount)
+HAL::DescriptorAddress PassExecutionContext::allocateTransientDescriptors(uint16 descriptorCount)
 {
 	// TODO: Revisit this
 	return transientDescriptorAllocator.allocate(descriptorCount);
 }
 
-GfxHAL::DescriptorSetReference PassExecutionContext::allocateTransientDescriptorSet(
-	GfxHAL::DescriptorSetLayoutHandle descriptorSetLayout)
+HAL::DescriptorSetReference PassExecutionContext::allocateTransientDescriptorSet(
+	HAL::DescriptorSetLayoutHandle descriptorSetLayout)
 {
 	const uint16 descriptorCount = device.getDescriptorSetLayoutDescriptorCount(descriptorSetLayout);
-	const GfxHAL::DescriptorAddress descriptorSetBaseAddress = allocateTransientDescriptors(descriptorCount);
+	const HAL::DescriptorAddress descriptorSetBaseAddress = allocateTransientDescriptors(descriptorCount);
 	return device.createDescriptorSetReference(descriptorSetLayout, descriptorSetBaseAddress);
 }
 
@@ -79,12 +77,12 @@ UploadMemoryAllocationInfo PassExecutionContext::allocateTransientUploadMemory(u
 	return transientUploadMemoryAllocator.allocate(size);
 }
 
-GfxHAL::TextureHandle PassExecutionContext::resolveTexture(Scheduler::TextureHandle texture)
+HAL::TextureHandle PassExecutionContext::resolveTexture(Scheduler::TextureHandle texture)
 {
 	const uint32 resourceIndex = uint32(texture);
 	XAssert(resourceIndex < schedule.resources.getSize());
 	const Schedule::Resource& resource = schedule.resources[resourceIndex];
-	XAssert(resource.type == GfxHAL::ResourceType::Texture);
+	XAssert(resource.type == HAL::ResourceType::Texture);
 
 	if (resource.lifetime == Schedule::ResourceLifetime::Transient)
 	{
@@ -105,10 +103,10 @@ GfxHAL::TextureHandle PassExecutionContext::resolveTexture(Scheduler::TextureHan
 ResourceViewHandle PassExecutionContext::createTransientTextureView(Scheduler::TextureHandle texture,
 	TexelViewFormat format, bool writable, const TextureSubresourceRange& subresourceRange) { }*/
 
-GfxHAL::RenderTargetViewHandle PassExecutionContext::createTransientRenderTargetView(GfxHAL::TextureHandle texture,
-	GfxHAL::TexelViewFormat format, uint8 mipLevel, uint16 arrayIndex)
+HAL::RenderTargetViewHandle PassExecutionContext::createTransientRenderTargetView(HAL::TextureHandle texture,
+	HAL::TexelViewFormat format, uint8 mipLevel, uint16 arrayIndex)
 {
-	const GfxHAL::RenderTargetViewHandle rtv = device.createRenderTargetView(texture, format, mipLevel, arrayIndex);
+	const HAL::RenderTargetViewHandle rtv = device.createRenderTargetView(texture, format, mipLevel, arrayIndex);
 
 	TransientResourcePool::Entry transientResourcePoolEntry = {};
 	transientResourcePoolEntry.type = TransientResourcePool::EntryType::RenderTarget;
@@ -121,26 +119,26 @@ GfxHAL::RenderTargetViewHandle PassExecutionContext::createTransientRenderTarget
 /*DepthStencilViewHandle PassExecutionContext::createTransientDepthStencilView(Scheduler::TextureHandle texture,
 	bool writableDepth, bool writableStencil, uint8 mipLevel, uint16 arrayIndex) { }*/
 
-void Schedule::initialize(GfxHAL::Device& device)
+void Schedule::initialize(HAL::Device& device)
 {
 	XAssert(!this->device);
 
 	this->device = &device;
-	device.createCommandList(commandList, GfxHAL::CommandListType::Graphics);
+	device.createCommandList(commandList, HAL::CommandListType::Graphics);
 }
 
 //Scheduler::BufferHandle Schedule::createTransientBuffer(uint32 size) { }
 
-/*Scheduler::TextureHandle Schedule::createTransientTexture(const GfxHAL::TextureDesc& textureDesc)
+/*Scheduler::TextureHandle Schedule::createTransientTexture(const HAL::TextureDesc& textureDesc)
 {
 	Resource resource = {};
-	resource.type = GfxHAL::ResourceType::Texture;
+	resource.type = HAL::ResourceType::Texture;
 }*/
 
-Scheduler::TextureHandle Schedule::importExternalTexture(GfxHAL::TextureHandle texture)
+Scheduler::TextureHandle Schedule::importExternalTexture(HAL::TextureHandle texture)
 {
 	Resource resource = {};
-	resource.type = GfxHAL::ResourceType::Texture;
+	resource.type = HAL::ResourceType::Texture;
 	resource.lifetime = ResourceLifetime::External;
 	resource.externalTextureHandle = texture;
 	
@@ -180,16 +178,16 @@ void Schedule::execute(TransientResourcePool& transientResourcePool,
 		if (resource.lifetime != ResourceLifetime::Transient)
 			continue;
 
-		if (resource.type == GfxHAL::ResourceType::Buffer)
+		if (resource.type == HAL::ResourceType::Buffer)
 		{
 			const uint64 requiredMemorySize = alignUp<uint64>(resource.transientBufferSize, 65536);
 			const uint64 memoryOffset = transientResourcePoolMemoryUsed;
 			transientResourcePoolMemoryUsed += requiredMemorySize;
 
-			const GfxHAL::BufferHandle buffer =
+			const HAL::BufferHandle buffer =
 				device->createBuffer(resource.transientBufferSize, true,
-					// GfxHAL::BufferMemoryType::DeviceLocal, transientResourcePool.deviceMemoryPool, memoryOffset
-					GfxHAL::BufferMemoryType::DeviceLocal);
+					// HAL::BufferMemoryType::DeviceLocal, transientResourcePool.deviceMemoryPool, memoryOffset
+					HAL::BufferMemoryType::DeviceLocal);
 
 			resource.transientResourcePoolEntryIndex = transientResourcePool.entries.getSize();
 
@@ -198,19 +196,19 @@ void Schedule::execute(TransientResourcePool& transientResourcePool,
 			transientResourcePoolEntry.buffer.bufferHandle = buffer;
 			transientResourcePool.entries.pushBack(transientResourcePoolEntry);
 		}
-		else if (resource.type == GfxHAL::ResourceType::Texture)
+		else if (resource.type == HAL::ResourceType::Texture)
 		{
-			const GfxHAL::ResourceAllocationInfo textureAllocationInfo =
+			const HAL::ResourceAllocationInfo textureAllocationInfo =
 				device->getTextureAllocationInfo(resource.transientTextureDesc);
 
 			const uint64 requiredMemorySize = alignUp<uint64>(textureAllocationInfo.size, 65536); // TODO: Do we need alignUp here?
 			const uint64 memoryOffset = transientResourcePoolMemoryUsed;
 			transientResourcePoolMemoryUsed += requiredMemorySize;
 
-			const GfxHAL::TextureHandle texture =
+			const HAL::TextureHandle texture =
 				device->createTexture(resource.transientTextureDesc,
 					//transientResourcePool.deviceMemoryPool, memoryOffset);
-					GfxHAL::DeviceMemoryAllocationHandle::Zero);
+					HAL::DeviceMemoryAllocationHandle::Zero);
 
 			resource.transientResourcePoolEntryIndex = transientResourcePool.entries.getSize();
 
@@ -231,9 +229,9 @@ void Schedule::execute(TransientResourcePool& transientResourcePool,
 
 	//commandList.close();
 
-	device->submitWorkload(GfxHAL::DeviceQueue::Main, commandList);
+	device->submitWorkload(HAL::DeviceQueue::Main, commandList);
 
-	const GfxHAL::DeviceQueueSyncPoint sp = device->getEndOfQueueSyncPoint(GfxHAL::DeviceQueue::Main);
+	const HAL::DeviceQueueSyncPoint sp = device->getEndOfQueueSyncPoint(HAL::DeviceQueue::Main);
 
 	transientDescriptorAllocator.enqueueRelease(sp);
 	transientUploadMemoryAllocator.enqueueRelease(sp);
