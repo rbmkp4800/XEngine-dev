@@ -28,8 +28,8 @@ namespace XEngine::Gfx
 		ShaderLibrary() = default;
 		~ShaderLibrary();
 
-		void load(const char* libraryFilePath);
-		void reload(const char* libraryFilePath);
+		void load(const char* libraryFilePath, HAL::Device& halDevice);
+		void reload(const char* libraryFilePath, HAL::Device& halDevice);
 
 		HAL::DescriptorSetLayoutHandle getDescriptorSetLayout(uint64 nameXSH) const;
 		HAL::PipelineLayoutHandle getPipelineLayout(uint64 nameXSH) const;

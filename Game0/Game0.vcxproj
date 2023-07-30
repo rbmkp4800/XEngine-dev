@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{e7c5a323-42a5-44e9-9363-1c3584cc4edd}</ProjectGuid>
+    <RootNamespace>Game0</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <Import Project="$(ProjectDefaultsPropsPath)" />
+
+  <ItemDefinitionGroup>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <ItemGroup>
+    <ClCompile Include="Game0.cpp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\XLib\XLib.vcxproj">
+      <Project>{df81a513-72e3-4b74-b866-97f3bb61d45f}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\XEngine.Common\XEngine.Common.vcxproj">
+      <Project>{276891e4-c661-4502-b581-781efb8098d6}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\XEngine.Gfx.HAL.D3D12\XEngine.Gfx.HAL.D3D12.vcxproj">
+      <Project>{1ed495b0-b69b-4409-83fc-587f590eab29}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\XEngine.Gfx\XEngine.Gfx.vcxproj">
+      <Project>{b22f5870-0471-414e-bbdf-7a7ab5e46b83}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\XEngine.System\XEngine.System.vcxproj">
+      <Project>{107c587b-0d5f-4de1-a06b-5fc8c7b1051b}</Project>
+    </ProjectReference>
+  </ItemGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+
+</Project>

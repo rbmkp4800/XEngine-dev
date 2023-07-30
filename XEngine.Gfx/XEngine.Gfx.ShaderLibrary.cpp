@@ -47,11 +47,9 @@ ShaderLibrary::~ShaderLibrary()
 	}
 }
 
-void ShaderLibrary::load(const char* libraryFilePath)
+void ShaderLibrary::load(const char* libraryFilePath, HAL::Device& halDevice)
 {
 	// TODO: Refactor this method.
-
-	HAL::Device& halDevice = Host::GetDevice();
 
 	File libraryFile;
 	libraryFile.open(libraryFilePath, FileAccessMode::Read, FileOpenMode::OpenExisting);
