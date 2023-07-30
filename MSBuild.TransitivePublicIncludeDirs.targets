@@ -14,7 +14,7 @@
         Targets="GetTransitivePublicIncludeDirsForReference"
         BuildInParallel="false"
         Properties="%(_MSBuildProjectReferenceExistent.SetConfiguration); %(_MSBuildProjectReferenceExistent.SetPlatform)"
-        Condition="'%(ProjectReference.Extension)' == '.vcxproj'"
+        Condition="'%(ProjectReference.Extension)' == '.vcxproj' and ('$(PublicIncludeDirectories)' != '' or '$(IsComputeTransitivePublicIncludeDirsRoot)' != '')"
         ContinueOnError="false"
         RemoveProperties="%(_MSBuildProjectReferenceExistent.GlobalPropertiesToRemove)">
       <Output TaskParameter="TargetOutputs" ItemName="UnfilteredReferencedVCProjectsTransitivePublicIncludeDirs"/>
@@ -24,17 +24,30 @@
     </RemoveDuplicates>
   </Target>
 
+  <Target Name="ComputeTransitivePublicIncludeDirs_MarkRoot">
+    <PropertyGroup>
+      <IsComputeTransitivePublicIncludeDirsRoot>true</IsComputeTransitivePublicIncludeDirsRoot>
+    </PropertyGroup>
+  </Target>
+
   <Target Name="ComputeTransitivePublicIncludeDirs" DependsOnTargets="GetReferencedVCProjectsTransitivePublicIncludeDirs">
     <ItemGroup>
       <ClCompile>
-        <AdditionalIncludeDirectories>%(CLCompile.AdditionalIncludeDirectories);@(ReferencedVCProjectsTransitivePublicIncludeDirs)</AdditionalIncludeDirectories>
+        <AdditionalIncludeDirectories>
+          %(CLCompile.AdditionalIncludeDirectories);
+          @(ReferencedVCProjectsTransitivePublicIncludeDirs)
+        </AdditionalIncludeDirectories>
       </ClCompile>
     </ItemGroup>
     <!-- <Message Importance="High" Text="#### ComputeTransitivePublicIncludeDirs($(ProjectName)|$(Configuration)|$(Platform)): @(ReferencedVCProjectsTransitivePublicIncludeDirs)"/> -->
   </Target>
 
   <PropertyGroup>
-    <ComputeCompileInputsTargets>$(ComputeCompileInputsTargets);ComputeTransitivePublicIncludeDirs</ComputeCompileInputsTargets>
+    <ComputeCompileInputsTargets>
+      $(ComputeCompileInputsTargets);
+      ComputeTransitivePublicIncludeDirs_MarkRoot;
+      ComputeTransitivePublicIncludeDirs
+    </ComputeCompileInputsTargets>
   </PropertyGroup>
 
 </Project>

@@ -30,8 +30,10 @@
 
   <ItemDefinitionGroup>
     <PostBuildEvent>
-      <Command>xcopy /y $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.dll $(OutDir)
-xcopy /y $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.pdb $(OutDir)</Command>
+      <Command>
+        xcopy /y $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.dll $(OutDir)
+        xcopy /y $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.pdb $(OutDir)
+      </Command>
       <Message>Copying DXC DLLs to output directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -64,6 +66,5 @@ xcopy /y $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <ImportGroup Label="ExtensionTargets" />
 
 </Project>

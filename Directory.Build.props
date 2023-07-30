@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 
+  <!--
+    Project defauls props are sparated into into two parts. First part is located in this file and is included via 'Microsoft.Cpp.Default.props'.
+    This part does not depend on any MSBuild props like '$(Configuration)' and '$(Platform)' that are defined in imports done later.
+    Second part is located in '$(ProjectDefaultsPropsPath)' and is ment to be imported after 'Microsoft.Cpp.props' so MSBuild project props are defined and can be used.
+    Note, that some props like '$(PlatformToolset)' can only be defined before 'Microsoft.Cpp.props' import, otherwise build will fail.
+  -->
   <PropertyGroup>
     <ProjectDefaultsPropsPath>$(MSBuildThisFileDirectory)XEngine.ProjectDefaults.props</ProjectDefaultsPropsPath>
   </PropertyGroup>
