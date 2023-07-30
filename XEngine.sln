@@ -13,21 +13,21 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GameSample1", "GameSample1\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.Shaders", "XEngine.Render.Shaders\XEngine.Render.Shaders.vcxproj", "{E6AF7FDC-1839-4501-96B6-389AB9CAFDDB}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.ShaderLibraryBuilder", "XEngine.Render.ShaderLibraryBuilder\XEngine.Render.ShaderLibraryBuilder.vcxproj", "{981D9FCB-69BD-47D9-8033-15F5B4621A85}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Gfx.ShaderLibraryBuilder", "XEngine.Gfx.ShaderLibraryBuilder\XEngine.Gfx.ShaderLibraryBuilder.vcxproj", "{981D9FCB-69BD-47D9-8033-15F5B4621A85}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.GeometryCompiler", "XEngine.GeometryCompiler\XEngine.GeometryCompiler.vcxproj", "{15BB28E9-80FC-4CF4-9A4E-AB2DA05352FC}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.GeometryImporter", "XEngine.GeometryImporter\XEngine.GeometryImporter.vcxproj", "{04B988B1-C7EA-4261-87E1-0A95B6630F95}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.GfxHAL.D3D12", "XEngine.GfxHAL.D3D12\XEngine.GfxHAL.D3D12.vcxproj", "{1ED495B0-B69B-4409-83FC-587F590EAB29}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Gfx.HAL.D3D12", "XEngine.Gfx.HAL.D3D12\XEngine.Gfx.HAL.D3D12.vcxproj", "{1ED495B0-B69B-4409-83FC-587F590EAB29}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XC.Compiler", "XC.Compiler\XC.Compiler.vcxproj", "{A0A7087D-4990-4DE2-9E57-A47928A38608}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.GfxHAL.Common", "XEngine.GfxHAL.Common\XEngine.GfxHAL.Common.vcxproj", "{102D6F8C-FAAD-4FD3-9B3A-16923042465E}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Gfx.HAL.Shared", "XEngine.Gfx.HAL.Shared\XEngine.Gfx.HAL.Shared.vcxproj", "{102D6F8C-FAAD-4FD3-9B3A-16923042465E}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.GfxHAL.ShaderCompiler", "XEngine.GfxHAL.ShaderCompiler\XEngine.GfxHAL.ShaderCompiler.vcxproj", "{0E31D4F6-C1D4-4A6F-8C42-A0F7B2E4D9D9}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Gfx.HAL.ShaderCompiler", "XEngine.Gfx.HAL.ShaderCompiler\XEngine.Gfx.HAL.ShaderCompiler.vcxproj", "{0E31D4F6-C1D4-4A6F-8C42-A0F7B2E4D9D9}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.ShaderLibraryFormat", "XEngine.Render.ShaderLibraryFormat\XEngine.Render.ShaderLibraryFormat.vcxproj", "{E41C3648-B10A-4C33-A052-D98F8ED51AB0}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Gfx.ShaderLibraryFormat", "XEngine.Gfx.ShaderLibraryFormat\XEngine.Gfx.ShaderLibraryFormat.vcxproj", "{E41C3648-B10A-4C33-A052-D98F8ED51AB0}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XUI", "XUI\XUI.vcxproj", "{41B7A650-F2DA-4859-94E6-008619E2D88B}"
 EndProject

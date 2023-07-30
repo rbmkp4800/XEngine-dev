@@ -14,12 +14,14 @@
 
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
-    <ProjectGuid>{E6AF7FDC-1839-4501-96B6-389AB9CAFDDB}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{102d6f8c-faad-4fd3-9b3a-16923042465e}</ProjectGuid>
+    <RootNamespace>XEngineGfxHALShared</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
 
   <PropertyGroup Label="Configuration">
-    <ConfigurationType>Makefile</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
   </PropertyGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -27,14 +29,19 @@
   <Import Project="$(ProjectDefaultsPropsPath)" />
 
   <PropertyGroup>
-    <NMakeBuildCommandLine>
-      $(SolutionDir)Build\XEngine.Gfx.ShaderLibraryBuilder_x64.Debug.exe
-    </NMakeBuildCommandLine>
+    <PublicIncludeDirectories>$(ProjectDir);$(PublicIncludeDirectories)</PublicIncludeDirectories>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\XEngine.Gfx.ShaderLibraryBuilder\XEngine.Gfx.ShaderLibraryBuilder.vcxproj">
-      <Project>{981d9fcb-69bd-47d9-8033-15f5b4621a85}</Project>
+    <ClInclude Include="XEngine.Gfx.HAL.Shared.h" />
+    <ClInclude Include="XEngine.Gfx.HAL.BlobFormat.h" />
+    <ClCompile Include="XEngine.Gfx.HAL.BlobFormat.cpp" />
+    <ClCompile Include="XEngine.Gfx.HAL.Shared.cpp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\XLib\XLib.vcxproj" >
+      <Project>{df81a513-72e3-4b74-b866-97f3bb61d45f}</Project>
     </ProjectReference>
   </ItemGroup>
 
