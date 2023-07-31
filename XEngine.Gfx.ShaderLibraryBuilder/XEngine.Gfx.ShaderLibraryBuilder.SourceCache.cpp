@@ -64,8 +64,8 @@ bool SourceCache::resolveText(XLib::StringViewASCII localPath, XLib::StringViewA
 {
 	resultText = {};
 
-	XTODO("Proper path validation and normalization");
-	XTODO("Proper error reporting")
+	// TODO: Proper path validation and normalization.
+	// TODO: Proper error reporting.
 
 	//if (!Path::IsValid(localPath)))
 	//	return false;
@@ -100,7 +100,10 @@ bool SourceCache::resolveText(XLib::StringViewASCII localPath, XLib::StringViewA
 	DynamicStringASCII text;
 	const bool readTextResult = ReadTextFile(fullPath.getCStr(), text);
 
-	const uint32 memoryBlockSize = sizeof(Entry) + uint32(normalizedLocalPath.getLength()) + 1;
+	if (!readTextResult)
+		TextWriteFmtStdOut("Cannot open file '", fullPath, "'\n");
+
+	const uintptr memoryBlockSize = sizeof(Entry) + normalizedLocalPath.getLength() + 1;
 	void* memoryBlock = SystemHeapAllocator::Allocate(memoryBlockSize);
 
 	Entry& newEntry = *(Entry*)memoryBlock;

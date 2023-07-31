@@ -28,7 +28,7 @@
 
   <PropertyGroup>
     <NMakeBuildCommandLine>
-      $(SolutionDir)Build\XEngine.Gfx.ShaderLibraryBuilder_x64.Debug.exe
+      $(SolutionDir)Build\XEngine.Gfx.ShaderLibraryBuilder_x64.Debug.exe -libdef="$(ProjectDir)$(ProjectName).libdef.json" -out="$(OutDir)$(ProjectName).xeslib"
     </NMakeBuildCommandLine>
   </PropertyGroup>
 

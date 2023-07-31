@@ -967,6 +967,9 @@ bool LibraryDefinitionLoader::readShaderSetupObject(HAL::ShaderCompiler::ShaderD
 
 bool LibraryDefinitionLoader::load(const char* jsonPath)
 {
+	XAssert(jsonPath && jsonPath[0]);
+	// TODO: Validate path.
+
 	this->jsonPath = jsonPath;
 
 	DynamicStringASCII text;
@@ -976,7 +979,10 @@ bool LibraryDefinitionLoader::load(const char* jsonPath)
 		File file;
 		file.open(jsonPath, FileAccessMode::Read, FileOpenMode::OpenExisting);
 		if (!file.isInitialized())
+		{
+			TextWriteFmtStdOut("Cannot open library definition file '", jsonPath, "'");
 			return false;
+		}
 
 		const uint32 fileSize = XCheckedCastU32(file.getSize());
 

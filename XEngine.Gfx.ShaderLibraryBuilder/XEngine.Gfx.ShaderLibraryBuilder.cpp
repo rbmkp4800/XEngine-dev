@@ -1,6 +1,7 @@
 #include <XLib.h>
 #include <XLib.Algorithm.QuickSort.h>
 #include <XLib.Containers.ArrayList.h>
+#include <XLib.Path.h>
 #include <XLib.System.File.h>
 #include <XLib.Text.h>
 
@@ -327,10 +328,38 @@ PipelineRef Pipeline::CreateCompute(StringViewASCII name,
 	return PipelineRef(&resultObject);
 }
 
-int main()
+int main(int argc, char* argv[])
 {
+	// Parse cmd line arguments.
+
+	const char* libraryDefinitionFilePath = nullptr;
+	const char* outLibraryFilePath = nullptr;
+
+	for (int i = 1; i < argc; i++)
+	{
+		if (String::StartsWith(argv[i], "-libdef="))
+			libraryDefinitionFilePath = argv[i] + 8;
+		else if (String::StartsWith(argv[i], "-out="))
+			outLibraryFilePath = argv[i] + 5;
+	}
+
+	if (!libraryDefinitionFilePath)
+	{
+		TextWriteFmtStdOut("error: missing library definition file path");
+		return 0;
+	}
+	if (!outLibraryFilePath)
+	{
+		TextWriteFmtStdOut("error: missing output file path");
+		return 0;
+	}
+
+	// Load library definition file.
+
+	TextWriteFmtStdOut("Loading shader library definition file '", libraryDefinitionFilePath, "'\n");
+
 	LibraryDefinition libraryDefinition;
-	if (!LibraryDefinitionLoader::Load(libraryDefinition, "../XEngine.Render.Shaders/.xeslibdef.json"))
+	if (!LibraryDefinitionLoader::Load(libraryDefinition, libraryDefinitionFilePath))
 		return 0;
 
 	// Sort pipelines by actual name, so log looks nice :sparkles:
@@ -345,7 +374,7 @@ int main()
 
 	// Actual compilation.
 
-	SourceCache sourceCache(StringView("../XEngine.Render.Shaders/"));
+	SourceCache sourceCache(Path::RemoveFileName(libraryDefinitionFilePath));
 
 	for (uint32 i = 0; i < pipelinesToCompile.getSize(); i++)
 	{
@@ -367,7 +396,7 @@ int main()
 
 				if (!sourceCache.resolveText(shader.sourcePath, shader.sourceText))
 				{
-					return 1;
+					return 0;
 				}
 			}
 
@@ -380,8 +409,8 @@ int main()
 
 			if (!result)
 			{
-				TextWriteFmtStdOut("graphics pipeline compilation error: ", compilationErrorMessage.text);
-				return 1;
+				TextWriteFmtStdOut("graphics pipeline compilation error: ", compilationErrorMessage.text, "\n");
+				return 0;
 			}
 
 			// ...
@@ -393,7 +422,7 @@ int main()
 
 			if (!sourceCache.resolveText(shader.sourcePath, shader.sourceText))
 			{
-				return 1;
+				return 0;
 			}
 
 			HAL::ShaderCompiler::ShaderCompilationArtifactsRef artifacts = nullptr;
@@ -403,7 +432,7 @@ int main()
 
 			if (!result)
 			{
-				return 1;
+				return 0;
 			}
 
 			// ...
@@ -411,8 +440,10 @@ int main()
 	}
 
 	// Store compiled shader library.
-	TextWriteFmtStdOut("Storing shader library\n");
-	StoreShaderLibrary(libraryDefinition, "../Build/XEngine.Render.Shaders.xeslib");
+
+	TextWriteFmtStdOut("Storing shader library '", outLibraryFilePath, "'\n");
+
+	StoreShaderLibrary(libraryDefinition, outLibraryFilePath);
 
 	return 0;
 }

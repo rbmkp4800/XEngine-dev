@@ -9,24 +9,24 @@ namespace XLib
 	{
 	public:
 		template <typename ResultWriter>
-		static inline bool Normalize(ResultWriter& resultWriter, const char* path, uintptr lengthLimit = uintptr(-1));
+		static inline bool Normalize(ResultWriter& resultWriter, const char* pathCStr);
 
 		static inline uintptr NormalizeInplace(char* path, uintptr length);
 
-		static StringViewASCII GetFileName(const char* path, uintptr lengthLimit = uintptr(-1));
-		static StringViewASCII GetFileExtension(const char* path, uintptr lengthLimit = uintptr(-1));
-		static StringViewASCII GetDirectoryName(const char* path, uintptr lengthLimit = uintptr(-1));
+		static StringViewASCII GetFileName(const char* pathCStr);
+		static StringViewASCII GetFileExtension(const char* pathCStr);
+		static StringViewASCII RemoveFileName(const char* pathCStr);
 
-		static inline bool HasFileName(const char* path, uintptr lengthLimit = uintptr(-1)) { return !GetFileName(path, lengthLimit).isEmpty(); }
-		static inline bool HasFileExtension(const char* path, uintptr lengthLimit = uintptr(-1)) { return !GetFileExtension(path, lengthLimit).isEmpty(); }
+		static inline bool HasFileName(const char* pathCStr) { return !GetFileName(pathCStr).isEmpty(); }
+		static inline bool HasFileExtension(const char* pathCStr) { return !GetFileExtension(pathCStr).isEmpty(); }
 
-		static bool IsAbsolute(const char* path, uintptr lengthLimit = uintptr(-1));
-		static inline bool IsRelative(const char* path, uintptr lengthLimit = uintptr(-1)) { return !Path::IsAbsolute(path, lengthLimit); }
+		static bool IsAbsolute(const char* pathCStr);
+		static inline bool IsRelative(const char* pathCStr) { return !Path::IsAbsolute(pathCStr); }
 
 		static inline bool IsDirectorySeparatorChar(char c) { return c == '/' || c == '\\'; }
 
 	private:
-		static bool NormalizeInternal(TextWriterVirtualAdapterBase& resultWriter, const char* path, uintptr lengthLimit);
+		static bool NormalizeInternal(TextWriterVirtualAdapterBase& resultWriter, const char* pathCStr);
 	};
 }
 
@@ -36,9 +36,9 @@ namespace XLib
 namespace XLib
 {
 	template <typename ResultWriter>
-	inline bool Path::Normalize(ResultWriter& resultWriter, const char* path, uintptr lengthLimit)
+	inline bool Path::Normalize(ResultWriter& resultWriter, const char* pathCStr)
 	{
 		TextWriterVirtualAdapter<ResultWriter> resultWriterVirtualAdapter(resultWriter);
-		return NormalizeInternal(resultWriterVirtualAdapter, path, lengthLimit);
+		return NormalizeInternal(resultWriterVirtualAdapter, pathCStr);
 	}
 }

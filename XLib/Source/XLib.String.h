@@ -201,13 +201,13 @@ namespace XLib
 
 		template <typename CharType> static inline bool StartsWith(const StringView<CharType>& string, const StringView<CharType>& prefix);
 		template <typename CharType> static inline bool StartsWith(const StringView<CharType>& string, const CharType* prefixCStr);
-		template <typename CharType> static inline bool StartsWith(const CharType* stringCStr, const StringView<CharType>& prefix);
-		template <typename CharType> static inline bool StartsWith(const CharType* stringCStr, const CharType* prefixCStr);
+		template <typename CharType> static inline bool StartsWith(const CharType* cstr, const StringView<CharType>& prefix);
+		template <typename CharType> static inline bool StartsWith(const CharType* cstr, const CharType* prefixCStr);
 
 		template <typename CharType> static inline bool EndsWith(const StringView<CharType>& string, const StringView<CharType>& suffix);
 		template <typename CharType> static inline bool EndsWith(const StringView<CharType>& string, const CharType* suffixCStr);
-		template <typename CharType> static inline bool EndsWith(const CharType* stringCStr, const StringView<CharType>& suffix);
-		template <typename CharType> static inline bool EndsWith(const CharType* stringCStr, const CharType* suffixCStr);
+		template <typename CharType> static inline bool EndsWith(const CharType* cstr, const StringView<CharType>& suffix);
+		template <typename CharType> static inline bool EndsWith(const CharType* cstr, const CharType* suffixCStr);
 	};
 
 	template <typename TextWriter, typename CharType>
@@ -594,6 +594,28 @@ namespace XLib
 			if (i >= string.getLength())
 				return false;
 			if (string[i] != prefixCStr[i])
+				return false;
+		}
+		return true;
+	}
+
+	template <typename CharType>
+	inline bool String::StartsWith(const CharType* cstr, const StringView<CharType>& prefix)
+	{
+		for (uintptr i = 0; i < prefix.getLength(); i++)
+		{
+			if (cstr[i] != prefix[i]) // Also handles terminator.
+				return false;
+		}
+		return true;
+	}
+
+	template <typename CharType>
+	inline bool String::StartsWith(const CharType* cstr, const CharType* prefixCStr)
+	{
+		for (uintptr i = 0; prefixCStr[i]; i++)
+		{
+			if (cstr[i] != prefixCStr[i]) // Also handles terminator.
 				return false;
 		}
 		return true;
