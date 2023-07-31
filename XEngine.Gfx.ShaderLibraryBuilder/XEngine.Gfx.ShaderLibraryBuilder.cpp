@@ -212,43 +212,43 @@ PipelineRef Pipeline::CreateGraphics(StringViewASCII name,
 {
 	// I should not be allowed to code. Sorry :(
 
-	uint32 memoryBlockSizeAccum = sizeof(Pipeline);
+	uintptr memoryBlockSizeAccum = sizeof(Pipeline);
 
-	const uint32 nameMemOffset = memoryBlockSizeAccum;
+	const uintptr nameMemOffset = memoryBlockSizeAccum;
 	memoryBlockSizeAccum += name.getLength() + 1;
 
-	const uint32 vsSourcePathMemOffset = memoryBlockSizeAccum;
+	const uintptr vsSourcePathMemOffset = memoryBlockSizeAccum;
 	memoryBlockSizeAccum += shaders.vs.sourcePath.getLength() + 1;
 
-	const uint32 vsEntryPointNameMemOffset = memoryBlockSizeAccum;
+	const uintptr vsEntryPointNameMemOffset = memoryBlockSizeAccum;
 	memoryBlockSizeAccum += shaders.vs.entryPointName.getLength() + 1;
 
-	const uint32 asSourcePathMemOffset = memoryBlockSizeAccum;
+	const uintptr asSourcePathMemOffset = memoryBlockSizeAccum;
 	memoryBlockSizeAccum += shaders.as.sourcePath.getLength() + 1;
 
-	const uint32 asEntryPointNameMemOffset = memoryBlockSizeAccum;
+	const uintptr asEntryPointNameMemOffset = memoryBlockSizeAccum;
 	memoryBlockSizeAccum += shaders.as.entryPointName.getLength() + 1;
 
-	const uint32 msSourcePathMemOffset = memoryBlockSizeAccum;
+	const uintptr msSourcePathMemOffset = memoryBlockSizeAccum;
 	memoryBlockSizeAccum += shaders.ms.sourcePath.getLength() + 1;
 
-	const uint32 msEntryPointNameMemOffset = memoryBlockSizeAccum;
+	const uintptr msEntryPointNameMemOffset = memoryBlockSizeAccum;
 	memoryBlockSizeAccum += shaders.ms.entryPointName.getLength() + 1;
 
-	const uint32 psSourcePathMemOffset = memoryBlockSizeAccum;
+	const uintptr psSourcePathMemOffset = memoryBlockSizeAccum;
 	memoryBlockSizeAccum += shaders.ps.sourcePath.getLength() + 1;
 
-	const uint32 psEntryPointNameMemOffset = memoryBlockSizeAccum;
+	const uintptr psEntryPointNameMemOffset = memoryBlockSizeAccum;
 	memoryBlockSizeAccum += shaders.ps.entryPointName.getLength() + 1;
 
-	const uint32 vertexBindingsMemOffset = memoryBlockSizeAccum;
+	const uintptr vertexBindingsMemOffset = memoryBlockSizeAccum;
 	memoryBlockSizeAccum += sizeof(HAL::ShaderCompiler::VertexBindingDesc) * settings.vertexBindingCount;
 
 	// NOTE: This code actually assumes that 'HAL::ShaderCompiler::VertexBindingDesc::name' is inplace char array.
 	// Because of this, we do not need to explicitly allocate memory for vertex binding names as they are stored inplace.
 	XAssert(countof(settings.vertexBindings[0].nameCStr) == sizeof(settings.vertexBindings[0].nameCStr));
 
-	const uint32 memoryBlockSize = memoryBlockSizeAccum;
+	const uintptr memoryBlockSize = memoryBlockSizeAccum;
 	void* memoryBlock = SystemHeapAllocator::Allocate(memoryBlockSize);
 	memorySet(memoryBlock, 0, memoryBlockSize);
 
@@ -295,18 +295,18 @@ PipelineRef Pipeline::CreateCompute(StringViewASCII name,
 	HAL::ShaderCompiler::PipelineLayout* pipelineLayout, uint64 pipelineLayoutNameXSH,
 	const HAL::ShaderCompiler::ShaderDesc& shader)
 {
-	uint32 memoryBlockSizeAccum = sizeof(Pipeline);
+	uintptr memoryBlockSizeAccum = sizeof(Pipeline);
 
-	const uint32 nameMemOffset = memoryBlockSizeAccum;
+	const uintptr nameMemOffset = memoryBlockSizeAccum;
 	memoryBlockSizeAccum += name.getLength() + 1;
 
-	const uint32 csSourcePathMemOffset = memoryBlockSizeAccum;
+	const uintptr csSourcePathMemOffset = memoryBlockSizeAccum;
 	memoryBlockSizeAccum += shader.sourcePath.getLength() + 1;
 
-	const uint32 csEntryPointNameMemOffset = memoryBlockSizeAccum;
+	const uintptr csEntryPointNameMemOffset = memoryBlockSizeAccum;
 	memoryBlockSizeAccum += shader.entryPointName.getLength() + 1;
 
-	const uint32 memoryBlockSize = memoryBlockSizeAccum;
+	const uintptr memoryBlockSize = memoryBlockSizeAccum;
 	void* memoryBlock = SystemHeapAllocator::Allocate(memoryBlockSize);
 	memorySet(memoryBlock, 0, memoryBlockSize);
 

@@ -4,7 +4,6 @@ using namespace XLib;
 using namespace XEngine::Gfx::HAL::ShaderCompiler;
 
 // TODO: Proper numeric literals lexing support.
-// TODO: Half of 'HLSLPatcher::Lexer' is copypasted from XJSON. Do something with it.
 
 enum class HLSLPatcher::LexemeType : uint8
 {
@@ -107,46 +106,29 @@ bool HLSLPatcher::Lexer::advance(Error& error)
 	{
 		TextSkipWhitespaces(textReader);
 
+		if (textReader.peekChar() != '/')
+			break;
 		if (textReader.getAvailableBytes() < 2)
 			break;
 
 		const char* potentialCommentStartPtr = textReader.getCurrentPtr();
-		const char c0 = potentialCommentStartPtr[0];
-		const char c1 = potentialCommentStartPtr[1];
 
-		const bool isSingleLineComment = c0 == '/' && c1 == '/';
-		const bool isMultilineComment = c0 == '/' && c1 == '*';
+		const bool isSingleLineComment = potentialCommentStartPtr[1] == '/';
+		const bool isMultilineComment = potentialCommentStartPtr[1] == '*';
 
-		if (isSingleLineComment || isMultilineComment)
-		{
-			textReader.getChar();
-			textReader.getChar();
-			XAssert(textReader.getCurrentPtr() == potentialCommentStartPtr + 2);
-		}
+		if (!isSingleLineComment && !isMultilineComment)
+			break;
+
+		textReader.getChar();
+		textReader.getChar();
+		XAssert(textReader.getCurrentPtr() == potentialCommentStartPtr + 2);
 
 		if (isSingleLineComment)
 		{
-			for (;;)
-			{
-				if (!textReader.canGetChar())
-					break;
-				const char c = textReader.getChar();
-				if (c == '\n')
-					break;
-				if (c == '\\')
-				{
-					const char c2 = textReader.getChar();
-					if (c2 == '\n')
-						continue;
-					if (c2 == '\r' && textReader.getChar() == '\n')
-						continue;
-				}
-			}
+			while (textReader.canGetChar() && textReader.getChar() != '\n') {}
 		}
-		else if (isMultilineComment)
+		else
 		{
-			// TODO: Use 'TextSkipToFirstOccurrence' instead.
-
 			for (;;)
 			{
 				if (textReader.getChar() == '*' && textReader.peekChar() == '/')
@@ -163,8 +145,6 @@ bool HLSLPatcher::Lexer::advance(Error& error)
 				}
 			}
 		}
-		else
-			break;
 	}
 
 	// Process lexeme.

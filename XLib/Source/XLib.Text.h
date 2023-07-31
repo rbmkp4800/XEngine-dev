@@ -28,8 +28,8 @@ namespace XLib
 		inline void initialize(const char* data, uintptr length) { begin = data; end = data + length; current = data; }
 
 		inline bool canGetChar() const { return current != end && *current != 0; }
-		inline uint32 peekChar() const { return canGetChar() ? *current : uint32(-1); }
-		inline uint32 getChar() { return canGetChar() ? *current++ : uint32(-1); }
+		inline char peekChar() const { return canGetChar() ? *current : 0; }
+		inline char getChar() { return canGetChar() ? *current++ : 0; }
 		inline char peekCharUnsafe() const { return *current; }
 		inline char getCharUnsafe() { return *current++; }
 		//inline void readChars();
@@ -53,7 +53,7 @@ namespace XLib
 		uint32 columnNumber = 0;
 
 	private:
-		inline void advanceLocation(uint32 c);
+		inline void advanceLocation(char c);
 
 	public:
 		MemoryTextReaderWithLocation() = default;
@@ -64,10 +64,10 @@ namespace XLib
 		inline void initialize(const char* data, uintptr length) { base.initialize(data, length); lineNumber = 0; columnNumber = 0; }
 
 		inline bool canGetChar() const { return base.canGetChar(); }
-		inline uint32 peekChar() const { return base.peekChar(); }
-		inline uint32 getChar() { const uint32 c = base.getChar(); advanceLocation(c); return c; }
+		inline char peekChar() const { return base.peekChar(); }
+		inline char getChar() { const char c = base.getChar(); advanceLocation(c); return c; }
 		inline char peekCharUnsafe() const { return base.peekCharUnsafe(); }
-		inline char getCharUnsafe() { const uint32 c = base.getCharUnsafe(); advanceLocation(c); return char(c); }
+		inline char getCharUnsafe() { const char c = base.getCharUnsafe(); advanceLocation(c); return char(c); }
 
 		inline uint32 getLineNumber() const { return lineNumber + 1; }
 		inline uint32 getColumnNumber() const { return columnNumber + 1; }
@@ -118,8 +118,8 @@ namespace XLib
 		inline void initialize(File& file);
 
 		inline bool canGetChar() const;
-		inline uint32 peekChar() const;
-		inline uint32 getChar();
+		inline char peekChar() const;
+		inline char getChar();
 		inline char peekCharUnsafe() const;
 		inline char getCharUnsafe();
 		//inline void readChars();
@@ -311,7 +311,7 @@ namespace XLib
 
 namespace XLib
 {
-	inline void MemoryTextReaderWithLocation::advanceLocation(uint32 c)
+	inline void MemoryTextReaderWithLocation::advanceLocation(char c)
 	{
 		// TODO: Handle end of file properly.
 
