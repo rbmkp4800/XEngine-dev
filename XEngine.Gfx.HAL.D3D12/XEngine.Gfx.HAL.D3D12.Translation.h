@@ -34,19 +34,47 @@ namespace XEngine::Gfx::HAL
 	{
 		switch (format)
 		{
-			case TexelViewFormat::R8_UNORM:			return DXGI_FORMAT_R8_UNORM;
-			case TexelViewFormat::R8_SNORM:			return DXGI_FORMAT_R8_SNORM;
-			case TexelViewFormat::R8_UINT:			return DXGI_FORMAT_R8_UINT;
-			case TexelViewFormat::R8_SINT:			return DXGI_FORMAT_R8_SINT;
-			case TexelViewFormat::R8G8_UNORM:		return DXGI_FORMAT_R8G8_UNORM;
-			case TexelViewFormat::R8G8_SNORM:		return DXGI_FORMAT_R8G8_SNORM;
-			case TexelViewFormat::R8G8_UINT:		return DXGI_FORMAT_R8G8_UINT;
-			case TexelViewFormat::R8G8_SINT:		return DXGI_FORMAT_R8G8_SINT;
-			case TexelViewFormat::R8G8B8A8_UNORM:	return DXGI_FORMAT_R8G8B8A8_UNORM;
-			case TexelViewFormat::R8G8B8A8_SNORM:	return DXGI_FORMAT_R8G8B8A8_SNORM;
-			case TexelViewFormat::R8G8B8A8_UINT:	return DXGI_FORMAT_R8G8B8A8_UINT;
-			case TexelViewFormat::R8G8B8A8_SINT:	return DXGI_FORMAT_R8G8B8A8_SINT;
-			case TexelViewFormat::R8G8B8A8_SRGB:	return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+			case TexelViewFormat::R8_UNORM:				return DXGI_FORMAT_R8_UNORM;
+			case TexelViewFormat::R8_SNORM:				return DXGI_FORMAT_R8_SNORM;
+			case TexelViewFormat::R8_UINT:				return DXGI_FORMAT_R8_UINT;
+			case TexelViewFormat::R8_SINT:				return DXGI_FORMAT_R8_SINT;
+			case TexelViewFormat::R8G8_UNORM:			return DXGI_FORMAT_R8G8_UNORM;
+			case TexelViewFormat::R8G8_SNORM:			return DXGI_FORMAT_R8G8_SNORM;
+			case TexelViewFormat::R8G8_UINT:			return DXGI_FORMAT_R8G8_UINT;
+			case TexelViewFormat::R8G8_SINT:			return DXGI_FORMAT_R8G8_SINT;
+			case TexelViewFormat::R8G8B8A8_UNORM:		return DXGI_FORMAT_R8G8B8A8_UNORM;
+			case TexelViewFormat::R8G8B8A8_SNORM:		return DXGI_FORMAT_R8G8B8A8_SNORM;
+			case TexelViewFormat::R8G8B8A8_UINT:		return DXGI_FORMAT_R8G8B8A8_UINT;
+			case TexelViewFormat::R8G8B8A8_SINT:		return DXGI_FORMAT_R8G8B8A8_SINT;
+			case TexelViewFormat::R8G8B8A8_SRGB:		return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+			case TexelViewFormat::R16_FLOAT:			return DXGI_FORMAT_R16_FLOAT;
+			case TexelViewFormat::R16_UNORM:			return DXGI_FORMAT_R16_UNORM;
+			case TexelViewFormat::R16_SNORM:			return DXGI_FORMAT_R16_SNORM;
+			case TexelViewFormat::R16_UINT:				return DXGI_FORMAT_R16_UINT;
+			case TexelViewFormat::R16_SINT:				return DXGI_FORMAT_R16_SINT;
+			case TexelViewFormat::R16G16_FLOAT:			return DXGI_FORMAT_R16G16_FLOAT;
+			case TexelViewFormat::R16G16_UNORM:			return DXGI_FORMAT_R16G16_UNORM;
+			case TexelViewFormat::R16G16_SNORM:			return DXGI_FORMAT_R16G16_SNORM;
+			case TexelViewFormat::R16G16_UINT:			return DXGI_FORMAT_R16G16_UINT;
+			case TexelViewFormat::R16G16_SINT:			return DXGI_FORMAT_R16G16_SINT;
+			case TexelViewFormat::R16G16B16A16_FLOAT:	return DXGI_FORMAT_R16G16B16A16_FLOAT;
+			case TexelViewFormat::R16G16B16A16_UNORM:	return DXGI_FORMAT_R16G16B16A16_UNORM;
+			case TexelViewFormat::R16G16B16A16_SNORM:	return DXGI_FORMAT_R16G16B16A16_SNORM;
+			case TexelViewFormat::R16G16B16A16_UINT:	return DXGI_FORMAT_R16G16B16A16_UINT;
+			case TexelViewFormat::R16G16B16A16_SINT:	return DXGI_FORMAT_R16G16B16A16_SINT;
+			case TexelViewFormat::R32_FLOAT:			return DXGI_FORMAT_R32_FLOAT;
+			case TexelViewFormat::R32_UINT:				return DXGI_FORMAT_R32_UINT;
+			case TexelViewFormat::R32_SINT:				return DXGI_FORMAT_R32_SINT;
+			case TexelViewFormat::R32G32_FLOAT:			return DXGI_FORMAT_R32G32_FLOAT;
+			case TexelViewFormat::R32G32_UINT:			return DXGI_FORMAT_R32G32_UINT;
+			case TexelViewFormat::R32G32_SINT:			return DXGI_FORMAT_R32G32_SINT;
+			case TexelViewFormat::R32G32B32_FLOAT:		return DXGI_FORMAT_R32G32B32_FLOAT;
+			case TexelViewFormat::R32G32B32_UINT:		return DXGI_FORMAT_R32G32B32_UINT;
+			case TexelViewFormat::R32G32B32_SINT:		return DXGI_FORMAT_R32G32B32_SINT;
+			case TexelViewFormat::R32G32B32A32_FLOAT:	return DXGI_FORMAT_R32G32B32A32_FLOAT;
+			case TexelViewFormat::R32G32B32A32_UINT:	return DXGI_FORMAT_R32G32B32A32_UINT;
+			case TexelViewFormat::R32G32B32A32_SINT:	return DXGI_FORMAT_R32G32B32A32_SINT;
+
 		}
 
 		XEMasterAssertUnreachableCode();

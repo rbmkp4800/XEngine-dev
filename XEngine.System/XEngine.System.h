@@ -46,18 +46,26 @@ namespace XEngine::System
 		~InputHandler();
 	};
 
-	// Probably this should be 'OutputSurfaceHandle'?
-	class OutputSurface : public XLib::NonCopyable
-	{
 
+	class Window : public XLib::NonCopyable
+	{
+	private:
+		void* hWnd = nullptr;
+
+	public:
+		Window() = default;
+		~Window();
+
+		void create(uint32 winth, uint32 heigth);
+		void destroy();
+
+		inline void* getHandle() const { return hWnd; }
 	};
 
 	void RegisterInputHandler(InputHandler* inputHandler);
 	void UnregisterInputHandler(InputHandler* inputHandler);
 	// RegisterInputDeviceChangeHanlder
 	// UnregisterInputDeviceChangeHandler
-	// RegisterGraphicsHardwareChangeHandler
-	// UnregisterGraphicsHardwareChangeHandler
 
 	void DispatchEvents();
 
@@ -66,17 +74,5 @@ namespace XEngine::System
 	// GetCursorPosition()
 
 	void SetCursorEnabled(bool enabled);
-	void SetCursorVisible(const OutputSurface& windowSurface, bool visible);
-
-
-	void CreateWindowOutputSurface(uint32 width, uint32 height, OutputSurface& surface);
-	// CreateDisplayOutputSurface
-	// CreateHMDOutputSurface
-	void DestroyOutputSurface(OutputSurface& surface);
-
-	bool IsOutputSurfaceInFocus(const OutputSurface& surface);
-
-	// EnumerateGPUs
-	// EnumerateDisplays
-	// EnumerateHMDs
+	void SetCursorVisible(const Window& window, bool visible);
 }

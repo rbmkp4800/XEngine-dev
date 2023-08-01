@@ -182,9 +182,9 @@ void TransientUploadMemoryAllocator::initialize(HAL::Device& device, uint8 poolS
 {
 	// TODO: State asserts
 
-	XEAssert(poolSizeLog2 > HAL::Device::ConstantBufferBindAlignmentLog2);
+	XEAssert(poolSizeLog2 > HAL::ConstantBufferBindAlignmentLog2);
 
-	baseAllocator.initialize(device, poolSizeLog2 - HAL::Device::ConstantBufferBindAlignmentLog2);
+	baseAllocator.initialize(device, poolSizeLog2 - HAL::ConstantBufferBindAlignmentLog2);
 
 	const uint32 poolSize = uint32(1) << poolSizeLog2;
 	uploadMemoryPoolBuffer = device.createBuffer(poolSize, false, HAL::BufferMemoryType::Upload);

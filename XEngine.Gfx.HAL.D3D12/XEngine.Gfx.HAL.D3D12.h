@@ -36,6 +36,12 @@ struct ID3D12Fence;
 
 namespace XEngine::Gfx::HAL
 {
+	constexpr uint32 ConstantBufferSizeLimit = 64 * 1024;
+	constexpr uint16 ConstantBufferBindAlignmentLog2 = 8;
+	constexpr uint16 ConstantBufferBindAlignment = 1 << ConstantBufferBindAlignmentLog2;
+	constexpr uint16 TextureArraySizeLimit = 2048;
+	constexpr uint32 SurfaceBackBufferCount = 2;
+
 	class Device;
 
 	enum class DeviceMemoryAllocationHandle	: uint32 { Zero = 0 };
@@ -48,7 +54,7 @@ namespace XEngine::Gfx::HAL
 	enum class PipelineLayoutHandle			: uint32 { Zero = 0 };
 	enum class PipelineHandle				: uint32 { Zero = 0 };
 	enum class FenceHandle					: uint32 { Zero = 0 };
-	enum class SwapChainHandle				: uint32 { Zero = 0 };
+	enum class SurfaceHandle				: uint32 { Zero = 0 };
 
 	enum class DescriptorSetReference		: uint64 { Zero = 0 };
 	enum class DeviceQueueSyncPoint			: uint64 { Zero = 0 };
@@ -329,8 +335,7 @@ namespace XEngine::Gfx::HAL
 		static constexpr uint32 MaxPipelineLayoutCount = 64;
 		static constexpr uint32 MaxPipelineCount = 1024;
 		static constexpr uint32 MaxFenceCount = 64;
-		static constexpr uint32 MaxSwapChainCount = 4;
-		static constexpr uint32 SwapChainBackBufferCount = 2;
+		static constexpr uint32 MaxSurfaceCount = 4;
 
 		struct MemoryAllocation;
 		struct Resource;
@@ -339,7 +344,7 @@ namespace XEngine::Gfx::HAL
 		struct PipelineLayout;
 		struct Pipeline;
 		struct Fence;
-		struct SwapChain;
+		struct Surface;
 
 		struct DecomposedDescriptorSetReference;
 
@@ -369,7 +374,7 @@ namespace XEngine::Gfx::HAL
 		PipelineLayout* pipelineLayoutTable = nullptr;
 		Pipeline* pipelineTable = nullptr;
 		Fence* fenceTable = nullptr;
-		SwapChain* swapChainTable = nullptr;
+		Surface* surfaceTable = nullptr;
 
 		XLib::InplaceBitArray<MaxMemoryAllocationCount> memoryAllocationTableAllocationMask;
 		XLib::InplaceBitArray<MaxResourceCount> resourceTableAllocationMask;
@@ -380,7 +385,7 @@ namespace XEngine::Gfx::HAL
 		XLib::InplaceBitArray<MaxPipelineLayoutCount> pipelineLayoutTableAllocationMask;
 		XLib::InplaceBitArray<MaxPipelineCount> pipelineTableAllocationMask;
 		XLib::InplaceBitArray<MaxFenceCount> fenceTableAllocationMask;
-		XLib::InplaceBitArray<MaxSwapChainCount> swapChainTableAllocationMask;
+		XLib::InplaceBitArray<MaxSurfaceCount> surfaceTableAllocationMask;
 
 		uint64 referenceSRVHeapPtr = 0;
 		uint64 shaderVisbileSRVHeapCPUPtr = 0;
@@ -405,7 +410,7 @@ namespace XEngine::Gfx::HAL
 		PipelineLayoutHandle composePipelineLayoutHandle(uint32 pipelineLayoutIndex) const;
 		PipelineHandle composePipelineHandle(uint32 pipelineIndex) const;
 		FenceHandle composeFenceHandle(uint32 fenceIndex) const;
-		SwapChainHandle composeSwapChainHandle(uint32 swapChainIndex) const;
+		SurfaceHandle composeSurfaceHandle(uint32 surfaceIndex) const;
 
 		uint32 resolveMemoryAllocationHandle(DeviceMemoryAllocationHandle handle) const;
 		uint32 resolveBufferHandle(BufferHandle handle) const;
@@ -417,7 +422,7 @@ namespace XEngine::Gfx::HAL
 		uint32 resolvePipelineLayoutHandle(PipelineLayoutHandle handle) const;
 		uint32 resolvePipelineHandle(PipelineHandle handle) const;
 		uint32 resolveFenceHandle(FenceHandle handle) const;
-		uint32 resolveSwapChainHandle(SwapChainHandle handle) const;
+		uint32 resolveSurfaceHandle(SurfaceHandle handle) const;
 
 		MemoryAllocation& getMemoryAllocationByHandle(DeviceMemoryAllocationHandle handle);
 		Resource& getResourceByBufferHandle(BufferHandle handle);
@@ -428,8 +433,8 @@ namespace XEngine::Gfx::HAL
 		Pipeline& getPipelineByHandle(PipelineHandle handle);
 		Fence& getFenceByHandle(FenceHandle handle);
 		const Fence& getFenceByHandle(FenceHandle handle) const;
-		SwapChain& getSwapChainByHandle(SwapChainHandle handle);
-		const SwapChain& getSwapChainByHandle(SwapChainHandle handle) const;
+		Surface& getSurfaceByHandle(SurfaceHandle handle);
+		const Surface& getSurfaceByHandle(SurfaceHandle handle) const;
 
 		DescriptorSetReference composeDescriptorSetReference(DescriptorSetLayoutHandle descriptorSetLayoutHandle,
 			uint32 baseDescriptorIndex, uint32 descriptorSetGeneration) const;
@@ -496,8 +501,10 @@ namespace XEngine::Gfx::HAL
 		FenceHandle createFence(uint64 initialValue);
 		void destroyFence(FenceHandle handle);
 
-		SwapChainHandle createSwapChain(uint16 width, uint16 height, void* hWnd);
-		void destroySwapChain(SwapChainHandle handle);
+		SurfaceHandle createWindowSurface(uint16 width, uint16 height, void* windowHandle);
+		// SurfaceHandle createDisplaySurface();
+		// SurfaceHandle createHMDSurface();
+		void destroySurface(SurfaceHandle handle);
 
 		void createCommandList(CommandList& commandList, CommandListType type);
 		void destroyCommandList(CommandList& commandList);
@@ -511,7 +518,7 @@ namespace XEngine::Gfx::HAL
 		void submitSyncPointWait(DeviceQueue queue, DeviceQueueSyncPoint syncPoint);
 		void submitFenceSignal(DeviceQueue queue, FenceHandle fenceHandle, uint64 value);
 		void submitFenceWait(DeviceQueue queue, FenceHandle fenceHandle, uint64 value);
-		void submitFlip(SwapChainHandle swapChainHandle);
+		void submitSurfaceFlip(SurfaceHandle surfaceHandle);
 		void submitPartiallyResidentResourcesRemap();
 
 		DeviceQueueSyncPoint getEndOfQueueSyncPoint(DeviceQueue queue) const;
@@ -524,18 +531,17 @@ namespace XEngine::Gfx::HAL
 
 		uint64 getFenceValue(FenceHandle fenceHandle) const;
 
-		TextureHandle getSwapChainBackBuffer(SwapChainHandle swapChainHandle, uint32 backBufferIndex) const;
-		uint32 getSwapChainCurrentBackBufferIndex(SwapChainHandle swapChainHandle) const;
+		TextureHandle getSurfaceBackBuffer(SurfaceHandle surfaceHandle, uint32 backBufferIndex) const;
+		uint32 getSurfaceCurrentBackBufferIndex(SurfaceHandle surfaceHandle) const;
 
 		const char* getName() const;
 
 	public:
-		static constexpr uint32 ConstantBufferSizeLimit = 64 * 1024;
-		static constexpr uint16 ConstantBufferBindAlignmentLog2 = 8;
-		static constexpr uint16 ConstantBufferBindAlignment = 1 << ConstantBufferBindAlignmentLog2;
-		static constexpr uint16 TextureArraySizeLimit = 2048;
-
 		static void Create(Device& device);
 		static uint16x3 CalculateMipLevelSize(uint16x3 srcSize, uint8 mipLevel);
 	};
+
+	// EnumerateDevices
+	// EnumerateDisplays
+	// EnumerateHMDs
 }

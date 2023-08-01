@@ -81,7 +81,7 @@ namespace XEngine::Gfx
 		byte* mappedUploadMemoryPoolBuffer = nullptr;
 
 	public:
-		static constexpr uint32 AllocationAlignment = HAL::Device::ConstantBufferBindAlignment;
+		static constexpr uint32 AllocationAlignment = HAL::ConstantBufferBindAlignment;
 
 	public:
 		TransientUploadMemoryAllocator() = default;

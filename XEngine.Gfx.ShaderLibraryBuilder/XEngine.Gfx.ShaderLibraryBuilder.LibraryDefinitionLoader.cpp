@@ -51,8 +51,6 @@ static HAL::TexelViewFormat ParseTexelViewFormatString(StringViewASCII string)
 	if (string == "R16G16B16A16_UINT")	return HAL::TexelViewFormat::R16G16B16A16_UINT;
 	if (string == "R16G16B16A16_SINT")	return HAL::TexelViewFormat::R16G16B16A16_SINT;
 	if (string == "R32_FLOAT")			return HAL::TexelViewFormat::R32_FLOAT;
-	if (string == "R32_UNORM")			return HAL::TexelViewFormat::R32_UNORM;
-	if (string == "R32_SNORM")			return HAL::TexelViewFormat::R32_SNORM;
 	if (string == "R32_UINT")			return HAL::TexelViewFormat::R32_UINT;
 	if (string == "R32_SINT")			return HAL::TexelViewFormat::R32_SINT;
 	if (string == "R32G32_FLOAT")		return HAL::TexelViewFormat::R32G32_FLOAT;

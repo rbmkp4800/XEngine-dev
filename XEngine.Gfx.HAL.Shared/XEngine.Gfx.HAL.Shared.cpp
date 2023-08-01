@@ -58,8 +58,6 @@ uint8 TexelViewFormatUtils::GetByteSize(TexelViewFormat format)
 		case TexelViewFormat::R16G16_UINT:
 		case TexelViewFormat::R16G16_SINT:
 		case TexelViewFormat::R32_FLOAT:
-		case TexelViewFormat::R32_UNORM:
-		case TexelViewFormat::R32_SNORM:
 		case TexelViewFormat::R32_UINT:
 		case TexelViewFormat::R32_SINT:
 			return 4;

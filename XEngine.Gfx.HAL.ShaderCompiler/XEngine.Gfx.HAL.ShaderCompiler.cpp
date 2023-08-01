@@ -581,7 +581,7 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 	d3dRootSignatureDesc.Desc_1_1.pParameters = d3dRootParams.getData();
 	d3dRootSignatureDesc.Desc_1_1.NumStaticSamplers = staticSamplerCount;
 	d3dRootSignatureDesc.Desc_1_1.pStaticSamplers = staticSamplerCount ? d3dStaticSamplers : nullptr;
-	d3dRootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+	d3dRootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
 	// TODO: D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED, D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED
 	// TODO: D3D12_ROOT_SIGNATURE_FLAG_DENY_*_SHADER_ROOT_ACCESS

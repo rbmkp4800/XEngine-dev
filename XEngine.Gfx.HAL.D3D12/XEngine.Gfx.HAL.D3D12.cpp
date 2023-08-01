@@ -19,7 +19,7 @@ using namespace XLib;
 using namespace XLib::Platform;
 using namespace XEngine::Gfx::HAL;
 
-static_assert(Device::ConstantBufferBindAlignment >= D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+static_assert(ConstantBufferBindAlignment >= D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 
 static COMPtr<IDXGIFactory7> dxgiFactory;
 static COMPtr<ID3D12Debug3> d3dDebug;
@@ -221,7 +221,7 @@ struct Device::Resource
 	ID3D12Resource2* d3dResource;
 	ResourceType type;
 	uint8 handleGeneration;
-	bool internalOwnership; // For example swap chain. User can't release it.
+	bool internalOwnership; // For example surface. User can't release it.
 
 	union
 	{
@@ -271,10 +271,10 @@ struct Device::Fence
 	ID3D12Fence* d3dFence;
 };
 
-struct Device::SwapChain
+struct Device::Surface
 {
 	IDXGISwapChain4* dxgiSwapChain;
-	TextureHandle backBuffers[SwapChainBackBufferCount];
+	TextureHandle backBuffers[SurfaceBackBufferCount];
 };
 
 struct Device::DecomposedDescriptorSetReference
@@ -508,7 +508,7 @@ void CommandList::bindBuffer(uint64 bindingNameXSH, BufferBindType bindType, Buf
 	XEAssert(resource.d3dResource);
 
 	const uint64 bufferAddress = resource.d3dResource->GetGPUVirtualAddress() + bufferPointer.offset;
-	XEAssert(imply(bindType == BufferBindType::Constant, bufferAddress % Device::ConstantBufferBindAlignment == 0));
+	XEAssert(imply(bindType == BufferBindType::Constant, bufferAddress % ConstantBufferBindAlignment == 0));
 
 	if (currentPipelineType == PipelineType::Graphics)
 	{
@@ -650,18 +650,18 @@ void CommandList::textureMemoryBarrier(TextureHandle textureHandle,
 
 		d3dTextureBarrier.Subresources.IndexOrFirstMipLevel = subresourceRange->baseMipLevel;
 		d3dTextureBarrier.Subresources.NumMipLevels = subresourceRange->mipLevelCount;
-		d3dTextureBarrier.Subresources.FirstArraySlice = subresourceRange->baseArraySlice;
-		d3dTextureBarrier.Subresources.NumArraySlices = subresourceRange->arraySliceCount;
+		d3dTextureBarrier.Subresources.FirstArraySlice = subresourceRange->baseArrayIndex;
+		d3dTextureBarrier.Subresources.NumArraySlices = subresourceRange->arraySize;
 		d3dTextureBarrier.Subresources.FirstPlane = 0;
 		d3dTextureBarrier.Subresources.NumPlanes = 1; // TODO: Handle this properly.
 	}
 	else
 	{
 		d3dTextureBarrier.Subresources.IndexOrFirstMipLevel = 0;
-		d3dTextureBarrier.Subresources.NumMipLevels = texture.texture.mipLevelCount;
+		d3dTextureBarrier.Subresources.NumMipLevels = texture.textureDesc.mipLevelCount;
 		d3dTextureBarrier.Subresources.FirstArraySlice = 0;
 		d3dTextureBarrier.Subresources.NumArraySlices =
-			(texture.texture.dimension == TextureDimension::Texture2DArray) ? texture.texture.size.z : 1; // TODO: Other dim arrays
+			(texture.textureDesc.dimension == TextureDimension::Texture2D) ? texture.textureDesc.size.z : 1; // TODO: Other dim arrays
 		d3dTextureBarrier.Subresources.FirstPlane = 0;
 		d3dTextureBarrier.Subresources.NumPlanes = 1; // TODO: Handle this properly.
 	}
@@ -843,7 +843,7 @@ void Device::initialize(ID3D12Device10* _d3dDevice)
 			sizeof(PipelineLayout) * MaxPipelineLayoutCount +
 			sizeof(Pipeline) * MaxPipelineCount +
 			sizeof(Fence) * MaxFenceCount +
-			sizeof(SwapChain) * MaxSwapChainCount;
+			sizeof(Surface) * MaxSurfaceCount;
 
 		// TODO: Handle this memory in proper way.
 		void* objectTablesMemory = SystemHeapAllocator::Allocate(objectTablesMemorySize);
@@ -856,9 +856,9 @@ void Device::initialize(ID3D12Device10* _d3dDevice)
 		pipelineLayoutTable = (PipelineLayout*)(descriptorSetLayoutTable + MaxDescriptorSetLayoutCount);
 		pipelineTable = (Pipeline*)(pipelineLayoutTable + MaxPipelineLayoutCount);
 		fenceTable = (Fence*)(pipelineTable + MaxPipelineCount);
-		swapChainTable = (SwapChain*)(fenceTable + MaxFenceCount);
+		surfaceTable = (Surface*)(fenceTable + MaxFenceCount);
 
-		void* objectTablesMemoryEndCheck = swapChainTable + MaxSwapChainCount;
+		void* objectTablesMemoryEndCheck = surfaceTable + MaxSurfaceCount;
 		XEAssert(uintptr(objectTablesMemory) + objectTablesMemorySize == uintptr(objectTablesMemoryEndCheck));
 	}
 
@@ -871,7 +871,7 @@ void Device::initialize(ID3D12Device10* _d3dDevice)
 	pipelineLayoutTableAllocationMask.clear();
 	pipelineTableAllocationMask.clear();
 	fenceTableAllocationMask.clear();
-	swapChainTableAllocationMask.clear();
+	surfaceTableAllocationMask.clear();
 
 	referenceSRVHeapPtr = d3dReferenceSRVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
 	shaderVisbileSRVHeapCPUPtr = d3dShaderVisbileSRVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
@@ -946,7 +946,7 @@ BufferHandle Device::createBuffer(uint64 size, bool allowShaderWrite, BufferMemo
 #if USE_ENHANCED_BARRIERS
 	XEMasterAssertUnreachableCode();
 
-	d3dDevice->CreatePlacedResource2(memoryAllocation.d3dHeap, memoryOffset,
+	d3dDevice->CreatePlacedResource2(memoryAllocation->d3dHeap, memoryOffset,
 		&d3dResourceDesc, D3D12_BARRIER_LAYOUT_UNDEFINED, nullptr, 0, nullptr,
 		IID_PPV_ARGS(&resource.d3dResource));
 #else
@@ -1545,13 +1545,13 @@ FenceHandle Device::createFence(uint64 initialValue)
 	return composeFenceHandle(fenceIndex);
 }
 
-SwapChainHandle Device::createSwapChain(uint16 width, uint16 height, void* hWnd)
+SurfaceHandle Device::createWindowSurface(uint16 width, uint16 height, void* systemWindowHandle)
 {
-	const sint32 swapChainIndex = swapChainTableAllocationMask.findFirstZeroAndSet();
-	XEMasterAssert(swapChainIndex >= 0);
+	const sint32 surfaceIndex = surfaceTableAllocationMask.findFirstZeroAndSet();
+	XEMasterAssert(surfaceIndex >= 0);
 
-	SwapChain& swapChain = swapChainTable[swapChainIndex];
-	XEAssert(!swapChain.dxgiSwapChain);
+	Surface& surface = surfaceTable[surfaceIndex];
+	XEAssert(!surface.dxgiSwapChain);
 
 	DXGI_SWAP_CHAIN_DESC1 dxgiSwapChainDesc = {};
 	dxgiSwapChainDesc.Width = width;
@@ -1561,20 +1561,20 @@ SwapChainHandle Device::createSwapChain(uint16 width, uint16 height, void* hWnd)
 	dxgiSwapChainDesc.SampleDesc.Count = 1;
 	dxgiSwapChainDesc.SampleDesc.Quality = 0;
 	dxgiSwapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	dxgiSwapChainDesc.BufferCount = SwapChainBackBufferCount;
+	dxgiSwapChainDesc.BufferCount = SurfaceBackBufferCount;
 	dxgiSwapChainDesc.Scaling = DXGI_SCALING_STRETCH;
 	dxgiSwapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	dxgiSwapChainDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
 	dxgiSwapChainDesc.Flags = 0;
 
 	COMPtr<IDXGISwapChain1> dxgiSwapChain1;
-	dxgiFactory->CreateSwapChainForHwnd(d3dGraphicsQueue, HWND(hWnd),
+	dxgiFactory->CreateSwapChainForHwnd(d3dGraphicsQueue, HWND(systemWindowHandle),
 		&dxgiSwapChainDesc, nullptr, nullptr, dxgiSwapChain1.initRef());
 
-	dxgiSwapChain1->QueryInterface(IID_PPV_ARGS(&swapChain.dxgiSwapChain));
+	dxgiSwapChain1->QueryInterface(IID_PPV_ARGS(&surface.dxgiSwapChain));
 
 	// Allocate resources for textures
-	for (uint32 i = 0; i < SwapChainBackBufferCount; i++)
+	for (uint32 i = 0; i < SurfaceBackBufferCount; i++)
 	{
 		const sint32 resourceIndex = resourceTableAllocationMask.findFirstZeroAndSet();
 		XEMasterAssert(resourceIndex >= 0);
@@ -1593,10 +1593,10 @@ SwapChainHandle Device::createSwapChain(uint16 width, uint16 height, void* hWnd)
 
 		dxgiSwapChain1->GetBuffer(i, IID_PPV_ARGS(&resource.d3dResource));
 		
-		swapChain.backBuffers[i] = composeTextureHandle(resourceIndex);
+		surface.backBuffers[i] = composeTextureHandle(resourceIndex);
 	}
 
-	return composeSwapChainHandle(swapChainIndex);
+	return composeSurfaceHandle(surfaceIndex);
 }
 
 void Device::createCommandList(CommandList& commandList, CommandListType type)
@@ -1689,9 +1689,9 @@ void Device::submitFenceWait(DeviceQueue queue, FenceHandle fenceHandle, uint64 
 	d3dGraphicsQueue->Wait(getFenceByHandle(fenceHandle).d3dFence, value);
 }
 
-void Device::submitFlip(SwapChainHandle swapChainHandle)
+void Device::submitSurfaceFlip(SurfaceHandle surfaceHandle)
 {
-	getSwapChainByHandle(swapChainHandle).dxgiSwapChain->Present(1, 0);
+	getSurfaceByHandle(surfaceHandle).dxgiSwapChain->Present(1, 0);
 
 	graphicsQueueSyncPointFenceValue = GetDeviceQueueSyncPointFenceNextCounterValue(graphicsQueueSyncPointFenceValue);
 	d3dGraphicsQueue->Signal(d3dGraphicsQueueSyncPointFence, graphicsQueueSyncPointFenceValue);
@@ -1736,19 +1736,19 @@ uint64 Device::getFenceValue(FenceHandle fenceHandle) const
 	return getFenceByHandle(fenceHandle).d3dFence->GetCompletedValue();
 }
 
-TextureHandle Device::getSwapChainBackBuffer(SwapChainHandle swapChainHandle, uint32 backBufferIndex) const
+TextureHandle Device::getSurfaceBackBuffer(SurfaceHandle surfaceHandle, uint32 backBufferIndex) const
 {
-	const SwapChain& swapChain = getSwapChainByHandle(swapChainHandle);
-	XEAssert(backBufferIndex < countof(swapChain.backBuffers));
-	return swapChain.backBuffers[backBufferIndex];
+	const Surface& surface = getSurfaceByHandle(surfaceHandle);
+	XEAssert(backBufferIndex < countof(surface.backBuffers));
+	return surface.backBuffers[backBufferIndex];
 }
 
-uint32 Device::getSwapChainCurrentBackBufferIndex(SwapChainHandle swapChainHandle) const
+uint32 Device::getSurfaceCurrentBackBufferIndex(SurfaceHandle surfaceHandle) const
 {
-	const SwapChain& swapChain = getSwapChainByHandle(swapChainHandle);
-	XEAssert(swapChain.dxgiSwapChain);
-	const uint32 backBufferIndex = swapChain.dxgiSwapChain->GetCurrentBackBufferIndex();
-	XEAssert(backBufferIndex < countof(swapChain.backBuffers));
+	const Surface& surface = getSurfaceByHandle(surfaceHandle);
+	XEAssert(surface.dxgiSwapChain);
+	const uint32 backBufferIndex = surface.dxgiSwapChain->GetCurrentBackBufferIndex();
+	XEAssert(backBufferIndex < countof(surface.backBuffers));
 	return backBufferIndex;
 }
 
@@ -1811,7 +1811,7 @@ namespace
 	constexpr uint8 PipelineLayoutHandleSignature = 0x8;
 	constexpr uint8 PipelineHandleSignature = 0x9;
 	constexpr uint8 FenceHandleSignature = 0xA;
-	constexpr uint8 SwapChainHandleSignature = 0xB;
+	constexpr uint8 SurfaceHandleSignature = 0xB;
 
 	struct DecomposedHandle
 	{
@@ -1906,11 +1906,11 @@ FenceHandle Device::composeFenceHandle(uint32 fenceIndex) const
 	return FenceHandle(ComposeHandle(FenceHandleSignature, 0, fenceIndex));
 }
 
-SwapChainHandle Device::composeSwapChainHandle(uint32 swapChainIndex) const
+SurfaceHandle Device::composeSurfaceHandle(uint32 surfaceIndex) const
 {
-	XEAssert(swapChainIndex < MaxSwapChainCount);
-	// swapChainTable[swapChainIndex].handleGeneration;
-	return SwapChainHandle(ComposeHandle(SwapChainHandleSignature, 0, swapChainIndex));
+	XEAssert(surfaceIndex < MaxSurfaceCount);
+	// surfaceTable[surfaceIndex].handleGeneration;
+	return SurfaceHandle(ComposeHandle(SurfaceHandleSignature, 0, surfaceIndex));
 }
 
 
@@ -2004,12 +2004,12 @@ uint32 Device::resolveFenceHandle(FenceHandle handle) const
 	return decomposed.entryIndex;
 }
 
-uint32 Device::resolveSwapChainHandle(SwapChainHandle handle) const
+uint32 Device::resolveSurfaceHandle(SurfaceHandle handle) const
 {
 	const DecomposedHandle decomposed = DecomposeHandle(uint32(handle));
-	XEAssert(decomposed.signature == SwapChainHandleSignature);
-	XEAssert(decomposed.entryIndex < MaxSwapChainCount);
-	//XEAssert(decomposed.generation == swapChainTable[decomposed.entryIndex].handleGeneration);
+	XEAssert(decomposed.signature == SurfaceHandleSignature);
+	XEAssert(decomposed.entryIndex < MaxSurfaceCount);
+	//XEAssert(decomposed.generation == surfaceTable[decomposed.entryIndex].handleGeneration);
 	return decomposed.entryIndex;
 }
 
@@ -2023,8 +2023,8 @@ auto Device::getPipelineLayoutByHandle(PipelineLayoutHandle handle) -> PipelineL
 auto Device::getPipelineByHandle(PipelineHandle handle) -> Pipeline& { return pipelineTable[resolvePipelineHandle(handle)]; }
 auto Device::getFenceByHandle(FenceHandle handle) -> Fence& { return fenceTable[resolveFenceHandle(handle)]; }
 auto Device::getFenceByHandle(FenceHandle handle) const -> const Fence& { return fenceTable[resolveFenceHandle(handle)]; }
-auto Device::getSwapChainByHandle(SwapChainHandle handle) -> SwapChain& { return swapChainTable[resolveSwapChainHandle(handle)]; }
-auto Device::getSwapChainByHandle(SwapChainHandle handle) const -> const SwapChain& { return swapChainTable[resolveSwapChainHandle(handle)]; }
+auto Device::getSurfaceByHandle(SurfaceHandle handle) -> Surface& { return surfaceTable[resolveSurfaceHandle(handle)]; }
+auto Device::getSurfaceByHandle(SurfaceHandle handle) const -> const Surface& { return surfaceTable[resolveSurfaceHandle(handle)]; }
 
 
 // DescriptorSetReference //////////////////////////////////////////////////////////////////////////

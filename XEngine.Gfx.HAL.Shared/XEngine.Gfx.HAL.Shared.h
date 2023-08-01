@@ -101,8 +101,6 @@ namespace XEngine::Gfx::HAL
 		R16G16B16A16_UINT,
 		R16G16B16A16_SINT,
 		R32_FLOAT,
-		R32_UNORM,
-		R32_SNORM,
 		R32_UINT,
 		R32_SINT,
 		R32G32_FLOAT,
@@ -195,4 +193,9 @@ namespace XEngine::Gfx::HAL
 		static bool SupportsVertexInputUsage(TexelViewFormat format);
 		static uint8 GetByteSize(TexelViewFormat format); // Provided formats should support linear storage.
 	};
+}
+
+namespace XEngine
+{
+	namespace GfxHAL = Gfx::HAL;
 }
