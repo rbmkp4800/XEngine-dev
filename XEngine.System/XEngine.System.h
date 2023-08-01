@@ -2,6 +2,7 @@
 
 #include <XLib.h>
 #include <XLib.NonCopyable.h>
+#include <XLib.Containers.DoublyLinkedList.h>
 
 namespace XEngine::System
 {
@@ -27,11 +28,15 @@ namespace XEngine::System
 		Down		= 0x28,
 		Delete		= 0x2E,
 	};
+	
+	namespace Internal { class InputHandlersList; }
 
 	class InputHandler abstract : public XLib::NonCopyable
 	{
+		friend Internal::InputHandlersList;
+
 	private:
-		//XLib::IntrusiveDoublyLinkedListItemHook handlersListItemHook;
+		XLib::IntrusiveDoublyLinkedListItemHook handlersListItemHook;
 
 	protected:
 		virtual void onMouseMove(sint32 xDelta, sint32 yDelta) {}
@@ -44,6 +49,10 @@ namespace XEngine::System
 	public:
 		InputHandler() = default;
 		~InputHandler();
+
+	private:
+		using HandlersList = XLib::IntrusiveDoublyLinkedList<InputHandler, &InputHandler::handlersListItemHook>;
+		static HandlersList handlersList;
 	};
 
 
@@ -75,4 +84,16 @@ namespace XEngine::System
 
 	void SetCursorEnabled(bool enabled);
 	void SetCursorVisible(const Window& window, bool visible);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Internal ////////////////////////////////////////////////////////////////////////////////////////
+
+namespace XEngine::System::Internal
+{
+	class InputHandlersList
+	{
+	public:
+		XLib::IntrusiveDoublyLinkedList<InputHandler, &InputHandler::handlersListItemHook> list;
+	};
 }

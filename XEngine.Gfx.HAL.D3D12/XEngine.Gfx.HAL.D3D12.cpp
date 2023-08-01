@@ -472,6 +472,41 @@ void CommandList::setPipeline(PipelineHandle pipelineHandle)
 	d3dCommandList->SetPipelineState(pipeline.d3dPipelineState);
 }
 
+void CommandList::bindIndexBuffer(BufferPointer bufferPointer, IndexBufferFormat format, uint64 byteSize)
+{
+	XEAssert(format == IndexBufferFormat::U16 || format == IndexBufferFormat::U32);
+	XEAssert(byteSize > 0);
+	XEAssert(state == State::Recording);
+
+	const Device::Resource& resource = device->getResourceByBufferHandle(bufferPointer.buffer);
+	XEAssert(resource.type == ResourceType::Buffer);
+	XEAssert(resource.d3dResource);
+
+	D3D12_INDEX_BUFFER_VIEW d3dIBV = {};
+	d3dIBV.BufferLocation = resource.d3dResource->GetGPUVirtualAddress() + bufferPointer.offset;
+	d3dIBV.SizeInBytes = byteSize;
+	d3dIBV.Format = format == IndexBufferFormat::U16 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
+
+	d3dCommandList->IASetIndexBuffer(&d3dIBV);
+}
+
+void CommandList::bindVertexBuffer(uint8 bufferIndex, BufferPointer bufferPointer, uint16 stride, uint64 byteSize)
+{
+	XEAssert(stride > 0 && byteSize > 0);
+	XEAssert(state == State::Recording);
+
+	const Device::Resource& resource = device->getResourceByBufferHandle(bufferPointer.buffer);
+	XEAssert(resource.type == ResourceType::Buffer);
+	XEAssert(resource.d3dResource);
+
+	D3D12_VERTEX_BUFFER_VIEW d3dVBV = {};
+	d3dVBV.BufferLocation = resource.d3dResource->GetGPUVirtualAddress() + bufferPointer.offset;
+	d3dVBV.SizeInBytes = byteSize;
+	d3dVBV.StrideInBytes = stride;
+
+	d3dCommandList->IASetVertexBuffers(bufferIndex, 1, &d3dVBV);
+}
+
 void CommandList::bindConstants(uint64 bindingNameXSH,
 	const void* data, uint32 size32bitValues, uint32 offset32bitValues)
 {
@@ -560,6 +595,14 @@ void CommandList::draw(uint32 vertexCount, uint32 vertexOffset)
 	XEAssert(currentPipelineType == PipelineType::Graphics);
 	// TODO: Check that pipeline is actually bound.
 	d3dCommandList->DrawInstanced(vertexCount, 1, vertexOffset, 0);
+}
+
+void CommandList::drawIndexed(uint32 indexCount, uint32 indexOffset, uint32 vertexOffset)
+{
+	XEAssert(state == State::Recording);
+	XEAssert(currentPipelineType == PipelineType::Graphics);
+	// TODO: Check that pipeline is actually bound.
+	d3dCommandList->DrawIndexedInstanced(indexCount, 1, indexOffset, vertexOffset, 0);
 }
 
 void CommandList::dispatch(uint32 groupCountX, uint32 groupCountY, uint32 groupCountZ)

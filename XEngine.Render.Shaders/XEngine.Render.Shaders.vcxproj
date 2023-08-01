@@ -33,6 +33,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="XEngine.Render.Shaders.libdef.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\XEngine.Gfx.ShaderLibraryBuilder\XEngine.Gfx.ShaderLibraryBuilder.vcxproj">
       <Project>{981d9fcb-69bd-47d9-8033-15f5b4621a85}</Project>
     </ProjectReference>

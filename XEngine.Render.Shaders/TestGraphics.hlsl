@@ -5,19 +5,28 @@ struct /*[[xe::export_cb_layout(XEngine::Render::Shaders::TestCB)]]*/ TestCB
 
 [[xe::binding(SOME_CONSTANT_BUFFER)]] ConstantBuffer<TestCB> testCB;
 
-float4 MainVS(uint vertexId : SV_VertexID) : SV_Position
+struct VSInput
 {
-	float4 position;
-	if (vertexId == 0)
-		position.xy = float2(0.6f, -0.4f);
-	else if (vertexId == 1)
-		position.xy = float2(-0.6f, -0.4f);
-	else
-		position.xy = float2(0.0f, 0.6f);
+	uint vertexId : SV_VertexID;
+	float3 position : POSITION;
+	float3 normal : NORMAL;
+	float2 texcoord : TEXCOORD;
+};
 
-	position.z = 0.5f;
-	position.w = 1.0f;
-	return position;
+struct VSOutput
+{
+	float4 position : SV_Position;
+	float3 normal : NORMAL;
+	float2 texcoord : TEXCOORD;
+};
+
+VSOutput MainVS(VSInput input)
+{
+	VSOutput output;
+	output.position = float4(input.position, 1.0f);
+	output.normal = input.normal;
+	output.texcoord = input.texcoord;
+	return output;
 }
 
 float4 MainPS() : SV_Target0

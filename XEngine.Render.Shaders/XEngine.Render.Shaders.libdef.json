@@ -15,7 +15,9 @@
 			{
 				"step_rate": "per_vertex",
 				"bindings": [
-					{ "name": "POSITION", "format": "R32G32B32_FLOAT" }
+					{ "name": "POSITION", "format": "R32G32B32_FLOAT" },
+					{ "name": "NORMAL", "format": "R32G32B32_FLOAT" },
+					{ "name": "TEXCOORD", "format": "R32G32_FLOAT" },
 				]
 			}
 		]

@@ -123,6 +123,13 @@ namespace XEngine::Gfx::HAL
 		Copy,
 	};
 
+	enum class IndexBufferFormat : uint8
+	{
+		Undefined = 0,
+		U16,
+		U32,
+	};
+
 	enum class BufferBindType : uint8
 	{
 		Undefined = 0,
@@ -271,6 +278,9 @@ namespace XEngine::Gfx::HAL
 		void setPipelineType(PipelineType pipelineType);
 		void setPipelineLayout(PipelineLayoutHandle pipelineLayoutHandle);
 		void setPipeline(PipelineHandle pipelineHandle);
+
+		void bindIndexBuffer(BufferPointer bufferPointer, IndexBufferFormat format, uint64 byteSize);
+		void bindVertexBuffer(uint8 bufferIndex, BufferPointer bufferPointer, uint16 stride, uint64 byteSize);
 
 		void bindConstants(uint64 bindingNameXSH, const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0);
 		void bindBuffer(uint64 bindingNameXSH, BufferBindType bindType, BufferPointer bufferPointer);

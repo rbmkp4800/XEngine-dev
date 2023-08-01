@@ -42,6 +42,9 @@
     <ProjectReference Include="..\XLib\XLib.vcxproj">
       <Project>{df81a513-72e3-4b74-b866-97f3bb61d45f}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\XEngine.XStringHash\XEngine.XStringHash.vcxproj" >
+      <Project>{ca640875-7c04-42ba-b081-8dac82c9f48d}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\XEngine.Common\XEngine.Common.vcxproj">
       <Project>{276891e4-c661-4502-b581-781efb8098d6}</Project>
     </ProjectReference>
