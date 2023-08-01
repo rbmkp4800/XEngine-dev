@@ -39,9 +39,9 @@ namespace XEngine::System
 		XLib::IntrusiveDoublyLinkedListItemHook handlersListItemHook;
 
 	protected:
-		virtual void onMouseMove(sint32 xDelta, sint32 yDelta) {}
+		virtual void onMouseMove(sint32 deltaX, sint32 deltaY) {}
 		virtual void onMouseButton(MouseButton button, bool state) {}
-		virtual void onScroll(float32 xDelta, float32 yDelta) {}
+		virtual void onScroll(float32 delta) {}
 		virtual void onKeyboard(KeyCode key, bool state) {}
 		virtual void onCharacter(uint32 characterUTF32) {}
 		virtual void onCloseRequest() {}
@@ -54,7 +54,6 @@ namespace XEngine::System
 		using HandlersList = XLib::IntrusiveDoublyLinkedList<InputHandler, &InputHandler::handlersListItemHook>;
 		static HandlersList handlersList;
 	};
-
 
 	class Window : public XLib::NonCopyable
 	{
@@ -76,14 +75,14 @@ namespace XEngine::System
 	// RegisterInputDeviceChangeHanlder
 	// UnregisterInputDeviceChangeHandler
 
-	void DispatchEvents();
-
 	bool IsKeyDown(KeyCode key);
 	bool IsMouseButtonDown(MouseButton mouseButton);
 	// GetCursorPosition()
 
 	void SetCursorEnabled(bool enabled);
 	void SetCursorVisible(const Window& window, bool visible);
+
+	void DispatchEvents();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -93,7 +92,51 @@ namespace XEngine::System::Internal
 {
 	class InputHandlersList
 	{
+	private:
+		XLib::IntrusiveDoublyLinkedList<InputHandler, &InputHandler::handlersListItemHook> handlersList;
+
 	public:
-		XLib::IntrusiveDoublyLinkedList<InputHandler, &InputHandler::handlersListItemHook> list;
+		InputHandlersList() = default;
+		~InputHandlersList() = default;
+
+		inline void registerHandler(InputHandler* handler)
+		{
+			handlersList.pushBack(handler);
+		}
+		void unregisterHandler(InputHandler* handler)
+		{
+			handlersList.remove(handler);
+		}
+
+		void onMouseMove(sint32 deltaX, sint32 deltaY)
+		{
+			for (InputHandler& handler : handlersList)
+				handler.onMouseMove(deltaX, deltaY);
+		}
+		void onMouseButton(MouseButton button, bool state)
+		{
+			for (InputHandler& handler : handlersList)
+				handler.onMouseButton(button, state);
+		}
+		void onScroll(float32 delta)
+		{
+			for (InputHandler& handler : handlersList)
+				handler.onScroll(delta);
+		}
+		void onKeyboard(KeyCode key, bool state)
+		{
+			for (InputHandler& handler : handlersList)
+				handler.onKeyboard(key, state);
+		}
+		void onCharacter(uint32 characterUTF32)
+		{
+			for (InputHandler& handler : handlersList)
+				handler.onCharacter(characterUTF32);
+		}
+		void onCloseRequest()
+		{
+			for (InputHandler& handler : handlersList)
+				handler.onCloseRequest();
+		}
 	};
 }

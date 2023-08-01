@@ -1,5 +1,7 @@
 #include <XLib.h>
+#include <XLib.Vectors.h>
 #include <XLib.Math.h>
+#include <XLib.Math.Matrix4x4.h>
 
 #include <XEngine.XStringHash.h>
 #include <XEngine.Gfx.HAL.D3D12.h>
@@ -19,10 +21,6 @@ struct TestVertex
 
 TestVertex cubeVertices[] =
 {
-	{ { +0.6f, -0.4f, 0.5f }, { 0.0f, 0.0f, -1.0f } },
-	{ { -0.6f, -0.4f, 0.5f }, { 0.0f, 0.0f, -1.0f } },
-	{ {  0.0f, +0.6f, 0.5f }, { 0.0f, 0.0f, -1.0f } },
-
 	{ { -1.0f, -1.0f, -1.0f }, { 0.0f, 0.0f, -1.0f } },
 	{ {  1.0f,  1.0f, -1.0f }, { 0.0f, 0.0f, -1.0f } },
 	{ {  1.0f, -1.0f, -1.0f }, { 0.0f, 0.0f, -1.0f } },
@@ -91,10 +89,14 @@ private:
 	Gfx::ShaderLibrary gfxShaderLibrary;
 	Gfx::TransientUploadMemoryAllocator gfxTransientAllocator;
 
+	float32x3 cameraPosition = {};
+	float32x2 cameraRotation = {};
+	float32 accum = 0.0f;
+
 protected:
-	virtual void onMouseMove(sint32 xDelta, sint32 yDelta) override {}
+	virtual void onMouseMove(sint32 deltaX, sint32 deltaY) override;
 	virtual void onMouseButton(System::MouseButton button, bool state) override {}
-	virtual void onScroll(float32 xDelta, float32 yDelta) override {}
+	virtual void onScroll(float32 delta) override {}
 	virtual void onKeyboard(System::KeyCode key, bool state) override {}
 	virtual void onCharacter(uint32 characterUTF32) override {}
 	virtual void onCloseRequest() override {}
@@ -106,11 +108,19 @@ public:
 	void run();
 };
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Game0::onMouseMove(sint32 deltaX, sint32 deltaY)
+{
+	cameraRotation.x += float32(deltaX) * 0.005f;
+	cameraRotation.y -= float32(deltaY) * 0.005f;
+}
+
 void Game0::run()
 {
 	window.create(1600, 900);
 
-	//System::RegisterInputHandler(this);
+	System::RegisterInputHandler(this);
 	//System::SetCursorEnabled(false);
 
 	GfxHAL::Device::Create(gfxDevice);
@@ -133,30 +143,63 @@ void Game0::run()
 	memoryCopy(vertexBuffer, cubeVertices, sizeof(cubeVertices));
 	memoryCopy(indexBuffer, cubeIndices, sizeof(cubeIndices));
 
-	gfxShaderLibrary.load("../Build/XEngine.Render.Shaders.xeslib", gfxDevice);
+	gfxShaderLibrary.load("XEngine.Render.Shaders.xeslib", gfxDevice);
 
 	const GfxHAL::PipelineLayoutHandle gfxTestPL = gfxShaderLibrary.getPipelineLayout("Test.PipelineLayout"_xsh);
 	const GfxHAL::PipelineHandle gfxTestGfxPipeline = gfxShaderLibrary.getPipeline("Test.GraphicsPipeline"_xsh);
+
+	cameraPosition = { -13.0f, -7.0f, 10.0f };
+	cameraRotation = { 0.0f, -0.7f };
 
 	for (;;)
 	{
 		System::DispatchEvents();
 
+		accum += 0.01f;
+
+		float32x3 viewSpaceTranslation = { 0.0f, 0.0f, 0.0f };
+		float32 translationStep = 0.1f;
+		if (System::IsKeyDown(System::KeyCode('A')))
+			viewSpaceTranslation.x -= translationStep;
+		if (System::IsKeyDown(System::KeyCode('D')))
+			viewSpaceTranslation.x += translationStep;
+
+		if (System::IsKeyDown(System::KeyCode('Q')))
+			viewSpaceTranslation.y -= translationStep;
+		if (System::IsKeyDown(System::KeyCode('E')))
+			viewSpaceTranslation.y += translationStep;
+
+		if (System::IsKeyDown(System::KeyCode('W')))
+			viewSpaceTranslation.z += translationStep;
+		if (System::IsKeyDown(System::KeyCode('S')))
+			viewSpaceTranslation.z -= translationStep;
+
+		const float32x3 cameraUp = float32x3(0.0f, 0.0, 1.0f);
+		const float32x3 cameraDirection = VectorMath::SphericalCoords_zZenith_xReference(cameraRotation);
+
+		cameraPosition += cameraDirection * viewSpaceTranslation.z;
+		cameraPosition.xy += float32x2(-Math::Sin(cameraRotation.x), Math::Cos(cameraRotation.x)) * viewSpaceTranslation.x;
+		cameraPosition.z += viewSpaceTranslation.y;
+
+		const Matrix4x4 cameraViewMatrix = Matrix4x4::LookAtCentered(cameraPosition, cameraDirection, cameraUp);
+		const Matrix4x4 cameraProjectionMatrix = Matrix4x4::Perspective(1.0f, 16.0f / 9.0f, 0.1f, 100.0f);
+
 		const uint32 currentBackBufferIndex = gfxDevice.getSurfaceCurrentBackBufferIndex(gfxSurface);
 		const GfxHAL::TextureHandle gfxCurrentBackBuffer = gfxSurfaceBuffers[currentBackBufferIndex];
 		const GfxHAL::RenderTargetViewHandle gfxCurrentRTV = gfxSurfaceBufferRTVs[currentBackBufferIndex];
 
-		static float qqq = 0.0f;
-		qqq += 0.1f;
-
 		struct TestCB
 		{
-			float32x4 c;
+			Matrix4x4 transform;
+			Matrix4x4 view;
+			Matrix4x4 viewProjection;
 		};
 
 		Gfx::UploadMemoryAllocationInfo testCBAllocationInfo = gfxTransientAllocator.allocate(sizeof(TestCB));
 		TestCB* testCB = (TestCB*)testCBAllocationInfo.cpuPointer;
-		testCB->c = { 0.0f, 0.0f, Math::Sin(qqq * 10.0f), 1.0f };
+		testCB->transform = Matrix4x4::RotationZ(accum);
+		testCB->view = cameraViewMatrix;
+		testCB->viewProjection = cameraViewMatrix * cameraProjectionMatrix;
 
 		gfxCommandList.open();
 		gfxCommandList.textureMemoryBarrier(gfxCurrentBackBuffer,
@@ -164,8 +207,8 @@ void Game0::run()
 			GfxHAL::BarrierAccess::None, GfxHAL::BarrierAccess::RenderTarget,
 			GfxHAL::TextureLayout::Present, GfxHAL::TextureLayout::RenderTarget);
 
-		float32 color[4] = { Math::Sin(qqq) * 0.5f + 0.5f, Math::Sin(qqq + 1.0f) * 0.5f + 0.5f, 0.0f, 1.0f };
-		gfxCommandList.clearRenderTarget(gfxCurrentRTV, color);
+		const float32x4 clearColor(0.0f, 0.1f, 0.3f, 1.0f);
+		gfxCommandList.clearRenderTarget(gfxCurrentRTV, (float32*)&clearColor);
 
 		gfxCommandList.setRenderTarget(gfxCurrentRTV);
 		gfxCommandList.setViewport(0.0f, 0.0f, 1600.0f, 900.0f);
@@ -178,7 +221,7 @@ void Game0::run()
 		gfxCommandList.bindIndexBuffer(GfxHAL::BufferPointer { gfxTestBuffer, 4096 }, GfxHAL::IndexBufferFormat::U16, 4096);
 		gfxCommandList.bindVertexBuffer(0, GfxHAL::BufferPointer { gfxTestBuffer, 0 }, sizeof(TestVertex), 4096);
 		gfxCommandList.bindBuffer("SOME_CONSTANT_BUFFER"_xsh, GfxHAL::BufferBindType::Constant, testCBAllocationInfo.gpuPointer);
-		gfxCommandList.drawIndexed(3);
+		gfxCommandList.drawIndexed(countof(cubeIndices));
 
 		gfxCommandList.textureMemoryBarrier(gfxCurrentBackBuffer,
 			GfxHAL::BarrierSync::All, GfxHAL::BarrierSync::None,

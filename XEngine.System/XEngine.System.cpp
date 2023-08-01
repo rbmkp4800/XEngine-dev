@@ -11,13 +11,120 @@ using namespace XLib;
 using namespace XEngine::System;
 
 static const wchar XEngineWindowClassName[] = L"XEngineOutputWindow";
+static XEngine::System::Internal::InputHandlersList GlobalInputHandlersList;
+static bool KeyboardState[0x100] = {};
 
-static XEngine::System::Internal::InputHandlersList inputHandlersList;
+static void HandleRawInput(WPARAM wParam, LPARAM lParam)
+{
+	if (wParam != RIM_INPUT)
+		return;
+
+	RAWINPUT inputBuffer = {};
+	UINT inputBufferSize = sizeof(RAWINPUT);
+
+	UINT result = GetRawInputData(HRAWINPUT(lParam), RID_INPUT,
+		&inputBuffer, &inputBufferSize, sizeof(RAWINPUTHEADER));
+
+	if (result == -1)
+		return;
+
+	static sint32 mouseLastAbsoluteX = 0;
+	static sint32 mouseLastAbsoluteY = 0;
+	static bool mouseLastAbsoluteStateSet = false;
+
+	if (inputBuffer.header.dwType == RIM_TYPEMOUSE)
+	{
+		const auto& data = inputBuffer.data.mouse;
+
+		if (data.usButtonFlags & RI_MOUSE_LEFT_BUTTON_DOWN)
+			GlobalInputHandlersList.onMouseButton(MouseButton::Left, true);
+		if (data.usButtonFlags & RI_MOUSE_LEFT_BUTTON_UP)
+			GlobalInputHandlersList.onMouseButton(MouseButton::Left, false);
+
+		if (data.usButtonFlags & RI_MOUSE_MIDDLE_BUTTON_DOWN)
+			GlobalInputHandlersList.onMouseButton(MouseButton::Middle, true);
+		if (data.usButtonFlags & RI_MOUSE_MIDDLE_BUTTON_UP)
+			GlobalInputHandlersList.onMouseButton(MouseButton::Middle, false);
+
+		if (data.usButtonFlags & RI_MOUSE_RIGHT_BUTTON_DOWN)
+			GlobalInputHandlersList.onMouseButton(MouseButton::Right, true);
+		if (data.usButtonFlags & RI_MOUSE_RIGHT_BUTTON_UP)
+			GlobalInputHandlersList.onMouseButton(MouseButton::Right, false);
+
+		if (data.usButtonFlags & RI_MOUSE_WHEEL)
+			GlobalInputHandlersList.onScroll(float32(sint16(data.usButtonData)) / float32(WHEEL_DELTA));
+
+		// TODO: Investigate further. Maybe add some logging during switch between modes.
+		if (data.usFlags & MOUSE_MOVE_ABSOLUTE)
+		{
+			// Absolute movement. Used in RDP/TeamViewer session.
+
+			uint16 currentAbsoluteX = 0;
+			uint16 currentAbsoluteY = 0;
+
+			if (data.usFlags & MOUSE_VIRTUAL_DESKTOP)
+			{
+				// http://www.petergiuntoli.com/parsing-wm_input-over-remote-desktop
+				// For virtual desktop coords: [0 .. MaxDim] map to [0 .. 0xFFFF]
+
+				// TODO: Handle virtual desktop size change properly and do not call 'GetSystemMetrics' each time.
+				const uint32 virtualDesktopWidth = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+				const uint32 virtualDesktopHeight = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+
+				currentAbsoluteX = uint16(data.lLastX * virtualDesktopWidth / 0xFFFF);
+				currentAbsoluteY = uint16(data.lLastY * virtualDesktopHeight / 0xFFFF);
+			}
+			else
+			{
+				currentAbsoluteX = uint16(data.lLastX);
+				currentAbsoluteY = uint16(data.lLastY);
+			}
+
+			if (mouseLastAbsoluteStateSet)
+			{
+				const sint32 deltaX = sint32(currentAbsoluteX) - sint32(mouseLastAbsoluteX);
+				const sint32 deltaY = sint32(currentAbsoluteY) - sint32(mouseLastAbsoluteY);
+
+				if (deltaX || deltaY)
+					GlobalInputHandlersList.onMouseMove(deltaX, deltaY);
+			}
+
+			mouseLastAbsoluteX = currentAbsoluteX;
+			mouseLastAbsoluteY = currentAbsoluteY;
+			mouseLastAbsoluteStateSet = true;
+		}
+		else
+		{
+			// Relative movement.
+
+			if (data.lLastX || data.lLastY)
+				GlobalInputHandlersList.onMouseMove(data.lLastX, data.lLastY);
+
+			// Assuming that absolute mode can be switched back to relative.
+			mouseLastAbsoluteStateSet = false;
+		}
+	}
+	else if (inputBuffer.header.dwType == RIM_TYPEKEYBOARD)
+	{
+		auto& data = inputBuffer.data.keyboard;
+
+		const bool keyState = data.Flags == RI_KEY_MAKE;
+
+		if (data.VKey < countof(KeyboardState))
+			KeyboardState[data.VKey] = keyState;
+
+		GlobalInputHandlersList.onKeyboard(KeyCode(data.VKey), keyState);
+	}
+}
 
 static LRESULT __stdcall WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	switch (message)
 	{
+		case WM_INPUT:
+			HandleRawInput(wParam, lParam);
+			return DefWindowProc(hWnd, message, wParam, lParam); // NOTE: 'DefWindowProc' must be called to cleaunup after WM_INPUT.
+
 		case WM_DESTROY:
 			PostQuitMessage(0);
 			break;
@@ -85,6 +192,7 @@ Window::~Window()
 void Window::create(uint32 width, uint32 height)
 {
 	RegisterWindowClass();
+	RegisterRawInput();
 
 	RECT rect = { 0, 0, LONG(width), LONG(height) };
 	AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, false);
@@ -96,6 +204,21 @@ void Window::create(uint32 width, uint32 height)
 	ShowWindow(HWND(hWnd), SW_SHOW);
 }
 
+void XEngine::System::RegisterInputHandler(InputHandler* inputHandler)
+{
+	GlobalInputHandlersList.registerHandler(inputHandler);
+}
+
+void XEngine::System::UnregisterInputHandler(InputHandler* inputHandler)
+{
+	GlobalInputHandlersList.unregisterHandler(inputHandler);
+}
+
+bool XEngine::System::IsKeyDown(KeyCode key)
+{
+	return uint32(key) < countof(KeyboardState) ? KeyboardState[uint32(key)] : false;
+}
+
 void XEngine::System::DispatchEvents()
 {
 	MSG message = { 0 };
@@ -104,14 +227,4 @@ void XEngine::System::DispatchEvents()
 		TranslateMessage(&message);
 		DispatchMessage(&message);
 	}
-}
-
-void XEngine::System::RegisterInputHandler(InputHandler* inputHandler)
-{
-	inputHandlersList.list.pushBack(inputHandler);
-}
-
-void XEngine::System::UnregisterInputHandler(InputHandler* inputHandler)
-{
-	XAssertNotImplemented();
 }

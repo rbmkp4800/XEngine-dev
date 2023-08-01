@@ -1,6 +1,8 @@
 struct /*[[xe::export_cb_layout(XEngine::Render::Shaders::TestCB)]]*/ TestCB
 {
-	float4 c;
+	float4x4 transform;
+	float4x4 view;
+	float4x4 viewProjection;
 };
 
 [[xe::binding(SOME_CONSTANT_BUFFER)]] ConstantBuffer<TestCB> testCB;
@@ -22,14 +24,18 @@ struct VSOutput
 
 VSOutput MainVS(VSInput input)
 {
+	const float3 worldSpacePosition = mul(float4(input.position, 1.0f), testCB.transform).xyz;
+	const float3 worldSpaceNormal = mul(input.normal, (float3x3) testCB.transform);
+	
 	VSOutput output;
-	output.position = float4(input.position, 1.0f);
-	output.normal = input.normal;
+	output.position = mul(testCB.viewProjection, float4(worldSpacePosition, 1.0f));;
+	output.normal = worldSpaceNormal; // normalize(mul((float3x3) testCB.view, worldSpaceNormal));
 	output.texcoord = input.texcoord;
 	return output;
 }
 
-float4 MainPS() : SV_Target0
+float4 MainPS(VSOutput input) : SV_Target0
 {
-	return testCB.c;
+	float a = abs(dot(input.normal, normalize(float3(1, 1, 1))));
+	return float4(a.xxx, 1.0f);
 }
