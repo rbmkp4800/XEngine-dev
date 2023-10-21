@@ -96,33 +96,6 @@ namespace XEngine::Gfx::HAL
 		return DXGI_FORMAT_UNKNOWN;
 	}
 
-	inline D3D12_HEAP_TYPE TranslateBufferMemoryTypeToD3D12HeapType(BufferMemoryType type)
-	{
-		switch (type)
-		{
-			case BufferMemoryType::DeviceLocal:	return D3D12_HEAP_TYPE_DEFAULT;
-			case BufferMemoryType::Upload:		return D3D12_HEAP_TYPE_UPLOAD;
-			case BufferMemoryType::Readback:	return D3D12_HEAP_TYPE_READBACK;
-		}
-
-		XEMasterAssertUnreachableCode();
-		return D3D12_HEAP_TYPE(0);
-	}
-
-	// TODO: Remove when dropping legacy barriers support.
-	inline D3D12_RESOURCE_STATES TranslateBufferMemoryTypeToInitialD3D12ResourceState(BufferMemoryType type)
-	{
-		switch (type)
-		{
-		case BufferMemoryType::DeviceLocal:	return D3D12_RESOURCE_STATE_COMMON;
-		case BufferMemoryType::Upload:		return D3D12_RESOURCE_STATE_GENERIC_READ;
-		case BufferMemoryType::Readback:	return D3D12_RESOURCE_STATE_COPY_DEST;
-		}
-
-		XEMasterAssertUnreachableCode();
-		return D3D12_RESOURCE_STATES(0);
-	}
-
 #if USE_ENHANCED_BARRIERS
 
 	inline D3D12_BARRIER_SYNC TranslateBarrierSyncToD3D12BarrierSync(BarrierSync sync)

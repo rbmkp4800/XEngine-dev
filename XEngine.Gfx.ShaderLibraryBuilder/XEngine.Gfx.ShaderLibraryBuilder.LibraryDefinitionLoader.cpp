@@ -812,7 +812,7 @@ bool LibraryDefinitionLoader::readGraphicsPipeline(StringViewASCII graphicsPipel
 						"format does not support render target usage", jsonRTValueCursor);
 				}
 
-				IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(renderTargetCount < HAL::MaxRenderTargetCount, "render targets limit exceeded", jsonRTValueCursor);
+				IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(renderTargetCount < HAL::MaxColorRenderTargetCount, "render targets limit exceeded", jsonRTValueCursor);
 
 				pipelineSettings.renderTargetsFormats[renderTargetCount] = renderTargetFormat;
 				renderTargetCount++;

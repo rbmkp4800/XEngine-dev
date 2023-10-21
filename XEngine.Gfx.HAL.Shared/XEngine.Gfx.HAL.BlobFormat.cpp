@@ -323,7 +323,7 @@ void GraphicsPipelineStateBlobWriter::registerBytecodeBlob(ShaderType type, uint
 void GraphicsPipelineStateBlobWriter::addRenderTarget(TexelViewFormat format)
 {
 	XAssert(initializationInProgress);
-	XAssert(renderTargetCount < MaxRenderTargetCount);
+	XAssert(renderTargetCount < MaxColorRenderTargetCount);
 
 	renderTargetFormats[renderTargetCount] = format;
 	renderTargetCount++;
@@ -398,7 +398,7 @@ void GraphicsPipelineStateBlobWriter::finalizeToMemoryBlock(void* memoryBlock, u
 	body.msBytecodeRegistered = msBytecodeRegistered;
 	body.psBytecodeRegistered = psBytecodeRegistered;
 
-	for (uint32 i = 0; i < MaxRenderTargetCount; i++)
+	for (uint32 i = 0; i < MaxColorRenderTargetCount; i++)
 		body.renderTargetFormats[i] = i < renderTargetCount ? renderTargetFormats[i] : TexelViewFormat::Undefined;
 
 	body.depthStencilFormat = depthStencilFormat;
@@ -454,12 +454,12 @@ bool GraphicsPipelineStateBlobReader::open(const void* data, uint32 size)
 
 uint32 GraphicsPipelineStateBlobReader::getRenderTargetCount() const
 {
-	for (uint32 i = 0; i < MaxRenderTargetCount; i++)
+	for (uint32 i = 0; i < MaxColorRenderTargetCount; i++)
 	{
 		if (body->renderTargetFormats[i] == TexelViewFormat::Undefined)
 			return i;
 	}
-	return MaxRenderTargetCount;
+	return MaxColorRenderTargetCount;
 }
 
 const VertexBindingInfo* GraphicsPipelineStateBlobReader::getVertexBindingInplace(uint8 bindingIndex) const

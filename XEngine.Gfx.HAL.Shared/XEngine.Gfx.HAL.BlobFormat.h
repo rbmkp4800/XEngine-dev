@@ -79,7 +79,7 @@ namespace XEngine::Gfx::HAL::BlobFormat::Data
 		bool psBytecodeRegistered;
 
 		// [24..33)
-		TexelViewFormat renderTargetFormats[MaxRenderTargetCount];
+		TexelViewFormat renderTargetFormats[MaxColorRenderTargetCount];
 		DepthStencilFormat depthStencilFormat;
 
 		// [33..36)
@@ -234,7 +234,7 @@ namespace XEngine::Gfx::HAL::BlobFormat
 		bool psBytecodeRegistered = false;
 
 		DepthStencilFormat depthStencilFormat = DepthStencilFormat::Undefined;
-		TexelViewFormat renderTargetFormats[MaxRenderTargetCount] = {};
+		TexelViewFormat renderTargetFormats[MaxColorRenderTargetCount] = {};
 		uint8 renderTargetCount = 0;
 
 		Data::VertexBindingRecord vertexBindingRecords[MaxVertexBindingCount] = {};
@@ -286,7 +286,7 @@ namespace XEngine::Gfx::HAL::BlobFormat
 
 		uint32 getPipelineLayoutSourceHash() const { return body->pipelineLayoutSourceHash; }
 		uint32 getRenderTargetCount() const;
-		TexelViewFormat getRenderTargetFormat(uint32 index) const { XAssert(index < MaxRenderTargetCount); return body->renderTargetFormats[index]; }
+		TexelViewFormat getRenderTargetFormat(uint32 index) const { XAssert(index < MaxColorRenderTargetCount); return body->renderTargetFormats[index]; }
 		DepthStencilFormat getDepthStencilFormat() const { return body->depthStencilFormat; }
 		bool isVertexBufferUsed(uint8 vertexBufferIndex) const { return (body->vertexBuffersUsedFlagBits >> vertexBufferIndex) & 1; }
 		bool isVertexBufferPerInstance(uint8 vertexBufferIndex) const { return (body->vertexBuffersPerInstanceFlagBits >> vertexBufferIndex) & 1; }

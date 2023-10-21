@@ -119,7 +119,7 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 		VertexBindingDesc* vertexBindings;
 		uint8 vertexBindingCount;
 
-		TexelViewFormat renderTargetsFormats[MaxRenderTargetCount];
+		TexelViewFormat renderTargetsFormats[MaxColorRenderTargetCount];
 		DepthStencilFormat depthStencilFormat;
 	};
 

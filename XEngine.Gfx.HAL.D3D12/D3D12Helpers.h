@@ -82,7 +82,7 @@ namespace D3D12Helpers
 		return desc;
 	}
 
-	inline D3D12_HEAP_PROPERTIES HeapProperties(D3D12_HEAP_TYPE type)
+	inline D3D12_HEAP_PROPERTIES HeapPropertiesForHeapType(D3D12_HEAP_TYPE type)
 	{
 		D3D12_HEAP_PROPERTIES props = {};
 		props.Type = type;

@@ -9,7 +9,7 @@ namespace XEngine::Gfx::HAL
 	constexpr uint8 MaxVertexBufferCount = 8;
 	constexpr uint8 MaxVertexBindingCount = 32;
 	constexpr uint16 MaxVertexBufferElementSize = 8192;
-	constexpr uint8 MaxRenderTargetCount = 8;
+	constexpr uint8 MaxColorRenderTargetCount = 8;
 
 	enum class ShaderType : uint8
 	{
@@ -178,8 +178,7 @@ namespace XEngine::Gfx::HAL
 	class TextureFormatUtils abstract final
 	{
 	public:
-		static inline bool IsValid(TextureFormat format) { return format < TextureFormat::ValueCount; }
-		static inline bool IsValidAndDefined(TextureFormat format) { return IsValid(format) && format != TextureFormat::Undefined; }
+		static inline bool IsValid(TextureFormat format) { return format < TextureFormat::ValueCount && format != TextureFormat::Undefined; }
 		static bool SupportsRenderTargetUsage(TextureFormat format);
 		static bool SupportsDepthStencilUsage(TextureFormat format);
 	};

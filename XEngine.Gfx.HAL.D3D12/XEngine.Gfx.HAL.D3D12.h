@@ -3,31 +3,30 @@
 #include <XLib.h>
 #include <XLib.Vectors.h>
 #include <XLib.NonCopyable.h>
-#include <XLib.Platform.COMPtr.h>
-#include <XLib.Containers.BitArray.h>
 
 #include <XEngine.Gfx.HAL.Shared.h>
 
 // TODO: Check that viewport and scissor are set when rendering.
 // TODO: Check that scissor rect is not larget than render target.
-// TODO: Replace DepthStencil with DepthRenderTarget.
-// TODO: Probably replace RenderTargetView with RenderTarget, DepthRenderTargetView with DepthRenderTarget.
 // TODO: Probably we can state that Texture2D is equivalent to Texture2DArray[1].
-// TODO: `TextureDesc` can be packed into 8 bytes.
 // TODO: Handle should be 18+10+4 or 17+11+4 instead of 20+8+4.
 // TODO: Setting pipeline type should not clear pipeline layout as one layout could work for graphics and compute.
 // TODO: Depth-stencil state, rasterizer state, blend state should be provided in runtime. We assume that these settings have nothing to do with shader bytecode.
+// TODO: Implement "host visible" memory/resources via `D3D12_HEAP_TYPE_GPU_UPLOAD`.
+// TODO: Move bindings from `Device::DescriptorSetLayout` and `Device::PipelineLayout` to device internal heap (TLSF probably).
+// TODO: Look into `minImageTransferGranularity`. This is additional constraint on CLs we submit to copy queue.
 
 // NOTE: `CreateGraphicsPipeline` / `CreateComputePipeline` will be replaced with `CreateShader` / `CompileShader`, when
 // D3D12 GPU work graphs (including collection state objects) and VK_EXT_shader_object are ready. At that point we should
 // also rename `PipelineLayout` to something like `ShaderInputLayout`.
+
+// NOTE: Virtual textures do not support compression (CMASK/DCC) on some architectures.
 
 #define XEAssert(cond) XAssert(cond)
 #define XEAssertUnreachableCode() XAssertUnreachableCode()
 #define XEMasterAssert(cond) XAssert(cond)
 #define XEMasterAssertUnreachableCode() XAssertUnreachableCode()
 
-struct ID3D12CommandAllocator;
 struct ID3D12CommandQueue;
 struct ID3D12DescriptorHeap;
 struct ID3D12GraphicsCommandList7;
@@ -40,39 +39,42 @@ namespace XEngine::Gfx::HAL
 	constexpr uint16 ConstantBufferBindAlignmentLog2 = 8;
 	constexpr uint16 ConstantBufferBindAlignment = 1 << ConstantBufferBindAlignmentLog2;
 	constexpr uint16 TextureArraySizeLimit = 2048;
-	constexpr uint32 SurfaceBackBufferCount = 2;
+	constexpr uint32 OutputBackBufferCount = 2;
 
 	class Device;
 
-	enum class DeviceMemoryAllocationHandle	: uint32 { Zero = 0 };
-	enum class BufferHandle					: uint32 { Zero = 0 };
-	enum class TextureHandle				: uint32 { Zero = 0 };
-	enum class ResourceViewHandle			: uint32 { Zero = 0 }; // ReferenceDescriptorHandle
-	enum class RenderTargetViewHandle		: uint32 { Zero = 0 }; // RenderTargetHandle
-	enum class DepthStencilViewHandle		: uint32 { Zero = 0 }; // DepthRenderTargetViewHandle (DepthRenderTargetHandle)
-	enum class DescriptorSetLayoutHandle	: uint32 { Zero = 0 };
-	enum class PipelineLayoutHandle			: uint32 { Zero = 0 };
-	enum class PipelineHandle				: uint32 { Zero = 0 };
-	enum class FenceHandle					: uint32 { Zero = 0 };
-	enum class SurfaceHandle				: uint32 { Zero = 0 };
+	enum class CommandAllocatorHandle			: uint32 { Zero = 0 };
+	enum class DeviceMemoryAllocationHandle		: uint32 { Zero = 0 };
+	enum class BufferHandle						: uint32 { Zero = 0 };
+	enum class TextureHandle					: uint32 { Zero = 0 };
+	enum class ResourceViewHandle				: uint32 { Zero = 0 }; // DescriptorSourceHandle?? createTextureDescriptorSource?
+	enum class ColorRenderTargetHandle			: uint32 { Zero = 0 };
+	enum class DepthStencilRenderTargetHandle	: uint32 { Zero = 0 };
+	enum class DescriptorSetLayoutHandle		: uint32 { Zero = 0 };
+	enum class PipelineLayoutHandle				: uint32 { Zero = 0 };
+	enum class PipelineHandle					: uint32 { Zero = 0 };
+	enum class OutputHandle						: uint32 { Zero = 0 };
 
-	enum class DescriptorSetReference		: uint64 { Zero = 0 };
-	enum class DeviceQueueSyncPoint			: uint64 { Zero = 0 };
+	enum class DescriptorSetReference			: uint64 { Zero = 0 };
+	enum class DeviceQueueSyncPoint				: uint64 { Zero = 0 };
+	enum class HostSignalToken					: uint64 { Zero = 0 };
 
 	using DescriptorAddress = uint32;
 
-	enum class DeviceQueue : uint8
+	enum class DeviceQueue : uint8 // Also used as queue index, so should start from 0.
 	{
-		Undefined = 0,
-		Main,
-		AsyncCompute,
-		AsyncCopy,
+		Graphics = 0,
+		Compute,
+		Copy,
+		ValueCount,
 	};
+
+	static constexpr uint8 DeviceQueueCount = uint8(DeviceQueue::ValueCount);
 
 	struct ResourceAllocationInfo
 	{
 		uint64 size;
-		uint64 alignment;
+		uint64 alignment; // TODO: Remove this. It should be well known constant (inc user provided tiling).
 	};
 
 	enum class ResourceType
@@ -82,12 +84,11 @@ namespace XEngine::Gfx::HAL
 		Texture,
 	};
 
-	enum class BufferMemoryType : uint8
+	enum class StagingBufferAccessMode : uint8
 	{
 		Undefined = 0,
-		DeviceLocal,
-		Upload,
-		Readback,
+		DeviceReadHostWrite,
+		DeviceWriteHostRead,
 	};
 
 	enum class TextureDimension : uint8
@@ -101,12 +102,12 @@ namespace XEngine::Gfx::HAL
 	struct TextureDesc
 	{
 		uint16x3 size;
-		TextureDimension dimension;
-		TextureFormat format;
-		uint8 mipLevelCount;
-		bool allowRenderTarget;
-		bool allowShaderWrite;
+		TextureDimension dimension : 2; // TODO: Calculate these bits properly.
+		TextureFormat format : 6;
+		uint8 mipLevelCount : 4;
+		bool allowRenderTarget : 1;
 	};
+	static_assert(sizeof(TextureDesc) == 8);
 
 	enum class PipelineType : uint8
 	{
@@ -241,8 +242,6 @@ namespace XEngine::Gfx::HAL
 		friend Device;
 
 	private:
-		enum class State : uint8;
-
 		struct BindingResolveResult;
 
 		static inline BindingResolveResult ResolveBindingByNameXSH(
@@ -251,36 +250,39 @@ namespace XEngine::Gfx::HAL
 	private:
 		Device* device = nullptr;
 		ID3D12GraphicsCommandList7* d3dCommandList = nullptr;
-		ID3D12CommandAllocator* d3dCommandAllocator = nullptr;
-		CommandListType type = CommandListType::Undefined;
+		uint32 deviceCommandListHandle = 0;
+		CommandAllocatorHandle commandAllocatorHandle = CommandAllocatorHandle::Zero;
 
-		State state = State(0);
-		DeviceQueueSyncPoint executionEndSyncPoint = DeviceQueueSyncPoint::Zero;
-		PipelineType currentPipelineType = PipelineType::Undefined;
+		CommandListType type = CommandListType::Undefined;
+		bool isOpen = false;
+
 		PipelineLayoutHandle currentPipelineLayoutHandle = PipelineLayoutHandle::Zero;
+		PipelineType currentPipelineType = PipelineType::Undefined;
+
+	private:
+		void cleanup();
 
 	public:
 		CommandList() = default;
 		~CommandList();
 
-		void open();
-		//void close(); // TODO: Do we need it at all?
+		void clearColorRenderTarget(ColorRenderTargetHandle colorRT, const float32* color);
+		void clearDepthStencilRenderTarget(DepthStencilRenderTargetHandle depthStencilRT,
+			bool clearDepth, bool clearStencil, float32 depth, uint8 stencil);
 
-		void clearRenderTarget(RenderTargetViewHandle rtv, const float32* color);
-		void clearDepthStencil(DepthStencilViewHandle dsv, bool clearDepth, bool clearStencil, float32 depth, uint8 stencil);
-
-		void setRenderTargets(uint8 rtvCount, const RenderTargetViewHandle* rtvs, DepthStencilViewHandle dsv = DepthStencilViewHandle::Zero);
+		void setRenderTargets(uint8 colorRTCount, const ColorRenderTargetHandle* colorRTs,
+			DepthStencilRenderTargetHandle depthStencilRT = DepthStencilRenderTargetHandle::Zero);
+		void setRenderTarget(ColorRenderTargetHandle colorRT,
+			DepthStencilRenderTargetHandle depthStencilRT = DepthStencilRenderTargetHandle::Zero);
 		void setViewport(float32 left, float32 top, float32 right, float32 bottom, float32 minDepth = 0.0f, float32 maxDepth = 1.0f);
 		void setScissor(uint32 left, uint32 top, uint32 right, uint32 bottom);
-
-		inline void setRenderTarget(RenderTargetViewHandle rtv, DepthStencilViewHandle dsv = DepthStencilViewHandle::Zero) { setRenderTargets(1, &rtv, dsv); }
 
 		void setPipelineType(PipelineType pipelineType);
 		void setPipelineLayout(PipelineLayoutHandle pipelineLayoutHandle);
 		void setPipeline(PipelineHandle pipelineHandle);
 
-		void bindIndexBuffer(BufferPointer bufferPointer, IndexBufferFormat format, uint64 byteSize);
-		void bindVertexBuffer(uint8 bufferIndex, BufferPointer bufferPointer, uint16 stride, uint64 byteSize);
+		void bindIndexBuffer(BufferPointer bufferPointer, IndexBufferFormat format, uint32 byteSize);
+		void bindVertexBuffer(uint8 bufferIndex, BufferPointer bufferPointer, uint16 stride, uint32 byteSize);
 
 		void bindConstants(uint64 bindingNameXSH, const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0);
 		void bindBuffer(uint64 bindingNameXSH, BufferBindType bindType, BufferPointer bufferPointer);
@@ -330,74 +332,107 @@ namespace XEngine::Gfx::HAL
 		BlobDataView ps;
 	};
 
+	struct DeviceSettings
+	{
+		uint16 maxMemoryAllocationCount;
+		uint16 maxCommandAllocatorCount;
+		uint16 maxCommandListCount;
+		uint16 maxResourceCount;
+		uint16 maxResourceViewCount;
+		uint16 maxColorRenderTargetCount;
+		uint16 maxDepthStencilRenderTargetCount;
+		uint16 maxDescriptorSetLayoutCount;
+		uint16 maxPipelineLayoutCount;
+		uint16 maxPipelineCount;
+		uint16 maxOutputCount;
+
+		uint32 descriptorPoolSize;
+	};
+
+	/*class PhysicalDevice
+	{
+	private:
+
+	public:
+		PhysicalDevice() = default;
+		~PhysicalDevice() = default;
+	};*/
+
 	class Device : public XLib::NonCopyable
 	{
 		friend CommandList;
 
 	private:
-		static constexpr uint32 MaxMemoryAllocationCount = 1024;
-		static constexpr uint32 MaxResourceCount = 1024;
-		static constexpr uint32 MaxResourceViewCount = 1024;
-		static constexpr uint32 MaxResourceDescriptorCount = 4096;
-		static constexpr uint32 MaxRenderTargetViewCount = 64;
-		static constexpr uint32 MaxDepthStencilViewCount = 64;
-		static constexpr uint32 MaxDescriptorSetLayoutCount = 64;
-		static constexpr uint32 MaxPipelineLayoutCount = 64;
-		static constexpr uint32 MaxPipelineCount = 1024;
-		static constexpr uint32 MaxFenceCount = 64;
-		static constexpr uint32 MaxSurfaceCount = 4;
+		struct Queue
+		{
+			ID3D12CommandQueue* d3dQueue;
+			ID3D12Fence* d3dDeviceSignalFence;
+			//ID3D12Fence* d3dHostSignalFence;
+			uint64 deviceSignalEmittedValue;
+			uint64 deviceSignalReachedValue;
+		};
 
+		template <typename EntryType>
+		class Pool
+		{
+		private:
+			EntryType* buffer = nullptr;
+			uint16 capacity = 0;
+			uint16 committedEntryCount = 0; // Number of entries allocated at least once.
+			uint16 freelistHeadIdx = 0;
+			uint16 freelistLength = 0;
+
+		private:
+			static constexpr uint8 GetHandleSignature();
+
+		public:
+			Pool() = default;
+			~Pool() = default;
+
+			inline void initialize(EntryType* buffer, uint16 capacity);
+
+			inline EntryType& allocate(uint32& outHandle, uint16* outEntryIndex = nullptr);
+			inline void release(uint32 handle);
+
+			inline uint16 resolveHandleToEntryIndex(uint32 handle) const;
+			inline EntryType& resolveHandle(uint32 handle, uint16* outEntryIndex = nullptr);
+			inline const EntryType& resolveHandle(uint32 handle, uint16* outEntryIndex = nullptr) const;
+
+			inline uint16 getCapacity() const { return capacity; }
+			inline uint16 getAllocatedEntryCount() const { return committedEntryCount - freelistLength; }
+
+			static inline uint8 GetHandleGeneration(uint32 handle);
+			static inline uint16 GetHandleEntryIndex(uint32 handle);
+			static inline uint32 ComposeHandle(uint16 entryIndex, uint8 handleGeneration);
+		};
+
+		struct PoolEntryBase;
+
+		struct CommandAllocator;
+		struct CommandList;
 		struct MemoryAllocation;
 		struct Resource;
 		struct ResourceView;
+		struct ColorRenderTarget;
+		struct DepthStencilRenderTarget;
 		struct DescriptorSetLayout;
 		struct PipelineLayout;
 		struct Pipeline;
-		struct Fence;
-		struct Surface;
+		struct Output;
 
 		struct DecomposedDescriptorSetReference;
 
 	private:
-		XLib::Platform::COMPtr<ID3D12Device10> d3dDevice;
+		ID3D12Device10* d3dDevice = nullptr;
 
-		XLib::Platform::COMPtr<ID3D12DescriptorHeap> d3dReferenceSRVHeap;
-		XLib::Platform::COMPtr<ID3D12DescriptorHeap> d3dShaderVisbileSRVHeap;
-		XLib::Platform::COMPtr<ID3D12DescriptorHeap> d3dRTVHeap;
-		XLib::Platform::COMPtr<ID3D12DescriptorHeap> d3dDSVHeap;
+		Queue queues[DeviceQueueCount] = {};
 
-		XLib::Platform::COMPtr<ID3D12CommandQueue> d3dGraphicsQueue;
-		//XLib::Platform::COMPtr<ID3D12CommandQueue> d3dAsyncComputeQueue;
-		//XLib::Platform::COMPtr<ID3D12CommandQueue> d3dAsyncCopyQueue;
+		ID3D12DescriptorHeap* d3dHostSRVHeap = nullptr; // Resource view pool
+		ID3D12DescriptorHeap* d3dShaderVisbileSRVHeap = nullptr; // Descriptor pool
+		ID3D12DescriptorHeap* d3dRTVHeap = nullptr;
+		ID3D12DescriptorHeap* d3dDSVHeap = nullptr;
 
-		XLib::Platform::COMPtr<ID3D12Fence> d3dGraphicsQueueSyncPointFence;
-		//XLib::Platform::COMPtr<ID3D12Fence> d3dAsyncComputeQueueFence;
-		//XLib::Platform::COMPtr<ID3D12Fence> d3dAsyncCopyQueueFence;
-		uint64 graphicsQueueSyncPointFenceValue = 0;
-		//uint64 asyncComputeQueueFenceValue = 0;
-		//uint64 asyncCopyQueueFenceValue = 0;
-
-		MemoryAllocation* memoryAllocationTable = nullptr;
-		Resource* resourceTable = nullptr;
-		ResourceView* resourceViewTable = nullptr;
-		DescriptorSetLayout* descriptorSetLayoutTable = nullptr;
-		PipelineLayout* pipelineLayoutTable = nullptr;
-		Pipeline* pipelineTable = nullptr;
-		Fence* fenceTable = nullptr;
-		Surface* surfaceTable = nullptr;
-
-		XLib::InplaceBitArray<MaxMemoryAllocationCount> memoryAllocationTableAllocationMask;
-		XLib::InplaceBitArray<MaxResourceCount> resourceTableAllocationMask;
-		XLib::InplaceBitArray<MaxResourceViewCount> resourceViewTableAllocationMask;
-		XLib::InplaceBitArray<MaxRenderTargetViewCount> renderTargetViewTableAllocationMask;
-		XLib::InplaceBitArray<MaxDepthStencilViewCount> depthStencilViewTableAllocationMask;
-		XLib::InplaceBitArray<MaxDescriptorSetLayoutCount> descriptorSetLayoutTableAllocationMask;
-		XLib::InplaceBitArray<MaxPipelineLayoutCount> pipelineLayoutTableAllocationMask;
-		XLib::InplaceBitArray<MaxPipelineCount> pipelineTableAllocationMask;
-		XLib::InplaceBitArray<MaxFenceCount> fenceTableAllocationMask;
-		XLib::InplaceBitArray<MaxSurfaceCount> surfaceTableAllocationMask;
-
-		uint64 referenceSRVHeapPtr = 0;
+		uint64 hostSRVHeapPtr = 0;
 		uint64 shaderVisbileSRVHeapCPUPtr = 0;
 		uint64 shaderVisbileSRVHeapGPUPtr = 0;
 		uint64 rtvHeapPtr = 0;
@@ -407,71 +442,59 @@ namespace XEngine::Gfx::HAL
 		uint16 rtvDescriptorSize = 0;
 		uint16 dsvDescriptorSize = 0;
 
-		uint32 descriptorSetReferenceGenerationCounter = 0;
+		Pool<CommandAllocator> commandAllocatorPool;
+		Pool<CommandList> commandListPool;
+		Pool<MemoryAllocation> memoryAllocationPool;
+		Pool<Resource> resourcePool;
+		Pool<ResourceView> resourceViewPool;
+		Pool<ColorRenderTarget> colorRenderTargetPool;
+		Pool<DepthStencilRenderTarget> depthStencilRenderTargetPool;
+		Pool<DescriptorSetLayout> descriptorSetLayoutPool;
+		Pool<PipelineLayout> pipelineLayoutPool;
+		Pool<Pipeline> pipelinePool;
+		Pool<Output> outputPool;
+
+		uint32 descriptorPoolSize = 0;
+
+		uint8 descriptorSetReferenceMagicCounter = 0;
 
 	private:
-		DeviceMemoryAllocationHandle composeMemoryAllocationHandle(uint32 memoryAllocationIndex) const;
-		BufferHandle composeBufferHandle(uint32 resourceIndex) const;
-		TextureHandle composeTextureHandle(uint32 resourceIndex) const;
-		ResourceViewHandle composeResourceViewHandle(uint32 resourceViewIndex) const;
-		RenderTargetViewHandle composeRenderTargetViewHandle(uint32 renderTargetIndex) const;
-		DepthStencilViewHandle composeDepthStencilViewHandle(uint32 depthStencilIndex) const;
-		DescriptorSetLayoutHandle composeDescriptorSetLayoutHandle(uint32 descriptorSetLayoutIndex) const;
-		PipelineLayoutHandle composePipelineLayoutHandle(uint32 pipelineLayoutIndex) const;
-		PipelineHandle composePipelineHandle(uint32 pipelineIndex) const;
-		FenceHandle composeFenceHandle(uint32 fenceIndex) const;
-		SurfaceHandle composeSurfaceHandle(uint32 surfaceIndex) const;
+		static inline DescriptorSetReference ComposeDescriptorSetReference(DescriptorSetLayoutHandle descriptorSetLayoutHandle,
+			uint32 baseDescriptorIndex, uint8 descriptorSetMagic);
+		static inline void DecomposeDescriptorSetReference(DescriptorSetReference descriptorSetReference,
+			DescriptorSetLayoutHandle& outDescriptorSetLayoutHandle, uint32& outBaseDescriptorIndex, uint8& outDescriptorSetMagic);
 
-		uint32 resolveMemoryAllocationHandle(DeviceMemoryAllocationHandle handle) const;
-		uint32 resolveBufferHandle(BufferHandle handle) const;
-		uint32 resolveTextureHandle(TextureHandle handle) const;
-		uint32 resolveResourceViewHandle(ResourceViewHandle handle) const;
-		uint32 resolveRenderTargetViewHandle(RenderTargetViewHandle handle) const;
-		uint32 resolveDepthStencilViewHandle(DepthStencilViewHandle handle) const;
-		uint32 resolveDescriptorSetLayoutHandle(DescriptorSetLayoutHandle handle) const;
-		uint32 resolvePipelineLayoutHandle(PipelineLayoutHandle handle) const;
-		uint32 resolvePipelineHandle(PipelineHandle handle) const;
-		uint32 resolveFenceHandle(FenceHandle handle) const;
-		uint32 resolveSurfaceHandle(SurfaceHandle handle) const;
+		static consteval uint8 GetDeviceQueueSyncPointSignalValueBitCount();
+		static inline DeviceQueueSyncPoint ComposeDeviceQueueSyncPoint(uint8 queueIndex, uint64 signalValue);
+		static inline void DecomposeDeviceQueueSyncPoint(DeviceQueueSyncPoint syncPoint, uint8& outQueueIndex, uint64& outSignalValue);
 
-		MemoryAllocation& getMemoryAllocationByHandle(DeviceMemoryAllocationHandle handle);
-		Resource& getResourceByBufferHandle(BufferHandle handle);
-		Resource& getResourceByTextureHandle(TextureHandle handle);
-		ResourceView& getResourceViewByHandle(ResourceViewHandle handle);
-		const DescriptorSetLayout& getDescriptorSetLayoutByHandle(DescriptorSetLayoutHandle handle) const;
-		PipelineLayout& getPipelineLayoutByHandle(PipelineLayoutHandle handle);
-		Pipeline& getPipelineByHandle(PipelineHandle handle);
-		Fence& getFenceByHandle(FenceHandle handle);
-		const Fence& getFenceByHandle(FenceHandle handle) const;
-		Surface& getSurfaceByHandle(SurfaceHandle handle);
-		const Surface& getSurfaceByHandle(SurfaceHandle handle) const;
-
-		DescriptorSetReference composeDescriptorSetReference(DescriptorSetLayoutHandle descriptorSetLayoutHandle,
-			uint32 baseDescriptorIndex, uint32 descriptorSetGeneration) const;
-		DecomposedDescriptorSetReference decomposeDescriptorSetReference(DescriptorSetReference descriptorSetReference) const;
+		static uint32 CalculateTextureSubresourceIndex(const TextureDesc& textureDesc, const TextureSubresource& textureSubresource);
 
 	private:
-		static uint32 CalculateTextureSubresourceIndex(const Resource& resource, const TextureSubresource& subresource);
-
-	private:
-		void initialize(ID3D12Device10* d3dDevice);
+		inline bool isDeviceSignalValueReached(const Queue& queue, uint64 signalValue, uint8 signalValueBitCount) const;
+		void updateCommandAllocatorExecutionStatus(CommandAllocator& commandAllocator);
 
 	public:
 		Device() = default;
 		~Device() = default;
 
-		DeviceMemoryAllocationHandle allocateMemory(uint64 size);
-		void releaseMemory(DeviceMemoryAllocationHandle memory);
+		void initialize(/*const PhysicalDevice& physicalDevice, */const DeviceSettings& settings);
+
+		CommandAllocatorHandle createCommandAllocator();
+		void destroyCommandAllocator(CommandAllocatorHandle commandAllocatorHandle);
+
+		DeviceMemoryAllocationHandle allocateDeviceMemory(uint64 size, bool hostVisible);
+		void releaseDeviceMemory(DeviceMemoryAllocationHandle deviceMemoryHandle);
 
 		ResourceAllocationInfo getTextureAllocationInfo(const TextureDesc& textureDesc) const;
 
-		BufferHandle createBuffer(uint64 size, bool allowShaderWrite, BufferMemoryType memoryType = BufferMemoryType::DeviceLocal,
-			DeviceMemoryAllocationHandle memoryHandle = DeviceMemoryAllocationHandle::Zero, uint64 memoryOffset = 0);
-		TextureHandle createTexture(const TextureDesc& desc,
-			DeviceMemoryAllocationHandle memoryHandle = DeviceMemoryAllocationHandle::Zero, uint64 memoryOffset = 0);
+		BufferHandle createBuffer(uint64 size, DeviceMemoryAllocationHandle memoryHandle, uint64 memoryOffset);
+		TextureHandle createTexture(const TextureDesc& desc, DeviceMemoryAllocationHandle memoryHandle, uint64 memoryOffset);
 
-		BufferHandle createPartiallyResidentBuffer(uint64 size, bool allowShaderWrite);
-		TextureHandle createPartiallyResidentTexture(const TextureDesc& textureDesc);
+		BufferHandle createVirtualBuffer(uint64 size);
+		TextureHandle createVirtualTexture(const TextureDesc& textureDesc);
+
+		BufferHandle createStagingBuffer(uint64 size, StagingBufferAccessMode accessMode);
 
 		void destroyBuffer(BufferHandle bufferHandle);
 		void destroyTexture(TextureHandle textureHandle);
@@ -481,77 +504,70 @@ namespace XEngine::Gfx::HAL
 			TexelViewFormat format, bool writable, const TextureSubresourceRange& subresourceRange);
 		ResourceViewHandle createTextureCubeView(TextureHandle textureHandle, TexelViewFormat format,
 			uint8 baseMipLevel = 0, uint8 mipLevelCount = 0, uint16 baseArrayIndex = 0, uint16 arraySize = 0);
-		ResourceViewHandle createRaytracingAccelerationStructureView(...);
+		//ResourceViewHandle createRaytracingAccelerationStructureView();
 
-		// ReferenceDescriptorHandle createBufferDescriptor(...);
-		// ReferenceDescriptorHandle createTextureDescriptor(...);
-		// ReferenceDescriptorHandle createTextureCubeDescriptor(...);
-		// ReferenceDescriptorHandle createRaytracingAccelerationStructureDescriptor(...);
+		void destroyResourceView(ResourceViewHandle resourceViewHandle);
 
-		void destroyResourceView(ResourceViewHandle handle);
-
-		RenderTargetViewHandle createRenderTargetView(TextureHandle textureHandle,
+		ColorRenderTargetHandle createColorRenderTarget(TextureHandle textureHandle,
 			TexelViewFormat format, uint8 mipLevel = 0, uint16 arrayIndex = 0);
-		void destroyRenderTargetView(RenderTargetViewHandle handle);
+		void destroyColorRenderTarget(ColorRenderTargetHandle colorRenderTargetHandle);
 
-		DepthStencilViewHandle createDepthStencilView(TextureHandle textureHandle,
+		DepthStencilRenderTargetHandle createDepthStencilRenderTarget(TextureHandle textureHandle,
 			bool writableDepth, bool writableStencil, uint8 mipLevel = 0, uint16 arrayIndex = 0);
-		void destroyDepthStencilView(DepthStencilViewHandle handle);
+		void destroyDepthStencilView(DepthStencilRenderTargetHandle depthStencilRenderTargetHandle);
 
 		DescriptorSetLayoutHandle createDescriptorSetLayout(BlobDataView blob);
-		void destroyDescriptorSetLayout(DescriptorSetLayoutHandle handle);
+		void destroyDescriptorSetLayout(DescriptorSetLayoutHandle descriptorSetLayoutHandle);
 
 		PipelineLayoutHandle createPipelineLayout(BlobDataView blob);
-		void destroyPipelineLayout(PipelineLayoutHandle handle);
+		void destroyPipelineLayout(PipelineLayoutHandle pipelineLayoutHandle);
 
 		PipelineHandle createGraphicsPipeline(PipelineLayoutHandle pipelineLayoutHandle, const GraphicsPipelineBlobs& blobs);
 		PipelineHandle createComputePipeline(PipelineLayoutHandle pipelineLayoutHandle, BlobDataView csBlob);
-		void destroyPipeline(PipelineHandle handle);
+		void destroyPipeline(PipelineHandle pipelineHandle);
 
-		FenceHandle createFence(uint64 initialValue);
-		void destroyFence(FenceHandle handle);
-
-		SurfaceHandle createWindowSurface(uint16 width, uint16 height, void* windowHandle);
-		// SurfaceHandle createDisplaySurface();
-		// SurfaceHandle createHMDSurface();
-		void destroySurface(SurfaceHandle handle);
-
-		void createCommandList(CommandList& commandList, CommandListType type);
-		void destroyCommandList(CommandList& commandList);
+		OutputHandle createWindowOutput(uint16 width, uint16 height, void* platformWindowHandle);
+		// OutputHandle createDisplayOutput();
+		// OutputHandle createVROutput();
+		void destroyOutput(OutputHandle outputHandle);
 
 		DescriptorSetReference createDescriptorSetReference(DescriptorSetLayoutHandle descriptorSetLayoutHandle, DescriptorAddress address);
 
 		void writeDescriptor(DescriptorAddress descriptorAddress, ResourceViewHandle resourceViewHandle);
 		void writeDescriptor(DescriptorSetReference descriptorSetReference, uint64 bindingNameXSH, ResourceViewHandle resourceViewHandle);
 
-		void submitWorkload(DeviceQueue queue, CommandList& commandList);
-		void submitSyncPointWait(DeviceQueue queue, DeviceQueueSyncPoint syncPoint);
-		void submitFenceSignal(DeviceQueue queue, FenceHandle fenceHandle, uint64 value);
-		void submitFenceWait(DeviceQueue queue, FenceHandle fenceHandle, uint64 value);
-		void submitSurfaceFlip(SurfaceHandle surfaceHandle);
-		void submitPartiallyResidentResourcesRemap();
+		void openCommandList(HAL::CommandList& commandList, CommandAllocatorHandle commandAllocatorHandle, CommandListType type = CommandListType::Graphics);
+		void closeCommandList(HAL::CommandList& commandList);
+		void discardCommandList(HAL::CommandList& commandList);
 
-		DeviceQueueSyncPoint getEndOfQueueSyncPoint(DeviceQueue queue) const;
+		void resetCommandAllocator(CommandAllocatorHandle commandAllocatorHandle);
+
+		void submitCommandList(DeviceQueue deviceQueue, HAL::CommandList& commandList);
+		void submitOutputFlip(DeviceQueue deviceQueue, OutputHandle outputHandle);
+		//void submitVirtualResourceMappingUpdate(DeviceQueue deviceQueue, );
+		void submitSyncPointWait(DeviceQueue deviceQueue, DeviceQueueSyncPoint syncPoint);
+		HostSignalToken submitHostSignalWait(DeviceQueue deviceQueue);
+
+		DeviceQueueSyncPoint getEndOfQueueSyncPoint(DeviceQueue deviceQueue) const;
 		bool isQueueSyncPointReached(DeviceQueueSyncPoint syncPoint) const;
+		void emitHostSignal(HostSignalToken signalToken);
 
-		void* mapBuffer(BufferHandle bufferHandle);
-		void unmapBuffer(BufferHandle bufferHandle);
+		void* getMappedBufferPtr(BufferHandle bufferHandle) const;
 
 		uint16 getDescriptorSetLayoutDescriptorCount(DescriptorSetLayoutHandle descriptorSetLayoutHandle) const;
 
-		uint64 getFenceValue(FenceHandle fenceHandle) const;
+		TextureHandle getOutputBackBuffer(OutputHandle outputHandle, uint32 backBufferIndex) const;
+		uint32 getOutputCurrentBackBufferIndex(OutputHandle outputHandle) const;
 
-		TextureHandle getSurfaceBackBuffer(SurfaceHandle surfaceHandle, uint32 backBufferIndex) const;
-		uint32 getSurfaceCurrentBackBufferIndex(SurfaceHandle surfaceHandle) const;
+		//void setObjectDebugName(uint32 objectHandle, const char* name);
+		//const char* getObjectDebugName() const;
 
 		const char* getName() const;
-
-	public:
-		static void Create(Device& device);
-		static uint16x3 CalculateMipLevelSize(uint16x3 srcSize, uint8 mipLevel);
 	};
 
-	// EnumerateDevices
+	// void EnumeratePhysicalDevices(uint32& physicalDeviceCount, PhysicalDevice* physicalDevices);
 	// EnumerateDisplays
-	// EnumerateHMDs
+	// EnumerateVRs
+
+	uint16x3 CalculateMipLevelSize(uint16x3 srcSize, uint8 mipLevel);
 }

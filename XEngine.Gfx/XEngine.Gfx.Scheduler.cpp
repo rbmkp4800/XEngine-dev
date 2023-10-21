@@ -1,3 +1,5 @@
+#if 0
+
 #include "XEngine.Gfx.Scheduler.h"
 
 using namespace XEngine::Gfx;
@@ -244,3 +246,5 @@ void Schedule::execute(TransientResourcePool& transientResourcePool,
 	resources.clear();
 	passes.clear();
 }
+
+#endif
