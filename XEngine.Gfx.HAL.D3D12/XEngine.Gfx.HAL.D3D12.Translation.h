@@ -87,7 +87,7 @@ namespace XEngine::Gfx::HAL
 		{
 			case DepthStencilFormat::Undefined:	return DXGI_FORMAT_UNKNOWN;
 			case DepthStencilFormat::D16:		return DXGI_FORMAT_D16_UNORM;
-			case DepthStencilFormat::D32:		return DXGI_FORMAT_D16_UNORM;
+			case DepthStencilFormat::D32:		return DXGI_FORMAT_D32_FLOAT;
 			case DepthStencilFormat::D24S8:		return DXGI_FORMAT_D24_UNORM_S8_UINT;
 			case DepthStencilFormat::D32S8:		return DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
 		}

@@ -80,8 +80,12 @@ private:
 
 	GfxHAL::Device gfxDevice;
 	GfxHAL::CommandAllocatorHandle gfxCommandAllocator;
+
 	GfxHAL::OutputHandle gfxOutput = GfxHAL::OutputHandle::Zero;
 	GfxHAL::ColorRenderTargetHandle gfxOutputBackBuffersColorRTs[GfxHAL::OutputBackBufferCount] = {};
+	GfxHAL::TextureHandle gfxDepthTexture = GfxHAL::TextureHandle::Zero;
+	GfxHAL::DepthStencilRenderTargetHandle gfxDepthRT = GfxHAL::DepthStencilRenderTargetHandle::Zero;
+
 	GfxHAL::BufferHandle gfxTestBuffer = GfxHAL::BufferHandle::Zero;
 	void* mappedTestBuffer = nullptr;
 
@@ -148,6 +152,17 @@ void Game0::run()
 		gfxOutputBackBuffersColorRTs[i] = gfxDevice.createColorRenderTarget(gfxBackBuffer, GfxHAL::TexelViewFormat::R8G8B8A8_UNORM);
 	}
 
+	GfxHAL::TextureDesc gfxDepthTextureDesc = {};
+	gfxDepthTextureDesc.size = { 1600, 900, 1 };
+	gfxDepthTextureDesc.dimension = GfxHAL::TextureDimension::Texture2D;
+	gfxDepthTextureDesc.format = GfxHAL::TextureFormat::D16;
+	gfxDepthTextureDesc.mipLevelCount = 1;
+	gfxDepthTextureDesc.allowRenderTarget = true;
+
+	gfxDepthTexture = gfxDevice.createTexture(gfxDepthTextureDesc);
+
+	gfxDepthRT = gfxDevice.createDepthStencilRenderTarget(gfxDepthTexture);
+
 	gfxTestBuffer = gfxDevice.createStagingBuffer(64 * 1024, GfxHAL::StagingBufferAccessMode::DeviceReadHostWrite);
 	mappedTestBuffer = gfxDevice.getMappedBufferPtr(gfxTestBuffer);
 
@@ -169,7 +184,7 @@ void Game0::run()
 	{
 		System::DispatchEvents();
 
-		accum += 0.01f;
+		accum += 0.005f;
 
 		float32x3 viewSpaceTranslation = { 0.0f, 0.0f, 0.0f };
 		float32 translationStep = 0.1f;
@@ -202,19 +217,6 @@ void Game0::run()
 		const GfxHAL::TextureHandle gfxCurrentBackBuffer = gfxDevice.getOutputBackBuffer(gfxOutput, currentBackBufferIndex);
 		const GfxHAL::ColorRenderTargetHandle gfxCurrentRT = gfxOutputBackBuffersColorRTs[currentBackBufferIndex];
 
-		struct TestCB
-		{
-			Matrix4x4 transform;
-			Matrix4x4 view;
-			Matrix4x4 viewProjection;
-		};
-
-		Gfx::UploadMemoryAllocationInfo testCBAllocationInfo = gfxTransientAllocator.allocate(sizeof(TestCB));
-		TestCB* testCB = (TestCB*)testCBAllocationInfo.cpuPointer;
-		testCB->transform = Matrix4x4::RotationZ(accum);
-		testCB->view = cameraViewMatrix;
-		testCB->viewProjection = cameraViewMatrix * cameraProjectionMatrix;
-
 		GfxHAL::CommandList gfxCommandList;
 		gfxDevice.openCommandList(gfxCommandList, gfxCommandAllocator);
 
@@ -225,8 +227,9 @@ void Game0::run()
 
 		const float32x4 clearColor(0.0f, 0.1f, 0.3f, 1.0f);
 		gfxCommandList.clearColorRenderTarget(gfxCurrentRT, (float32*)&clearColor);
+		gfxCommandList.clearDepthStencilRenderTarget(gfxDepthRT, true, false, 1.0f, 0);
 
-		gfxCommandList.setRenderTarget(gfxCurrentRT);
+		gfxCommandList.setRenderTarget(gfxCurrentRT, gfxDepthRT);
 		gfxCommandList.setViewport(0.0f, 0.0f, 1600.0f, 900.0f);
 		gfxCommandList.setScissor(0, 0, 1600, 900);
 
@@ -236,8 +239,36 @@ void Game0::run()
 
 		gfxCommandList.bindIndexBuffer(GfxHAL::BufferPointer { gfxTestBuffer, 4096 }, GfxHAL::IndexBufferFormat::U16, 4096);
 		gfxCommandList.bindVertexBuffer(0, GfxHAL::BufferPointer { gfxTestBuffer, 0 }, sizeof(TestVertex), 4096);
-		gfxCommandList.bindBuffer("SOME_CONSTANT_BUFFER"_xsh, GfxHAL::BufferBindType::Constant, testCBAllocationInfo.gpuPointer);
-		gfxCommandList.drawIndexed(countof(cubeIndices));
+		
+		for (int i = 0; i < 27; i++)
+		{
+			struct TestCB
+			{
+				Matrix4x4 transform;
+				Matrix4x4 view;
+				Matrix4x4 viewProjection;
+			};
+
+			int r = i % 3;
+			int c = i % 9 / 3;
+			int s = i / 9;
+
+			float32x3 o =
+			{
+				float32(r - 1) * 3.0f,
+				float32(c - 1) * 3.0f,
+				float32(s - 1) * 3.0f,
+			};
+
+			Gfx::UploadMemoryAllocationInfo testCBAllocationInfo = gfxTransientAllocator.allocate(sizeof(TestCB));
+			TestCB* testCB = (TestCB*)testCBAllocationInfo.cpuPointer;
+			testCB->transform = Matrix4x4::Translation(o) * Matrix4x4::RotationZ(accum);
+			testCB->view = cameraViewMatrix;
+			testCB->viewProjection = cameraViewMatrix * cameraProjectionMatrix;
+
+			gfxCommandList.bindBuffer("SOME_CONSTANT_BUFFER"_xsh, GfxHAL::BufferBindType::Constant, testCBAllocationInfo.gpuPointer);
+			gfxCommandList.drawIndexed(countof(cubeIndices));
+		}
 
 		gfxCommandList.textureMemoryBarrier(gfxCurrentBackBuffer,
 			GfxHAL::BarrierSync::All, GfxHAL::BarrierSync::None,

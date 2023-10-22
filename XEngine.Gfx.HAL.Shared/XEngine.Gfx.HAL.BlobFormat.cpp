@@ -320,19 +320,18 @@ void GraphicsPipelineStateBlobWriter::registerBytecodeBlob(ShaderType type, uint
 	}
 }
 
-void GraphicsPipelineStateBlobWriter::addRenderTarget(TexelViewFormat format)
+void GraphicsPipelineStateBlobWriter::setColorRTFormat(uint8 index, TexelViewFormat format)
 {
 	XAssert(initializationInProgress);
-	XAssert(renderTargetCount < MaxColorRenderTargetCount);
+	XAssert(index < MaxColorRenderTargetCount);
 
-	renderTargetFormats[renderTargetCount] = format;
-	renderTargetCount++;
+	colorRTFormats[index] = format;
 }
 
-void GraphicsPipelineStateBlobWriter::setDepthStencilFormat(DepthStencilFormat format)
+void GraphicsPipelineStateBlobWriter::setDepthStencilRTFormat(DepthStencilFormat format)
 {
 	XAssert(initializationInProgress);
-	depthStencilFormat = format;
+	depthStencilRTFormat = format;
 }
 
 void GraphicsPipelineStateBlobWriter::enableVertexBuffer(uint8 index, bool perInstance)
@@ -399,9 +398,9 @@ void GraphicsPipelineStateBlobWriter::finalizeToMemoryBlock(void* memoryBlock, u
 	body.psBytecodeRegistered = psBytecodeRegistered;
 
 	for (uint32 i = 0; i < MaxColorRenderTargetCount; i++)
-		body.renderTargetFormats[i] = i < renderTargetCount ? renderTargetFormats[i] : TexelViewFormat::Undefined;
+		body.colorRTFormats[i] = colorRTFormats[i];
 
-	body.depthStencilFormat = depthStencilFormat;
+	body.depthStencilRTFormat = depthStencilRTFormat;
 
 	body.vertexBuffersUsedFlagBits = vertexBuffersUsedFlagBits;
 	body.vertexBuffersPerInstanceFlagBits = vertexBuffersPerInstanceFlagBits;
@@ -450,16 +449,6 @@ bool GraphicsPipelineStateBlobReader::open(const void* data, uint32 size)
 	this->vertexBindingRecords = body->vertexBindingCount > 0 ?
 		(const VertexBindingRecord*)((const byte*)data + vertexBindingRecordsOffset) : nullptr;
 	return true;
-}
-
-uint32 GraphicsPipelineStateBlobReader::getRenderTargetCount() const
-{
-	for (uint32 i = 0; i < MaxColorRenderTargetCount; i++)
-	{
-		if (body->renderTargetFormats[i] == TexelViewFormat::Undefined)
-			return i;
-	}
-	return MaxColorRenderTargetCount;
 }
 
 const VertexBindingInfo* GraphicsPipelineStateBlobReader::getVertexBindingInplace(uint8 bindingIndex) const

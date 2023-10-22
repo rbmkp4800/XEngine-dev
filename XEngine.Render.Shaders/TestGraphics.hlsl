@@ -28,14 +28,14 @@ VSOutput MainVS(VSInput input)
 	const float3 worldSpaceNormal = mul(input.normal, (float3x3) testCB.transform);
 	
 	VSOutput output;
-	output.position = mul(testCB.viewProjection, float4(worldSpacePosition, 1.0f));;
-	output.normal = worldSpaceNormal; // normalize(mul((float3x3) testCB.view, worldSpaceNormal));
+	output.position = mul(float4(worldSpacePosition, 1.0f), testCB.viewProjection);
+	output.normal = worldSpaceNormal;
 	output.texcoord = input.texcoord;
 	return output;
 }
 
 float4 MainPS(VSOutput input) : SV_Target0
 {
-	float a = abs(dot(input.normal, normalize(float3(1, 1, 1))));
+	float a = saturate(dot(input.normal, normalize(float3(-1, 1, 1))));
 	return float4(a.xxx, 1.0f);
 }

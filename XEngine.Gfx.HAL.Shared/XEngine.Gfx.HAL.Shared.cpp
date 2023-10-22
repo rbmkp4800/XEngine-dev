@@ -2,19 +2,43 @@
 
 using namespace XEngine::Gfx::HAL;
 
-bool TextureFormatUtils::SupportsRenderTargetUsage(TextureFormat format)
+bool TextureFormatUtils::SupportsColorRTUsage(TextureFormat format)
 {
-	XTODO(__FUNCTION__ " not implemented");
-	return true;
+	switch (format)
+	{
+		case TextureFormat::R8:
+		case TextureFormat::R8G8:
+		case TextureFormat::R8G8B8A8:
+		case TextureFormat::R16:
+		case TextureFormat::R16G16:
+		case TextureFormat::R16G16B16A16:
+		case TextureFormat::R32:
+		case TextureFormat::R32G32:
+		case TextureFormat::R32G32B32:
+		case TextureFormat::R32G32B32A32:
+			return true;
+	}
+	return false;
 }
 
-bool TextureFormatUtils::SupportsDepthStencilUsage(TextureFormat format)
+bool TextureFormatUtils::SupportsDepthStencilRTUsage(TextureFormat format)
 {
-	XTODO(__FUNCTION__ " not implemented");
-	return true;
+	return TranslateToDepthStencilFormat(format) != DepthStencilFormat::Undefined;
 }
 
-bool TexelViewFormatUtils::SupportsRenderTargetUsage(TexelViewFormat format)
+DepthStencilFormat TextureFormatUtils::TranslateToDepthStencilFormat(TextureFormat format)
+{
+	switch (format)
+	{
+		case TextureFormat::D16:	return DepthStencilFormat::D16;
+		case TextureFormat::D32:	return DepthStencilFormat::D32;
+		case TextureFormat::D24S8:	return DepthStencilFormat::D24S8;
+		case TextureFormat::D32S8:	return DepthStencilFormat::D32S8;
+	}
+	return DepthStencilFormat::Undefined;
+}
+
+bool TexelViewFormatUtils::SupportsColorRTUsage(TexelViewFormat format)
 {
 	XTODO(__FUNCTION__ " not implemented");
 	return true;

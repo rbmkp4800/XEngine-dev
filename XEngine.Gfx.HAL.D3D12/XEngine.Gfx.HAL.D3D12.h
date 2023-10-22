@@ -15,6 +15,7 @@
 // TODO: Implement "host visible" memory/resources via `D3D12_HEAP_TYPE_GPU_UPLOAD`.
 // TODO: Move bindings from `Device::DescriptorSetLayout` and `Device::PipelineLayout` to device internal heap (TLSF probably).
 // TODO: Look into `minImageTransferGranularity`. This is additional constraint on CLs we submit to copy queue.
+// TODO: Do something about optimized clear values passed on resource creation. Warning suppressed for now.
 
 // NOTE: `CreateGraphicsPipeline` / `CreateComputePipeline` will be replaced with `CreateShader` / `CompileShader`, when
 // D3D12 GPU work graphs (including collection state objects) and VK_EXT_shader_object are ready. At that point we should
@@ -488,8 +489,8 @@ namespace XEngine::Gfx::HAL
 
 		ResourceAllocationInfo getTextureAllocationInfo(const TextureDesc& textureDesc) const;
 
-		BufferHandle createBuffer(uint64 size, DeviceMemoryAllocationHandle memoryHandle, uint64 memoryOffset);
-		TextureHandle createTexture(const TextureDesc& desc, DeviceMemoryAllocationHandle memoryHandle, uint64 memoryOffset);
+		BufferHandle createBuffer(uint64 size, DeviceMemoryAllocationHandle memoryHandle = DeviceMemoryAllocationHandle::Zero, uint64 memoryOffset = 0);
+		TextureHandle createTexture(const TextureDesc& desc, DeviceMemoryAllocationHandle memoryHandle = DeviceMemoryAllocationHandle::Zero, uint64 memoryOffset = 0);
 
 		BufferHandle createVirtualBuffer(uint64 size);
 		TextureHandle createVirtualTexture(const TextureDesc& textureDesc);
@@ -513,7 +514,7 @@ namespace XEngine::Gfx::HAL
 		void destroyColorRenderTarget(ColorRenderTargetHandle colorRenderTargetHandle);
 
 		DepthStencilRenderTargetHandle createDepthStencilRenderTarget(TextureHandle textureHandle,
-			bool writableDepth, bool writableStencil, uint8 mipLevel = 0, uint16 arrayIndex = 0);
+			bool writableDepth = true, bool writableStencil = true, uint8 mipLevel = 0, uint16 arrayIndex = 0);
 		void destroyDepthStencilView(DepthStencilRenderTargetHandle depthStencilRenderTargetHandle);
 
 		DescriptorSetLayoutHandle createDescriptorSetLayout(BlobDataView blob);

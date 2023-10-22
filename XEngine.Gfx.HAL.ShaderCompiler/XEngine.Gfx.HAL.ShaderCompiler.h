@@ -119,8 +119,8 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 		VertexBindingDesc* vertexBindings;
 		uint8 vertexBindingCount;
 
-		TexelViewFormat renderTargetsFormats[MaxColorRenderTargetCount];
-		DepthStencilFormat depthStencilFormat;
+		TexelViewFormat colorRTFormats[MaxColorRenderTargetCount];
+		DepthStencilFormat depthStencilRTFormat;
 	};
 
 	struct GraphicsPipelineCompilationArtifacts

@@ -785,9 +785,9 @@ bool LibraryDefinitionLoader::readGraphicsPipeline(StringViewASCII graphicsPipel
 
 			vertexInputLayoutIsSet = true;
 		}
-		else if (jsonKey.string == "render_targets")
+		else if (jsonKey.string == "color_rts")
 		{
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!renderTargetsAreSet, "render targets already set", jsonKeyCursor);
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!renderTargetsAreSet, "color RTs already set", jsonKeyCursor);
 			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonValue.type == JSONValueType::Array, "array expected", jsonValueCursor);
 
 			jsonReader.openArray();
@@ -808,13 +808,13 @@ bool LibraryDefinitionLoader::readGraphicsPipeline(StringViewASCII graphicsPipel
 
 					renderTargetFormat = ParseTexelViewFormatString(jsonRTValue.string.string);
 					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(renderTargetFormat != HAL::TexelViewFormat::Undefined, "invalid format", jsonRTValueCursor);
-					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(HAL::TexelViewFormatUtils::SupportsRenderTargetUsage(renderTargetFormat),
+					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(HAL::TexelViewFormatUtils::SupportsColorRTUsage(renderTargetFormat),
 						"format does not support render target usage", jsonRTValueCursor);
 				}
 
-				IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(renderTargetCount < HAL::MaxColorRenderTargetCount, "render targets limit exceeded", jsonRTValueCursor);
+				IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(renderTargetCount < HAL::MaxColorRenderTargetCount, "color RT limit exceeded", jsonRTValueCursor);
 
-				pipelineSettings.renderTargetsFormats[renderTargetCount] = renderTargetFormat;
+				pipelineSettings.colorRTFormats[renderTargetCount] = renderTargetFormat;
 				renderTargetCount++;
 			}
 
@@ -823,15 +823,15 @@ bool LibraryDefinitionLoader::readGraphicsPipeline(StringViewASCII graphicsPipel
 
 			renderTargetsAreSet = true;
 		}
-		else if (jsonKey.string == "depth_stencil")
+		else if (jsonKey.string == "depth_stencil_rt")
 		{
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!depthStencilIsSet, "depth stencil already set", jsonKeyCursor);
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!depthStencilIsSet, "depth stencil RT already set", jsonKeyCursor);
 			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonValue.type == JSONValueType::String, "string expected", jsonValueCursor);
 
 			const HAL::DepthStencilFormat depthStencilFormat = ParseDepthStencilFormatString(jsonValue.string.string);
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(depthStencilFormat != HAL::DepthStencilFormat::Undefined, "invalid format", jsonValueCursor);
+			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(depthStencilFormat != HAL::DepthStencilFormat::Undefined, "invalid depth stencil RT format", jsonValueCursor);
 
-			pipelineSettings.depthStencilFormat = depthStencilFormat;
+			pipelineSettings.depthStencilRTFormat = depthStencilFormat;
 			depthStencilIsSet = true;
 		}
 		else

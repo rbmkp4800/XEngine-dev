@@ -172,7 +172,7 @@ static void RegisterWindowClass()
 	wndClassEx.lpfnWndProc = WndProc;
 	wndClassEx.hInstance = GetModuleHandle(nullptr);
 	wndClassEx.hCursor = LoadCursor(nullptr, IDC_ARROW);
-	wndClassEx.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);;
+	wndClassEx.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
 	wndClassEx.lpszClassName = XEngineWindowClassName;
 	RegisterClassExW(&wndClassEx);
 

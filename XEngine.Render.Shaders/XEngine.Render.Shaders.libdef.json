@@ -48,7 +48,8 @@
 		"vertex_input_layout": "Test.VertexInputLayout",
 		"vs": { "path": "TestGraphics.hlsl", "entry": "MainVS" },
 		"ps": { "path": "TestGraphics.hlsl", "entry": "MainPS" },
-		"render_targets": [ "R8G8B8A8_UNORM" ]
+		"color_rts": [ "R8G8B8A8_UNORM" ],
+		"depth_stencil_rt" : "D16",
 	},
 
 	"Test.ComputePipeline": {

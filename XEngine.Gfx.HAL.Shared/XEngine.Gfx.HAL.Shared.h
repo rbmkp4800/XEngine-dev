@@ -179,16 +179,16 @@ namespace XEngine::Gfx::HAL
 	{
 	public:
 		static inline bool IsValid(TextureFormat format) { return format < TextureFormat::ValueCount && format != TextureFormat::Undefined; }
-		static bool SupportsRenderTargetUsage(TextureFormat format);
-		static bool SupportsDepthStencilUsage(TextureFormat format);
+		static bool SupportsColorRTUsage(TextureFormat format);
+		static bool SupportsDepthStencilRTUsage(TextureFormat format);
+		static DepthStencilFormat TranslateToDepthStencilFormat(TextureFormat format);
 	};
 
 	class TexelViewFormatUtils abstract final
 	{
 	public:
-		static inline bool IsValid(TexelViewFormat format) { return format < TexelViewFormat::ValueCount; }
-		static inline bool IsValidAndDefined(TexelViewFormat format) { return IsValid(format) && format != TexelViewFormat::Undefined; }
-		static bool SupportsRenderTargetUsage(TexelViewFormat format);
+		static inline bool IsValid(TexelViewFormat format) { return format < TexelViewFormat::ValueCount && format != TexelViewFormat::Undefined; }
+		static bool SupportsColorRTUsage(TexelViewFormat format);
 		static bool SupportsVertexInputUsage(TexelViewFormat format);
 		static uint8 GetByteSize(TexelViewFormat format); // Provided formats should support linear storage.
 	};

@@ -815,6 +815,7 @@ static bool CompileShaderDXC(const PipelineLayout& pipelineLayout, const ShaderD
 		dxcArgsList.pushBack(L"-E");
 		dxcArgsList.pushBack(entryPointNameW);
 
+		dxcArgsList.pushBack(L"-Zpr"); // Row-major.
 		//dxcArgsList.pushBack(L"-enable-16bit-types");
 	}
 
@@ -951,33 +952,26 @@ bool ShaderCompiler::CompileGraphicsPipeline(
 	if (psEnabled) stateBlobWriter.registerBytecodeBlob(ShaderType::Pixel, psBlob->getChecksum());
 
 	// Validate and register render targets.
+	for (uint8 i = 0; i < countof(settings.colorRTFormats); i++)
 	{
-		bool undefinedRenderTargetFound = false;
-		for (TexelViewFormat renderTargetFormat : settings.renderTargetsFormats)
+		if (settings.colorRTFormats[i] == TexelViewFormat::Undefined)
+			continue;
+
+		if (!TexelViewFormatUtils::IsValid(settings.colorRTFormats[i]))
 		{
-			if (undefinedRenderTargetFound)
-				XAssert(renderTargetFormat == TexelViewFormat::Undefined);
-			else if (renderTargetFormat == TexelViewFormat::Undefined)
-				undefinedRenderTargetFound = true;
-			else
-			{
-				if (!TexelViewFormatUtils::IsValidAndDefined(renderTargetFormat))
-				{
-					errorMessage.text = "render targets: invalid format";
-					return false;
-				}
-				if (!TexelViewFormatUtils::SupportsRenderTargetUsage(renderTargetFormat))
-				{
-					errorMessage.text = "render targets: format does not support render target usage";
-					return false;
-				}
-				stateBlobWriter.addRenderTarget(renderTargetFormat);
-			}
+			errorMessage.text = "color render targets: invalid format";
+			return false;
 		}
+		if (!TexelViewFormatUtils::SupportsColorRTUsage(settings.colorRTFormats[i]))
+		{
+			errorMessage.text = "color render targets: format does not support render target usage";
+			return false;
+		}
+		stateBlobWriter.setColorRTFormat(i, settings.colorRTFormats[i]);
 	}
 
 	// TODO: `ValidateDepthStencilFormatValue`.
-	stateBlobWriter.setDepthStencilFormat(settings.depthStencilFormat);
+	stateBlobWriter.setDepthStencilRTFormat(settings.depthStencilRTFormat);
 
 	// Validate and register vertex input layout.
 	for (uint8 i = 0; i < MaxVertexBufferCount; i++)

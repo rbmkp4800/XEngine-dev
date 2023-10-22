@@ -79,8 +79,8 @@ namespace XEngine::Gfx::HAL::BlobFormat::Data
 		bool psBytecodeRegistered;
 
 		// [24..33)
-		TexelViewFormat renderTargetFormats[MaxColorRenderTargetCount];
-		DepthStencilFormat depthStencilFormat;
+		TexelViewFormat colorRTFormats[MaxColorRenderTargetCount];
+		DepthStencilFormat depthStencilRTFormat;
 
 		// [33..36)
 		uint8 vertexBuffersUsedFlagBits;
@@ -233,9 +233,8 @@ namespace XEngine::Gfx::HAL::BlobFormat
 		bool msBytecodeRegistered = false;
 		bool psBytecodeRegistered = false;
 
-		DepthStencilFormat depthStencilFormat = DepthStencilFormat::Undefined;
-		TexelViewFormat renderTargetFormats[MaxColorRenderTargetCount] = {};
-		uint8 renderTargetCount = 0;
+		TexelViewFormat colorRTFormats[MaxColorRenderTargetCount] = {};
+		DepthStencilFormat depthStencilRTFormat = DepthStencilFormat::Undefined;
 
 		Data::VertexBindingRecord vertexBindingRecords[MaxVertexBindingCount] = {};
 		uint8 vertexBuffersEnabledFlagBits = 0;
@@ -253,8 +252,8 @@ namespace XEngine::Gfx::HAL::BlobFormat
 
 		void beginInitialization();
 		void registerBytecodeBlob(ShaderType type, uint32 blobChecksum);
-		void addRenderTarget(TexelViewFormat format);
-		void setDepthStencilFormat(DepthStencilFormat format);
+		void setColorRTFormat(uint8 index, TexelViewFormat format);
+		void setDepthStencilRTFormat(DepthStencilFormat format);
 		void enableVertexBuffer(uint8 index, bool perInstance);
 		void addVertexBinding(const VertexBindingInfo& bindingInfo);
 		void endInitialization();
@@ -285,9 +284,8 @@ namespace XEngine::Gfx::HAL::BlobFormat
 		uint32 getPSBytecodeBlobChecksum() const { return body->psBytecodeChecksum; }
 
 		uint32 getPipelineLayoutSourceHash() const { return body->pipelineLayoutSourceHash; }
-		uint32 getRenderTargetCount() const;
-		TexelViewFormat getRenderTargetFormat(uint32 index) const { XAssert(index < MaxColorRenderTargetCount); return body->renderTargetFormats[index]; }
-		DepthStencilFormat getDepthStencilFormat() const { return body->depthStencilFormat; }
+		TexelViewFormat getColorRTFormat(uint32 index) const { XAssert(index < MaxColorRenderTargetCount); return body->colorRTFormats[index]; }
+		DepthStencilFormat getDepthStencilRTFormat() const { return body->depthStencilRTFormat; }
 		bool isVertexBufferUsed(uint8 vertexBufferIndex) const { return (body->vertexBuffersUsedFlagBits >> vertexBufferIndex) & 1; }
 		bool isVertexBufferPerInstance(uint8 vertexBufferIndex) const { return (body->vertexBuffersPerInstanceFlagBits >> vertexBufferIndex) & 1; }
 		uint8 getVertexBindingCount() const { return body->vertexBindingCount; }

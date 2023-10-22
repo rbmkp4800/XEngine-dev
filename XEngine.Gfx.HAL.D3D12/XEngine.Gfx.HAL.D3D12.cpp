@@ -1080,6 +1080,24 @@ void Device::initialize(/*const PhysicalDevice& physicalDevice, */const DeviceSe
 		dxgiAdapter->Release();
 	}
 
+	{
+		ID3D12InfoQueue* d3dInfoQueue = nullptr;
+		d3dDevice->QueryInterface(IID_PPV_ARGS(&d3dInfoQueue));
+
+		D3D12_MESSAGE_ID d3dMessagesToHide[] = {
+			// NOTE: Disable these warnings temporarily until we come up with a solution for optimized clear value handling.
+			D3D12_MESSAGE_ID_CLEARRENDERTARGETVIEW_MISMATCHINGCLEARVALUE,
+			D3D12_MESSAGE_ID_CLEARDEPTHSTENCILVIEW_MISMATCHINGCLEARVALUE,
+		};
+
+		D3D12_INFO_QUEUE_FILTER d3dInfoQueueFilter = {};
+		d3dInfoQueueFilter.DenyList.NumIDs = countof(d3dMessagesToHide);
+		d3dInfoQueueFilter.DenyList.pIDList = d3dMessagesToHide;
+		d3dInfoQueue->AddStorageFilterEntries(&d3dInfoQueueFilter);
+
+		d3dInfoQueue->Release();
+	}
+
 	// Init queues.
 	{
 		ID3D12CommandQueue* d3dGraphicsQueue = nullptr;
@@ -1315,18 +1333,22 @@ TextureHandle Device::createTexture(const TextureDesc& desc,
 	const D3D12_HEAP_PROPERTIES d3dHeapProps = D3D12Helpers::HeapPropertiesForHeapType(D3D12_HEAP_TYPE_DEFAULT);
 
 	D3D12_RESOURCE_FLAGS d3dResourceFlags = D3D12_RESOURCE_FLAG_NONE;
-	d3dResourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
 	if (desc.allowRenderTarget)
 	{
-		// TODO: Deduce from format type of RT (Color/Depth).
-		if (TextureFormatUtils::SupportsRenderTargetUsage(desc.format))
+		const bool isColorRT = TextureFormatUtils::SupportsColorRTUsage(desc.format);
+		const bool isDepthStencilRT = TextureFormatUtils::SupportsDepthStencilRTUsage(desc.format);
+		XEAssert(isColorRT || isDepthStencilRT); // Format should support at least one of RT usages.
+		XEAssert(!(isColorRT && isDepthStencilRT)); // Can't support both at once.
+
+		if (isColorRT)
 			d3dResourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-		else if (TextureFormatUtils::SupportsDepthStencilUsage(desc.format))
+		if (isDepthStencilRT)
 			d3dResourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-		else
-			XEMasterAssertUnreachableCode();
 	}
+
+	if ((d3dResourceFlags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL) == 0)
+		d3dResourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
 	XEAssert(desc.dimension == TextureDimension::Texture2D); // Not implemented.
 
@@ -1516,6 +1538,7 @@ ColorRenderTargetHandle Device::createColorRenderTarget(TextureHandle textureHan
 	const Resource& resource = resourcePool.resolveHandle(uint32(textureHandle));
 	XEAssert(resource.type == ResourceType::Texture && resource.d3dResource);
 	XEAssert(resource.textureDesc.dimension == TextureDimension::Texture2D);
+	XEAssert(resource.textureDesc.allowRenderTarget);
 	// TODO: Assert compatible texture format / texel view format.
 
 	ColorRenderTargetHandle colorRenderTargetHandle = ColorRenderTargetHandle::Zero;
@@ -1547,7 +1570,11 @@ DepthStencilRenderTargetHandle Device::createDepthStencilRenderTarget(TextureHan
 	const Resource& resource = resourcePool.resolveHandle(uint32(textureHandle));
 	XEAssert(resource.type == ResourceType::Texture && resource.d3dResource);
 	XEAssert(resource.textureDesc.dimension == TextureDimension::Texture2D);
+	XEAssert(resource.textureDesc.allowRenderTarget);
 	// TODO: Assert compatible texture format / texel view format.
+
+	const DepthStencilFormat dsFormat = TextureFormatUtils::TranslateToDepthStencilFormat(resource.textureDesc.format);
+	XEAssert(dsFormat != DepthStencilFormat::Undefined);
 
 	DepthStencilRenderTargetHandle depthStencilRenderTargetHandle = DepthStencilRenderTargetHandle::Zero;
 	uint16 depthStencilRenderTargetIndex = 0;
@@ -1556,12 +1583,11 @@ DepthStencilRenderTargetHandle Device::createDepthStencilRenderTarget(TextureHan
 	D3D12_DSV_FLAGS d3dDSVFlags = D3D12_DSV_FLAG_NONE;
 	if (!writableDepth)
 		d3dDSVFlags |= D3D12_DSV_FLAG_READ_ONLY_DEPTH;
-	if (!writableStencil)
+	if (!writableStencil) // TODO: Check that texture has stencil.
 		d3dDSVFlags |= D3D12_DSV_FLAG_READ_ONLY_STENCIL;
 
 	D3D12_DEPTH_STENCIL_VIEW_DESC d3dDSVDesc = {};
-	XEAssertUnreachableCode();
-	//d3dDSVDesc.Format = ...;
+	d3dDSVDesc.Format = TranslateDepthStencilFormatToDXGIFormat(dsFormat);
 	d3dDSVDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 	d3dDSVDesc.Flags = d3dDSVFlags;
 	d3dDSVDesc.Texture2D.MipSlice = mipLevel;
@@ -1633,7 +1659,7 @@ PipelineLayoutHandle Device::createPipelineLayout(BlobDataView blob)
 
 PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayoutHandle, const GraphicsPipelineBlobs& blobs)
 {
-	const PipelineLayout& pipelineLayout = pipelineLayoutPool.resolveHandle(uint32(pipelineLayoutHandle));;
+	const PipelineLayout& pipelineLayout = pipelineLayoutPool.resolveHandle(uint32(pipelineLayoutHandle));
 	XEAssert(pipelineLayout.d3dRootSignature);
 
 	PipelineHandle pipelineHandle = PipelineHandle::Zero;
@@ -1712,7 +1738,7 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 		XEMasterAssert(!d3dVS.pShaderBytecode);
 
 	// Process vertex input bindings (input layout elements).
-	D3D12_INPUT_ELEMENT_DESC d3dILElements[MaxVertexBindingCount];
+	D3D12_INPUT_ELEMENT_DESC d3dILElements[MaxVertexBindingCount] = {};
 	if (stateBlobReader.getVertexBindingCount() > 0)
 	{
 		XEMasterAssert(d3dVS.pShaderBytecode);
@@ -1732,7 +1758,6 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 
 			const bool perIstance = stateBlobReader.isVertexBufferPerInstance(bindingInfo->bufferIndex);
 
-			d3dILElements[i] = {};
 			d3dILElements[i].SemanticName = bindingInfo->nameCStr;
 			d3dILElements[i].SemanticIndex = 0;
 			d3dILElements[i].Format = TranslateTexelViewFormatToDXGIFormat(bindingInfo->format);
@@ -1786,20 +1811,22 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 		d3dSubobjectPS.bytecode = d3dPS;
 	}
 
-	// Depth stencil
-#if 0
+	// Blend state
+	// ...
+
+	// Rasterizer state
+	// ...
+
+	// Depth stencil state
 	{
 		D3D12Helpers::PipelineStateSubobjectDepthStencil& d3dSubobjectDS =
 			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectDepthStencil>(sizeof(void*));
 		d3dSubobjectDS.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL;
 		d3dSubobjectDS.desc = {};
-
-		D3D12_DEPTH_STENCIL_DESC& d3dDepthStencilDesc = d3dSubobjectDS.desc;
-		d3dDepthStencilDesc.DepthEnable = FALSE;
-		d3dDepthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;;
-		d3dDepthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+		d3dSubobjectDS.desc.DepthEnable = TRUE;
+		d3dSubobjectDS.desc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+		d3dSubobjectDS.desc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
 	}
-#endif
 
 	// Input layout
 	{
@@ -1820,29 +1847,37 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 	}
 
 	// Render target formats
-	if (stateBlobReader.getRenderTargetCount() > 0)
 	{
-		D3D12Helpers::PipelineStateSubobjectRenderTargetFormats& d3dSubobjectRTs =
-			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectRenderTargetFormats>(sizeof(void*));
-		d3dSubobjectRTs.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RENDER_TARGET_FORMATS;
-		d3dSubobjectRTs.formats = {};
+		bool someColorRTEnabled = false;
+		for (uint8 i = 0; i < MaxColorRenderTargetCount; i++)
+			someColorRTEnabled |= stateBlobReader.getColorRTFormat(i) != TexelViewFormat::Undefined;
 
-		const uint32 renderTargetCount = stateBlobReader.getRenderTargetCount();
-		XEMasterAssert(renderTargetCount < MaxColorRenderTargetCount);
+		if (someColorRTEnabled)
+		{
+			D3D12Helpers::PipelineStateSubobjectRenderTargetFormats& d3dSubobjectRTs =
+				*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectRenderTargetFormats>(sizeof(void*));
+			d3dSubobjectRTs.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RENDER_TARGET_FORMATS;
+			d3dSubobjectRTs.formats = {};
 
-		D3D12_RT_FORMAT_ARRAY& d3dRTFormatArray = d3dSubobjectRTs.formats;
-		for (uint32 i = 0; i < renderTargetCount; i++)
-			d3dRTFormatArray.RTFormats[i] = TranslateTexelViewFormatToDXGIFormat(stateBlobReader.getRenderTargetFormat(i));
-		d3dRTFormatArray.NumRenderTargets = renderTargetCount;
+			for (uint8 i = 0; i < MaxColorRenderTargetCount; i++)
+			{
+				if (stateBlobReader.getColorRTFormat(i) != TexelViewFormat::Undefined)
+				{
+					d3dSubobjectRTs.formats.RTFormats[i] = TranslateTexelViewFormatToDXGIFormat(stateBlobReader.getColorRTFormat(i));
+					d3dSubobjectRTs.formats.NumRenderTargets = i + 1;
+				}
+			}
+			XEAssert(d3dSubobjectRTs.formats.NumRenderTargets > 0);
+		}
 	}
 
 	// Depth stencil format
-	if (stateBlobReader.getDepthStencilFormat() != DepthStencilFormat::Undefined)
+	if (stateBlobReader.getDepthStencilRTFormat() != DepthStencilFormat::Undefined)
 	{
 		D3D12Helpers::PipelineStateSubobjectDepthStencilFormat& d3dSubobjectDSFormat =
 			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectDepthStencilFormat>(sizeof(void*));
 		d3dSubobjectDSFormat.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL_FORMAT;
-		d3dSubobjectDSFormat.format = TranslateDepthStencilFormatToDXGIFormat(stateBlobReader.getDepthStencilFormat());
+		d3dSubobjectDSFormat.format = TranslateDepthStencilFormatToDXGIFormat(stateBlobReader.getDepthStencilRTFormat());
 	}
 
 	D3D12_PIPELINE_STATE_STREAM_DESC d3dPSOStreamDesc = {};
@@ -1858,7 +1893,7 @@ PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayou
 
 PipelineHandle Device::createComputePipeline(PipelineLayoutHandle pipelineLayoutHandle, BlobDataView csBlob)
 {
-	const PipelineLayout& pipelineLayout = pipelineLayoutPool.resolveHandle(uint32(pipelineLayoutHandle));;
+	const PipelineLayout& pipelineLayout = pipelineLayoutPool.resolveHandle(uint32(pipelineLayoutHandle));
 	XEAssert(pipelineLayout.d3dRootSignature);
 
 	PipelineHandle pipelineHandle = PipelineHandle::Zero;

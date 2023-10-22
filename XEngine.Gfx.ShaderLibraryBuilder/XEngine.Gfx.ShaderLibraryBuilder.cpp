@@ -285,8 +285,8 @@ PipelineRef Pipeline::CreateGraphics(StringViewASCII name,
 	resultObject.graphics.settings.vertexBindings = settings.vertexBindingCount > 0 ? internalVertexBindings : nullptr;
 	resultObject.graphics.settings.vertexBindingCount = settings.vertexBindingCount;
 
-	memoryCopy(&resultObject.graphics.settings.renderTargetsFormats, &settings.renderTargetsFormats, sizeof(resultObject.graphics.settings.renderTargetsFormats));
-	resultObject.graphics.settings.depthStencilFormat = settings.depthStencilFormat;
+	memoryCopy(&resultObject.graphics.settings.colorRTFormats, &settings.colorRTFormats, sizeof(resultObject.graphics.settings.colorRTFormats));
+	resultObject.graphics.settings.depthStencilRTFormat = settings.depthStencilRTFormat;
 	resultObject.isGraphics = true;
 
 	return PipelineRef(&resultObject);
