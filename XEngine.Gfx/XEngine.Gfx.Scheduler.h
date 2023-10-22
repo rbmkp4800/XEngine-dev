@@ -34,28 +34,28 @@ namespace XEngine::Gfx::Scheduler
 			{
 				struct
 				{
-					HAL::BufferHandle bufferHandle;
+					HAL::BufferHandle handle;
 				} buffer;
 
 				struct
 				{
-					HAL::TextureHandle textureHandle;
+					HAL::TextureHandle handle;
 				} texture;
 
 				struct
 				{
-					HAL::ResourceViewHandle resourceViewHandle;
-				} descriptor;
+					HAL::ResourceViewHandle handle;
+				} resourceView;
 
 				struct
 				{
-					HAL::RenderTargetViewHandle renderTargetViewHandle;
-				} renderTarget;
+					HAL::ColorRenderTargetHandle handle;
+				} colorRenderTarget;
 
 				struct
 				{
-					HAL::DepthStencilViewHandle depthStencilViewHandle;
-				} depthRenderTarget;
+					HAL::DepthStencilRenderTargetHandle handle;
+				} depthStencilRenderTarget;
 			};
 		};
 
@@ -117,9 +117,9 @@ namespace XEngine::Gfx::Scheduler
 		HAL::ResourceViewHandle createTransientTextureView(HAL::TextureHandle texture,
 			HAL::TexelViewFormat format = HAL::TexelViewFormat::Undefined,
 			bool writable = false, const HAL::TextureSubresourceRange& subresourceRange = {});
-		HAL::RenderTargetViewHandle createTransientRenderTargetView(HAL::TextureHandle texture,
+		HAL::ColorRenderTargetHandle createTransientColorRenderTarget(HAL::TextureHandle texture,
 			HAL::TexelViewFormat format, uint8 mipLevel = 0, uint16 arrayIndex = 0);
-		HAL::DepthStencilViewHandle createTransientDepthStencilView(HAL::TextureHandle texture,
+		HAL::DepthStencilRenderTargetHandle createTransientDepthStencilRenderTarget(HAL::TextureHandle texture,
 			bool writableDepth, bool writableStencil, uint8 mipLevel = 0, uint16 arrayIndex = 0);
 	};
 
@@ -250,7 +250,6 @@ namespace XEngine::Gfx::Scheduler
 
 	private:
 		HAL::Device* device = nullptr;
-		HAL::CommandList commandList;
 
 		XLib::ArrayList<Resource> resources;
 		XLib::ArrayList<Pass> passes;
@@ -278,7 +277,8 @@ namespace XEngine::Gfx::Scheduler
 
 		uint64 getTransientResourcePoolMemoryRequirement() const;
 
-		void execute(TransientResourcePool& transientResourcePool,
+		void execute(HAL::CommandAllocatorHandle commandAllocator,
+			TransientResourcePool& transientResourcePool,
 			TransientDescriptorAllocator& transientDescriptorAllocator,
 			TransientUploadMemoryAllocator& transientUploadMemoryAllocator);
 	};

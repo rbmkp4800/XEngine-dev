@@ -1,5 +1,3 @@
-#if 0
-
 #include "XEngine.Gfx.Scheduler.h"
 
 using namespace XEngine::Gfx;
@@ -36,8 +34,8 @@ void TransientResourcePool::reset()
 				break;
 
 			case EntryType::Texture:
-				device->destroyTexture(entry.texture.textureHandle);
-				entry.texture.textureHandle = HAL::TextureHandle::Zero;
+				device->destroyTexture(entry.texture.handle);
+				entry.texture.handle = HAL::TextureHandle::Zero;
 				break;
 
 			case EntryType::Descriptor:
@@ -45,8 +43,8 @@ void TransientResourcePool::reset()
 				break;
 
 			case EntryType::RenderTarget:
-				device->destroyRenderTargetView(entry.renderTarget.renderTargetViewHandle);
-				entry.renderTarget.renderTargetViewHandle = HAL::RenderTargetViewHandle::Zero;
+				device->destroyColorRenderTarget(entry.colorRenderTarget.handle);
+				entry.colorRenderTarget.handle = HAL::ColorRenderTargetHandle::Zero;
 				break;
 
 			case EntryType::DepthRenderTarget:
@@ -92,7 +90,7 @@ HAL::TextureHandle PassExecutionContext::resolveTexture(Scheduler::TextureHandle
 		const TransientResourcePool::Entry& transientResourcePoolEntry =
 			transientResourcePool.entries[resource.transientResourcePoolEntryIndex];
 		XAssert(transientResourcePoolEntry.type == TransientResourcePool::EntryType::Texture);
-		return transientResourcePoolEntry.texture.textureHandle;
+		return transientResourcePoolEntry.texture.handle;
 	}
 	else
 	{
@@ -105,17 +103,17 @@ HAL::TextureHandle PassExecutionContext::resolveTexture(Scheduler::TextureHandle
 ResourceViewHandle PassExecutionContext::createTransientTextureView(Scheduler::TextureHandle texture,
 	TexelViewFormat format, bool writable, const TextureSubresourceRange& subresourceRange) { }*/
 
-HAL::RenderTargetViewHandle PassExecutionContext::createTransientRenderTargetView(HAL::TextureHandle texture,
+HAL::ColorRenderTargetHandle PassExecutionContext::createTransientColorRenderTarget(HAL::TextureHandle texture,
 	HAL::TexelViewFormat format, uint8 mipLevel, uint16 arrayIndex)
 {
-	const HAL::RenderTargetViewHandle rtv = device.createRenderTargetView(texture, format, mipLevel, arrayIndex);
+	const HAL::ColorRenderTargetHandle rt = device.createColorRenderTarget(texture, format, mipLevel, arrayIndex);
 
 	TransientResourcePool::Entry transientResourcePoolEntry = {};
 	transientResourcePoolEntry.type = TransientResourcePool::EntryType::RenderTarget;
-	transientResourcePoolEntry.renderTarget.renderTargetViewHandle = rtv;
+	transientResourcePoolEntry.colorRenderTarget.handle = rt;
 	transientResourcePool.entries.pushBack(transientResourcePoolEntry);
 
-	return rtv;
+	return rt;
 }
 
 /*DepthStencilViewHandle PassExecutionContext::createTransientDepthStencilView(Scheduler::TextureHandle texture,
@@ -126,7 +124,6 @@ void Schedule::initialize(HAL::Device& device)
 	XAssert(!this->device);
 
 	this->device = &device;
-	device.createCommandList(commandList, HAL::CommandListType::Graphics);
 }
 
 //Scheduler::BufferHandle Schedule::createTransientBuffer(uint32 size) { }
@@ -164,7 +161,8 @@ void Schedule::compile()
 
 }
 
-void Schedule::execute(TransientResourcePool& transientResourcePool,
+void Schedule::execute(HAL::CommandAllocatorHandle commandAllocator,
+	TransientResourcePool& transientResourcePool,
 	TransientDescriptorAllocator& transientDescriptorAllocator,
 	TransientUploadMemoryAllocator& transientUploadMemoryAllocator)
 {
@@ -187,15 +185,13 @@ void Schedule::execute(TransientResourcePool& transientResourcePool,
 			transientResourcePoolMemoryUsed += requiredMemorySize;
 
 			const HAL::BufferHandle buffer =
-				device->createBuffer(resource.transientBufferSize, true,
-					// HAL::BufferMemoryType::DeviceLocal, transientResourcePool.deviceMemoryPool, memoryOffset
-					HAL::BufferMemoryType::DeviceLocal);
+				device->createBuffer(resource.transientBufferSize);
 
 			resource.transientResourcePoolEntryIndex = transientResourcePool.entries.getSize();
 
 			TransientResourcePool::Entry transientResourcePoolEntry = {};
 			transientResourcePoolEntry.type = TransientResourcePool::EntryType::Buffer;
-			transientResourcePoolEntry.buffer.bufferHandle = buffer;
+			transientResourcePoolEntry.buffer.handle = buffer;
 			transientResourcePool.entries.pushBack(transientResourcePoolEntry);
 		}
 		else if (resource.type == HAL::ResourceType::Texture)
@@ -208,7 +204,7 @@ void Schedule::execute(TransientResourcePool& transientResourcePool,
 			transientResourcePoolMemoryUsed += requiredMemorySize;
 
 			const HAL::TextureHandle texture =
-				device->createTexture(resource.transientTextureDesc,
+				device->createTexture(resource.transientTextureDesc, HAL::TextureLayout::Common,
 					//transientResourcePool.deviceMemoryPool, memoryOffset);
 					HAL::DeviceMemoryAllocationHandle::Zero);
 
@@ -216,7 +212,7 @@ void Schedule::execute(TransientResourcePool& transientResourcePool,
 
 			TransientResourcePool::Entry transientResourcePoolEntry = {};
 			transientResourcePoolEntry.type = TransientResourcePool::EntryType::Texture;
-			transientResourcePoolEntry.texture.textureHandle = texture;
+			transientResourcePoolEntry.texture.handle = texture;
 			transientResourcePool.entries.pushBack(transientResourcePoolEntry);
 		}
 	}
@@ -224,16 +220,17 @@ void Schedule::execute(TransientResourcePool& transientResourcePool,
 	PassExecutionContext context(*device, *this,
 		transientResourcePool, transientDescriptorAllocator, transientUploadMemoryAllocator);
 
-	commandList.open();
+	HAL::CommandList commandList;
+
+	device->openCommandList(commandList, commandAllocator);
 
 	for (Pass& pass : passes)
 		pass.executporFunc(context, *device, commandList, pass.userData);
 
-	//commandList.close();
+	device->closeCommandList(commandList);
+	device->submitCommandList(HAL::DeviceQueue::Graphics, commandList);
 
-	device->submitWorkload(HAL::DeviceQueue::Main, commandList);
-
-	const HAL::DeviceQueueSyncPoint sp = device->getEndOfQueueSyncPoint(HAL::DeviceQueue::Main);
+	const HAL::DeviceQueueSyncPoint sp = device->getEndOfQueueSyncPoint(HAL::DeviceQueue::Graphics);
 
 	transientDescriptorAllocator.enqueueRelease(sp);
 	transientUploadMemoryAllocator.enqueueRelease(sp);
@@ -246,5 +243,3 @@ void Schedule::execute(TransientResourcePool& transientResourcePool,
 	resources.clear();
 	passes.clear();
 }
-
-#endif
