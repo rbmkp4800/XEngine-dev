@@ -16,6 +16,8 @@
 // TODO: Move bindings from `Device::DescriptorSetLayout` and `Device::PipelineLayout` to device internal heap (TLSF probably).
 // TODO: Look into `minImageTransferGranularity`. This is additional constraint on CLs we submit to copy queue.
 // TODO: Do something about optimized clear values passed on resource creation. Warning suppressed for now.
+// TODO: `TextureLayout::Commom` allows shader write access (D3D12 UAV), but D3D12 spec says that this is only allowed using a "queue-specific" common layout. We should revisit this when implementing multi-queue support (including vulkan specifics).
+// TODO: `TextureLayout::Commom` is equivalent to `D3D12_BARRIER_LAYOUT_DIRECT_QUEUE_COMMON`, so only gfx queue is supported for now.
 
 // NOTE: `CreateGraphicsPipeline` / `CreateComputePipeline` will be replaced with `CreateShader` / `CompileShader`, when
 // D3D12 GPU work graphs (including collection state objects) and VK_EXT_shader_object are ready. At that point we should
@@ -106,7 +108,7 @@ namespace XEngine::Gfx::HAL
 		TextureDimension dimension : 2; // TODO: Calculate these bits properly.
 		TextureFormat format : 6;
 		uint8 mipLevelCount : 4;
-		bool allowRenderTarget : 1;
+		bool enableRenderTargetUsage : 1;
 	};
 	static_assert(sizeof(TextureDesc) == 8);
 
@@ -215,10 +217,9 @@ namespace XEngine::Gfx::HAL
 	{
 		Undefined = 0,
 		Present,
+		Common, // Copy source/dest, shader read/write.
 		CopySource,
 		CopyDest,
-		ShaderReadAndCopySource,
-		ShaderReadAndCopySourceDest,
 		ShaderRead,
 		ShaderReadWrite,
 		RenderTarget,
@@ -489,8 +490,10 @@ namespace XEngine::Gfx::HAL
 
 		ResourceAllocationInfo getTextureAllocationInfo(const TextureDesc& textureDesc) const;
 
-		BufferHandle createBuffer(uint64 size, DeviceMemoryAllocationHandle memoryHandle = DeviceMemoryAllocationHandle::Zero, uint64 memoryOffset = 0);
-		TextureHandle createTexture(const TextureDesc& desc, DeviceMemoryAllocationHandle memoryHandle = DeviceMemoryAllocationHandle::Zero, uint64 memoryOffset = 0);
+		BufferHandle createBuffer(uint64 size,
+			DeviceMemoryAllocationHandle memoryHandle = DeviceMemoryAllocationHandle::Zero, uint64 memoryOffset = 0);
+		TextureHandle createTexture(const TextureDesc& desc, TextureLayout initialLayout,
+			DeviceMemoryAllocationHandle memoryHandle = DeviceMemoryAllocationHandle::Zero, uint64 memoryOffset = 0);
 
 		BufferHandle createVirtualBuffer(uint64 size);
 		TextureHandle createVirtualTexture(const TextureDesc& textureDesc);

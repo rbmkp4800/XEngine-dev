@@ -157,9 +157,9 @@ void Game0::run()
 	gfxDepthTextureDesc.dimension = GfxHAL::TextureDimension::Texture2D;
 	gfxDepthTextureDesc.format = GfxHAL::TextureFormat::D16;
 	gfxDepthTextureDesc.mipLevelCount = 1;
-	gfxDepthTextureDesc.allowRenderTarget = true;
+	gfxDepthTextureDesc.enableRenderTargetUsage = true;
 
-	gfxDepthTexture = gfxDevice.createTexture(gfxDepthTextureDesc);
+	gfxDepthTexture = gfxDevice.createTexture(gfxDepthTextureDesc, GfxHAL::TextureLayout::DepthStencilReadWrite);
 
 	gfxDepthRT = gfxDevice.createDepthStencilRenderTarget(gfxDepthTexture);
 

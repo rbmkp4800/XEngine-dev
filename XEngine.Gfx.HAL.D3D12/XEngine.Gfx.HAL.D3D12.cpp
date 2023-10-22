@@ -1,5 +1,3 @@
-#define USE_ENHANCED_BARRIERS 0
-
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include "D3D12Helpers.h"
@@ -21,7 +19,7 @@ using namespace XEngine::Gfx::HAL;
 static_assert(ConstantBufferBindAlignment >= D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 
 static IDXGIFactory7* dxgiFactory = nullptr;
-static ID3D12Debug3* d3dDebug = nullptr;
+static ID3D12Debug6* d3dDebug = nullptr;
 
 namespace // Barriers validation
 {
@@ -61,11 +59,10 @@ namespace // Barriers validation
 		BarrierAccess compatibleAccess = BarrierAccess::None;
 		switch (layout)
 		{
-			case TextureLayout::Present:						compatibleAccess = BarrierAccess::CopySource | BarrierAccess::ShaderRead; break;
+			case TextureLayout::Present:						compatibleAccess = BarrierAccess::None; break;
+			case TextureLayout::Common:							compatibleAccess = BarrierAccess::CopySource | BarrierAccess::CopyDest | BarrierAccess::ShaderRead | BarrierAccess::ShaderReadWrite; break;
 			case TextureLayout::CopySource:						compatibleAccess = BarrierAccess::CopySource; break;
 			case TextureLayout::CopyDest:						compatibleAccess = BarrierAccess::CopyDest; break;
-			case TextureLayout::ShaderReadAndCopySource:		compatibleAccess = BarrierAccess::ShaderRead | BarrierAccess::CopySource; break;
-			case TextureLayout::ShaderReadAndCopySourceDest:	compatibleAccess = BarrierAccess::ShaderRead | BarrierAccess::CopySource | BarrierAccess::CopyDest; break;
 			case TextureLayout::ShaderRead:						compatibleAccess = BarrierAccess::ShaderRead; break;
 			case TextureLayout::ShaderReadWrite:				compatibleAccess = BarrierAccess::ShaderReadWrite; break;
 			case TextureLayout::RenderTarget:					compatibleAccess = BarrierAccess::RenderTarget; break;
@@ -108,57 +105,6 @@ namespace // Barriers validation
 		return (sync & compatibleSync) != BarrierSync(0);
 	}
 }
-
-#if !USE_ENHANCED_BARRIERS
-
-namespace // Legacy barriers utils
-{
-	void ApplyLegacyD3D12Barrier(ID3D12GraphicsCommandList* d3dCommandList,
-		ID3D12Resource* d3dResource, UINT subresourceIndex,
-		BarrierAccess accessBefore, BarrierAccess accessAfter,
-		TextureLayout layoutBefore = TextureLayout::Undefined, TextureLayout layoutAfter = TextureLayout::Undefined)
-	{
-		const bool isLayoutBeforeUndefined = (layoutBefore == TextureLayout::Undefined);
-		const bool isLayoutAfterUndefined = (layoutAfter == TextureLayout::Undefined);
-
-		if (isLayoutBeforeUndefined || isLayoutAfterUndefined)
-		{
-			// Resource aliasing barrier.
-			D3D12_RESOURCE_BARRIER d3dResourceBarrier = {};
-			d3dResourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
-			d3dResourceBarrier.Aliasing.pResourceBefore = isLayoutBeforeUndefined ? nullptr : d3dResource;
-			d3dResourceBarrier.Aliasing.pResourceAfter = isLayoutAfterUndefined ? nullptr : d3dResource;
-			d3dCommandList->ResourceBarrier(1, &d3dResourceBarrier);
-		}
-
-		{
-			// Resource transition barrier.
-			D3D12_RESOURCE_BARRIER d3dResourceBarrier = {};
-			d3dResourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-			d3dResourceBarrier.Transition.pResource = d3dResource;
-			d3dResourceBarrier.Transition.Subresource = subresourceIndex;
-			d3dResourceBarrier.Transition.StateBefore = TranslateBarrierAccessToD3D12ResourceStates(accessBefore);
-			d3dResourceBarrier.Transition.StateAfter = TranslateBarrierAccessToD3D12ResourceStates(accessAfter);
-			d3dCommandList->ResourceBarrier(1, &d3dResourceBarrier);
-		}
-
-		constexpr BarrierAccess uavBarrierAccessMask = BarrierAccess::ShaderReadWrite |
-			BarrierAccess::RaytracingAccelerationStructureRead | BarrierAccess::RaytracingAccelerationStructureWrite;
-
-		if ((accessBefore & uavBarrierAccessMask) != BarrierAccess(0) &&
-			(accessAfter & uavBarrierAccessMask) != BarrierAccess(0))
-		{
-			// Resource UAV barrier.
-			D3D12_RESOURCE_BARRIER d3dResourceBarrier = {};
-			d3dResourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-			d3dResourceBarrier.UAV.pResource = d3dResource;
-			d3dCommandList->ResourceBarrier(1, &d3dResourceBarrier);
-		}
-	}
-}
-
-#endif
-
 
 // Device internal types ///////////////////////////////////////////////////////////////////////////
 
@@ -588,8 +534,6 @@ void CommandList::bufferMemoryBarrier(BufferHandle bufferHandle,
 	const Device::Resource& buffer = device->resourcePool.resolveHandle(uint32(bufferHandle));
 	XEAssert(buffer.type == ResourceType::Buffer && buffer.d3dResource);
 
-#if USE_ENHANCED_BARRIERS
-
 	D3D12_BUFFER_BARRIER d3dBufferBarrier = {};
 	d3dBufferBarrier.SyncBefore = TranslateBarrierSyncToD3D12BarrierSync(syncBefore);
 	d3dBufferBarrier.SyncAfter  = TranslateBarrierSyncToD3D12BarrierSync(syncAfter);
@@ -605,13 +549,6 @@ void CommandList::bufferMemoryBarrier(BufferHandle bufferHandle,
 	d3dBarrierGroup.pBufferBarriers = &d3dBufferBarrier;
 
 	d3dCommandList->Barrier(1, &d3dBarrierGroup);
-
-#else
-
-	ApplyLegacyD3D12Barrier(d3dCommandList,
-		buffer.d3dResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, accessBefore, accessAfter);
-
-#endif
 }
 
 void CommandList::textureMemoryBarrier(TextureHandle textureHandle,
@@ -632,8 +569,6 @@ void CommandList::textureMemoryBarrier(TextureHandle textureHandle,
 
 	const Device::Resource& texture = device->resourcePool.resolveHandle(uint32(textureHandle));
 	XEAssert(texture.type == ResourceType::Texture && texture.d3dResource);
-
-#if USE_ENHANCED_BARRIERS
 
 	D3D12_TEXTURE_BARRIER d3dTextureBarrier = {};
 	d3dTextureBarrier.SyncBefore = TranslateBarrierSyncToD3D12BarrierSync(syncBefore);
@@ -676,16 +611,6 @@ void CommandList::textureMemoryBarrier(TextureHandle textureHandle,
 	d3dBarrierGroup.pTextureBarriers = &d3dTextureBarrier;
 
 	d3dCommandList->Barrier(1, &d3dBarrierGroup);
-
-#else
-
-	XEAssert(!subresourceRange); // Not implemented.
-
-	ApplyLegacyD3D12Barrier(d3dCommandList,
-		texture.d3dResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-		accessBefore, accessAfter, layoutBefore, layoutAfter);
-
-#endif
 }
 
 void CommandList::copyBuffer(BufferHandle dstBufferHandle, uint64 dstOffset,
@@ -1070,7 +995,9 @@ void Device::initialize(/*const PhysicalDevice& physicalDevice, */const DeviceSe
 	if (!d3dDebug)
 		D3D12GetDebugInterface(IID_PPV_ARGS(&d3dDebug));
 
-	d3dDebug->EnableDebugLayer();
+	//d3dDebug->EnableDebugLayer();
+	//d3dDebug->SetEnableGPUBasedValidation(TRUE);
+	//d3dDebug->SetEnableAutoName(TRUE);
 
 	{
 		IDXGIAdapter4* dxgiAdapter = nullptr;
@@ -1080,7 +1007,7 @@ void Device::initialize(/*const PhysicalDevice& physicalDevice, */const DeviceSe
 		dxgiAdapter->Release();
 	}
 
-	{
+	/*{
 		ID3D12InfoQueue* d3dInfoQueue = nullptr;
 		d3dDevice->QueryInterface(IID_PPV_ARGS(&d3dInfoQueue));
 
@@ -1096,7 +1023,7 @@ void Device::initialize(/*const PhysicalDevice& physicalDevice, */const DeviceSe
 		d3dInfoQueue->AddStorageFilterEntries(&d3dInfoQueueFilter);
 
 		d3dInfoQueue->Release();
-	}
+	}*/
 
 	// Init queues.
 	{
@@ -1270,7 +1197,11 @@ ResourceAllocationInfo Device::getTextureAllocationInfo(const TextureDesc& textu
 
 BufferHandle Device::createBuffer(uint64 size, DeviceMemoryAllocationHandle memoryHandle, uint64 memoryOffset)
 {
+	// TODO: Check that resource fits into memory.
+	// TODO: Check alignment.
+
 	XEAssert(memoryHandle == DeviceMemoryAllocationHandle::Zero && memoryOffset == 0); // Not implemented.
+
 	const MemoryAllocation* memoryAllocation = nullptr;
 
 	BufferHandle resourceHandle = BufferHandle::Zero;
@@ -1285,41 +1216,40 @@ BufferHandle Device::createBuffer(uint64 size, DeviceMemoryAllocationHandle memo
 
 	const D3D12_RESOURCE_DESC1 d3dResourceDesc = D3D12Helpers::ResourceDesc1ForBuffer(size);
 
-	// TODO: Check that resource fits into memory.
-	// TODO: Check alignment.
-
-#if USE_ENHANCED_BARRIERS
-	XEMasterAssertUnreachableCode();
-
-	d3dDevice->CreatePlacedResource2(memoryAllocation->d3dHeap, memoryOffset,
-		&d3dResourceDesc, D3D12_BARRIER_LAYOUT_UNDEFINED, nullptr, 0, nullptr,
-		IID_PPV_ARGS(&resource.d3dResource));
-#else
-
 	if (memoryAllocation)
 	{
-		d3dDevice->CreatePlacedResource1(memoryAllocation->d3dHeap, memoryOffset,
-			&d3dResourceDesc, D3D12_RESOURCE_STATE_COMMON, nullptr,
+		d3dDevice->CreatePlacedResource2(memoryAllocation->d3dHeap, memoryOffset,
+			&d3dResourceDesc, D3D12_BARRIER_LAYOUT_UNDEFINED, nullptr, 0, nullptr,
 			IID_PPV_ARGS(&resource.d3dResource));
 	}
 	else
 	{
-		const D3D12_HEAP_PROPERTIES d3dHeapProperties =
-			D3D12Helpers::HeapPropertiesForHeapType(D3D12_HEAP_TYPE_DEFAULT);
+		const D3D12_HEAP_PROPERTIES d3dHeapProps = D3D12Helpers::HeapPropertiesForHeapType(D3D12_HEAP_TYPE_DEFAULT);
 
-		d3dDevice->CreateCommittedResource2(&d3dHeapProperties, D3D12_HEAP_FLAG_NONE, &d3dResourceDesc,
-			D3D12_RESOURCE_STATE_COMMON, nullptr, nullptr, IID_PPV_ARGS(&resource.d3dResource));
+		d3dDevice->CreateCommittedResource3(&d3dHeapProps, D3D12_HEAP_FLAG_NONE,
+			&d3dResourceDesc, D3D12_BARRIER_LAYOUT_UNDEFINED, nullptr, nullptr, 0, nullptr,
+			IID_PPV_ARGS(&resource.d3dResource));
 	}
-	
-#endif
 
 	return resourceHandle;
 }
 
-TextureHandle Device::createTexture(const TextureDesc& desc,
+TextureHandle Device::createTexture(const TextureDesc& desc, TextureLayout initialLayout,
 	DeviceMemoryAllocationHandle memoryHandle, uint64 memoryOffset)
 {
+	// TODO: Check if `mipLevelCount` is not greater than max possible level count for this resource.
+	// TODO: Check that resource fits into memory.
+	// TODO: Check alignment.
+
 	XEAssert(memoryHandle == DeviceMemoryAllocationHandle::Zero && memoryOffset == 0); // Not implemented.
+	XEAssert(desc.dimension == TextureDimension::Texture2D); // Not implemented.
+
+	const bool enableColorRT = desc.enableRenderTargetUsage && TextureFormatUtils::SupportsColorRTUsage(desc.format);
+	const bool enableDepthStencilRT = desc.enableRenderTargetUsage && TextureFormatUtils::SupportsDepthStencilRTUsage(desc.format);
+
+	XEAssert(enableColorRT || enableDepthStencilRT); // Format should support at least one of RT usages.
+	XEAssert(!(enableColorRT && enableDepthStencilRT)); // Can't support both at once.
+
 	const MemoryAllocation* memoryAllocation = nullptr;
 
 	TextureHandle resourceHandle = TextureHandle::Zero;
@@ -1330,58 +1260,47 @@ TextureHandle Device::createTexture(const TextureDesc& desc,
 	resource.textureDesc = desc;
 
 	const DXGI_FORMAT dxgiFormat = TranslateTextureFormatToDXGIFormat(desc.format);
-	const D3D12_HEAP_PROPERTIES d3dHeapProps = D3D12Helpers::HeapPropertiesForHeapType(D3D12_HEAP_TYPE_DEFAULT);
 
 	D3D12_RESOURCE_FLAGS d3dResourceFlags = D3D12_RESOURCE_FLAG_NONE;
-
-	if (desc.allowRenderTarget)
-	{
-		const bool isColorRT = TextureFormatUtils::SupportsColorRTUsage(desc.format);
-		const bool isDepthStencilRT = TextureFormatUtils::SupportsDepthStencilRTUsage(desc.format);
-		XEAssert(isColorRT || isDepthStencilRT); // Format should support at least one of RT usages.
-		XEAssert(!(isColorRT && isDepthStencilRT)); // Can't support both at once.
-
-		if (isColorRT)
-			d3dResourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-		if (isDepthStencilRT)
-			d3dResourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-	}
-
-	if ((d3dResourceFlags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL) == 0)
+	if (enableColorRT)
+		d3dResourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+	if (enableDepthStencilRT)
+		d3dResourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+	if (!enableDepthStencilRT)
 		d3dResourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
-	XEAssert(desc.dimension == TextureDimension::Texture2D); // Not implemented.
+	D3D12_RESOURCE_DESC1 d3dResourceDesc = {};
+	d3dResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	d3dResourceDesc.Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+	d3dResourceDesc.Width = desc.size.x;
+	d3dResourceDesc.Height = desc.size.y;
+	d3dResourceDesc.DepthOrArraySize = 1;
+	d3dResourceDesc.MipLevels = desc.mipLevelCount;
+	d3dResourceDesc.Format = dxgiFormat;
+	d3dResourceDesc.SampleDesc.Count = 1;
+	d3dResourceDesc.SampleDesc.Quality = 0;
+	d3dResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+	d3dResourceDesc.Flags = d3dResourceFlags;
 
-	// TODO: Check if `mipLevelCount` is not greater than max possible level count for this resource.
-	const D3D12_RESOURCE_DESC1 d3dResourceDesc =
-		D3D12Helpers::ResourceDesc1ForTexture2D(desc.size.x, desc.size.y, desc.mipLevelCount, dxgiFormat, d3dResourceFlags);
-
-	// TODO: Check that resource fits into memory.
-	// TODO: Check alignment.
-	// TODO: Handle initial layout properly.
-
-#if USE_ENHANCED_BARRIERS
-	d3dDevice->CreatePlacedResource2(memoryAllocation.d3dHeap, memoryOffset,
-		&d3dResourceDesc, D3D12_BARRIER_LAYOUT_COMMON, nullptr, 0, nullptr,
-		IID_PPV_ARGS(&resource.d3dResource));
-#else
+	XEAssert(initialLayout != TextureLayout::Undefined);
+	XEAssert(imply(initialLayout == TextureLayout::RenderTarget, enableColorRT));
+	XEAssert(imply(initialLayout == TextureLayout::DepthStencilRead || initialLayout == TextureLayout::DepthStencilReadWrite, enableDepthStencilRT));
+	const D3D12_BARRIER_LAYOUT d3dInitialLayout = TranslateTextureLayoutToD3D12BarrierLayout(initialLayout);
 
 	if (memoryAllocation)
 	{
-		d3dDevice->CreatePlacedResource1(memoryAllocation->d3dHeap, memoryOffset,
-			&d3dResourceDesc, D3D12_RESOURCE_STATE_COMMON, nullptr,
+		d3dDevice->CreatePlacedResource2(memoryAllocation->d3dHeap, memoryOffset,
+			&d3dResourceDesc, d3dInitialLayout, nullptr, 0, nullptr,
 			IID_PPV_ARGS(&resource.d3dResource));
 	}
 	else
 	{
-		const D3D12_HEAP_PROPERTIES d3dHeapProperties =
-			D3D12Helpers::HeapPropertiesForHeapType(D3D12_HEAP_TYPE_DEFAULT);
+		const D3D12_HEAP_PROPERTIES d3dHeapProps = D3D12Helpers::HeapPropertiesForHeapType(D3D12_HEAP_TYPE_DEFAULT);
 
-		d3dDevice->CreateCommittedResource2(&d3dHeapProperties, D3D12_HEAP_FLAG_NONE, &d3dResourceDesc,
-			D3D12_RESOURCE_STATE_COMMON, nullptr, nullptr, IID_PPV_ARGS(&resource.d3dResource));
+		d3dDevice->CreateCommittedResource3(&d3dHeapProps, D3D12_HEAP_FLAG_NONE,
+			&d3dResourceDesc, d3dInitialLayout, nullptr, nullptr, 0, nullptr,
+			IID_PPV_ARGS(&resource.d3dResource));
 	}
-
-#endif
 
 	return resourceHandle;
 }
@@ -1397,37 +1316,20 @@ BufferHandle Device::createStagingBuffer(uint64 size, StagingBufferAccessMode ac
 
 	const D3D12_RESOURCE_DESC1 d3dResourceDesc = D3D12Helpers::ResourceDesc1ForBuffer(size);
 
-	// TODO: Check that resource fits into memory.
-	// TODO: Check alignment.
-
 	D3D12_HEAP_TYPE d3dHeapType = D3D12_HEAP_TYPE(0);
-	D3D12_RESOURCE_STATES d3dInitialState = D3D12_RESOURCE_STATES(0);
 
 	if (accessMode == StagingBufferAccessMode::DeviceReadHostWrite)
-	{
 		d3dHeapType = D3D12_HEAP_TYPE_UPLOAD;
-		d3dInitialState = D3D12_RESOURCE_STATE_GENERIC_READ;
-	}
 	else if (accessMode == StagingBufferAccessMode::DeviceWriteHostRead)
-	{
 		d3dHeapType = D3D12_HEAP_TYPE_READBACK;
-		d3dInitialState = D3D12_RESOURCE_STATE_COPY_DEST;
-	}
 	else
 		XEMasterAssertUnreachableCode();
 
+	const D3D12_HEAP_PROPERTIES d3dHeapProperties = D3D12Helpers::HeapPropertiesForHeapType(d3dHeapType);
 
-#if USE_ENHANCED_BARRIERS
-	XEMasterAssertUnreachableCode();
-#else
-
-	const D3D12_HEAP_PROPERTIES d3dHeapProperties =
-		D3D12Helpers::HeapPropertiesForHeapType(d3dHeapType);
-
-	d3dDevice->CreateCommittedResource2(&d3dHeapProperties, D3D12_HEAP_FLAG_NONE, &d3dResourceDesc,
-		d3dInitialState, nullptr, nullptr, IID_PPV_ARGS(&resource.d3dResource));
-
-#endif
+	d3dDevice->CreateCommittedResource3(&d3dHeapProperties, D3D12_HEAP_FLAG_NONE,
+		&d3dResourceDesc, D3D12_BARRIER_LAYOUT_UNDEFINED, nullptr, nullptr, 0, nullptr,
+		IID_PPV_ARGS(&resource.d3dResource));
 
 	return resourceHandle;
 }
@@ -1538,7 +1440,7 @@ ColorRenderTargetHandle Device::createColorRenderTarget(TextureHandle textureHan
 	const Resource& resource = resourcePool.resolveHandle(uint32(textureHandle));
 	XEAssert(resource.type == ResourceType::Texture && resource.d3dResource);
 	XEAssert(resource.textureDesc.dimension == TextureDimension::Texture2D);
-	XEAssert(resource.textureDesc.allowRenderTarget);
+	XEAssert(resource.textureDesc.enableRenderTargetUsage);
 	// TODO: Assert compatible texture format / texel view format.
 
 	ColorRenderTargetHandle colorRenderTargetHandle = ColorRenderTargetHandle::Zero;
@@ -1570,7 +1472,7 @@ DepthStencilRenderTargetHandle Device::createDepthStencilRenderTarget(TextureHan
 	const Resource& resource = resourcePool.resolveHandle(uint32(textureHandle));
 	XEAssert(resource.type == ResourceType::Texture && resource.d3dResource);
 	XEAssert(resource.textureDesc.dimension == TextureDimension::Texture2D);
-	XEAssert(resource.textureDesc.allowRenderTarget);
+	XEAssert(resource.textureDesc.enableRenderTargetUsage);
 	// TODO: Assert compatible texture format / texel view format.
 
 	const DepthStencilFormat dsFormat = TextureFormatUtils::TranslateToDepthStencilFormat(resource.textureDesc.format);
@@ -1986,7 +1888,7 @@ OutputHandle Device::createWindowOutput(uint16 width, uint16 height, void* platf
 		backBufferTexture.textureDesc.dimension = TextureDimension::Texture2D;
 		backBufferTexture.textureDesc.format = TextureFormat::R8G8B8A8;
 		backBufferTexture.textureDesc.mipLevelCount = 1;
-		backBufferTexture.textureDesc.allowRenderTarget = true;
+		backBufferTexture.textureDesc.enableRenderTargetUsage = true;
 
 		output.backBuffers[i] = backBufferTextureHandle;
 	}
@@ -2113,6 +2015,7 @@ void Device::resetCommandAllocator(CommandAllocatorHandle commandAllocatorHandle
 void Device::submitCommandList(DeviceQueue deviceQueue, HAL::CommandList& commandList)
 {
 	XEAssert(deviceQueue == DeviceQueue::Graphics); // Not implemented.
+	// `TextureLayout::Commom` <-> `D3D12_BARRIER_LAYOUT_DIRECT_QUEUE_COMMON`
 
 	XEMasterAssert(commandList.device && commandList.d3dCommandList && commandList.device == this);
 	XEMasterAssert(!commandList.isOpen);
