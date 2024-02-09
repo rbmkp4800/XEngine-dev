@@ -16,7 +16,7 @@
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{fe97d89c-fbb2-46b6-8fb4-29a54bf5b93d}</ProjectGuid>
-    <RootNamespace>XEngineSimulator</RootNamespace>
+    <RootNamespace>XEngineSimulationEngine</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
 
@@ -33,16 +33,19 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ClInclude Include="XEngine.Simulator.h" />
+    <ClInclude Include="XEngine.Simulation.Engine.h" />
   </ItemGroup>
 
   <ItemGroup>
-    <ClCompile Include="XEngine.Simulator.cpp" />
+    <ClCompile Include="XEngine.Simulation.Engine.cpp" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\XLib\XLib.vcxproj">
       <Project>{df81a513-72e3-4b74-b866-97f3bb61d45f}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\XEngine.Simulation.Model\XEngine.Simulation.Model.vcxproj">
+      <Project>{EE103A5C-3F12-4525-B46F-7C7A45EB9F69}</Project>
     </ProjectReference>
   </ItemGroup>
 
