@@ -132,4 +132,7 @@ namespace D3D12Helpers
 		desc.Texture2D.ResourceMinLODClamp = resourceMinLODClamp;
 		return desc;
 	}
+
+	inline D3D12_CPU_DESCRIPTOR_HANDLE CPUDescriptorHandle(UINT64 ptr) { return D3D12_CPU_DESCRIPTOR_HANDLE { ptr }; }
+	inline D3D12_GPU_DESCRIPTOR_HANDLE GPUDescriptorHandle(UINT64 ptr) { return D3D12_GPU_DESCRIPTOR_HANDLE { ptr }; }
 }

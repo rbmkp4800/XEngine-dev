@@ -82,9 +82,7 @@ private:
 	GfxHAL::CommandAllocatorHandle gfxCommandAllocator;
 
 	GfxHAL::OutputHandle gfxOutput = GfxHAL::OutputHandle::Zero;
-	GfxHAL::ColorRenderTargetHandle gfxOutputBackBuffersColorRTs[GfxHAL::OutputBackBufferCount] = {};
 	GfxHAL::TextureHandle gfxDepthTexture = GfxHAL::TextureHandle::Zero;
-	GfxHAL::DepthStencilRenderTargetHandle gfxDepthRT = GfxHAL::DepthStencilRenderTargetHandle::Zero;
 
 	GfxHAL::BufferHandle gfxTestBuffer = GfxHAL::BufferHandle::Zero;
 	void* mappedTestBuffer = nullptr;
@@ -132,9 +130,6 @@ void Game0::run()
 	gfxDeviceSettings.maxCommandAllocatorCount = 8;
 	gfxDeviceSettings.maxCommandListCount = 8;
 	gfxDeviceSettings.maxResourceCount = 1024;
-	gfxDeviceSettings.maxResourceViewCount = 1024;
-	gfxDeviceSettings.maxColorRenderTargetCount = 64;
-	gfxDeviceSettings.maxDepthStencilRenderTargetCount = 64;
 	gfxDeviceSettings.maxDescriptorSetLayoutCount = 64;
 	gfxDeviceSettings.maxPipelineLayoutCount = 64;
 	gfxDeviceSettings.maxPipelineCount = 64;
@@ -146,11 +141,6 @@ void Game0::run()
 	gfxTransientAllocator.initialize(gfxDevice, 16);
 
 	gfxOutput = gfxDevice.createWindowOutput(1600, 900, window.getHandle());
-	for (int i = 0; i < GfxHAL::OutputBackBufferCount; i++)
-	{
-		GfxHAL::TextureHandle gfxBackBuffer = gfxDevice.getOutputBackBuffer(gfxOutput, i);
-		gfxOutputBackBuffersColorRTs[i] = gfxDevice.createColorRenderTarget(gfxBackBuffer, GfxHAL::TexelViewFormat::R8G8B8A8_UNORM);
-	}
 
 	GfxHAL::TextureDesc gfxDepthTextureDesc = {};
 	gfxDepthTextureDesc.size = { 1600, 900, 1 };
@@ -160,8 +150,6 @@ void Game0::run()
 	gfxDepthTextureDesc.enableRenderTargetUsage = true;
 
 	gfxDepthTexture = gfxDevice.createTexture(gfxDepthTextureDesc, GfxHAL::TextureLayout::DepthStencilReadWrite);
-
-	gfxDepthRT = gfxDevice.createDepthStencilRenderTarget(gfxDepthTexture);
 
 	gfxTestBuffer = gfxDevice.createStagingBuffer(64 * 1024, GfxHAL::StagingBufferAccessMode::DeviceReadHostWrite);
 	mappedTestBuffer = gfxDevice.getMappedBufferPtr(gfxTestBuffer);
@@ -215,7 +203,6 @@ void Game0::run()
 
 		const uint32 currentBackBufferIndex = gfxDevice.getOutputCurrentBackBufferIndex(gfxOutput);
 		const GfxHAL::TextureHandle gfxCurrentBackBuffer = gfxDevice.getOutputBackBuffer(gfxOutput, currentBackBufferIndex);
-		const GfxHAL::ColorRenderTargetHandle gfxCurrentRT = gfxOutputBackBuffersColorRTs[currentBackBufferIndex];
 
 		GfxHAL::CommandList gfxCommandList;
 		gfxDevice.openCommandList(gfxCommandList, gfxCommandAllocator);
@@ -225,11 +212,15 @@ void Game0::run()
 			GfxHAL::BarrierAccess::None, GfxHAL::BarrierAccess::RenderTarget,
 			GfxHAL::TextureLayout::Present, GfxHAL::TextureLayout::RenderTarget);
 
-		const float32x4 clearColor(0.0f, 0.1f, 0.3f, 1.0f);
-		gfxCommandList.clearColorRenderTarget(gfxCurrentRT, (float32*)&clearColor);
-		gfxCommandList.clearDepthStencilRenderTarget(gfxDepthRT, true, false, 1.0f, 0);
+		GfxHAL::ColorRenderTarget colorRT =
+		{
+			.texture = gfxCurrentBackBuffer,
+			.format = GfxHAL::TexelViewFormat::R8G8B8A8_UNORM,
+		};
 
-		gfxCommandList.setRenderTarget(gfxCurrentRT, gfxDepthRT);
+		GfxHAL::DepthStencilRenderTarget dsRT = { .texture = gfxDepthTexture, };
+
+		gfxCommandList.setRenderTargets(1, &colorRT, &dsRT);
 		gfxCommandList.setViewport(0.0f, 0.0f, 1600.0f, 900.0f);
 		gfxCommandList.setScissor(0, 0, 1600, 900);
 
@@ -240,6 +231,10 @@ void Game0::run()
 		gfxCommandList.bindIndexBuffer(GfxHAL::BufferPointer { gfxTestBuffer, 4096 }, GfxHAL::IndexBufferFormat::U16, 4096);
 		gfxCommandList.bindVertexBuffer(0, GfxHAL::BufferPointer { gfxTestBuffer, 0 }, sizeof(TestVertex), 4096);
 		
+		const float32x4 clearColor(0.0f, 0.1f, 0.3f, 1.0f);
+		gfxCommandList.clearColorRenderTarget(0, (float32*)&clearColor);
+		gfxCommandList.clearDepthStencilRenderTarget(true, false, 1.0f, 0);
+
 		for (int i = 0; i < 27; i++)
 		{
 			struct TestCB

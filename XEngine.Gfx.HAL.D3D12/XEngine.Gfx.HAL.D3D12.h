@@ -8,6 +8,7 @@
 
 // TODO: Check that viewport and scissor are set when rendering.
 // TODO: Check that scissor rect is not larget than render target.
+// TODO: Validate color/depth-stencil RT formats when rendering.
 // TODO: Probably we can state that Texture2D is equivalent to Texture2DArray[1].
 // TODO: Handle should be 18+10+4 or 17+11+4 instead of 20+8+4.
 // TODO: Setting pipeline type should not clear pipeline layout as one layout could work for graphics and compute.
@@ -42,7 +43,7 @@ namespace XEngine::Gfx::HAL
 	constexpr uint16 ConstantBufferBindAlignmentLog2 = 8;
 	constexpr uint16 ConstantBufferBindAlignment = 1 << ConstantBufferBindAlignmentLog2;
 	constexpr uint16 TextureArraySizeLimit = 2048;
-	constexpr uint32 OutputBackBufferCount = 2;
+	constexpr uint32 OutputBackBufferCount = 2; // TODO: I do not like this name. Replace "back buffer" with something...
 
 	class Device;
 
@@ -50,9 +51,6 @@ namespace XEngine::Gfx::HAL
 	enum class DeviceMemoryAllocationHandle		: uint32 { Zero = 0 };
 	enum class BufferHandle						: uint32 { Zero = 0 };
 	enum class TextureHandle					: uint32 { Zero = 0 };
-	enum class ResourceViewHandle				: uint32 { Zero = 0 }; // DescriptorSourceHandle?? createTextureDescriptorSource?
-	enum class ColorRenderTargetHandle			: uint32 { Zero = 0 };
-	enum class DepthStencilRenderTargetHandle	: uint32 { Zero = 0 };
 	enum class DescriptorSetLayoutHandle		: uint32 { Zero = 0 };
 	enum class PipelineLayoutHandle				: uint32 { Zero = 0 };
 	enum class PipelineHandle					: uint32 { Zero = 0 };
@@ -112,6 +110,47 @@ namespace XEngine::Gfx::HAL
 	};
 	static_assert(sizeof(TextureDesc) == 8);
 
+	enum class ResourceViewType : uint8
+	{
+		Undefined = 0,
+		Buffer,
+		Texture,
+		TextureCube,
+		RaytracingAccelerationStructure,
+	};
+
+	struct ResourceView
+	{
+		union
+		{
+			uint32 resourceHandle;
+			BufferHandle bufferHandle;
+			TextureHandle textureHandle;
+		};
+
+		union
+		{
+			struct
+			{
+				TexelViewFormat format;
+				bool writable;
+			} buffer;
+
+			struct
+			{
+				TexelViewFormat format;
+				bool writable;
+				uint8 baseMipLevel;
+				uint8 mipLevelCount;
+				// TextureAspects aspects;
+			} texture;
+
+			// ...
+		};
+
+		ResourceViewType type;
+	};
+
 	enum class PipelineType : uint8
 	{
 		Undefined = 0,
@@ -125,6 +164,21 @@ namespace XEngine::Gfx::HAL
 		Graphics,
 		Compute,
 		Copy,
+	};
+
+	struct ColorRenderTarget
+	{
+		TextureHandle texture;
+		TexelViewFormat format;
+		uint8 mipLevel;
+		uint16 arrayIndex;
+	};
+
+	struct DepthStencilRenderTarget
+	{
+		TextureHandle texture;
+		uint8 mipLevel;
+		uint16 arrayIndex;
 	};
 
 	enum class IndexBufferFormat : uint8
@@ -255,11 +309,16 @@ namespace XEngine::Gfx::HAL
 		uint32 deviceCommandListHandle = 0;
 		CommandAllocatorHandle commandAllocatorHandle = CommandAllocatorHandle::Zero;
 
+		uint16 rtvHeapOffset = 0;
+		uint16 dsvHeapOffset = 0;
+
 		CommandListType type = CommandListType::Undefined;
 		bool isOpen = false;
 
 		PipelineLayoutHandle currentPipelineLayoutHandle = PipelineLayoutHandle::Zero;
 		PipelineType currentPipelineType = PipelineType::Undefined;
+		uint8 setColorRenderTargetCount = 0;
+		bool isDepthStencilRenderTargetSet = false;
 
 	private:
 		void cleanup();
@@ -268,14 +327,8 @@ namespace XEngine::Gfx::HAL
 		CommandList() = default;
 		~CommandList();
 
-		void clearColorRenderTarget(ColorRenderTargetHandle colorRT, const float32* color);
-		void clearDepthStencilRenderTarget(DepthStencilRenderTargetHandle depthStencilRT,
-			bool clearDepth, bool clearStencil, float32 depth, uint8 stencil);
-
-		void setRenderTargets(uint8 colorRTCount, const ColorRenderTargetHandle* colorRTs,
-			DepthStencilRenderTargetHandle depthStencilRT = DepthStencilRenderTargetHandle::Zero);
-		void setRenderTarget(ColorRenderTargetHandle colorRT,
-			DepthStencilRenderTargetHandle depthStencilRT = DepthStencilRenderTargetHandle::Zero);
+		void setRenderTargets(uint8 colorRenderTargetCount, const ColorRenderTarget* colorRenderTargets,
+			const DepthStencilRenderTarget* depthStencilRenderTarget = nullptr, bool readOnlyDepth = false, bool readOnlyStencil = false);
 		void setViewport(float32 left, float32 top, float32 right, float32 bottom, float32 minDepth = 0.0f, float32 maxDepth = 1.0f);
 		void setScissor(uint32 left, uint32 top, uint32 right, uint32 bottom);
 
@@ -290,6 +343,9 @@ namespace XEngine::Gfx::HAL
 		void bindBuffer(uint64 bindingNameXSH, BufferBindType bindType, BufferPointer bufferPointer);
 		void bindDescriptorSet(uint64 bindingNameXSH, DescriptorSetReference descriptorSetReference);
 		void bindDescriptorArray(uint64 bindingNameXSH, DescriptorAddress arrayStartAddress);
+
+		void clearColorRenderTarget(uint8 colorRenderTargetIndex, const float32* color);
+		void clearDepthStencilRenderTarget(bool clearDepth, bool clearStencil, float32 depth, uint8 stencil);
 
 		void draw(uint32 vertexCount, uint32 vertexOffset = 0);
 		void drawIndexed(uint32 indexCount, uint32 indexOffset = 0, uint32 vertexOffset = 0);
@@ -340,9 +396,6 @@ namespace XEngine::Gfx::HAL
 		uint16 maxCommandAllocatorCount;
 		uint16 maxCommandListCount;
 		uint16 maxResourceCount;
-		uint16 maxResourceViewCount;
-		uint16 maxColorRenderTargetCount;
-		uint16 maxDepthStencilRenderTargetCount;
 		uint16 maxDescriptorSetLayoutCount;
 		uint16 maxPipelineLayoutCount;
 		uint16 maxPipelineCount;
@@ -414,9 +467,6 @@ namespace XEngine::Gfx::HAL
 		struct CommandList;
 		struct MemoryAllocation;
 		struct Resource;
-		struct ResourceView;
-		struct ColorRenderTarget;
-		struct DepthStencilRenderTarget;
 		struct DescriptorSetLayout;
 		struct PipelineLayout;
 		struct Pipeline;
@@ -429,12 +479,10 @@ namespace XEngine::Gfx::HAL
 
 		Queue queues[DeviceQueueCount] = {};
 
-		ID3D12DescriptorHeap* d3dHostSRVHeap = nullptr; // Resource view pool
-		ID3D12DescriptorHeap* d3dShaderVisbileSRVHeap = nullptr; // Descriptor pool
+		ID3D12DescriptorHeap* d3dShaderVisbileSRVHeap = nullptr;
 		ID3D12DescriptorHeap* d3dRTVHeap = nullptr;
 		ID3D12DescriptorHeap* d3dDSVHeap = nullptr;
 
-		uint64 hostSRVHeapPtr = 0;
 		uint64 shaderVisbileSRVHeapCPUPtr = 0;
 		uint64 shaderVisbileSRVHeapGPUPtr = 0;
 		uint64 rtvHeapPtr = 0;
@@ -448,9 +496,6 @@ namespace XEngine::Gfx::HAL
 		Pool<CommandList> commandListPool;
 		Pool<MemoryAllocation> memoryAllocationPool;
 		Pool<Resource> resourcePool;
-		Pool<ResourceView> resourceViewPool;
-		Pool<ColorRenderTarget> colorRenderTargetPool;
-		Pool<DepthStencilRenderTarget> depthStencilRenderTargetPool;
 		Pool<DescriptorSetLayout> descriptorSetLayoutPool;
 		Pool<PipelineLayout> pipelineLayoutPool;
 		Pool<Pipeline> pipelinePool;
@@ -503,23 +548,6 @@ namespace XEngine::Gfx::HAL
 		void destroyBuffer(BufferHandle bufferHandle);
 		void destroyTexture(TextureHandle textureHandle);
 
-		ResourceViewHandle createBufferView(BufferHandle bufferHandle, TexelViewFormat format, bool writable);
-		ResourceViewHandle createTextureView(TextureHandle textureHandle,
-			TexelViewFormat format, bool writable, const TextureSubresourceRange& subresourceRange);
-		ResourceViewHandle createTextureCubeView(TextureHandle textureHandle, TexelViewFormat format,
-			uint8 baseMipLevel = 0, uint8 mipLevelCount = 0, uint16 baseArrayIndex = 0, uint16 arraySize = 0);
-		//ResourceViewHandle createRaytracingAccelerationStructureView();
-
-		void destroyResourceView(ResourceViewHandle resourceViewHandle);
-
-		ColorRenderTargetHandle createColorRenderTarget(TextureHandle textureHandle,
-			TexelViewFormat format, uint8 mipLevel = 0, uint16 arrayIndex = 0);
-		void destroyColorRenderTarget(ColorRenderTargetHandle colorRenderTargetHandle);
-
-		DepthStencilRenderTargetHandle createDepthStencilRenderTarget(TextureHandle textureHandle,
-			bool writableDepth = true, bool writableStencil = true, uint8 mipLevel = 0, uint16 arrayIndex = 0);
-		void destroyDepthStencilView(DepthStencilRenderTargetHandle depthStencilRenderTargetHandle);
-
 		DescriptorSetLayoutHandle createDescriptorSetLayout(BlobDataView blob);
 		void destroyDescriptorSetLayout(DescriptorSetLayoutHandle descriptorSetLayoutHandle);
 
@@ -537,8 +565,8 @@ namespace XEngine::Gfx::HAL
 
 		DescriptorSetReference createDescriptorSetReference(DescriptorSetLayoutHandle descriptorSetLayoutHandle, DescriptorAddress address);
 
-		void writeDescriptor(DescriptorAddress descriptorAddress, ResourceViewHandle resourceViewHandle);
-		void writeDescriptor(DescriptorSetReference descriptorSetReference, uint64 bindingNameXSH, ResourceViewHandle resourceViewHandle);
+		void writeDescriptor(DescriptorAddress descriptorAddress, const ResourceView& resourceView);
+		void writeDescriptor(DescriptorSetReference descriptorSetReference, uint64 bindingNameXSH, const ResourceView& resourceView);
 
 		void openCommandList(HAL::CommandList& commandList, CommandAllocatorHandle commandAllocatorHandle, CommandListType type = CommandListType::Graphics);
 		void closeCommandList(HAL::CommandList& commandList);

@@ -59,15 +59,15 @@ namespace // Barriers validation
 		BarrierAccess compatibleAccess = BarrierAccess::None;
 		switch (layout)
 		{
-			case TextureLayout::Present:						compatibleAccess = BarrierAccess::None; break;
-			case TextureLayout::Common:							compatibleAccess = BarrierAccess::CopySource | BarrierAccess::CopyDest | BarrierAccess::ShaderRead | BarrierAccess::ShaderReadWrite; break;
-			case TextureLayout::CopySource:						compatibleAccess = BarrierAccess::CopySource; break;
-			case TextureLayout::CopyDest:						compatibleAccess = BarrierAccess::CopyDest; break;
-			case TextureLayout::ShaderRead:						compatibleAccess = BarrierAccess::ShaderRead; break;
-			case TextureLayout::ShaderReadWrite:				compatibleAccess = BarrierAccess::ShaderReadWrite; break;
-			case TextureLayout::RenderTarget:					compatibleAccess = BarrierAccess::RenderTarget; break;
-			case TextureLayout::DepthStencilRead:				compatibleAccess = BarrierAccess::DepthStencilRead; break;
-			case TextureLayout::DepthStencilReadWrite:			compatibleAccess = BarrierAccess::DepthStencilReadWrite; break;
+			case TextureLayout::Present:				compatibleAccess = BarrierAccess::None; break;
+			case TextureLayout::Common:					compatibleAccess = BarrierAccess::CopySource | BarrierAccess::CopyDest | BarrierAccess::ShaderRead | BarrierAccess::ShaderReadWrite; break;
+			case TextureLayout::CopySource:				compatibleAccess = BarrierAccess::CopySource; break;
+			case TextureLayout::CopyDest:				compatibleAccess = BarrierAccess::CopyDest; break;
+			case TextureLayout::ShaderRead:				compatibleAccess = BarrierAccess::ShaderRead; break;
+			case TextureLayout::ShaderReadWrite:		compatibleAccess = BarrierAccess::ShaderReadWrite; break;
+			case TextureLayout::RenderTarget:			compatibleAccess = BarrierAccess::RenderTarget; break;
+			case TextureLayout::DepthStencilRead:		compatibleAccess = BarrierAccess::DepthStencilRead; break;
+			case TextureLayout::DepthStencilReadWrite:	compatibleAccess = BarrierAccess::DepthStencilReadWrite; break;
 			default:
 				return false;
 		}
@@ -120,7 +120,7 @@ struct Device::CommandAllocator : PoolEntryBase
 	ID3D12CommandAllocator* d3dCommandAllocator;
 	uint32 queueExecutionFinishSignals[DeviceQueueCount];
 	uint8 queueExecutionMask;
-	
+
 	uint16 closedUnsubmittedCommandListCount;
 	bool hasOpenCommandList;
 };
@@ -147,20 +147,6 @@ struct Device::Resource : PoolEntryBase
 		TextureDesc textureDesc;
 	};
 };
-
-struct Device::ResourceView : PoolEntryBase
-{
-	union
-	{
-		BufferHandle bufferHandle;
-		TextureHandle textureHandle;
-	};
-	ResourceType resourceType;
-};
-
-struct Device::ColorRenderTarget : PoolEntryBase { };
-
-struct Device::DepthStencilRenderTarget : PoolEntryBase { };
 
 struct Device::DescriptorSetLayout : PoolEntryBase
 {
@@ -247,6 +233,8 @@ void CommandList::cleanup()
 
 	currentPipelineLayoutHandle = PipelineLayoutHandle::Zero;
 	currentPipelineType = PipelineType::Undefined;
+	setColorRenderTargetCount = 0;
+	isDepthStencilRenderTargetSet = false;
 }
 
 CommandList::~CommandList()
@@ -254,68 +242,85 @@ CommandList::~CommandList()
 	XEMasterAssert(!device && !d3dCommandList && !isOpen); // Command list should be submitted or discarded.
 }
 
-void CommandList::clearColorRenderTarget(ColorRenderTargetHandle colorRT, const float32* color)
+void CommandList::setRenderTargets(uint8 colorRenderTargetCount, const ColorRenderTarget* colorRenderTargets,
+	const DepthStencilRenderTarget* depthStencilRenderTarget, bool readOnlyDepth, bool readOnlyStencil)
 {
 	XEAssert(isOpen);
+	XEAssert(colorRenderTargetCount < MaxColorRenderTargetCount);
+	XEAssert((colorRenderTargetCount > 0) == (colorRenderTargets != nullptr));
 
-	const uint32 descriptorIndex = device->colorRenderTargetPool.resolveHandleToEntryIndex(uint32(colorRT));
-	const uint64 descriptorPtr = device->rtvHeapPtr + descriptorIndex * device->rtvDescriptorSize;
-	d3dCommandList->ClearRenderTargetView({ descriptorPtr }, color, 0, nullptr);
-}
-
-void CommandList::clearDepthStencilRenderTarget(DepthStencilRenderTargetHandle depthStencilRT,
-	bool clearDepth, bool clearStencil, float32 depth, uint8 stencil)
-{
-	XEAssert(isOpen);
-	XEAssert(clearDepth || clearStencil);
-
-	const uint32 descriptorIndex = device->depthStencilRenderTargetPool.resolveHandleToEntryIndex(uint32(depthStencilRT));
-	const uint64 descriptorPtr = device->dsvHeapPtr + descriptorIndex * device->dsvDescriptorSize;
-
-	D3D12_CLEAR_FLAGS d3dClearFlags = D3D12_CLEAR_FLAGS(0);
-	if (clearDepth)
-		d3dClearFlags |= D3D12_CLEAR_FLAG_DEPTH;
-	if (clearStencil)
-		d3dClearFlags |= D3D12_CLEAR_FLAG_STENCIL;
-
-	d3dCommandList->ClearDepthStencilView({ descriptorPtr }, d3dClearFlags, depth, stencil, 0, nullptr);
-}
-
-void CommandList::setRenderTargets(uint8 colorRTCount, const ColorRenderTargetHandle* colorRTs,
-	DepthStencilRenderTargetHandle depthStencilRT)
-{
-	XEAssert(isOpen);
-
-	D3D12_CPU_DESCRIPTOR_HANDLE d3dRTVDescriptorPtrs[MaxColorRenderTargetCount] = {};
-	D3D12_CPU_DESCRIPTOR_HANDLE d3dDSVDescriptorPtr = {};
-
-	const bool useRTVs = colorRTCount > 0;
-	if (useRTVs)
+	if (colorRenderTargets)
 	{
-		XEAssert(colorRTs);
-		XEAssert(colorRTCount < countof(d3dRTVDescriptorPtrs));
-		for (uint8 i = 0; i < colorRTCount; i++)
+		for (uint8 colorRenderTargetIndex = 0; colorRenderTargetIndex < colorRenderTargetCount; colorRenderTargetIndex++)
 		{
-			const uint32 descriptorIndex = device->colorRenderTargetPool.resolveHandleToEntryIndex(uint32(colorRTs[i]));
-			d3dRTVDescriptorPtrs[i].ptr = device->rtvHeapPtr + descriptorIndex * device->rtvDescriptorSize;
+			const ColorRenderTarget& rt = colorRenderTargets[colorRenderTargetIndex];
+
+			const Device::Resource& resource = device->resourcePool.resolveHandle(uint32(rt.texture));
+			XEAssert(resource.type == ResourceType::Texture && resource.d3dResource);
+			XEAssert(resource.textureDesc.dimension == TextureDimension::Texture2D);
+			XEAssert(resource.textureDesc.enableRenderTargetUsage);
+			// TODO: Assert compatible texture format / texel view format.
+
+			D3D12_RENDER_TARGET_VIEW_DESC d3dRTVDesc = {};
+			d3dRTVDesc.Format = TranslateTexelViewFormatToDXGIFormat(rt.format);
+			d3dRTVDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+			d3dRTVDesc.Texture2D.MipSlice = rt.mipLevel;
+			d3dRTVDesc.Texture2D.PlaneSlice = 0;
+
+			XEAssert(rt.arrayIndex == 0); // Not implemented.
+
+			const uint32 descriptorIndex = rtvHeapOffset + colorRenderTargetIndex;
+			const uint64 descriptorPtr = device->rtvHeapPtr + descriptorIndex * device->rtvDescriptorSize;
+			device->d3dDevice->CreateRenderTargetView(resource.d3dResource, &d3dRTVDesc, D3D12Helpers::CPUDescriptorHandle(descriptorPtr));
 		}
 	}
 
-	const bool useDSV = depthStencilRT != DepthStencilRenderTargetHandle::Zero;
-	if (useDSV)
+	if (depthStencilRenderTarget)
 	{
-		const uint32 descriptorIndex = device->depthStencilRenderTargetPool.resolveHandleToEntryIndex(uint32(depthStencilRT));
-		d3dDSVDescriptorPtr.ptr = device->dsvHeapPtr + uint32(descriptorIndex) * device->dsvDescriptorSize;
+		const DepthStencilRenderTarget& rt = *depthStencilRenderTarget;
+
+		const Device::Resource& resource = device->resourcePool.resolveHandle(uint32(rt.texture));
+		XEAssert(resource.type == ResourceType::Texture && resource.d3dResource);
+		XEAssert(resource.textureDesc.dimension == TextureDimension::Texture2D);
+		XEAssert(resource.textureDesc.enableRenderTargetUsage);
+		// TODO: Assert compatible texture format / texel view format.
+
+		const DepthStencilFormat dsFormat = TextureFormatUtils::TranslateToDepthStencilFormat(resource.textureDesc.format);
+		XEAssert(dsFormat != DepthStencilFormat::Undefined);
+
+		D3D12_DSV_FLAGS d3dDSVFlags = D3D12_DSV_FLAG_NONE;
+		if (readOnlyDepth)
+			d3dDSVFlags |= D3D12_DSV_FLAG_READ_ONLY_DEPTH;
+		if (readOnlyStencil) // TODO: Check that texture has stencil.
+			d3dDSVFlags |= D3D12_DSV_FLAG_READ_ONLY_STENCIL;
+
+		D3D12_DEPTH_STENCIL_VIEW_DESC d3dDSVDesc = {};
+		d3dDSVDesc.Format = TranslateDepthStencilFormatToDXGIFormat(dsFormat);
+		d3dDSVDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+		d3dDSVDesc.Flags = d3dDSVFlags;
+		d3dDSVDesc.Texture2D.MipSlice = rt.mipLevel;
+
+		XEAssert(rt.arrayIndex == 0); // Not implemented.
+
+		const uint32 descriptorIndex = dsvHeapOffset;
+		const uint64 descriptorPtr = device->dsvHeapPtr + descriptorIndex * device->dsvDescriptorSize;
+		device->d3dDevice->CreateDepthStencilView(resource.d3dResource, &d3dDSVDesc, D3D12Helpers::CPUDescriptorHandle(descriptorPtr));
 	}
 
-	d3dCommandList->OMSetRenderTargets(colorRTCount,
-		useRTVs ? d3dRTVDescriptorPtrs : nullptr, FALSE,
-		useDSV ? &d3dDSVDescriptorPtr : nullptr);
-}
+	D3D12_CPU_DESCRIPTOR_HANDLE d3dRTVDescriptorPtr = {};
+	D3D12_CPU_DESCRIPTOR_HANDLE d3dDSVDescriptorPtr = {};
 
-void CommandList::setRenderTarget(ColorRenderTargetHandle colorRT, DepthStencilRenderTargetHandle depthStencilRT)
-{
-	setRenderTargets(1, &colorRT, depthStencilRT);
+	const uint64 rtvDescriptorPtr = device->rtvHeapPtr + rtvHeapOffset * device->rtvDescriptorSize;
+	const uint64 dsvDescriptorPtr = device->dsvHeapPtr + dsvHeapOffset * device->dsvDescriptorSize;
+	const D3D12_CPU_DESCRIPTOR_HANDLE rtvDescriptorHandle = D3D12Helpers::CPUDescriptorHandle(rtvDescriptorPtr);
+	const D3D12_CPU_DESCRIPTOR_HANDLE dsvDescriptorHandle = D3D12Helpers::CPUDescriptorHandle(dsvDescriptorPtr);
+
+	d3dCommandList->OMSetRenderTargets(colorRenderTargetCount,
+		colorRenderTargets ? &rtvDescriptorHandle : nullptr, TRUE,
+		depthStencilRenderTarget ? &dsvDescriptorHandle : nullptr);
+
+	setColorRenderTargetCount = colorRenderTargetCount;
+	isDepthStencilRenderTargetSet = depthStencilRenderTarget != nullptr;
 }
 
 void CommandList::setViewport(float32 left, float32 top, float32 right, float32 bottom, float32 minDepth, float32 maxDepth)
@@ -489,11 +494,40 @@ void CommandList::bindDescriptorSet(uint64 bindingNameXSH, DescriptorSetReferenc
 	const uint64 descriptorTableGPUPtr = device->shaderVisbileSRVHeapGPUPtr + baseDescriptorIndex * device->srvDescriptorSize;
 
 	if (currentPipelineType == PipelineType::Graphics)
-		d3dCommandList->SetGraphicsRootDescriptorTable(resolvedBinding.d3dRootParameterIndex, { descriptorTableGPUPtr });
+		d3dCommandList->SetGraphicsRootDescriptorTable(resolvedBinding.d3dRootParameterIndex, D3D12Helpers::GPUDescriptorHandle(descriptorTableGPUPtr));
 	else if (currentPipelineType == PipelineType::Compute)
-		d3dCommandList->SetComputeRootDescriptorTable(resolvedBinding.d3dRootParameterIndex, { descriptorTableGPUPtr });
+		d3dCommandList->SetComputeRootDescriptorTable(resolvedBinding.d3dRootParameterIndex, D3D12Helpers::GPUDescriptorHandle(descriptorTableGPUPtr));
 	else
 		XEAssertUnreachableCode();
+}
+
+void CommandList::clearColorRenderTarget(uint8 colorRenderTargetIndex, const float32* color)
+{
+	XEAssert(isOpen);
+	XEAssert(colorRenderTargetIndex < MaxColorRenderTargetCount);
+	XEAssert(colorRenderTargetIndex < setColorRenderTargetCount);
+
+	const uint32 descriptorIndex = rtvHeapOffset + colorRenderTargetIndex;
+	const uint64 descriptorPtr = device->rtvHeapPtr + descriptorIndex * device->rtvDescriptorSize;
+	d3dCommandList->ClearRenderTargetView(D3D12Helpers::CPUDescriptorHandle(descriptorPtr), color, 0, nullptr);
+}
+
+void CommandList::clearDepthStencilRenderTarget(bool clearDepth, bool clearStencil, float32 depth, uint8 stencil)
+{
+	XEAssert(isOpen);
+	XEAssert(clearDepth || clearStencil);
+	XEAssert(isDepthStencilRenderTargetSet);
+
+	const uint32 descriptorIndex = dsvHeapOffset;
+	const uint64 descriptorPtr = device->dsvHeapPtr + descriptorIndex * device->dsvDescriptorSize;
+
+	D3D12_CLEAR_FLAGS d3dClearFlags = D3D12_CLEAR_FLAGS(0);
+	if (clearDepth)
+		d3dClearFlags |= D3D12_CLEAR_FLAG_DEPTH;
+	if (clearStencil)
+		d3dClearFlags |= D3D12_CLEAR_FLAG_STENCIL;
+
+	d3dCommandList->ClearDepthStencilView(D3D12Helpers::CPUDescriptorHandle(descriptorPtr), d3dClearFlags, depth, stencil, 0, nullptr);
 }
 
 void CommandList::draw(uint32 vertexCount, uint32 vertexOffset)
@@ -724,13 +758,10 @@ template<> constexpr uint8 Device::Pool<Device::CommandAllocator>			::GetHandleS
 template <> constexpr uint8 Device::Pool<Device::CommandList>				::GetHandleSignature() { return 2; }
 template <> constexpr uint8 Device::Pool<Device::MemoryAllocation>			::GetHandleSignature() { return 3; }
 template <> constexpr uint8 Device::Pool<Device::Resource>					::GetHandleSignature() { return 4; }
-template <> constexpr uint8 Device::Pool<Device::ResourceView>				::GetHandleSignature() { return 5; }
-template <> constexpr uint8 Device::Pool<Device::ColorRenderTarget>			::GetHandleSignature() { return 6; }
-template <> constexpr uint8 Device::Pool<Device::DepthStencilRenderTarget>	::GetHandleSignature() { return 7; }
-template <> constexpr uint8 Device::Pool<Device::DescriptorSetLayout>		::GetHandleSignature() { return 8; }
-template <> constexpr uint8 Device::Pool<Device::PipelineLayout>			::GetHandleSignature() { return 9; }
-template <> constexpr uint8 Device::Pool<Device::Pipeline>					::GetHandleSignature() { return 10; }
-template <> constexpr uint8 Device::Pool<Device::Output>					::GetHandleSignature() { return 11; }
+template <> constexpr uint8 Device::Pool<Device::DescriptorSetLayout>		::GetHandleSignature() { return 5; }
+template <> constexpr uint8 Device::Pool<Device::PipelineLayout>			::GetHandleSignature() { return 6; }
+template <> constexpr uint8 Device::Pool<Device::Pipeline>					::GetHandleSignature() { return 7; }
+template <> constexpr uint8 Device::Pool<Device::Output>					::GetHandleSignature() { return 8; }
 
 template <typename EntryType>
 inline void Device::Pool<EntryType>::initialize(EntryType* buffer, uint16 capacity)
@@ -906,7 +937,7 @@ inline DeviceQueueSyncPoint Device::ComposeDeviceQueueSyncPoint(uint8 queueIndex
 	result |= uint64(queueIndex & 0xF) << 48;
 	result |= uint64(checksum) << 52;
 	result |= 0xA000'0000'0000'0000;
-	
+
 	return DeviceQueueSyncPoint(result);
 }
 
@@ -1053,30 +1084,30 @@ void Device::initialize(/*const PhysicalDevice& physicalDevice, */const DeviceSe
 
 	// Init descriptor heaps.
 	{
-		const D3D12_DESCRIPTOR_HEAP_DESC d3dHostSRVHeapDesc =
-			D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, settings.maxResourceViewCount);
+		// Each command list has own piece of RTV/DSV heap.
+		const uint16 rtvHeapSize = settings.maxCommandListCount * MaxColorRenderTargetCount;
+		const uint16 dsvHeapSize = settings.maxCommandListCount * 1;
+
 		const D3D12_DESCRIPTOR_HEAP_DESC d3dShaderVisbileSRVHeapDesc =
 			D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
 				settings.descriptorPoolSize, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
 		const D3D12_DESCRIPTOR_HEAP_DESC d3dRTVHeapDesc =
-			D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, settings.maxColorRenderTargetCount);
+			D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, rtvHeapSize);
 		const D3D12_DESCRIPTOR_HEAP_DESC d3dDSVHeapDesc =
-			D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, settings.maxDepthStencilRenderTargetCount);
+			D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, dsvHeapSize);
 
-		d3dDevice->CreateDescriptorHeap(&d3dHostSRVHeapDesc, IID_PPV_ARGS(&d3dHostSRVHeap));
 		d3dDevice->CreateDescriptorHeap(&d3dShaderVisbileSRVHeapDesc, IID_PPV_ARGS(&d3dShaderVisbileSRVHeap));
 		d3dDevice->CreateDescriptorHeap(&d3dRTVHeapDesc, IID_PPV_ARGS(&d3dRTVHeap));
 		d3dDevice->CreateDescriptorHeap(&d3dDSVHeapDesc, IID_PPV_ARGS(&d3dDSVHeap));
 
-		hostSRVHeapPtr = d3dHostSRVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
 		shaderVisbileSRVHeapCPUPtr = d3dShaderVisbileSRVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
 		shaderVisbileSRVHeapGPUPtr = d3dShaderVisbileSRVHeap->GetGPUDescriptorHandleForHeapStart().ptr;
 		rtvHeapPtr = d3dRTVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
 		dsvHeapPtr = d3dDSVHeap->GetCPUDescriptorHandleForHeapStart().ptr;
 
+		srvDescriptorSize = uint16(d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
 		rtvDescriptorSize = uint16(d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV));
 		dsvDescriptorSize = uint16(d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
-		srvDescriptorSize = uint16(d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
 	}
 
 	// Allocate pools.
@@ -1094,15 +1125,6 @@ void Device::initialize(/*const PhysicalDevice& physicalDevice, */const DeviceSe
 
 		const uintptr resourcePoolMemOffset = poolsMemorySizeAccum;
 		poolsMemorySizeAccum += sizeof(Resource) * settings.maxResourceCount;
-
-		const uintptr resourceViewPoolMemOffset = poolsMemorySizeAccum;
-		poolsMemorySizeAccum += sizeof(ResourceView) * settings.maxResourceViewCount;
-
-		const uintptr colorRenderTargetPoolMemOffset = poolsMemorySizeAccum;
-		poolsMemorySizeAccum += sizeof(ColorRenderTarget) * settings.maxColorRenderTargetCount;
-
-		const uintptr depthStencilRenderTargetPoolMemOffset = poolsMemorySizeAccum;
-		poolsMemorySizeAccum += sizeof(DepthStencilRenderTarget) * settings.maxDepthStencilRenderTargetCount;
 
 		const uintptr descriptorSetLayoutPoolMemOffset = poolsMemorySizeAccum;
 		poolsMemorySizeAccum += sizeof(DescriptorSetLayout) * settings.maxDescriptorSetLayoutCount;
@@ -1125,9 +1147,6 @@ void Device::initialize(/*const PhysicalDevice& physicalDevice, */const DeviceSe
 		commandListPool.initialize			((CommandList*)			(poolsMemory + commandListPoolMemOffset),			settings.maxCommandAllocatorCount);
 		memoryAllocationPool.initialize		((MemoryAllocation*)	(poolsMemory + memoryAllocationPoolMemOffset),		settings.maxCommandListCount);
 		resourcePool.initialize				((Resource*)			(poolsMemory + resourcePoolMemOffset),				settings.maxResourceCount);
-		resourceViewPool.initialize			((ResourceView*)		(poolsMemory + resourceViewPoolMemOffset),			settings.maxResourceViewCount);
-		colorRenderTargetPool.initialize	((ColorRenderTarget*)	(poolsMemory + colorRenderTargetPoolMemOffset),		settings.maxColorRenderTargetCount);
-		depthStencilRenderTargetPool.initialize((DepthStencilRenderTarget*)(poolsMemory + depthStencilRenderTargetPoolMemOffset), settings.maxDepthStencilRenderTargetCount);
 		descriptorSetLayoutPool.initialize	((DescriptorSetLayout*)	(poolsMemory + descriptorSetLayoutPoolMemOffset),	settings.maxDescriptorSetLayoutCount);
 		pipelineLayoutPool.initialize		((PipelineLayout*)		(poolsMemory + pipelineLayoutPoolMemOffset),		settings.maxPipelineLayoutCount);
 		pipelinePool.initialize				((Pipeline*)			(poolsMemory + pipelinePoolMemOffset),				settings.maxPipelineCount);
@@ -1342,169 +1361,6 @@ void Device::destroyBuffer(BufferHandle bufferHandle)
 void Device::destroyTexture(TextureHandle textureHandle)
 {
 	XEMasterAssertUnreachableCode();
-}
-
-ResourceViewHandle Device::createBufferView(BufferHandle bufferHandle, TexelViewFormat format, bool writable)
-{
-	const Resource& resource = resourcePool.resolveHandle(uint32(bufferHandle));
-	XEAssert(resource.type == ResourceType::Buffer && resource.d3dResource);
-
-	// TODO: Check if format is supported to use with texel buffers.
-	const DXGI_FORMAT dxgiFormat = TranslateTexelViewFormatToDXGIFormat(format);
-
-	ResourceViewHandle resourceViewHandle = ResourceViewHandle::Zero;
-	uint16 resourceViewIndex = 0;
-	ResourceView& resourceView = resourceViewPool.allocate((uint32&)resourceViewHandle, &resourceViewIndex);
-	XEAssert(resourceView.resourceType == ResourceType::Undefined);
-	resourceView.bufferHandle = bufferHandle;
-	resourceView.resourceType = ResourceType::Buffer;
-
-	const uint64 descriptorPtr = rtvHeapPtr + rtvDescriptorSize * resourceViewIndex;
-
-	XEMasterAssertUnreachableCode();
-#if 0
-	if (writable)
-	{
-		D3D12_UNORDERED_ACCESS_VIEW_DESC d3dUAVDesc = {};
-		d3dUAVDesc.Format = dxgiFormat;
-		d3dUAVDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-		d3dUAVDesc.Buffer.FirstElement = 0;
-		d3dUAVDesc.Buffer.NumElements = ...;
-		d3dUAVDesc.Buffer.StructureByteStride = ...;
-		d3dUAVDesc.Buffer.CounterOffsetInBytes = 0;
-		d3dUAVDesc.Buffer.Flags = ...;
-
-		d3dDevice->CreateUnorderedAccessView(resource.d3dResource, nullptr, &d3dUAVDesc, { descriptorPtr });
-	}
-	else
-	{
-		D3D12_SHADER_RESOURCE_VIEW_DESC d3dSRVDesc = {};
-		d3dSRVDesc.Format = dxgiFormat;
-		d3dSRVDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-		d3dSRVDesc.Shader4ComponentMapping = ...;
-		d3dSRVDesc.Buffer.FirstElement = 0;
-		d3dSRVDesc.Buffer.NumElements = ...;
-		d3dSRVDesc.Buffer.StructureByteStride = ...;
-		d3dSRVDesc.Buffer.Flags = ...;
-
-		d3dDevice->CreateShaderResourceView(resource.d3dResource, &d3dSRVDesc, { descriptorPtr });
-	}
-#endif
-
-	return resourceViewHandle;
-}
-
-ResourceViewHandle Device::createTextureView(TextureHandle textureHandle, TexelViewFormat format, bool writable,
-	const TextureSubresourceRange& subresourceRange)
-{
-	const Resource& resource = resourcePool.resolveHandle(uint32(textureHandle));
-	XEAssert(resource.type == ResourceType::Texture && resource.d3dResource);
-
-	// TODO: Check compatibility with TextureFormat.
-	const DXGI_FORMAT dxgiFormat = TranslateTexelViewFormatToDXGIFormat(format);
-
-	ResourceViewHandle resourceViewHandle = ResourceViewHandle::Zero;
-	uint16 resourceViewIndex = 0;
-	ResourceView& resourceView = resourceViewPool.allocate((uint32&)resourceViewHandle, &resourceViewIndex);
-	XEAssert(resourceView.resourceType == ResourceType::Undefined);
-	resourceView.textureHandle = textureHandle;
-	resourceView.resourceType = ResourceType::Texture;
-
-	const uint64 descriptorPtr = rtvHeapPtr + rtvDescriptorSize * resourceViewIndex;
-
-	if (writable)
-	{
-		D3D12_UNORDERED_ACCESS_VIEW_DESC d3dUAVDesc = {};
-		d3dUAVDesc.Format = dxgiFormat;
-		// ...
-		XEMasterAssertUnreachableCode();
-
-		d3dDevice->CreateUnorderedAccessView(resource.d3dResource, nullptr, &d3dUAVDesc, { descriptorPtr });
-	}
-	else
-	{
-		D3D12_SHADER_RESOURCE_VIEW_DESC d3dSRVDesc = {};
-		d3dSRVDesc.Format = dxgiFormat;
-		// ...
-		XEMasterAssertUnreachableCode();
-
-		d3dDevice->CreateShaderResourceView(resource.d3dResource, &d3dSRVDesc, { descriptorPtr });
-	}
-
-	return resourceViewHandle;
-}
-
-ColorRenderTargetHandle Device::createColorRenderTarget(TextureHandle textureHandle,
-	TexelViewFormat format, uint8 mipLevel, uint16 arrayIndex)
-{
-	const Resource& resource = resourcePool.resolveHandle(uint32(textureHandle));
-	XEAssert(resource.type == ResourceType::Texture && resource.d3dResource);
-	XEAssert(resource.textureDesc.dimension == TextureDimension::Texture2D);
-	XEAssert(resource.textureDesc.enableRenderTargetUsage);
-	// TODO: Assert compatible texture format / texel view format.
-
-	ColorRenderTargetHandle colorRenderTargetHandle = ColorRenderTargetHandle::Zero;
-	uint16 colorRenderTargetIndex = 0;
-	colorRenderTargetPool.allocate((uint32&)colorRenderTargetHandle, &colorRenderTargetIndex);
-
-	D3D12_RENDER_TARGET_VIEW_DESC d3dRTVDesc = {};
-	d3dRTVDesc.Format = TranslateTexelViewFormatToDXGIFormat(format);
-	d3dRTVDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-	d3dRTVDesc.Texture2D.MipSlice = mipLevel;
-	d3dRTVDesc.Texture2D.PlaneSlice = 0;
-
-	XEAssert(arrayIndex == 0); // Not implemented.
-
-	const uint64 descriptorPtr = rtvHeapPtr + rtvDescriptorSize * colorRenderTargetIndex;
-	d3dDevice->CreateRenderTargetView(resource.d3dResource, &d3dRTVDesc, { descriptorPtr });
-
-	return colorRenderTargetHandle;
-}
-
-void Device::destroyColorRenderTarget(ColorRenderTargetHandle colorRenderTargetHandle)
-{
-	colorRenderTargetPool.release(uint32(colorRenderTargetHandle));
-}
-
-DepthStencilRenderTargetHandle Device::createDepthStencilRenderTarget(TextureHandle textureHandle,
-	bool writableDepth, bool writableStencil, uint8 mipLevel, uint16 arrayIndex)
-{
-	const Resource& resource = resourcePool.resolveHandle(uint32(textureHandle));
-	XEAssert(resource.type == ResourceType::Texture && resource.d3dResource);
-	XEAssert(resource.textureDesc.dimension == TextureDimension::Texture2D);
-	XEAssert(resource.textureDesc.enableRenderTargetUsage);
-	// TODO: Assert compatible texture format / texel view format.
-
-	const DepthStencilFormat dsFormat = TextureFormatUtils::TranslateToDepthStencilFormat(resource.textureDesc.format);
-	XEAssert(dsFormat != DepthStencilFormat::Undefined);
-
-	DepthStencilRenderTargetHandle depthStencilRenderTargetHandle = DepthStencilRenderTargetHandle::Zero;
-	uint16 depthStencilRenderTargetIndex = 0;
-	depthStencilRenderTargetPool.allocate((uint32&)depthStencilRenderTargetHandle, &depthStencilRenderTargetIndex);
-
-	D3D12_DSV_FLAGS d3dDSVFlags = D3D12_DSV_FLAG_NONE;
-	if (!writableDepth)
-		d3dDSVFlags |= D3D12_DSV_FLAG_READ_ONLY_DEPTH;
-	if (!writableStencil) // TODO: Check that texture has stencil.
-		d3dDSVFlags |= D3D12_DSV_FLAG_READ_ONLY_STENCIL;
-
-	D3D12_DEPTH_STENCIL_VIEW_DESC d3dDSVDesc = {};
-	d3dDSVDesc.Format = TranslateDepthStencilFormatToDXGIFormat(dsFormat);
-	d3dDSVDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-	d3dDSVDesc.Flags = d3dDSVFlags;
-	d3dDSVDesc.Texture2D.MipSlice = mipLevel;
-
-	XEAssert(arrayIndex == 0); // Not implemented.
-
-	const uint64 descriptorPtr = dsvHeapPtr + dsvDescriptorSize * depthStencilRenderTargetIndex;
-	d3dDevice->CreateDepthStencilView(resource.d3dResource, &d3dDSVDesc, { descriptorPtr });
-
-	return depthStencilRenderTargetHandle;
-}
-
-void Device::destroyDepthStencilView(DepthStencilRenderTargetHandle depthStencilRenderTargetHandle)
-{
-	depthStencilRenderTargetPool.release(uint32(depthStencilRenderTargetHandle));
 }
 
 DescriptorSetLayoutHandle Device::createDescriptorSetLayout(BlobDataView blob)
@@ -1903,19 +1759,85 @@ DescriptorSetReference Device::createDescriptorSetReference(
 	return ComposeDescriptorSetReference(descriptorSetLayoutHandle, uint32(address), descriptorSetReferenceMagicCounter);
 }
 
-void Device::writeDescriptor(DescriptorAddress descriptorAddress, ResourceViewHandle resourceViewHandle)
+void Device::writeDescriptor(DescriptorAddress descriptorAddress, const ResourceView& resourceView)
 {
-	const uint32 sourceDescriptorIndex = resourceViewPool.resolveHandleToEntryIndex(uint32(resourceViewHandle));
-	const uint32 destDescriptorIndex = uint32(descriptorAddress);
-	XEAssert(destDescriptorIndex < descriptorPoolSize);
+	const Resource& resource = resourcePool.resolveHandle(resourceView.resourceHandle);
+	XEAssert(resource.d3dResource);
 
-	const uint64 sourcePtr = hostSRVHeapPtr + sourceDescriptorIndex * srvDescriptorSize;
-	const uint64 destPtr = shaderVisbileSRVHeapCPUPtr + destDescriptorIndex * srvDescriptorSize;
-	d3dDevice->CopyDescriptorsSimple(1, { destPtr }, { sourcePtr }, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	const uint64 descriptorPtr = shaderVisbileSRVHeapCPUPtr + uint32(descriptorAddress) * srvDescriptorSize;
+	const D3D12_CPU_DESCRIPTOR_HANDLE descriptorHandle = D3D12Helpers::CPUDescriptorHandle(descriptorPtr);
+
+	XTODO(__FUNCTION__ " not implemented");
+
+	if (resourceView.type == ResourceViewType::Buffer)
+	{
+		XEAssert(resource.type == ResourceType::Buffer);
+
+		// TODO: Check if format is supported to use with texel buffers.
+		const DXGI_FORMAT dxgiFormat = TranslateTexelViewFormatToDXGIFormat(resourceView.buffer.format);
+
+		XEMasterAssertUnreachableCode();
+#if 0
+		if (resourceView.buffer.writable)
+		{
+			D3D12_UNORDERED_ACCESS_VIEW_DESC d3dUAVDesc = {};
+			d3dUAVDesc.Format = dxgiFormat;
+			d3dUAVDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+			d3dUAVDesc.Buffer.FirstElement = 0;
+			d3dUAVDesc.Buffer.NumElements = ...;
+			d3dUAVDesc.Buffer.StructureByteStride = ...;
+			d3dUAVDesc.Buffer.CounterOffsetInBytes = 0;
+			d3dUAVDesc.Buffer.Flags = ...;
+
+			d3dDevice->CreateUnorderedAccessView(resource.d3dResource, nullptr, &d3dUAVDesc, descriptorHandle);
+		}
+		else
+		{
+			D3D12_SHADER_RESOURCE_VIEW_DESC d3dSRVDesc = {};
+			d3dSRVDesc.Format = dxgiFormat;
+			d3dSRVDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+			d3dSRVDesc.Shader4ComponentMapping = ...;
+			d3dSRVDesc.Buffer.FirstElement = 0;
+			d3dSRVDesc.Buffer.NumElements = ...;
+			d3dSRVDesc.Buffer.StructureByteStride = ...;
+			d3dSRVDesc.Buffer.Flags = ...;
+
+			d3dDevice->CreateShaderResourceView(resource.d3dResource, &d3dSRVDesc, descriptorHandle);
+		}
+#endif
+	}
+	else if (resourceView.type == ResourceViewType::Texture)
+	{
+		XEAssert(resource.type == ResourceType::Texture);
+
+		// TODO: Check compatibility with TextureFormat.
+		const DXGI_FORMAT dxgiFormat = TranslateTexelViewFormatToDXGIFormat(resourceView.texture.format);
+
+		XEMasterAssertUnreachableCode();
+#if 0
+		if (resourceView.texture.writable)
+		{
+			D3D12_UNORDERED_ACCESS_VIEW_DESC d3dUAVDesc = {};
+			d3dUAVDesc.Format = dxgiFormat;
+			// ...
+
+			d3dDevice->CreateUnorderedAccessView(resource.d3dResource, nullptr, &d3dUAVDesc, descriptorHandle);
+		}
+		else
+		{
+			D3D12_SHADER_RESOURCE_VIEW_DESC d3dSRVDesc = {};
+			d3dSRVDesc.Format = dxgiFormat;
+			// ...
+
+			d3dDevice->CreateShaderResourceView(resource.d3dResource, &d3dSRVDesc, descriptorHandle);
+		}
+#endif
+	}
+	else
+		XEAssertUnreachableCode();
 }
 
-void Device::writeDescriptor(DescriptorSetReference descriptorSetReference,
-	uint64 bindingNameXSH, ResourceViewHandle resourceViewHandle)
+void Device::writeDescriptor(DescriptorSetReference descriptorSetReference, uint64 bindingNameXSH, const ResourceView& resourceView)
 {
 	DescriptorSetLayoutHandle descriptorSetLayoutHandle = DescriptorSetLayoutHandle::Zero;
 	uint32 baseDescriptorIndex = 0;
@@ -1929,7 +1851,7 @@ void Device::writeDescriptor(DescriptorSetReference descriptorSetReference,
 		if (binding.nameXSH == bindingNameXSH)
 		{
 			// TODO: This is very hacky. Properly calculate descriptor index and check resource view type.
-			writeDescriptor(DescriptorAddress(baseDescriptorIndex + i), resourceViewHandle);
+			writeDescriptor(DescriptorAddress(baseDescriptorIndex + i), resourceView);
 			return;
 		}
 	}
@@ -1949,7 +1871,8 @@ void Device::openCommandList(HAL::CommandList& commandList, CommandAllocatorHand
 	commandAllocator.hasOpenCommandList = true;
 
 	uint32 deviceCommandListHandle = 0;
-	CommandList& deviceCommandList = commandListPool.allocate(deviceCommandListHandle);
+	uint16 deviceCommandListIndex = 0;
+	CommandList& deviceCommandList = commandListPool.allocate(deviceCommandListHandle, &deviceCommandListIndex);
 
 	if (deviceCommandList.d3dCommandList)
 	{
@@ -1965,8 +1888,14 @@ void Device::openCommandList(HAL::CommandList& commandList, CommandAllocatorHand
 	commandList.d3dCommandList = deviceCommandList.d3dCommandList;
 	commandList.deviceCommandListHandle = deviceCommandListHandle;
 	commandList.commandAllocatorHandle = commandAllocatorHandle;
+	commandList.rtvHeapOffset = deviceCommandListIndex * MaxColorRenderTargetCount;
+	commandList.dsvHeapOffset = deviceCommandListIndex * 1;
 	commandList.type = type;
 	commandList.isOpen = true;
+	commandList.currentPipelineLayoutHandle = PipelineLayoutHandle::Zero;
+	commandList.currentPipelineType = PipelineType::Undefined;
+	commandList.setColorRenderTargetCount = 0;
+	commandList.isDepthStencilRenderTargetSet = false;
 
 	commandList.d3dCommandList->SetDescriptorHeaps(1, &d3dShaderVisbileSRVHeap);
 	commandList.d3dCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
