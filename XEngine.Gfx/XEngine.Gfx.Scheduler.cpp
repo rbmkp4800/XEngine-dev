@@ -8,9 +8,6 @@ enum class TransientResourcePool::EntryType : uint8
 	Undefined = 0,
 	Buffer,
 	Texture,
-	Descriptor,
-	RenderTarget,
-	DepthRenderTarget,
 };
 
 void TransientResourcePool::initialize(HAL::Device& device,
@@ -38,19 +35,6 @@ void TransientResourcePool::reset()
 				entry.texture.handle = HAL::TextureHandle::Zero;
 				break;
 
-			case EntryType::Descriptor:
-				XAssertUnreachableCode();
-				break;
-
-			case EntryType::RenderTarget:
-				device->destroyColorRenderTarget(entry.colorRenderTarget.handle);
-				entry.colorRenderTarget.handle = HAL::ColorRenderTargetHandle::Zero;
-				break;
-
-			case EntryType::DepthRenderTarget:
-				XAssertUnreachableCode();
-				break;
-
 			default:
 				XAssertUnreachableCode();
 		}
@@ -58,21 +42,21 @@ void TransientResourcePool::reset()
 	entries.clear();
 }
 
-HAL::DescriptorAddress PassExecutionContext::allocateTransientDescriptors(uint16 descriptorCount)
+PassExecutionContext::PassExecutionContext(HAL::Device& device, const Schedule& schedule, HAL::DescriptorAllocatorHandle transientDescriptorAllocator,
+	TransientUploadMemoryAllocator& transientUploadMemoryAllocator, TransientResourcePool& transientResourcePool) :
+	device(device),
+	schedule(schedule),
+	transientDescriptorAllocator(transientDescriptorAllocator),
+	transientUploadMemoryAllocator(transientUploadMemoryAllocator),
+	transientResourcePool(transientResourcePool)
+{ }
+
+HAL::DescriptorSet PassExecutionContext::allocateDescriptorSet(HAL::DescriptorSetLayoutHandle descriptorSetLayout)
 {
-	// TODO: Revisit this
-	return transientDescriptorAllocator.allocate(descriptorCount);
+	return device.allocateDescriptorSet(transientDescriptorAllocator, descriptorSetLayout);
 }
 
-HAL::DescriptorSetReference PassExecutionContext::allocateTransientDescriptorSet(
-	HAL::DescriptorSetLayoutHandle descriptorSetLayout)
-{
-	const uint16 descriptorCount = device.getDescriptorSetLayoutDescriptorCount(descriptorSetLayout);
-	const HAL::DescriptorAddress descriptorSetBaseAddress = allocateTransientDescriptors(descriptorCount);
-	return device.createDescriptorSetReference(descriptorSetLayout, descriptorSetBaseAddress);
-}
-
-UploadMemoryAllocationInfo PassExecutionContext::allocateTransientUploadMemory(uint32 size)
+UploadMemoryAllocationInfo PassExecutionContext::allocateUploadMemory(uint32 size)
 {
 	return transientUploadMemoryAllocator.allocate(size);
 }
@@ -80,66 +64,81 @@ UploadMemoryAllocationInfo PassExecutionContext::allocateTransientUploadMemory(u
 HAL::TextureHandle PassExecutionContext::resolveTexture(Scheduler::TextureHandle texture)
 {
 	const uint32 resourceIndex = uint32(texture);
-	XAssert(resourceIndex < schedule.resources.getSize());
+	XEAssert(resourceIndex < schedule.resources.getSize());
 	const Schedule::Resource& resource = schedule.resources[resourceIndex];
 	XAssert(resource.type == HAL::ResourceType::Texture);
 
 	if (resource.lifetime == Schedule::ResourceLifetime::Transient)
 	{
-		XAssert(resource.transientResourcePoolEntryIndex < transientResourcePool.entries.getSize());
+		XEAssert(resource.transientResourcePoolEntryIndex < transientResourcePool.entries.getSize());
 		const TransientResourcePool::Entry& transientResourcePoolEntry =
 			transientResourcePool.entries[resource.transientResourcePoolEntryIndex];
-		XAssert(transientResourcePoolEntry.type == TransientResourcePool::EntryType::Texture);
+		XEAssert(transientResourcePoolEntry.type == TransientResourcePool::EntryType::Texture);
 		return transientResourcePoolEntry.texture.handle;
 	}
 	else
 	{
-		XAssert(resource.lifetime == Schedule::ResourceLifetime::External);
+		XEAssert(resource.lifetime == Schedule::ResourceLifetime::External);
 		return resource.externalTextureHandle;
 	}
 }
 
-/*ResourceViewHandle PassExecutionContext::createTransientBufferView(Scheduler::BufferHandle buffer) { }
-ResourceViewHandle PassExecutionContext::createTransientTextureView(Scheduler::TextureHandle texture,
-	TexelViewFormat format, bool writable, const TextureSubresourceRange& subresourceRange) { }*/
 
-HAL::ColorRenderTargetHandle PassExecutionContext::createTransientColorRenderTarget(HAL::TextureHandle texture,
-	HAL::TexelViewFormat format, uint8 mipLevel, uint16 arrayIndex)
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum class Schedule::ResourceLifetime : uint8
 {
-	const HAL::ColorRenderTargetHandle rt = device.createColorRenderTarget(texture, format, mipLevel, arrayIndex);
+	Undefined = 0,
+	Transient,
+	External,
+};
 
-	TransientResourcePool::Entry transientResourcePoolEntry = {};
-	transientResourcePoolEntry.type = TransientResourcePool::EntryType::RenderTarget;
-	transientResourcePoolEntry.colorRenderTarget.handle = rt;
-	transientResourcePool.entries.pushBack(transientResourcePoolEntry);
+struct Schedule::Resource
+{
+	HAL::ResourceType type;
+	ResourceLifetime lifetime;
 
-	return rt;
-}
+	union
+	{
+		uint32 transientBufferSize;
+		HAL::TextureDesc transientTextureDesc;
+		HAL::BufferHandle externalBufferHandle;
+		HAL::TextureHandle externalTextureHandle;
+	};
 
-/*DepthStencilViewHandle PassExecutionContext::createTransientDepthStencilView(Scheduler::TextureHandle texture,
-	bool writableDepth, bool writableStencil, uint8 mipLevel, uint16 arrayIndex) { }*/
+	uint32 transientResourcePoolEntryIndex;
+};
 
-void Schedule::initialize(HAL::Device& device)
+struct Schedule::Pass
+{
+	PassExecutorFunc executporFunc;
+	const void* userData;
+};
+
+void Schedule::initialize(HAL::Device& device, uint16 maxResourceCount, uint16 maxPassCount)
 {
 	XAssert(!this->device);
-
 	this->device = &device;
+	...;
 }
 
-//Scheduler::BufferHandle Schedule::createTransientBuffer(uint32 size) { }
-
-/*Scheduler::TextureHandle Schedule::createTransientTexture(const HAL::TextureDesc& textureDesc)
+Scheduler::BufferHandle Schedule::createTransientBuffer(uint32 size)
 {
-	Resource resource = {};
-	resource.type = HAL::ResourceType::Texture;
-}*/
+	...;
+}
 
-Scheduler::TextureHandle Schedule::importExternalTexture(HAL::TextureHandle texture)
+Scheduler::TextureHandle Schedule::createTransientTexture(const HAL::TextureDesc& textureDesc)
+{
+	...;
+}
+
+Scheduler::TextureHandle Schedule::importExternalTexture(HAL::TextureHandle texture, HAL::TextureLayout defaultLayout)
 {
 	Resource resource = {};
 	resource.type = HAL::ResourceType::Texture;
 	resource.lifetime = ResourceLifetime::External;
 	resource.externalTextureHandle = texture;
+	defaultLayout ...;
 	
 	const Scheduler::TextureHandle result = Scheduler::TextureHandle(resources.getSize());
 	resources.pushBack(resource);
@@ -161,18 +160,12 @@ void Schedule::compile()
 
 }
 
-void Schedule::execute(HAL::CommandAllocatorHandle commandAllocator,
-	TransientResourcePool& transientResourcePool,
-	TransientDescriptorAllocator& transientDescriptorAllocator,
-	TransientUploadMemoryAllocator& transientUploadMemoryAllocator)
+void Schedule::execute(HAL::CommandAllocatorHandle commandAllocator, HAL::DescriptorAllocatorHandle transientDescriptorAllocator,
+	TransientUploadMemoryAllocator& transientUploadMemoryAllocator, TransientResourcePool& transientResourcePool)
 {
 	XEAssert(device);
-	// TODO: Assert that transient resource pool created for same device? Same for descriptors and upload memory allocators.
-
-	XAssert(transientResourcePool.entries.isEmpty());
 
 	uint64 transientResourcePoolMemoryUsed = 0;
-
 	for (Resource& resource : resources)
 	{
 		if (resource.lifetime != ResourceLifetime::Transient)
@@ -217,24 +210,22 @@ void Schedule::execute(HAL::CommandAllocatorHandle commandAllocator,
 		}
 	}
 
-	PassExecutionContext context(*device, *this,
-		transientResourcePool, transientDescriptorAllocator, transientUploadMemoryAllocator);
+	{
+		PassExecutionContext context(*device, *this, transientDescriptorAllocator,
+			transientUploadMemoryAllocator, transientResourcePool);
 
-	HAL::CommandList commandList;
+		HAL::CommandList commandList;
+		device->openCommandList(commandList, commandAllocator);
 
-	device->openCommandList(commandList, commandAllocator);
+		for (Pass& pass : passes)
+			pass.executporFunc(context, *device, commandList, pass.userData);
 
-	for (Pass& pass : passes)
-		pass.executporFunc(context, *device, commandList, pass.userData);
-
-	device->closeCommandList(commandList);
-	device->submitCommandList(HAL::DeviceQueue::Graphics, commandList);
+		device->closeCommandList(commandList);
+		device->submitCommandList(HAL::DeviceQueue::Graphics, commandList);
+	}
 
 	const HAL::DeviceQueueSyncPoint sp = device->getEndOfQueueSyncPoint(HAL::DeviceQueue::Graphics);
-
-	transientDescriptorAllocator.enqueueRelease(sp);
 	transientUploadMemoryAllocator.enqueueRelease(sp);
-
 	while (!device->isQueueSyncPointReached(sp))
 		{ }
 
