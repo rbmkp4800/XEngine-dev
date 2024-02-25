@@ -47,20 +47,19 @@ namespace XEngine::Gfx::HAL
 
 	class Device;
 
-	enum class CommandAllocatorHandle			: uint32 { Zero = 0 };
-	enum class DeviceMemoryAllocationHandle		: uint32 { Zero = 0 };
-	enum class BufferHandle						: uint32 { Zero = 0 };
-	enum class TextureHandle					: uint32 { Zero = 0 };
-	enum class DescriptorSetLayoutHandle		: uint32 { Zero = 0 };
-	enum class PipelineLayoutHandle				: uint32 { Zero = 0 };
-	enum class PipelineHandle					: uint32 { Zero = 0 };
-	enum class OutputHandle						: uint32 { Zero = 0 };
+	enum class CommandAllocatorHandle		: uint32 { Zero = 0 };
+	enum class DescriptorAllocatorHandle	: uint32 { Zero = 0 };
+	enum class DeviceMemoryAllocationHandle	: uint32 { Zero = 0 };
+	enum class BufferHandle					: uint32 { Zero = 0 };
+	enum class TextureHandle				: uint32 { Zero = 0 };
+	enum class DescriptorSetLayoutHandle	: uint32 { Zero = 0 };
+	enum class PipelineLayoutHandle			: uint32 { Zero = 0 };
+	enum class PipelineHandle				: uint32 { Zero = 0 };
+	enum class OutputHandle					: uint32 { Zero = 0 };
 
-	enum class DescriptorSetReference			: uint64 { Zero = 0 };
-	enum class DeviceQueueSyncPoint				: uint64 { Zero = 0 };
-	enum class HostSignalToken					: uint64 { Zero = 0 };
-
-	using DescriptorAddress = uint32;
+	enum class DescriptorSet				: uint64 { Zero = 0 };
+	enum class DeviceQueueSyncPoint			: uint64 { Zero = 0 };
+	enum class HostSignalToken				: uint64 { Zero = 0 };
 
 	enum class DeviceQueue : uint8 // Also used as queue index, so should start from 0.
 	{
@@ -341,8 +340,8 @@ namespace XEngine::Gfx::HAL
 
 		void bindConstants(uint64 bindingNameXSH, const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0);
 		void bindBuffer(uint64 bindingNameXSH, BufferBindType bindType, BufferPointer bufferPointer);
-		void bindDescriptorSet(uint64 bindingNameXSH, DescriptorSetReference descriptorSetReference);
-		void bindDescriptorArray(uint64 bindingNameXSH, DescriptorAddress arrayStartAddress);
+		void bindDescriptorSet(uint64 bindingNameXSH, DescriptorSet descriptorSet);
+		//void bindDescriptorArray(uint64 bindingNameXSH, ...);
 
 		void clearColorRenderTarget(uint8 colorRenderTargetIndex, const float32* color);
 		void clearDepthStencilRenderTarget(bool clearDepth, bool clearStencil, float32 depth, uint8 stencil);
@@ -392,16 +391,17 @@ namespace XEngine::Gfx::HAL
 
 	struct DeviceSettings
 	{
-		uint16 maxMemoryAllocationCount;
 		uint16 maxCommandAllocatorCount;
+		uint16 maxDescriptorAllocatorCount;
 		uint16 maxCommandListCount;
+		uint16 maxMemoryAllocationCount;
 		uint16 maxResourceCount;
 		uint16 maxDescriptorSetLayoutCount;
 		uint16 maxPipelineLayoutCount;
 		uint16 maxPipelineCount;
 		uint16 maxOutputCount;
 
-		uint32 descriptorPoolSize;
+		uint32 bindlessDescriptorPoolSize;
 	};
 
 	/*class PhysicalDevice
@@ -453,6 +453,10 @@ namespace XEngine::Gfx::HAL
 			inline EntryType& resolveHandle(uint32 handle, uint16* outEntryIndex = nullptr);
 			inline const EntryType& resolveHandle(uint32 handle, uint16* outEntryIndex = nullptr) const;
 
+			inline EntryType& getEntryByIndex(uint16 entryIndex);
+			inline const EntryType& getEntryByIndex(uint16 entryIndex) const;
+			inline bool isEntryAllocated(uint16 entryIndex) const;
+
 			inline uint16 getCapacity() const { return capacity; }
 			inline uint16 getAllocatedEntryCount() const { return committedEntryCount - freelistLength; }
 
@@ -464,6 +468,7 @@ namespace XEngine::Gfx::HAL
 		struct PoolEntryBase;
 
 		struct CommandAllocator;
+		struct DescriptorAllocator;
 		struct CommandList;
 		struct MemoryAllocation;
 		struct Resource;
@@ -472,7 +477,7 @@ namespace XEngine::Gfx::HAL
 		struct Pipeline;
 		struct Output;
 
-		struct DecomposedDescriptorSetReference;
+		static constexpr uint32 DescriptorAllocatorChunkSize = 1024;
 
 	private:
 		ID3D12Device10* d3dDevice = nullptr;
@@ -493,6 +498,7 @@ namespace XEngine::Gfx::HAL
 		uint16 dsvDescriptorSize = 0;
 
 		Pool<CommandAllocator> commandAllocatorPool;
+		Pool<DescriptorAllocator> descriptorAllocatorPool;
 		Pool<CommandList> commandListPool;
 		Pool<MemoryAllocation> memoryAllocationPool;
 		Pool<Resource> resourcePool;
@@ -501,16 +507,9 @@ namespace XEngine::Gfx::HAL
 		Pool<Pipeline> pipelinePool;
 		Pool<Output> outputPool;
 
-		uint32 descriptorPoolSize = 0;
-
-		uint8 descriptorSetReferenceMagicCounter = 0;
+		uint32 bindlessDescriptorPoolSize = 0;
 
 	private:
-		static inline DescriptorSetReference ComposeDescriptorSetReference(DescriptorSetLayoutHandle descriptorSetLayoutHandle,
-			uint32 baseDescriptorIndex, uint8 descriptorSetMagic);
-		static inline void DecomposeDescriptorSetReference(DescriptorSetReference descriptorSetReference,
-			DescriptorSetLayoutHandle& outDescriptorSetLayoutHandle, uint32& outBaseDescriptorIndex, uint8& outDescriptorSetMagic);
-
 		static consteval uint8 GetDeviceQueueSyncPointSignalValueBitCount();
 		static inline DeviceQueueSyncPoint ComposeDeviceQueueSyncPoint(uint8 queueIndex, uint64 signalValue);
 		static inline void DecomposeDeviceQueueSyncPoint(DeviceQueueSyncPoint syncPoint, uint8& outQueueIndex, uint64& outSignalValue);
@@ -518,8 +517,15 @@ namespace XEngine::Gfx::HAL
 		static uint32 CalculateTextureSubresourceIndex(const TextureDesc& textureDesc, const TextureSubresource& textureSubresource);
 
 	private:
-		inline bool isDeviceSignalValueReached(const Queue& queue, uint64 signalValue, uint8 signalValueBitCount) const;
+		inline DescriptorSet composeDescriptorSetReference(DescriptorSetLayoutHandle descriptorSetLayoutHandle,
+			uint32 baseDescriptorIndex, uint16 descriptorAllocatorIndex, uint8 descriptorAllocatorResetCounter);
+		inline void decomposeDescriptorSetReference(DescriptorSet descriptorSet,
+			const DescriptorSetLayout*& outDescriptorSetLayout, uint32& outBaseDescriptorIndex) const;
+
 		void updateCommandAllocatorExecutionStatus(CommandAllocator& commandAllocator);
+		void writeDescriptor(uint32 descriptorIndex, const ResourceView& resourceView);
+
+		inline bool isDeviceSignalValueReached(const Queue& queue, uint64 signalValue, uint8 signalValueBitCount) const;
 
 	public:
 		Device() = default;
@@ -529,6 +535,9 @@ namespace XEngine::Gfx::HAL
 
 		CommandAllocatorHandle createCommandAllocator();
 		void destroyCommandAllocator(CommandAllocatorHandle commandAllocatorHandle);
+
+		DescriptorAllocatorHandle createDescriptorAllocator();
+		void destroyDescriptorAllocator(DescriptorAllocatorHandle descriptorAllocatorHandle);
 
 		DeviceMemoryAllocationHandle allocateDeviceMemory(uint64 size, bool hostVisible);
 		void releaseDeviceMemory(DeviceMemoryAllocationHandle deviceMemoryHandle);
@@ -563,16 +572,17 @@ namespace XEngine::Gfx::HAL
 		// OutputHandle createVROutput();
 		void destroyOutput(OutputHandle outputHandle);
 
-		DescriptorSetReference createDescriptorSetReference(DescriptorSetLayoutHandle descriptorSetLayoutHandle, DescriptorAddress address);
+		DescriptorSet allocateDescriptorSet(DescriptorAllocatorHandle descriptorAllocatorHandle, DescriptorSetLayoutHandle descriptorSetLayoutHandle);
 
-		void writeDescriptor(DescriptorAddress descriptorAddress, const ResourceView& resourceView);
-		void writeDescriptor(DescriptorSetReference descriptorSetReference, uint64 bindingNameXSH, const ResourceView& resourceView);
+		void writeDescriptorSet(DescriptorSet descriptorSet, uint64 bindingNameXSH, const ResourceView& resourceView);
+		void writeBindlessDescriptor(uint32 bindlessDescriptorIndex, const ResourceView& resourceView);
 
 		void openCommandList(HAL::CommandList& commandList, CommandAllocatorHandle commandAllocatorHandle, CommandListType type = CommandListType::Graphics);
 		void closeCommandList(HAL::CommandList& commandList);
 		void discardCommandList(HAL::CommandList& commandList);
 
 		void resetCommandAllocator(CommandAllocatorHandle commandAllocatorHandle);
+		void resetDescriptorAllocator(DescriptorAllocatorHandle descriptorAllocatorHandle);
 
 		void submitCommandList(DeviceQueue deviceQueue, HAL::CommandList& commandList);
 		void submitOutputFlip(DeviceQueue deviceQueue, OutputHandle outputHandle);

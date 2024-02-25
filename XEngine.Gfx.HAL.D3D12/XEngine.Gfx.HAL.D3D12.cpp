@@ -125,6 +125,14 @@ struct Device::CommandAllocator : PoolEntryBase
 	bool hasOpenCommandList;
 };
 
+struct Device::DescriptorAllocator : PoolEntryBase
+{
+	// NOTE: This is temporary solution and it is hacky AF. Should be replaced with list of chunks per allocator.
+	uint32 srvHeapChunkOffset;
+	uint16 allocatedDescriptorCount;
+	uint8 resetCounter;
+};
+
 struct Device::CommandList : PoolEntryBase
 {
 	ID3D12GraphicsCommandList7* d3dCommandList;
@@ -174,13 +182,6 @@ struct Device::Output : PoolEntryBase
 {
 	IDXGISwapChain4* dxgiSwapChain;
 	TextureHandle backBuffers[OutputBackBufferCount];
-};
-
-struct Device::DecomposedDescriptorSetReference
-{
-	const DescriptorSetLayout& descriptorSetLayout;
-	uint32 baseDescriptorIndex;
-	uint32 descriptorSetGeneration;
 };
 
 
@@ -476,20 +477,17 @@ void CommandList::bindBuffer(uint64 bindingNameXSH, BufferBindType bindType, Buf
 		XEAssertUnreachableCode();
 }
 
-void CommandList::bindDescriptorSet(uint64 bindingNameXSH, DescriptorSetReference descriptorSetReference)
+void CommandList::bindDescriptorSet(uint64 bindingNameXSH, DescriptorSet descriptorSet)
 {
 	XEAssert(isOpen);
 
 	const BindingResolveResult resolvedBinding = ResolveBindingByNameXSH(device, currentPipelineLayoutHandle, bindingNameXSH);
 	XEAssert(resolvedBinding.type == PipelineBindingType::DescriptorSet);
 
-	DescriptorSetLayoutHandle descriptorSetLayoutHandle = DescriptorSetLayoutHandle::Zero;
+	const Device::DescriptorSetLayout* descriptorSetLayout = nullptr;
 	uint32 baseDescriptorIndex = 0;
-	uint8 descriptorSetMagic = 0;
-	Device::DecomposeDescriptorSetReference(descriptorSetReference, descriptorSetLayoutHandle, baseDescriptorIndex, descriptorSetMagic);
-	const Device::DescriptorSetLayout& descriptorSetLayout = device->descriptorSetLayoutPool.resolveHandle(uint32(descriptorSetLayoutHandle));
-
-	XEAssert(descriptorSetLayout.sourceHash == resolvedBinding.descriptorSetLayoutSourceHash);
+	device->decomposeDescriptorSetReference(descriptorSet, descriptorSetLayout, baseDescriptorIndex);
+	XEAssert(descriptorSetLayout->sourceHash == resolvedBinding.descriptorSetLayoutSourceHash);
 
 	const uint64 descriptorTableGPUPtr = device->shaderVisbileSRVHeapGPUPtr + baseDescriptorIndex * device->srvDescriptorSize;
 
@@ -754,14 +752,15 @@ void CommandList::copyBufferTexture(CopyBufferTextureDirection direction,
 //		Device index(?)		0x .F..'....
 //		Signature			0x F...'....
 
-template<> constexpr uint8 Device::Pool<Device::CommandAllocator>			::GetHandleSignature() { return 1; }
-template <> constexpr uint8 Device::Pool<Device::CommandList>				::GetHandleSignature() { return 2; }
-template <> constexpr uint8 Device::Pool<Device::MemoryAllocation>			::GetHandleSignature() { return 3; }
-template <> constexpr uint8 Device::Pool<Device::Resource>					::GetHandleSignature() { return 4; }
-template <> constexpr uint8 Device::Pool<Device::DescriptorSetLayout>		::GetHandleSignature() { return 5; }
-template <> constexpr uint8 Device::Pool<Device::PipelineLayout>			::GetHandleSignature() { return 6; }
-template <> constexpr uint8 Device::Pool<Device::Pipeline>					::GetHandleSignature() { return 7; }
-template <> constexpr uint8 Device::Pool<Device::Output>					::GetHandleSignature() { return 8; }
+template <> constexpr uint8 Device::Pool<Device::CommandAllocator>			::GetHandleSignature() { return 1; }
+template <> constexpr uint8 Device::Pool<Device::DescriptorAllocator>		::GetHandleSignature() { return 2; }
+template <> constexpr uint8 Device::Pool<Device::CommandList>				::GetHandleSignature() { return 3; }
+template <> constexpr uint8 Device::Pool<Device::MemoryAllocation>			::GetHandleSignature() { return 4; }
+template <> constexpr uint8 Device::Pool<Device::Resource>					::GetHandleSignature() { return 5; }
+template <> constexpr uint8 Device::Pool<Device::DescriptorSetLayout>		::GetHandleSignature() { return 6; }
+template <> constexpr uint8 Device::Pool<Device::PipelineLayout>			::GetHandleSignature() { return 7; }
+template <> constexpr uint8 Device::Pool<Device::Pipeline>					::GetHandleSignature() { return 8; }
+template <> constexpr uint8 Device::Pool<Device::Output>					::GetHandleSignature() { return 9; }
 
 template <typename EntryType>
 inline void Device::Pool<EntryType>::initialize(EntryType* buffer, uint16 capacity)
@@ -793,6 +792,7 @@ inline EntryType& Device::Pool<EntryType>::allocate(uint32& outHandle, uint16* o
 	}
 
 	EntryType& entry = buffer[entryIndex];
+	XEAssert(!entry.isAllocated);
 	entry.isAllocated = true;
 
 	outHandle = ComposeHandle(entryIndex, entry.handleGeneration);
@@ -807,7 +807,7 @@ inline void Device::Pool<EntryType>::release(uint32 handle)
 {
 	const uint16 entryIndex = resolveHandleToEntryIndex(handle);
 	EntryType& entry = buffer[entryIndex];
-	XAssert(entry.isAllocated);
+	XEAssert(entry.isAllocated);
 	entry.isAllocated = false;
 	entry.handleGeneration++;
 	entry.freelistNextIdx = freelistHeadIdx;
@@ -819,13 +819,11 @@ inline void Device::Pool<EntryType>::release(uint32 handle)
 template <typename EntryType>
 inline uint16 Device::Pool<EntryType>::resolveHandleToEntryIndex(uint32 handle) const
 {
-	XEAssert(handle);
-	const uint8 signature = uint8(handle >> 28);
-	const uint8 generation = GetHandleGeneration(handle);
 	const uint16 entryIndex = GetHandleEntryIndex(handle);
-	XEAssert(signature == GetHandleSignature());
+	XEAssert(uint8(handle >> 28) == GetHandleSignature());
 	XEAssert(entryIndex < committedEntryCount);
-	XEAssert(generation == buffer[entryIndex].handleGeneration);
+	XEAssert(GetHandleGeneration(handle) == buffer[entryIndex].handleGeneration);
+	XEAssert(buffer[entryIndex].isAllocated);
 	return entryIndex;
 }
 
@@ -848,6 +846,27 @@ inline const EntryType& Device::Pool<EntryType>::resolveHandle(uint32 handle, ui
 }
 
 template <typename EntryType>
+inline EntryType& Device::Pool<EntryType>::getEntryByIndex(uint16 entryIndex)
+{
+	XEAssert(entryIndex < committedEntryCount);
+	return buffer[entryIndex];
+}
+
+template <typename EntryType>
+inline const EntryType& Device::Pool<EntryType>::getEntryByIndex(uint16 entryIndex) const
+{
+	XEAssert(entryIndex < committedEntryCount);
+	return buffer[entryIndex];
+}
+
+template <typename EntryType>
+inline bool Device::Pool<EntryType>::isEntryAllocated(uint16 entryIndex) const
+{
+	XEAssert(entryIndex < committedEntryCount);
+	return buffer[entryIndex].isAllocated;
+}
+
+template <typename EntryType>
 inline uint8 Device::Pool<EntryType>::GetHandleGeneration(uint32 handle) { return uint8(handle >> 16); }
 
 template <typename EntryType>
@@ -859,57 +878,8 @@ inline uint32 Device::Pool<EntryType>::ComposeHandle(uint16 entryIndex, uint8 ha
 	return (uint32(GetHandleSignature()) << 28) | (uint32(handleGeneration) << 16) | uint32(entryIndex);
 }
 
+
 // Device //////////////////////////////////////////////////////////////////////////////////////////
-
-// DescriptorSetReference structure:
-//		Base descriptor index					0x ....'....'...F'FFFF
-//		Descriptor set layout index				0x ....'...F'FFF.'....
-//		Descriptor set layout handle generation	0x ....'.FF.'....'....
-//		Descriptor set magic					0x ...F'F...'....'....
-//		Checksum								0x .FF.'....'....'....
-//		Signature								0x F...'....'....'....
-
-inline DescriptorSetReference Device::ComposeDescriptorSetReference(DescriptorSetLayoutHandle descriptorSetLayoutHandle,
-	uint32 baseDescriptorIndex, uint8 descriptorSetMagic)
-{
-	const uint8 dslHandleGeneration = Pool<DescriptorSetLayout>::GetHandleGeneration(uint32(descriptorSetLayoutHandle));
-	const uint16 dslPoolEntryIndex = Pool<DescriptorSetLayout>::GetHandleEntryIndex(uint32(descriptorSetLayoutHandle));
-	const uint8 checksum = 0x69; // TODO: Proper checksum.
-
-	XEAssert((baseDescriptorIndex & ~0x000F'FFFF) == 0);
-
-	uint64 result = 0;
-	result |= baseDescriptorIndex;
-	result |= uint64(dslPoolEntryIndex) << 20;
-	result |= uint64(dslHandleGeneration) << 36;
-	result |= uint64(descriptorSetMagic) << 44;
-	result |= uint64(checksum) << 52;
-	result |= 0xD000'0000'0000'0000;
-
-	return DescriptorSetReference(result);
-}
-
-inline void Device::DecomposeDescriptorSetReference(DescriptorSetReference descriptorSetReference,
-	DescriptorSetLayoutHandle& outDescriptorSetLayoutHandle, uint32& outBaseDescriptorIndex, uint8& outDescriptorSetMagic)
-{
-	const uint64 refU64 = uint64(descriptorSetReference);
-
-	const uint32 baseDescriptorIndex = uint32(refU64) & 0x000F'FFFF;
-	const uint16 dslPoolEntryIndex = uint16(refU64 >> 20);
-	const uint8 dslHandleGeneration = uint8(refU64 >> 36);
-	const uint8 descriptorSetMagic = uint8(refU64 >> 44);
-	const uint8 checksum = uint8(refU64 >> 52);
-	const uint8 signature = uint8(refU64 >> 60);
-
-	const uint8 checksumVerification = 0x69; // TODO: Proper checksum.
-	XEAssert(signature == 0xD);
-	XEAssert(checksum == checksumVerification);
-
-	outDescriptorSetLayoutHandle = DescriptorSetLayoutHandle(Pool<DescriptorSetLayout>::ComposeHandle(dslPoolEntryIndex, dslHandleGeneration));
-	outBaseDescriptorIndex = baseDescriptorIndex;
-	outDescriptorSetMagic = descriptorSetMagic;
-}
-
 
 // DeviceQueueSyncPoint structure:
 //		Fence counter	0x ....'FFFF'FFFF'FFFF
@@ -961,7 +931,6 @@ inline void Device::DecomposeDeviceQueueSyncPoint(DeviceQueueSyncPoint syncPoint
 	outSignalValue = signalValue;
 }
 
-
 uint32 Device::CalculateTextureSubresourceIndex(const TextureDesc& textureDesc, const TextureSubresource& textureSubresource)
 {
 	XEAssert(textureSubresource.mipLevel < textureDesc.mipLevelCount);
@@ -982,17 +951,63 @@ uint32 Device::CalculateTextureSubresourceIndex(const TextureDesc& textureDesc, 
 	return textureSubresource.mipLevel + (textureSubresource.arrayIndex * mipLevelCount) + (planeIndex * mipLevelCount * arraySize);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
-inline bool Device::isDeviceSignalValueReached(const Queue& queue, uint64 signalValue, uint8 signalValueBitCount) const
+// DescriptorSet reference structure:
+//		Base descriptor index					0x ....'....'...F'FFFF
+//		Descriptor set layout index				0x ....'....'FFF.'....
+//		Descriptor set layout handle generation	0x ....'..FF'....'....
+//		Descriptor allocator index				0x ....'3F..'....'....
+//		Descriptor allocator reset counter		0x ...F'C...'....'....
+//		Checksum								0x .FF.'....'....'....
+//		Signature								0x F...'....'....'....
+
+inline DescriptorSet Device::composeDescriptorSetReference(DescriptorSetLayoutHandle descriptorSetLayoutHandle,
+	uint32 baseDescriptorIndex, uint16 descriptorAllocatorIndex, uint8 descriptorAllocatorResetCounter)
 {
-	const uint64 mask = (uint64(1) << signalValueBitCount) - 1;
-	const uint64 halfRange = uint64(-1) << (signalValueBitCount - 1);
-	XEAssert((signalValue & ~mask) == 0);
+	const uint8 dslHandleGeneration = Pool<DescriptorSetLayout>::GetHandleGeneration(uint32(descriptorSetLayoutHandle));
+	const uint16 dslPoolEntryIndex = Pool<DescriptorSetLayout>::GetHandleEntryIndex(uint32(descriptorSetLayoutHandle));
+	const uint8 checksum = 0x69; // TODO: Proper checksum.
 
-	if ((queue.deviceSignalReachedValue & mask) - signalValue < halfRange)
-		return true;
-	((Queue&)queue).deviceSignalReachedValue = queue.d3dDeviceSignalFence->GetCompletedValue();
-	return (queue.deviceSignalReachedValue & mask) - signalValue < halfRange;
+	XEAssert((baseDescriptorIndex & ~0x000F'FFFF) == 0);
+	XEAssert((dslPoolEntryIndex & ~0x0FFF) == 0);
+	XEAssert((descriptorAllocatorIndex & ~0x003F) == 0);
+
+	uint64 result = 0;
+	result |= baseDescriptorIndex;
+	result |= uint64(dslPoolEntryIndex) << 20;
+	result |= uint64(dslHandleGeneration) << 32;
+	result |= uint64(descriptorAllocatorIndex) << 40;
+	result |= uint64(descriptorAllocatorResetCounter & 0x3F) << 46;
+	result |= uint64(checksum) << 52;
+	result |= 0xD000'0000'0000'0000;
+
+	return DescriptorSet(result);
+}
+
+inline void Device::decomposeDescriptorSetReference(DescriptorSet descriptorSet,
+	const DescriptorSetLayout*& outDescriptorSetLayout, uint32& outBaseDescriptorIndex) const
+{
+	const uint64 refU64 = uint64(descriptorSet);
+
+	const uint32 baseDescriptorIndex				= uint32(refU64      ) & 0x000F'FFFF;
+	const uint16 dslPoolEntryIndex					= uint16(refU64 >> 20) & 0x0FFF;
+	const uint8  dslHandleGeneration				= uint8 (refU64 >> 32);
+	const uint16 descriptorAllocatorIndex			= uint16(refU64 >> 40) & 0x003F;
+	const uint8  descriptorAllocatorResetCounter	= uint8 (refU64 >> 46) & 0x3F;
+	const uint8  checksum							= uint8 (refU64 >> 52);
+	const uint8  signature							= uint8 (refU64 >> 60);
+
+	const uint8 checksumVerification = 0x69; // TODO: Proper checksum.
+	XEAssert(signature == 0xD);
+	XEAssert(checksum == checksumVerification);
+	XEAssert(descriptorAllocatorPool.isEntryAllocated(descriptorAllocatorIndex));
+	XEAssert((descriptorAllocatorPool.getEntryByIndex(descriptorAllocatorIndex).resetCounter & 0x3F) == descriptorAllocatorResetCounter);
+
+	const uint32 descriptorSetLayoutHandle = Pool<DescriptorSetLayout>::ComposeHandle(dslPoolEntryIndex, dslHandleGeneration);
+
+	outDescriptorSetLayout = &descriptorSetLayoutPool.resolveHandle(descriptorSetLayoutHandle);
+	outBaseDescriptorIndex = baseDescriptorIndex;
 }
 
 void Device::updateCommandAllocatorExecutionStatus(CommandAllocator& commandAllocator)
@@ -1017,6 +1032,97 @@ void Device::updateCommandAllocatorExecutionStatus(CommandAllocator& commandAllo
 	XEAssert(commandAllocator.queueExecutionMask == 0);
 }
 
+void Device::writeDescriptor(uint32 descriptorIndex, const ResourceView& resourceView)
+{
+	const Resource& resource = resourcePool.resolveHandle(resourceView.resourceHandle);
+	XEAssert(resource.d3dResource);
+
+	const uint64 descriptorPtr = shaderVisbileSRVHeapCPUPtr + descriptorIndex * srvDescriptorSize;
+	const D3D12_CPU_DESCRIPTOR_HANDLE descriptorHandle = D3D12Helpers::CPUDescriptorHandle(descriptorPtr);
+
+	XTODO(__FUNCTION__ " not implemented");
+
+	if (resourceView.type == ResourceViewType::Buffer)
+	{
+		XEAssert(resource.type == ResourceType::Buffer);
+
+		// TODO: Check if format is supported to use with texel buffers.
+		const DXGI_FORMAT dxgiFormat = TranslateTexelViewFormatToDXGIFormat(resourceView.buffer.format);
+
+		XEMasterAssertUnreachableCode();
+#if 0
+		if (resourceView.buffer.writable)
+		{
+			D3D12_UNORDERED_ACCESS_VIEW_DESC d3dUAVDesc = {};
+			d3dUAVDesc.Format = dxgiFormat;
+			d3dUAVDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+			d3dUAVDesc.Buffer.FirstElement = 0;
+			d3dUAVDesc.Buffer.NumElements = ...;
+			d3dUAVDesc.Buffer.StructureByteStride = ...;
+			d3dUAVDesc.Buffer.CounterOffsetInBytes = 0;
+			d3dUAVDesc.Buffer.Flags = ...;
+
+			d3dDevice->CreateUnorderedAccessView(resource.d3dResource, nullptr, &d3dUAVDesc, descriptorHandle);
+		}
+		else
+		{
+			D3D12_SHADER_RESOURCE_VIEW_DESC d3dSRVDesc = {};
+			d3dSRVDesc.Format = dxgiFormat;
+			d3dSRVDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+			d3dSRVDesc.Shader4ComponentMapping = ...;
+			d3dSRVDesc.Buffer.FirstElement = 0;
+			d3dSRVDesc.Buffer.NumElements = ...;
+			d3dSRVDesc.Buffer.StructureByteStride = ...;
+			d3dSRVDesc.Buffer.Flags = ...;
+
+			d3dDevice->CreateShaderResourceView(resource.d3dResource, &d3dSRVDesc, descriptorHandle);
+		}
+#endif
+	}
+	else if (resourceView.type == ResourceViewType::Texture)
+	{
+		XEAssert(resource.type == ResourceType::Texture);
+
+		// TODO: Check compatibility with TextureFormat.
+		const DXGI_FORMAT dxgiFormat = TranslateTexelViewFormatToDXGIFormat(resourceView.texture.format);
+
+		XEMasterAssertUnreachableCode();
+#if 0
+		if (resourceView.texture.writable)
+		{
+			D3D12_UNORDERED_ACCESS_VIEW_DESC d3dUAVDesc = {};
+			d3dUAVDesc.Format = dxgiFormat;
+			// ...
+
+			d3dDevice->CreateUnorderedAccessView(resource.d3dResource, nullptr, &d3dUAVDesc, descriptorHandle);
+		}
+		else
+		{
+			D3D12_SHADER_RESOURCE_VIEW_DESC d3dSRVDesc = {};
+			d3dSRVDesc.Format = dxgiFormat;
+			// ...
+
+			d3dDevice->CreateShaderResourceView(resource.d3dResource, &d3dSRVDesc, descriptorHandle);
+		}
+#endif
+	}
+	else
+		XEAssertUnreachableCode();
+}
+
+inline bool Device::isDeviceSignalValueReached(const Queue& queue, uint64 signalValue, uint8 signalValueBitCount) const
+{
+	const uint64 mask = (uint64(1) << signalValueBitCount) - 1;
+	const uint64 halfRange = uint64(-1) << (signalValueBitCount - 1);
+	XEAssert((signalValue & ~mask) == 0);
+
+	if ((queue.deviceSignalReachedValue & mask) - signalValue < halfRange)
+		return true;
+	((Queue&)queue).deviceSignalReachedValue = queue.d3dDeviceSignalFence->GetCompletedValue();
+	return (queue.deviceSignalReachedValue & mask) - signalValue < halfRange;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Device::initialize(/*const PhysicalDevice& physicalDevice, */const DeviceSettings& settings)
 {
@@ -1084,13 +1190,16 @@ void Device::initialize(/*const PhysicalDevice& physicalDevice, */const DeviceSe
 
 	// Init descriptor heaps.
 	{
+		const uint32 srvHeapSize = settings.bindlessDescriptorPoolSize +
+			settings.maxDescriptorAllocatorCount * DescriptorAllocatorChunkSize;
+
 		// Each command list has own piece of RTV/DSV heap.
 		const uint16 rtvHeapSize = settings.maxCommandListCount * MaxColorRenderTargetCount;
 		const uint16 dsvHeapSize = settings.maxCommandListCount * 1;
 
 		const D3D12_DESCRIPTOR_HEAP_DESC d3dShaderVisbileSRVHeapDesc =
 			D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
-				settings.descriptorPoolSize, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
+				srvHeapSize, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
 		const D3D12_DESCRIPTOR_HEAP_DESC d3dRTVHeapDesc =
 			D3D12Helpers::DescriptorHeapDesc(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, rtvHeapSize);
 		const D3D12_DESCRIPTOR_HEAP_DESC d3dDSVHeapDesc =
@@ -1153,9 +1262,7 @@ void Device::initialize(/*const PhysicalDevice& physicalDevice, */const DeviceSe
 		outputPool.initialize				((Output*)				(poolsMemory + outputPoolMemOffset),				settings.maxOutputCount);
 	}
 
-	descriptorPoolSize = settings.descriptorPoolSize;
-
-	descriptorSetReferenceMagicCounter = 0;
+	bindlessDescriptorPoolSize = settings.bindlessDescriptorPoolSize;
 }
 
 CommandAllocatorHandle Device::createCommandAllocator()
@@ -1185,6 +1292,32 @@ void Device::destroyCommandAllocator(CommandAllocatorHandle commandAllocatorHand
 	commandAllocator.d3dCommandAllocator->Release();
 
 	commandAllocatorPool.release(uint32(commandAllocatorHandle));
+}
+
+DescriptorAllocatorHandle Device::createDescriptorAllocator()
+{
+	DescriptorAllocatorHandle descriptorAllocatorHandle = DescriptorAllocatorHandle::Zero;
+	uint16 descriptorAllocatorIndex = 0;
+	DescriptorAllocator& descriptorAllocator = descriptorAllocatorPool.allocate((uint32&)descriptorAllocatorHandle, &descriptorAllocatorIndex);
+
+	descriptorAllocator.srvHeapChunkOffset = bindlessDescriptorPoolSize + descriptorAllocatorIndex * DescriptorAllocatorChunkSize;
+	descriptorAllocator.allocatedDescriptorCount = 0;
+	descriptorAllocator.resetCounter = 0;
+
+	return descriptorAllocatorHandle;
+}
+
+void Device::destroyDescriptorAllocator(DescriptorAllocatorHandle descriptorAllocatorHandle)
+{
+	DescriptorAllocator& descriptorAllocator = descriptorAllocatorPool.resolveHandle(uint32(descriptorAllocatorHandle));
+
+	descriptorAllocator.allocatedDescriptorCount = 0;
+	descriptorAllocator.resetCounter++;	// We need this, as we do not store descriptor allocator handle generation in descriptor
+										// set ref, but we need to validate allocator somehow.
+
+	XEMasterAssertUnreachableCode(); // Not implemented.
+
+	descriptorAllocatorPool.release(uint32(descriptorAllocatorHandle));
 }
 
 DeviceMemoryAllocationHandle Device::allocateDeviceMemory(uint64 size, bool hostVisible)
@@ -1752,110 +1885,45 @@ OutputHandle Device::createWindowOutput(uint16 width, uint16 height, void* platf
 	return outputHandle;
 }
 
-DescriptorSetReference Device::createDescriptorSetReference(
-	DescriptorSetLayoutHandle descriptorSetLayoutHandle, DescriptorAddress address)
+DescriptorSet Device::allocateDescriptorSet(DescriptorAllocatorHandle descriptorAllocatorHandle,
+	DescriptorSetLayoutHandle descriptorSetLayoutHandle)
 {
-	descriptorSetReferenceMagicCounter++;
-	return ComposeDescriptorSetReference(descriptorSetLayoutHandle, uint32(address), descriptorSetReferenceMagicCounter);
+	uint16 descriptorAllocatorIndex = 0;
+	DescriptorAllocator& descriptorAllocator = descriptorAllocatorPool.resolveHandle(uint32(descriptorAllocatorHandle), &descriptorAllocatorIndex);
+
+	const uint16 descriptorCount = descriptorSetLayoutPool.resolveHandle(uint32(descriptorSetLayoutHandle)).bindingCount;
+	const uint32 baseDescriptorIndex = descriptorAllocator.srvHeapChunkOffset + descriptorAllocator.allocatedDescriptorCount;
+
+	descriptorAllocator.allocatedDescriptorCount += descriptorCount;
+	XEAssert(descriptorAllocator.allocatedDescriptorCount <= DescriptorAllocatorChunkSize);
+
+	return composeDescriptorSetReference(descriptorSetLayoutHandle, baseDescriptorIndex, descriptorAllocatorIndex, descriptorAllocator.resetCounter);
 }
 
-void Device::writeDescriptor(DescriptorAddress descriptorAddress, const ResourceView& resourceView)
+void Device::writeDescriptorSet(DescriptorSet descriptorSet, uint64 bindingNameXSH, const ResourceView& resourceView)
 {
-	const Resource& resource = resourcePool.resolveHandle(resourceView.resourceHandle);
-	XEAssert(resource.d3dResource);
-
-	const uint64 descriptorPtr = shaderVisbileSRVHeapCPUPtr + uint32(descriptorAddress) * srvDescriptorSize;
-	const D3D12_CPU_DESCRIPTOR_HANDLE descriptorHandle = D3D12Helpers::CPUDescriptorHandle(descriptorPtr);
-
-	XTODO(__FUNCTION__ " not implemented");
-
-	if (resourceView.type == ResourceViewType::Buffer)
-	{
-		XEAssert(resource.type == ResourceType::Buffer);
-
-		// TODO: Check if format is supported to use with texel buffers.
-		const DXGI_FORMAT dxgiFormat = TranslateTexelViewFormatToDXGIFormat(resourceView.buffer.format);
-
-		XEMasterAssertUnreachableCode();
-#if 0
-		if (resourceView.buffer.writable)
-		{
-			D3D12_UNORDERED_ACCESS_VIEW_DESC d3dUAVDesc = {};
-			d3dUAVDesc.Format = dxgiFormat;
-			d3dUAVDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-			d3dUAVDesc.Buffer.FirstElement = 0;
-			d3dUAVDesc.Buffer.NumElements = ...;
-			d3dUAVDesc.Buffer.StructureByteStride = ...;
-			d3dUAVDesc.Buffer.CounterOffsetInBytes = 0;
-			d3dUAVDesc.Buffer.Flags = ...;
-
-			d3dDevice->CreateUnorderedAccessView(resource.d3dResource, nullptr, &d3dUAVDesc, descriptorHandle);
-		}
-		else
-		{
-			D3D12_SHADER_RESOURCE_VIEW_DESC d3dSRVDesc = {};
-			d3dSRVDesc.Format = dxgiFormat;
-			d3dSRVDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-			d3dSRVDesc.Shader4ComponentMapping = ...;
-			d3dSRVDesc.Buffer.FirstElement = 0;
-			d3dSRVDesc.Buffer.NumElements = ...;
-			d3dSRVDesc.Buffer.StructureByteStride = ...;
-			d3dSRVDesc.Buffer.Flags = ...;
-
-			d3dDevice->CreateShaderResourceView(resource.d3dResource, &d3dSRVDesc, descriptorHandle);
-		}
-#endif
-	}
-	else if (resourceView.type == ResourceViewType::Texture)
-	{
-		XEAssert(resource.type == ResourceType::Texture);
-
-		// TODO: Check compatibility with TextureFormat.
-		const DXGI_FORMAT dxgiFormat = TranslateTexelViewFormatToDXGIFormat(resourceView.texture.format);
-
-		XEMasterAssertUnreachableCode();
-#if 0
-		if (resourceView.texture.writable)
-		{
-			D3D12_UNORDERED_ACCESS_VIEW_DESC d3dUAVDesc = {};
-			d3dUAVDesc.Format = dxgiFormat;
-			// ...
-
-			d3dDevice->CreateUnorderedAccessView(resource.d3dResource, nullptr, &d3dUAVDesc, descriptorHandle);
-		}
-		else
-		{
-			D3D12_SHADER_RESOURCE_VIEW_DESC d3dSRVDesc = {};
-			d3dSRVDesc.Format = dxgiFormat;
-			// ...
-
-			d3dDevice->CreateShaderResourceView(resource.d3dResource, &d3dSRVDesc, descriptorHandle);
-		}
-#endif
-	}
-	else
-		XEAssertUnreachableCode();
-}
-
-void Device::writeDescriptor(DescriptorSetReference descriptorSetReference, uint64 bindingNameXSH, const ResourceView& resourceView)
-{
-	DescriptorSetLayoutHandle descriptorSetLayoutHandle = DescriptorSetLayoutHandle::Zero;
+	const Device::DescriptorSetLayout* descriptorSetLayout = nullptr;
 	uint32 baseDescriptorIndex = 0;
-	uint8 descriptorSetMagic = 0;
-	DecomposeDescriptorSetReference(descriptorSetReference, descriptorSetLayoutHandle, baseDescriptorIndex, descriptorSetMagic);
-	const DescriptorSetLayout& descriptorSetLayout = descriptorSetLayoutPool.resolveHandle(uint32(descriptorSetLayoutHandle));
+	decomposeDescriptorSetReference(descriptorSet, descriptorSetLayout, baseDescriptorIndex);
 
-	for (uint16 i = 0; i < descriptorSetLayout.bindingCount; i++)
+	for (uint16 i = 0; i < descriptorSetLayout->bindingCount; i++)
 	{
-		const BlobFormat::DescriptorSetBindingInfo& binding = descriptorSetLayout.bindings[i];
+		const BlobFormat::DescriptorSetBindingInfo& binding = descriptorSetLayout->bindings[i];
 		if (binding.nameXSH == bindingNameXSH)
 		{
 			// TODO: This is very hacky. Properly calculate descriptor index and check resource view type.
-			writeDescriptor(DescriptorAddress(baseDescriptorIndex + i), resourceView);
+			writeDescriptor(baseDescriptorIndex + i, resourceView);
 			return;
 		}
 	}
 	XEAssertUnreachableCode();
+}
+
+void Device::writeBindlessDescriptor(uint32 bindlessDescriptorIndex, const ResourceView& resourceView)
+{
+	// Bindless descriptor pool is located at the start of SRV heap.
+	XEAssert(bindlessDescriptorIndex < bindlessDescriptorPoolSize);
+	writeDescriptor(bindlessDescriptorIndex, resourceView);
 }
 
 void Device::openCommandList(HAL::CommandList& commandList, CommandAllocatorHandle commandAllocatorHandle, CommandListType type)
@@ -1939,6 +2007,13 @@ void Device::resetCommandAllocator(CommandAllocatorHandle commandAllocatorHandle
 	XEMasterAssert(commandAllocator.queueExecutionMask == 0);
 
 	commandAllocator.d3dCommandAllocator->Reset();
+}
+
+void Device::resetDescriptorAllocator(DescriptorAllocatorHandle descriptorAllocatorHandle)
+{
+	DescriptorAllocator& descriptorAllocator = descriptorAllocatorPool.resolveHandle(uint32(descriptorAllocatorHandle));
+	descriptorAllocator.allocatedDescriptorCount = 0;
+	descriptorAllocator.resetCounter++;
 }
 
 void Device::submitCommandList(DeviceQueue deviceQueue, HAL::CommandList& commandList)

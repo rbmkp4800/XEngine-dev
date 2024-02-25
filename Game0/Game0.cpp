@@ -126,15 +126,16 @@ void Game0::run()
 
 	GfxHAL::DeviceSettings gfxDeviceSettings = {};
 
+	gfxDeviceSettings.maxCommandAllocatorCount = 4;
+	gfxDeviceSettings.maxDescriptorAllocatorCount = 4;
+	gfxDeviceSettings.maxCommandListCount = 4;
 	gfxDeviceSettings.maxMemoryAllocationCount = 1024;
-	gfxDeviceSettings.maxCommandAllocatorCount = 8;
-	gfxDeviceSettings.maxCommandListCount = 8;
 	gfxDeviceSettings.maxResourceCount = 1024;
 	gfxDeviceSettings.maxDescriptorSetLayoutCount = 64;
 	gfxDeviceSettings.maxPipelineLayoutCount = 64;
 	gfxDeviceSettings.maxPipelineCount = 64;
 	gfxDeviceSettings.maxOutputCount = 4;
-	gfxDeviceSettings.descriptorPoolSize = 1024;
+	gfxDeviceSettings.bindlessDescriptorPoolSize = 16;
 
 	gfxDevice.initialize(gfxDeviceSettings);
 	gfxCommandAllocator = gfxDevice.createCommandAllocator();

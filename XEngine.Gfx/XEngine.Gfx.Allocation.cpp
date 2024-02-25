@@ -156,17 +156,6 @@ void CircularAllocatorWithGPUReleaseQueue::enqueueRelease(HAL::DeviceQueueSyncPo
 	}
 }
 
-void TransientDescriptorAllocator::initialize(HAL::Device& device,
-	HAL::DescriptorAddress descriptorPoolBaseAddress, uint8 descriptorPoolSizeLog2)
-{
-	// TODO: State asserts
-	// TODO: Assert that allocator descriptor pool fits into global device descriptor pool.
-
-	baseAllocator.initialize(device, descriptorPoolSizeLog2);
-
-	this->descriptorPoolBaseAddress = descriptorPoolBaseAddress;
-}
-
 TransientUploadMemoryAllocator::~TransientUploadMemoryAllocator()
 {
 	if (uploadMemoryPoolBuffer != HAL::BufferHandle::Zero)

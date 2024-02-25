@@ -6,6 +6,7 @@
 #include <XEngine.Gfx.HAL.D3D12.h>
 
 // TODO: All this code should probably be thread safe or assert single-thread usage.
+// TODO: We removed `TransientDescriptorAllocator` so there is no need to have abstract `CircularAllocatorWithGPUReleaseQueue`.
 
 namespace XEngine::Gfx
 {
@@ -47,23 +48,6 @@ namespace XEngine::Gfx
 		void enqueueRelease(HAL::DeviceQueueSyncPoint syncPoint);
 
 		inline HAL::Device* getDevice() { return device; }
-	};
-
-	class TransientDescriptorAllocator : public XLib::NonCopyable
-	{
-	private:
-		CircularAllocatorWithGPUReleaseQueue baseAllocator;
-
-		HAL::DescriptorAddress descriptorPoolBaseAddress = 0;
-
-	public:
-		TransientDescriptorAllocator() = default;
-		~TransientDescriptorAllocator() = default;
-
-		void initialize(HAL::Device& device, HAL::DescriptorAddress descriptorPoolBaseAddress, uint8 descriptorPoolSizeLog2);
-
-		inline HAL::DescriptorAddress allocate(uint16 size) { return baseAllocator.allocate(size); }
-		inline void enqueueRelease(HAL::DeviceQueueSyncPoint syncPoint) { baseAllocator.enqueueRelease(syncPoint); }
 	};
 
 	struct UploadMemoryAllocationInfo
