@@ -221,7 +221,7 @@ void Game0::run()
 
 		GfxHAL::DepthStencilRenderTarget dsRT = { .texture = gfxDepthTexture, };
 
-		gfxCommandList.setRenderTargets(1, &colorRT, &dsRT);
+		gfxCommandList.bindRenderTargets(1, &colorRT, &dsRT);
 		gfxCommandList.setViewport(0.0f, 0.0f, 1600.0f, 900.0f);
 		gfxCommandList.setScissor(0, 0, 1600, 900);
 

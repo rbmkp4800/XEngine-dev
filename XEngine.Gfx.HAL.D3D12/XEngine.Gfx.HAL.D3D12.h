@@ -31,11 +31,11 @@
 #define XEMasterAssert(cond) XAssert(cond)
 #define XEMasterAssertUnreachableCode() XAssertUnreachableCode()
 
+struct ID3D12Device10;
 struct ID3D12CommandQueue;
+struct ID3D12Fence;
 struct ID3D12DescriptorHeap;
 struct ID3D12GraphicsCommandList7;
-struct ID3D12Device10;
-struct ID3D12Fence;
 
 namespace XEngine::Gfx::HAL
 {
@@ -163,6 +163,83 @@ namespace XEngine::Gfx::HAL
 		Graphics,
 		Compute,
 		Copy,
+	};
+
+	enum class RasterizerFillMode : uint8
+	{
+		Solid = 0,
+		Wireframe,
+	};
+
+	enum class RasterizerCullMode : uint8
+	{
+		None = 0,
+		Front,
+		Back,
+	};
+
+	struct RasterizerState
+	{
+		RasterizerFillMode fillMode;
+		RasterizerCullMode cullMode;
+		// TODO: ...
+	};
+
+	enum class ComparisonFunc : uint8
+	{
+		Never = 0,
+		Always,
+		Equal,
+		NotEqual,
+		Less,
+		LessEqual,
+		Greater,
+		GreaterEqual,
+	};
+
+	struct DepthStencilState
+	{
+		bool depthReadEnable;
+		bool depthWriteEnable;
+		ComparisonFunc depthComparisonFunc;
+		// TODO: Stencil ...
+	};
+
+	enum class BlendFactor : uint8
+	{
+		Zero = 0,
+		One,
+		SrcColor,
+		OneMinusSrcColor,
+		DstColor,
+		OneMinusDstColor,
+		SrcAlpha,
+		OneMinusSrcAlpha,
+		DstAlpha,
+		OneMinusDstAlpha,
+		ConstantColor,
+		OneMinusConstantColor,
+		ConstantAlpha,
+		OneMinusConstantAlpha,
+	};
+
+	enum class BlendOp : uint8
+	{
+		Add = 0,
+		Substract,
+		ReverseSubstract,
+		Min,
+		Max,
+	};
+
+	struct ColorBlendState
+	{
+		BlendFactor srcColorBlendFactor;
+		BlendFactor dstColorBlendFactor;
+		BlendOp colorBlendOp;
+		BlendFactor scrAlphaBlendFactor;
+		BlendFactor dstAlphaBlendFactor;
+		BlendOp alphaBlendOp;
 	};
 
 	struct ColorRenderTarget
@@ -326,14 +403,18 @@ namespace XEngine::Gfx::HAL
 		CommandList() = default;
 		~CommandList();
 
-		void setRenderTargets(uint8 colorRenderTargetCount, const ColorRenderTarget* colorRenderTargets,
-			const DepthStencilRenderTarget* depthStencilRenderTarget = nullptr, bool readOnlyDepth = false, bool readOnlyStencil = false);
-		void setViewport(float32 left, float32 top, float32 right, float32 bottom, float32 minDepth = 0.0f, float32 maxDepth = 1.0f);
-		void setScissor(uint32 left, uint32 top, uint32 right, uint32 bottom);
-
 		void setPipelineType(PipelineType pipelineType);
 		void setPipelineLayout(PipelineLayoutHandle pipelineLayoutHandle);
 		void setPipeline(PipelineHandle pipelineHandle);
+
+		void setViewport(float32 left, float32 top, float32 right, float32 bottom, float32 minDepth = 0.0f, float32 maxDepth = 1.0f);
+		void setScissor(uint32 left, uint32 top, uint32 right, uint32 bottom);
+		void setRasterizerState(const RasterizerState& rasterizerState);
+		void setDepthStencilState(const DepthStencilState& depthStencilState);
+		void setColorBlendState(uint8 colorRenderTargetIndex, const ColorBlendState* colorBlendState = nullptr);
+
+		void bindRenderTargets(uint8 colorRenderTargetCount, const ColorRenderTarget* colorRenderTargets,
+			const DepthStencilRenderTarget* depthStencilRenderTarget = nullptr, bool readOnlyDepth = false, bool readOnlyStencil = false);
 
 		void bindIndexBuffer(BufferPointer bufferPointer, IndexBufferFormat format, uint32 byteSize);
 		void bindVertexBuffer(uint8 bufferIndex, BufferPointer bufferPointer, uint16 stride, uint32 byteSize);

@@ -243,7 +243,80 @@ CommandList::~CommandList()
 	XEMasterAssert(!device && !d3dCommandList && !isOpen); // Command list should be submitted or discarded.
 }
 
-void CommandList::setRenderTargets(uint8 colorRenderTargetCount, const ColorRenderTarget* colorRenderTargets,
+void CommandList::setPipelineType(PipelineType pipelineType)
+{
+	XEAssert(isOpen);
+	if (currentPipelineType == pipelineType)
+		return;
+
+	currentPipelineType = pipelineType;
+	currentPipelineLayoutHandle = PipelineLayoutHandle::Zero;
+}
+
+void CommandList::setPipelineLayout(PipelineLayoutHandle pipelineLayoutHandle)
+{
+	XEAssert(isOpen);
+	XEAssert(pipelineLayoutHandle != PipelineLayoutHandle::Zero);
+
+	if (currentPipelineLayoutHandle == pipelineLayoutHandle)
+		return;
+
+	const Device::PipelineLayout& pipelineLayout = device->pipelineLayoutPool.resolveHandle(uint32(pipelineLayoutHandle));
+
+	if (currentPipelineType == PipelineType::Graphics)
+		d3dCommandList->SetGraphicsRootSignature(pipelineLayout.d3dRootSignature);
+	else if (currentPipelineType == PipelineType::Compute)
+		d3dCommandList->SetComputeRootSignature(pipelineLayout.d3dRootSignature);
+	else
+		XEAssertUnreachableCode();
+
+	currentPipelineLayoutHandle = pipelineLayoutHandle;
+}
+
+void CommandList::setPipeline(PipelineHandle pipelineHandle)
+{
+	XEAssert(isOpen);
+
+	const Device::Pipeline& pipeline = device->pipelinePool.resolveHandle(uint32(pipelineHandle));
+	XEAssert(pipeline.type == currentPipelineType);
+	XEAssert(pipeline.pipelineLayoutHandle == currentPipelineLayoutHandle);
+
+	XEAssert(pipeline.d3dPipelineState);
+	d3dCommandList->SetPipelineState(pipeline.d3dPipelineState);
+}
+
+void CommandList::setViewport(float32 left, float32 top, float32 right, float32 bottom, float32 minDepth, float32 maxDepth)
+{
+	XEAssert(isOpen);
+
+	const D3D12_VIEWPORT d3dViewport = { left, top, right - left, bottom - top, minDepth, maxDepth };
+	d3dCommandList->RSSetViewports(1, &d3dViewport);
+}
+
+void CommandList::setScissor(uint32 left, uint32 top, uint32 right, uint32 bottom)
+{
+	XEAssert(isOpen);
+
+	const D3D12_RECT d3dRect = { LONG(left), LONG(top), LONG(right), LONG(bottom) };
+	d3dCommandList->RSSetScissorRects(1, &d3dRect);
+}
+
+void CommandList::setRasterizerState(const RasterizerState& rasterizerState)
+{
+
+}
+
+void CommandList::setDepthStencilState(const DepthStencilState& depthStencilState)
+{
+
+}
+
+void CommandList::setColorBlendState(uint8 colorRenderTargetIndex, const ColorBlendState* colorBlendState)
+{
+
+}
+
+void CommandList::bindRenderTargets(uint8 colorRenderTargetCount, const ColorRenderTarget* colorRenderTargets,
 	const DepthStencilRenderTarget* depthStencilRenderTarget, bool readOnlyDepth, bool readOnlyStencil)
 {
 	XEAssert(isOpen);
@@ -322,64 +395,6 @@ void CommandList::setRenderTargets(uint8 colorRenderTargetCount, const ColorRend
 
 	setColorRenderTargetCount = colorRenderTargetCount;
 	isDepthStencilRenderTargetSet = depthStencilRenderTarget != nullptr;
-}
-
-void CommandList::setViewport(float32 left, float32 top, float32 right, float32 bottom, float32 minDepth, float32 maxDepth)
-{
-	XEAssert(isOpen);
-
-	const D3D12_VIEWPORT d3dViewport = { left, top, right - left, bottom - top, minDepth, maxDepth };
-	d3dCommandList->RSSetViewports(1, &d3dViewport);
-}
-
-void CommandList::setScissor(uint32 left, uint32 top, uint32 right, uint32 bottom)
-{
-	XEAssert(isOpen);
-
-	const D3D12_RECT d3dRect = { LONG(left), LONG(top), LONG(right), LONG(bottom) };
-	d3dCommandList->RSSetScissorRects(1, &d3dRect);
-}
-
-void CommandList::setPipelineType(PipelineType pipelineType)
-{
-	XEAssert(isOpen);
-	if (currentPipelineType == pipelineType)
-		return;
-
-	currentPipelineType = pipelineType;
-	currentPipelineLayoutHandle = PipelineLayoutHandle::Zero;
-}
-
-void CommandList::setPipelineLayout(PipelineLayoutHandle pipelineLayoutHandle)
-{
-	XEAssert(isOpen);
-	XEAssert(pipelineLayoutHandle != PipelineLayoutHandle::Zero);
-
-	if (currentPipelineLayoutHandle == pipelineLayoutHandle)
-		return;
-
-	const Device::PipelineLayout& pipelineLayout = device->pipelineLayoutPool.resolveHandle(uint32(pipelineLayoutHandle));
-
-	if (currentPipelineType == PipelineType::Graphics)
-		d3dCommandList->SetGraphicsRootSignature(pipelineLayout.d3dRootSignature);
-	else if (currentPipelineType == PipelineType::Compute)
-		d3dCommandList->SetComputeRootSignature(pipelineLayout.d3dRootSignature);
-	else
-		XEAssertUnreachableCode();
-
-	currentPipelineLayoutHandle = pipelineLayoutHandle;
-}
-
-void CommandList::setPipeline(PipelineHandle pipelineHandle)
-{
-	XEAssert(isOpen);
-
-	const Device::Pipeline& pipeline = device->pipelinePool.resolveHandle(uint32(pipelineHandle));
-	XEAssert(pipeline.type == currentPipelineType);
-	XEAssert(pipeline.pipelineLayoutHandle == currentPipelineLayoutHandle);
-
-	XEAssert(pipeline.d3dPipelineState);
-	d3dCommandList->SetPipelineState(pipeline.d3dPipelineState);
 }
 
 void CommandList::bindIndexBuffer(BufferPointer bufferPointer, IndexBufferFormat format, uint32 byteSize)
