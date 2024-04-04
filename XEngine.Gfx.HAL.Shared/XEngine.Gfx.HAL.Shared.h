@@ -6,9 +6,11 @@ namespace XEngine::Gfx::HAL
 {
 	constexpr uint8 MaxDescriptorSetBindingCount = 32;
 	constexpr uint8 MaxPipelineBindingCount = 32;
+
 	constexpr uint8 MaxVertexBufferCount = 8;
-	constexpr uint8 MaxVertexBindingCount = 32;
 	constexpr uint16 MaxVertexBufferElementSize = 8192;
+	constexpr uint8 MaxVertexAttributeCount = 32;
+
 	constexpr uint8 MaxColorRenderTargetCount = 8;
 
 	enum class ShaderType : uint8
@@ -19,6 +21,8 @@ namespace XEngine::Gfx::HAL
 		Amplification,
 		Mesh,
 		Pixel,
+
+		ValueCount,
 	};
 
 	enum class PipelineBindingType : uint8
@@ -192,9 +196,4 @@ namespace XEngine::Gfx::HAL
 		static bool SupportsVertexInputUsage(TexelViewFormat format);
 		static uint8 GetByteSize(TexelViewFormat format); // Provided formats should support linear storage.
 	};
-}
-
-namespace XEngine
-{
-	namespace GfxHAL = Gfx::HAL;
 }

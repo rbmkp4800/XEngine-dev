@@ -9,19 +9,19 @@
 		//"lod_bias": 0
 	},
 
-	"Test.VertexInputLayout": {
+	/*"Test.VertexInputLayout": {
 		"type": "vertex_input_layout",
 		"buffers": [
 			{
 				"step_rate": "per_vertex",
-				"bindings": [
+				"elements": [
 					{ "name": "POSITION", "format": "R32G32B32_FLOAT" },
 					{ "name": "NORMAL", "format": "R32G32B32_FLOAT" },
 					{ "name": "TEXCOORD", "format": "R32G32_FLOAT" },
 				]
 			}
 		]
-	},
+	},*/
 
 	"Test.DescriptorSetLayout": {
 		"type": "descriptor_set_layout",
@@ -42,7 +42,31 @@
 		// "flags" : [ "block_as", "block_ms", "block_vertex_input" ], // Or 'allow' insead of 'block'?
 	},
 
-	"Test.GraphicsPipeline": {
+	"TestVS": {
+		"type": "vertex_shader",
+		"layout": "Test.PipelineLayout",
+		"path": "TestGraphics.hlsl",
+		"entry": "MainVS",
+		//"vertex_input_layout": "Test.VertexInputLayout",
+	},
+
+	"TestPS": {
+		"type": "pixel_shader",
+		"layout": "Test.PipelineLayout",
+		"path": "TestGraphics.hlsl",
+		"entry": "MainPS",
+
+		//"color_rts": [ "R8G8B8A8_UNORM" ],
+		//"depth_stencil_rt": "D16",
+
+		/*"variations": {
+			"": "DEF_A=0;DEF_B;DEF_C=ASD",
+			"MYVARIATION0": "DEF_A=0;DEF_B;DEF_C=ASD",
+			"MYVARIATION1": "DEF_A=0;DEF_B;DEF_C=ASD",
+		},*/
+	},
+
+	/*"Test.GraphicsPipeline": {
 		"type": "graphics_pipeline",
 		"layout": "Test.PipelineLayout",
 		"vertex_input_layout": "Test.VertexInputLayout",
@@ -56,5 +80,5 @@
 		"type": "compute_pipeline",
 		"layout": "Test.PipelineLayout",
 		"cs": { "path": "TestCompute.hlsl", "entry" :"MainCS" }
+	}*/
 	}
-}

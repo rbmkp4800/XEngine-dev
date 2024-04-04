@@ -13,66 +13,41 @@
 
 namespace XEngine::Gfx::ShaderLibraryBuilder
 {
-	class Pipeline;
-	using PipelineRef = XLib::RefCountedPtr<Pipeline>;
+	class Shader;
+	using ShaderRef = XLib::RefCountedPtr<Shader>;
 
-	class Pipeline : public XLib::RefCounted
+	class Shader : public XLib::RefCounted
 	{
 	private:
 		XLib::StringViewASCII name;
+		uint64 nameXSH;
 
-		HAL::ShaderCompiler::PipelineLayoutRef pipelineLayout;
+		HAL::ShaderCompiler::PipelineLayoutRef pipelineLayout = nullptr;
 		uint64 pipelineLayoutNameXSH = 0;
 
-		struct
-		{
-			HAL::ShaderCompiler::ShaderDesc shader;
-			HAL::ShaderCompiler::BlobRef compiledBlob;
-		} compute = {};
-
-		struct
-		{
-			HAL::ShaderCompiler::GraphicsPipelineShaders shaders;
-			HAL::ShaderCompiler::GraphicsPipelineSettings settings;
-			HAL::ShaderCompiler::GraphicsPipelineCompiledBlobs compiledBlobs;
-		} graphics = {};
-
-		bool isGraphics = false;
+		HAL::ShaderCompiler::ShaderCompilationArgs compilationArgs = {};
+		HAL::ShaderCompiler::BlobRef compiledBlob = nullptr;
 
 	private:
-		Pipeline() = default;
-		virtual ~Pipeline() override = default;
+		Shader() = default;
+		virtual ~Shader() override = default;
 
 	public:
 		inline XLib::StringViewASCII getName() const { return name; }
+		inline uint64 getNameXSH() const { return nameXSH; }
 
-		inline HAL::ShaderCompiler::PipelineLayout* getPipelineLayout() const { return pipelineLayout.get(); }
+		inline const HAL::ShaderCompiler::PipelineLayout& getPipelineLayout() const { return *pipelineLayout.get(); }
 		inline uint64 getPipelineLayoutNameXSH() const { return pipelineLayoutNameXSH; }
 
-		inline HAL::ShaderCompiler::ShaderDesc getComputeShader() const { return compute.shader; }
-		inline HAL::ShaderCompiler::BlobRef& computeShaderCompiledBlob() { return compute.compiledBlob; }
-		inline const HAL::ShaderCompiler::BlobRef& computeShaderCompiledBlob() const { return compute.compiledBlob; }
+		inline const HAL::ShaderCompiler::ShaderCompilationArgs& getCompilationArgs() const { return compilationArgs; }
 
-		inline HAL::ShaderCompiler::GraphicsPipelineShaders getGraphicsShaders() const { return graphics.shaders; }
-		inline HAL::ShaderCompiler::GraphicsPipelineSettings getGraphicsSettings() const { return graphics.settings; }
-		inline HAL::ShaderCompiler::GraphicsPipelineCompiledBlobs& graphicsCompiledBlobs() { return graphics.compiledBlobs; }
-		inline const HAL::ShaderCompiler::GraphicsPipelineCompiledBlobs& graphicsCompiledBlobs() const { return graphics.compiledBlobs; }
-
-		inline bool isGraphicsPipeline() const { return isGraphics; }
+		inline void setCompiledBlob(const HAL::ShaderCompiler::Blob* blob) { compiledBlob = (HAL::ShaderCompiler::Blob*)blob; }
+		inline const HAL::ShaderCompiler::Blob& getCompiledBlob() const { return *compiledBlob.get(); }
 
 	public:
-
-		// These methods pull all arrays / strings from input and store them locally.
-		// Shader text is not stored.
-
-		static PipelineRef CreateGraphics(XLib::StringViewASCII name,
+		static ShaderRef Create(XLib::StringViewASCII name,
 			HAL::ShaderCompiler::PipelineLayout* pipelineLayout, uint64 pipelineLayoutNameXSH,
-			const HAL::ShaderCompiler::GraphicsPipelineShaders& shaders,
-			const HAL::ShaderCompiler::GraphicsPipelineSettings& settings);
-
-		static PipelineRef CreateCompute(XLib::StringViewASCII name,
-			HAL::ShaderCompiler::PipelineLayout* pipelineLayout, uint64 pipelineLayoutNameXSH,
-			const HAL::ShaderCompiler::ShaderDesc& shader);
+			const HAL::ShaderCompiler::ShaderCompilationArgs& compilationArgs);
 	};
 
 	struct LibraryDefinition
@@ -89,14 +64,8 @@ namespace XEngine::Gfx::ShaderLibraryBuilder
 			HAL::ShaderCompiler::PipelineLayoutRef ref;
 		};
 
-		struct Pipeline
-		{
-			uint64 nameXSH;
-			PipelineRef ref;
-		};
-
 		XLib::ArrayList<DescriptorSetLayout> descriptorSetLayouts;
 		XLib::ArrayList<PipelineLayout> pipelineLayouts;
-		XLib::ArrayList<Pipeline> pipelines;
+		XLib::ArrayList<ShaderRef> shaders;
 	};
 }

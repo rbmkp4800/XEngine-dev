@@ -68,6 +68,8 @@ namespace XLib
 
 		inline Type* begin() { return buffer; }
 		inline Type* end() { return buffer + size; }
+		inline const Type* begin() const { return buffer; }
+		inline const Type* end() const { return buffer + size; }
 		inline Type& front() { return buffer[0]; }
 		inline Type& back() { return buffer[size - 1]; }
 	};

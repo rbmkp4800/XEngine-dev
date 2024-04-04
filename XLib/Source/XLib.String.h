@@ -43,7 +43,7 @@ namespace XLib
 		inline bool endsWith(const StringView<CharType>& suffix) const;
 		inline bool endsWith(const CharType* suffixCStr) const;
 
-		inline StringView<CharType> getSubString(uintptr begin, uintptr end = uintptr(-1)) const;
+		inline StringView<CharType> getSubString(uintptr startIndex, uintptr length = uintptr(-1)) const;
 	};
 
 
@@ -251,15 +251,15 @@ namespace XLib
 	inline bool StringView<CharType>::endsWith(const CharType* suffixCStr) const { return String::EndsWith(*this, suffixCStr); }
 
 	template <typename CharType>
-	inline StringView<CharType> StringView<CharType>::getSubString(uintptr begin, uintptr end) const
+	inline StringView<CharType> StringView<CharType>::getSubString(uintptr startIndex, uintptr length) const
 	{
-		XAssert(begin <= length);
-		if (end == uintptr(-1))
-			end = length;
+		XAssert(startIndex <= this->length);
+		if (length == uintptr(-1))
+			length = this->length - startIndex;
 		else
-			XAssert(end <= length);
+			XAssert(startIndex + length <= this->length);
 
-		return StringView<CharType>(data + begin, end - begin);
+		return StringView<CharType>(data + startIndex, length);
 	}
 
 	// InplaceString ///////////////////////////////////////////////////////////////////////////////

@@ -37,493 +37,360 @@ static inline bool ValidateGenericBlobHeader(const void* blobData, uint32 blobSi
 	return true;
 }
 
-// DescriptorSetLayoutBlobWriter ///////////////////////////////////////////////////////////////////
 
-void DescriptorSetLayoutBlobWriter::initialize(uint16 bindingCount)
+// Descriptor set layout blob //////////////////////////////////////////////////////////////////////
+
+void DescriptorSetLayoutBlobWriter::setup(const DescriptorSetLayoutBlobInfo& blobInfo)
 {
-	XAssert(memoryBlockSize == 0); // Not initialized.
-	XAssert(bindingCount > 0);
-	XAssert(bindingCount <= MaxDescriptorSetBindingCount);
+	XAssert(blobSize == 0);
+	this->blobInfo = blobInfo;
 
-	this->bindingCount = bindingCount;
-
-	memoryBlockSize =
+	blobSize =
 		sizeof(GenericBlobHeader) +
 		sizeof(DescriptorSetLayoutBlobSubHeader) +
-		sizeof(DescriptorSetBindingRecord) * bindingCount;
+		sizeof(DescriptorSetBindingRecord) * blobInfo.bindingCount;
 }
 
-uint32 DescriptorSetLayoutBlobWriter::getMemoryBlockSize() const
+void DescriptorSetLayoutBlobWriter::setBlobMemory(void* memory, uint32 memorySize)
 {
-	XAssert(memoryBlockSize > 0);
-	return memoryBlockSize;
+	XAssert(blobSize > 0 && !blobMemory);
+	XAssert(blobSize == memorySize);
+
+	blobMemory = memory;
+	memorySet(blobMemory, 0, blobSize);
+
+	{
+		uint32 offsetAccum = 0;
+		offsetAccum += sizeof(GenericBlobHeader);
+
+		const uint32 subHeaderOffset = offsetAccum;
+		offsetAccum += sizeof(DescriptorSetLayoutBlobSubHeader);
+
+		const uint32 bindingRecordsOffset = offsetAccum;
+		offsetAccum += sizeof(DescriptorSetBindingRecord) * blobInfo.bindingCount;
+
+		XAssert(offsetAccum == blobSize);
+
+		subHeader = (DescriptorSetLayoutBlobSubHeader*)(uintptr(blobMemory) + subHeaderOffset);
+		bindingRecords = (DescriptorSetBindingRecord*)(uintptr(blobMemory) + bindingRecordsOffset);
+	}
 }
 
-void DescriptorSetLayoutBlobWriter::setMemoryBlock(void* memoryBlock, uint32 memoryBlockSize)
+void DescriptorSetLayoutBlobWriter::writeBindingInfo(uint16 bindingIndex, const DescriptorSetBindingInfo& bindingInfo)
 {
-	XAssert(!this->memoryBlock);
-	XAssert(this->memoryBlockSize == memoryBlockSize && memoryBlockSize > 0);
-	this->memoryBlock = memoryBlock;
-	memorySet(memoryBlock, 0, memoryBlockSize);
-}
+	XAssert(bindingRecords);
+	XAssert(bindingIndex < blobInfo.bindingCount);
 
-void DescriptorSetLayoutBlobWriter::writeBinding(uint16 bindingIndex, const DescriptorSetBindingInfo& bindingInfo)
-{
-	XAssert(memoryBlock);
-	XAssert(bindingIndex < bindingCount);
-
-	const uint32 offset =
-		sizeof(GenericBlobHeader) +
-		sizeof(DescriptorSetLayoutBlobSubHeader) +
-		sizeof(DescriptorSetBindingRecord) * bindingIndex;
-	DescriptorSetBindingRecord& record = *(DescriptorSetBindingRecord*)((byte*)memoryBlock + offset);
-	record = {};
+	DescriptorSetBindingRecord& record = bindingRecords[bindingIndex];
 	record.nameXSH0 = uint32(bindingInfo.nameXSH);
 	record.nameXSH1 = uint32(bindingInfo.nameXSH >> 32);
 	record.descriptorCount = bindingInfo.descriptorCount;
 	record.descriptorType = bindingInfo.descriptorType;
 }
 
-void DescriptorSetLayoutBlobWriter::finalize(uint32 sourceHash)
+void DescriptorSetLayoutBlobWriter::finalize()
 {
-	XAssert(memoryBlock);
+	XAssert(blobMemory);
 
-	DescriptorSetLayoutBlobSubHeader& subHeader =
-		*(DescriptorSetLayoutBlobSubHeader*)((byte*)memoryBlock + sizeof(GenericBlobHeader));
-	subHeader.sourceHash = sourceHash;
-	subHeader.bindingCount = bindingCount;
+	subHeader->sourceHash = blobInfo.sourceHash;
+	subHeader->bindingCount = blobInfo.bindingCount;
 
-	FillGenericBlobHeader(memoryBlock, memoryBlockSize, DescriptorSetLayoutBlobSignature, 0);
-	memoryBlock = nullptr;
+	FillGenericBlobHeader(blobMemory, blobSize, ShaderBlobSignature, 0);
+	memorySet(this, 0, sizeof(*this));
 }
 
-// DescriptorSetLayoutBlobReader ///////////////////////////////////////////////////////////////////
 
 bool DescriptorSetLayoutBlobReader::open(const void* data, uint32 size)
 {
-	XAssert(!this->data);
+	XAssert(!subHeader);
 
 	if (!ValidateGenericBlobHeader(data, size, DescriptorSetLayoutBlobSignature, 0))
 		return false;
-	if (size < sizeof(GenericBlobHeader) + sizeof(DescriptorSetLayoutBlobSubHeader))
-		return false;
 
-	const DescriptorSetLayoutBlobSubHeader* subHeader =
-		(const DescriptorSetLayoutBlobSubHeader*)((const byte*)data + sizeof(GenericBlobHeader));
+	{
+		uint32 offsetAccum = 0;
+		offsetAccum += sizeof(GenericBlobHeader);
 
-	if (subHeader->bindingCount == 0 ||
-		subHeader->bindingCount > MaxDescriptorSetBindingCount)
-		return false;
+		const uint32 subHeaderOffset = offsetAccum;
+		offsetAccum += sizeof(DescriptorSetLayoutBlobSubHeader);
 
-	const uint32 bindingRecordsOffset =
-		sizeof(GenericBlobHeader) +
-		sizeof(DescriptorSetLayoutBlobSubHeader);
-	const uint32 sizeCheck =
-		bindingRecordsOffset +
-		sizeof(DescriptorSetBindingRecord) * subHeader->bindingCount;
+		if (size < offsetAccum)
+			return false;
+		const DescriptorSetLayoutBlobSubHeader* subHeader = (DescriptorSetLayoutBlobSubHeader*)(uintptr(data) + subHeaderOffset);
 
-	if (size != sizeCheck)
-		return false;
+		const uint32 bindingRecordsOffset = offsetAccum;
+		offsetAccum += sizeof(DescriptorSetBindingRecord) * subHeader->bindingCount;
 
-	this->data = data;
-	this->size = size;
-	this->subHeader = subHeader;
-	this->bindingRecords = (const DescriptorSetBindingRecord*)((const byte*)data + bindingRecordsOffset);
+		if (offsetAccum != size)
+			return false;
+
+		this->subHeader = subHeader;
+		this->bindingRecords = (DescriptorSetBindingRecord*)(uintptr(data) + bindingRecordsOffset);
+	}
+
 	return true;
 }
 
-DescriptorSetBindingInfo DescriptorSetLayoutBlobReader::getBinding(uint32 bindingIndex) const
+DescriptorSetLayoutBlobInfo DescriptorSetLayoutBlobReader::getBlobInfo() const
 {
+	XAssert(subHeader);
+	DescriptorSetLayoutBlobInfo blobInfo = {};
+	blobInfo.bindingCount = subHeader->bindingCount;
+	blobInfo.sourceHash = subHeader->sourceHash;
+	return blobInfo;
+}
+
+DescriptorSetBindingInfo DescriptorSetLayoutBlobReader::getBindingInfo(uint32 bindingIndex) const
+{
+	XAssert(bindingRecords);
 	XAssert(bindingIndex < subHeader->bindingCount);
 	const DescriptorSetBindingRecord& record = bindingRecords[bindingIndex];
 
-	DescriptorSetBindingInfo result = {};
-	result.nameXSH = uint64(record.nameXSH0) | (uint64(record.nameXSH1) << 32);
-	result.descriptorCount = record.descriptorCount;
-	result.descriptorType = record.descriptorType;
-	return result;
+	DescriptorSetBindingInfo bindingInfo = {};
+	bindingInfo.nameXSH = uint64(record.nameXSH0) | (uint64(record.nameXSH1) << 32);
+	bindingInfo.descriptorCount = record.descriptorCount;
+	bindingInfo.descriptorType = record.descriptorType;
+	return bindingInfo;
 }
 
-// PipelineLayoutBlobWriter ////////////////////////////////////////////////////////////////////////
 
-void PipelineLayoutBlobWriter::initialize(uint16 bindingCount, uint32 platformDataSize)
+// Pipeline layout blob ////////////////////////////////////////////////////////////////////////////
+
+void PipelineLayoutBlobWriter::setup(const PipelineLayoutBlobInfo& blobInfo)
 {
-	XAssert(memoryBlockSize == 0); // Not initialized.
-	XAssert(bindingCount > 0);
-	XAssert(bindingCount <= MaxDescriptorSetBindingCount);
+	XAssert(blobSize == 0);
+	this->blobInfo = blobInfo;
 
-	this->bindingCount = bindingCount;
-	this->platformDataSize = platformDataSize;
-
-	memoryBlockSize =
+	blobSize =
 		sizeof(GenericBlobHeader) +
 		sizeof(PipelineLayoutBlobSubHeader) +
-		sizeof(PipelineBindingRecord) * bindingCount +
-		platformDataSize;
+		sizeof(PipelineBindingRecord) * blobInfo.bindingCount +
+		blobInfo.platformDataSize;
 }
 
-uint32 PipelineLayoutBlobWriter::getMemoryBlockSize() const
+void PipelineLayoutBlobWriter::setBlobMemory(void* memory, uint32 memorySize)
 {
-	XAssert(memoryBlockSize > 0);
-	return memoryBlockSize;
-}
+	XAssert(blobSize > 0 && !blobMemory);
+	XAssert(blobSize == memorySize);
 
-void PipelineLayoutBlobWriter::setMemoryBlock(void* memoryBlock, uint32 memoryBlockSize)
-{
-	XAssert(!this->memoryBlock);
-	XAssert(this->memoryBlockSize == memoryBlockSize && memoryBlockSize > 0);
-	this->memoryBlock = memoryBlock;
-	memorySet(memoryBlock, 0, memoryBlockSize);
-}
+	blobMemory = memory;
+	memorySet(blobMemory, 0, blobSize);
 
-void PipelineLayoutBlobWriter::writeBinding(uint16 bindingIndex, const PipelineBindingInfo& bindingInfo)
-{
-	XAssert(memoryBlock);
-	XAssert(bindingIndex < bindingCount);
-
-	const uint32 offset =
-		sizeof(GenericBlobHeader) +
-		sizeof(PipelineLayoutBlobSubHeader) +
-		sizeof(PipelineBindingRecord) * bindingIndex;
-	PipelineBindingRecord& record = *(PipelineBindingRecord*)((byte*)memoryBlock + offset);
-	record = {};
-	record.nameXSH = bindingInfo.nameXSH;
-	record.d3dRootParameterIndex = bindingInfo.d3dRootParameterIndex;
-	record.type = bindingInfo.type;
-	if (bindingInfo.type == PipelineBindingType::DescriptorSet)
-		record.descriptorSetLayoutSourceHash = bindingInfo.descriptorSetLayoutSourceHash;
-	if (bindingInfo.type == PipelineBindingType::InplaceConstants)
-		record.inplaceConstantCount = bindingInfo.inplaceConstantCount;
-}
-
-void PipelineLayoutBlobWriter::writePlatformData(const void* platformData, uint32 platformDataSize)
-{
-	XAssert(memoryBlock);
-	XAssert(this->platformDataSize == platformDataSize);
-
-	const uint32 offset =
-		sizeof(GenericBlobHeader) +
-		sizeof(PipelineLayoutBlobSubHeader) +
-		sizeof(PipelineBindingRecord) * bindingCount;
-	memoryCopy((byte*)memoryBlock + offset, platformData, platformDataSize);
-}
-
-void PipelineLayoutBlobWriter::finalize(uint32 sourceHash)
-{
-	XAssert(memoryBlock);
-
-	PipelineLayoutBlobSubHeader& subHeader =
-		*(PipelineLayoutBlobSubHeader*)((byte*)memoryBlock + sizeof(GenericBlobHeader));
-	subHeader.sourceHash = sourceHash;
-	subHeader.bindingCount = bindingCount;
-	subHeader.platformDataSize = XCheckedCastU16(platformDataSize);
-
-	FillGenericBlobHeader(memoryBlock, memoryBlockSize, PipelineLayoutBlobSignature, 0);
-	memoryBlock = nullptr;
-}
-
-// PipelineLayoutBlobReader ////////////////////////////////////////////////////////////////////////
-
-bool PipelineLayoutBlobReader::open(const void* data, uint32 size)
-{
-	XAssert(!this->data);
-
-	if (!ValidateGenericBlobHeader(data, size, PipelineLayoutBlobSignature, 0))
-		return false;
-	if (size < sizeof(GenericBlobHeader) + sizeof(PipelineLayoutBlobSubHeader))
-		return false;
-
-	const PipelineLayoutBlobSubHeader* subHeader =
-		(const PipelineLayoutBlobSubHeader*)((const byte*)data + sizeof(GenericBlobHeader));
-
-	if (subHeader->bindingCount > MaxPipelineBindingCount)
-		return false;
-
-	const uint32 bindingRecordsOffset =
-		sizeof(GenericBlobHeader) +
-		sizeof(PipelineLayoutBlobSubHeader);
-	const uint32 platformDataOffset =
-		bindingRecordsOffset +
-		sizeof(PipelineBindingRecord) * subHeader->bindingCount;
-	const uint32 sizeCheck =
-		platformDataOffset +
-		subHeader->platformDataSize;
-
-	if (size != sizeCheck)
-		return false;
-
-	this->data = data;
-	this->size = size;
-	this->subHeader = subHeader;
-	this->bindingRecords = subHeader->bindingCount > 0 ? (const PipelineBindingRecord*)((const byte*)data + bindingRecordsOffset) : nullptr;
-	this->platformData = (const byte*)data + platformDataOffset;
-	return true;
-}
-
-PipelineBindingInfo PipelineLayoutBlobReader::getPipelineBinding(uint16 bindingIndex) const
-{
-	XAssert(bindingIndex < subHeader->bindingCount);
-	const PipelineBindingRecord& record = bindingRecords[bindingIndex];
-
-	PipelineBindingInfo result = {};
-	result.nameXSH = record.nameXSH;
-	result.d3dRootParameterIndex = record.d3dRootParameterIndex;
-	result.type = record.type;
-	if (record.type == PipelineBindingType::InplaceConstants)
-		result.inplaceConstantCount = record.inplaceConstantCount;
-	if (record.type == PipelineBindingType::DescriptorSet)
-		result.descriptorSetLayoutSourceHash = record.descriptorSetLayoutSourceHash;
-	return result;
-}
-
-// GraphicsPipelineStateBlobWriter /////////////////////////////////////////////////////////////////
-
-void GraphicsPipelineStateBlobWriter::beginInitialization()
-{
-	XAssert(memoryBlockSize == 0);	// Not initialized.
-	XAssert(!initializationInProgress);
-	initializationInProgress = true;
-}
-
-void GraphicsPipelineStateBlobWriter::registerBytecodeBlob(ShaderType type, uint32 blobChecksum)
-{
-	XAssert(initializationInProgress);
-
-	switch (type)
 	{
-		case ShaderType::Vertex:
-			XAssert(!vsBytecodeRegistered);
-			vsBytecodeRegistered = true;
-			vsBytecodeChecksum = blobChecksum;
-			break;
+		uint32 offsetAccum = 0;
+		offsetAccum += sizeof(GenericBlobHeader);
 
-		case ShaderType::Amplification:
-			XAssert(!asBytecodeRegistered);
-			asBytecodeRegistered = true;
-			asBytecodeChecksum = blobChecksum;
-			break;
+		const uint32 subHeaderOffset = offsetAccum;
+		offsetAccum += sizeof(PipelineLayoutBlobSubHeader);
 
-		case ShaderType::Mesh:
-			XAssert(!msBytecodeRegistered);
-			msBytecodeRegistered = true;
-			msBytecodeChecksum = blobChecksum;
-			break;
+		const uint32 bindingRecordsOffset = offsetAccum;
+		offsetAccum += sizeof(PipelineBindingRecord) * blobInfo.bindingCount;
 
-		case ShaderType::Pixel:
-			XAssert(!psBytecodeRegistered);
-			psBytecodeRegistered = true;
-			psBytecodeChecksum = blobChecksum;
-			break;
+		const uint32 platformDataOffset = offsetAccum;
+		offsetAccum += blobInfo.platformDataSize;
 
-		default:
-			XAssertUnreachableCode();
+		XAssert(offsetAccum == blobSize);
+
+		subHeader = (PipelineLayoutBlobSubHeader*)(uintptr(blobMemory) + subHeaderOffset);
+		bindingRecords = (PipelineBindingRecord*)(uintptr(blobMemory) + bindingRecordsOffset);
+		platformData = (void*)(uintptr(blobMemory) + platformDataOffset);
 	}
 }
 
-void GraphicsPipelineStateBlobWriter::setColorRTFormat(uint8 index, TexelViewFormat format)
+void PipelineLayoutBlobWriter::writeBindingInfo(uint16 bindingIndex, const PipelineBindingInfo& bindingInfo)
 {
-	XAssert(initializationInProgress);
-	XAssert(index < MaxColorRenderTargetCount);
+	XAssert(bindingRecords);
+	XAssert(bindingIndex < blobInfo.bindingCount);
 
-	colorRTFormats[index] = format;
+	PipelineBindingRecord& record = bindingRecords[bindingIndex];
+	record.nameXSH = bindingInfo.nameXSH;
+	record.d3dRootParameterIndex = bindingInfo.d3dRootParameterIndex;
+	record.type = bindingInfo.type;
+	record.descriptorSetLayoutSourceHash = bindingInfo.type == PipelineBindingType::DescriptorSet ? bindingInfo.descriptorSetLayoutSourceHash : 0;
+	record.inplaceConstantCount = bindingInfo.type == PipelineBindingType::InplaceConstants ? bindingInfo.inplaceConstantCount : 0;
 }
 
-void GraphicsPipelineStateBlobWriter::setDepthStencilRTFormat(DepthStencilFormat format)
+void PipelineLayoutBlobWriter::writePlatformData(const void* data, uint32 size)
 {
-	XAssert(initializationInProgress);
-	depthStencilRTFormat = format;
+	XAssert(platformData);
+	XAssert(size == blobInfo.platformDataSize);
+	memoryCopy(platformData, data, size);
 }
 
-void GraphicsPipelineStateBlobWriter::enableVertexBuffer(uint8 index, bool perInstance)
+void PipelineLayoutBlobWriter::finalize()
 {
-	XAssert(initializationInProgress);
-	static_assert(MaxVertexBufferCount <= 8); // uint8
-	XAssert(index < MaxVertexBufferCount);
-	const uint8 bit = 1 << index;
-	vertexBuffersEnabledFlagBits |= bit;
-	vertexBuffersPerInstanceFlagBits |= perInstance ? bit : 0;
+	XAssert(blobMemory);
+
+	subHeader->sourceHash = blobInfo.sourceHash;
+	subHeader->bindingCount = blobInfo.bindingCount;
+	subHeader->platformDataSize = XCheckedCastU16(blobInfo.platformDataSize);
+
+	FillGenericBlobHeader(blobMemory, blobSize, ShaderBlobSignature, 0);
+	memorySet(this, 0, sizeof(*this));
 }
 
-void GraphicsPipelineStateBlobWriter::addVertexBinding(const VertexBindingInfo& bindingInfo)
+
+bool PipelineLayoutBlobReader::open(const void* data, uint32 size)
 {
-	XAssert(initializationInProgress);
-	XAssert(bindingInfo.offset < MaxVertexBufferElementSize);
-	XAssert(bindingInfo.bufferIndex < MaxVertexBufferCount);
+	XAssert(!subHeader);
 
-	const uint8 bufferBit = 1 << bindingInfo.bufferIndex;
-	XAssert((vertexBuffersEnabledFlagBits & bufferBit) != 0); // Buffer should be enabled previously
-	vertexBuffersUsedFlagBits |= bufferBit;
-
-	XAssert(vertexBindingCount < MaxVertexBindingCount);
-	vertexBindingRecords[vertexBindingCount] = bindingInfo;
-	vertexBindingCount++;
-}
-
-void GraphicsPipelineStateBlobWriter::endInitialization()
-{
-	XAssert(initializationInProgress);
-	initializationInProgress = false;
-
-	// At least one bytecode should be registered.
-	XAssert(vsBytecodeRegistered || asBytecodeRegistered || msBytecodeRegistered || psBytecodeRegistered);
-
-	memoryBlockSize =
-		sizeof(GenericBlobHeader) +
-		sizeof(GraphicsPipelineStateBlobBody) +
-		sizeof(VertexBindingRecord) * vertexBindingCount;
-}
-
-uint32 GraphicsPipelineStateBlobWriter::getMemoryBlockSize() const
-{
-	XAssert(memoryBlockSize > 0);
-	return memoryBlockSize;
-}
-
-void GraphicsPipelineStateBlobWriter::finalizeToMemoryBlock(void* memoryBlock, uint32 memoryBlockSize, uint32 pipelineLayoutSourceHash)
-{
-	XAssert(this->memoryBlockSize == memoryBlockSize && memoryBlockSize > 0);
-	memorySet(memoryBlock, 0, memoryBlockSize);
-
-	GraphicsPipelineStateBlobBody& body = *(GraphicsPipelineStateBlobBody*)((byte*)memoryBlock + sizeof(GenericBlobHeader));
-
-	body.pipelineLayoutSourceHash = pipelineLayoutSourceHash;
-
-	body.vsBytecodeChecksum = vsBytecodeChecksum;
-	body.asBytecodeChecksum = asBytecodeChecksum;
-	body.msBytecodeChecksum = msBytecodeChecksum;
-	body.psBytecodeChecksum = psBytecodeChecksum;
-	body.vsBytecodeRegistered = vsBytecodeRegistered;
-	body.asBytecodeRegistered = asBytecodeRegistered;
-	body.msBytecodeRegistered = msBytecodeRegistered;
-	body.psBytecodeRegistered = psBytecodeRegistered;
-
-	for (uint32 i = 0; i < MaxColorRenderTargetCount; i++)
-		body.colorRTFormats[i] = colorRTFormats[i];
-
-	body.depthStencilRTFormat = depthStencilRTFormat;
-
-	body.vertexBuffersUsedFlagBits = vertexBuffersUsedFlagBits;
-	body.vertexBuffersPerInstanceFlagBits = vertexBuffersPerInstanceFlagBits;
-	body.vertexBindingCount = vertexBindingCount;
-
-	const uint32 vertexBindingRecordsOffset =
-		sizeof(GenericBlobHeader) +
-		sizeof(GraphicsPipelineStateBlobBody);
-	VertexBindingRecord* dstVertexBindingRecords =
-		(VertexBindingRecord*)((byte*)memoryBlock + vertexBindingRecordsOffset);
-	memoryCopy(dstVertexBindingRecords, vertexBindingRecords, sizeof(VertexBindingRecord) * vertexBindingCount);
-
-	FillGenericBlobHeader(memoryBlock, memoryBlockSize, GraphicsPipelineStateBlobSignature, 0);
-}
-
-// GraphicsPipelineStateBlobReader /////////////////////////////////////////////////////////////////
-
-bool GraphicsPipelineStateBlobReader::open(const void* data, uint32 size)
-{
-	XAssert(!this->data);
-
-	if (!ValidateGenericBlobHeader(data, size, GraphicsPipelineStateBlobSignature, 0))
-		return false;
-	if (size < sizeof(GenericBlobHeader) + sizeof(GraphicsPipelineStateBlobBody))
+	if (!ValidateGenericBlobHeader(data, size, PipelineLayoutBlobSignature, 0))
 		return false;
 
-	const GraphicsPipelineStateBlobBody* body =
-		(const GraphicsPipelineStateBlobBody*)((const byte*)data + sizeof(GenericBlobHeader));
+	{
+		uint32 offsetAccum = 0;
+		offsetAccum += sizeof(GenericBlobHeader);
 
-	if (body->vertexBindingCount > MaxVertexBindingCount)
-		return false;
+		const uint32 subHeaderOffset = offsetAccum;
+		offsetAccum += sizeof(PipelineLayoutBlobSubHeader);
 
-	const uint32 vertexBindingRecordsOffset =
-		sizeof(GenericBlobHeader) +
-		sizeof(GraphicsPipelineStateBlobBody);
-	const uint32 sizeCheck =
-		vertexBindingRecordsOffset +
-		sizeof(VertexBindingRecord) * body->vertexBindingCount;
+		if (size < offsetAccum)
+			return false;
+		const PipelineLayoutBlobSubHeader* subHeader = (const PipelineLayoutBlobSubHeader*)(uintptr(data) + subHeaderOffset);
 
-	if (size != sizeCheck)
-		return false;
+		const uint32 bindingRecordsOffset = offsetAccum;
+		offsetAccum += sizeof(PipelineBindingRecord) * subHeader->bindingCount;
 
-	this->data = data;
-	this->size = size;
-	this->body = body;
-	this->vertexBindingRecords = body->vertexBindingCount > 0 ?
-		(const VertexBindingRecord*)((const byte*)data + vertexBindingRecordsOffset) : nullptr;
+		const uint32 platformDataOffset = offsetAccum;
+		offsetAccum += subHeader->platformDataSize;
+
+		if (offsetAccum != size)
+			return false;
+
+		this->subHeader = subHeader;
+		this->bindingRecords = (const PipelineBindingRecord*)(uintptr(data) + bindingRecordsOffset);
+		this->platformData = (const void*)(uintptr(data) + platformDataOffset);
+	}
+
 	return true;
 }
 
-const VertexBindingInfo* GraphicsPipelineStateBlobReader::getVertexBindingInplace(uint8 bindingIndex) const
+PipelineLayoutBlobInfo PipelineLayoutBlobReader::getBlobInfo() const
 {
-	XAssert(bindingIndex < body->vertexBindingCount);
-	return &vertexBindingRecords[bindingIndex];
+	XAssert(subHeader);
+	PipelineLayoutBlobInfo blobInfo = {};
+	blobInfo.bindingCount = subHeader->bindingCount;
+	blobInfo.platformDataSize = subHeader->platformDataSize;
+	blobInfo.sourceHash = subHeader->sourceHash;
+	return blobInfo;
 }
 
-// BytecodeBlobWriter //////////////////////////////////////////////////////////////////////////////
-
-void BytecodeBlobWriter::initialize(uint32 bytecodeSize)
+PipelineBindingInfo PipelineLayoutBlobReader::getBindingInfo(uint16 bindingIndex) const
 {
-	XAssert(memoryBlockSize == 0); // Not initialized.
-	XAssert(bytecodeSize > 0);
+	XAssert(bindingRecords);
+	XAssert(bindingIndex < subHeader->bindingCount);
+	const PipelineBindingRecord& record = bindingRecords[bindingIndex];
 
-	this->bytecodeSize = bytecodeSize;
+	PipelineBindingInfo bindingInfo = {};
+	bindingInfo.nameXSH = record.nameXSH;
+	bindingInfo.d3dRootParameterIndex = record.d3dRootParameterIndex;
+	bindingInfo.type = record.type;
+	if (record.type == PipelineBindingType::DescriptorSet)
+		bindingInfo.descriptorSetLayoutSourceHash = record.descriptorSetLayoutSourceHash;
+	else if (record.type == PipelineBindingType::InplaceConstants)
+		bindingInfo.inplaceConstantCount = record.inplaceConstantCount;
+	return bindingInfo;
+}
 
-	memoryBlockSize =
+
+// Shader blob /////////////////////////////////////////////////////////////////////////////////////
+
+void ShaderBlobWriter::setup(const ShaderBlobInfo& blobInfo)
+{
+	XAssert(blobSize == 0);
+	this->blobInfo = blobInfo;
+
+	blobSize =
 		sizeof(GenericBlobHeader) +
-		sizeof(BytecodeBlobSubHeader) +
-		bytecodeSize;
+		sizeof(ShaderBlobSubHeader) +
+		blobInfo.bytecodeSize;
 }
 
-uint32 BytecodeBlobWriter::getMemoryBlockSize() const
+void ShaderBlobWriter::setBlobMemory(void* memory, uint32 memorySize)
 {
-	XAssert(memoryBlockSize > 0);
-	return memoryBlockSize;
+	XAssert(blobSize > 0 && !blobMemory);
+	XAssert(blobSize == memorySize);
+
+	blobMemory = memory;
+	memorySet(blobMemory, 0, blobSize);
+
+	{
+		uint32 offsetAccum = 0;
+		offsetAccum += sizeof(GenericBlobHeader);
+
+		const uint32 subHeaderOffset = offsetAccum;
+		offsetAccum += sizeof(ShaderBlobSubHeader);
+
+		const uint32 bytecodeOffset = offsetAccum;
+		offsetAccum += blobInfo.bytecodeSize;
+
+		XAssert(offsetAccum == blobSize);
+
+		subHeader = (ShaderBlobSubHeader*)(uintptr(blobMemory) + subHeaderOffset);
+		bytecode = (void*)(uintptr(blobMemory) + bytecodeOffset);
+	}
 }
 
-void BytecodeBlobWriter::setMemoryBlock(void* memoryBlock, uint32 memoryBlockSize)
+void ShaderBlobWriter::writeBytecode(const void* data, uint32 size)
 {
-	XAssert(!this->memoryBlock);
-	XAssert(this->memoryBlockSize == memoryBlockSize && memoryBlockSize > 0);
-	this->memoryBlock = memoryBlock;
-	memorySet(memoryBlock, 0, memoryBlockSize);
+	XAssert(bytecode);
+	XAssert(size == blobInfo.bytecodeSize);
+	memoryCopy(bytecode, data, size);
 }
 
-void BytecodeBlobWriter::writeBytecode(const void* bytecodeData, uint32 bytecodeSize)
+void ShaderBlobWriter::finalize()
 {
-	XAssert(memoryBlock);
-	XAssert(this->bytecodeSize == bytecodeSize);
+	XAssert(blobMemory);
 
-	const uint32 offset =
-		sizeof(GenericBlobHeader) +
-		sizeof(BytecodeBlobSubHeader);
-	memoryCopy((byte*)memoryBlock + offset, bytecodeData, bytecodeSize);
+	subHeader->pipelineLayoutSourceHash = blobInfo.pipelineLayoutSourceHash;
+	subHeader->bytecodeSizeLo16 = uint16(blobInfo.bytecodeSize);
+	subHeader->bytecodeSizeHi8 = XCheckedCastU8(blobInfo.bytecodeSize >> 16);
+	subHeader->shaderType = blobInfo.shaderType;
+
+	FillGenericBlobHeader(blobMemory, blobSize, ShaderBlobSignature, 0);
+	memorySet(this, 0, sizeof(*this));
 }
 
-void BytecodeBlobWriter::finalize(ShaderType type, uint32 pipelineLayoutSourceHash)
+
+bool ShaderBlobReader::open(const void* data, uint32 size)
 {
-	XAssert(memoryBlock);
+	XAssert(!subHeader);
 
-	BytecodeBlobSubHeader& subHeader = *(BytecodeBlobSubHeader*)((byte*)memoryBlock + sizeof(GenericBlobHeader));
-	subHeader.pipelineLayoutSourceHash = pipelineLayoutSourceHash;
-	subHeader.type = type;
-
-	FillGenericBlobHeader(memoryBlock, memoryBlockSize, BytecodeBlobSignature, 0);
-	memoryBlock = nullptr;
-}
-
-// BytecodeBlobReader //////////////////////////////////////////////////////////////////////////////
-
-bool BytecodeBlobReader::open(const void* data, uint32 size)
-{
-	XAssert(!this->data);
-
-	if (!ValidateGenericBlobHeader(data, size, BytecodeBlobSignature, 0))
+	if (!ValidateGenericBlobHeader(data, size, PipelineLayoutBlobSignature, 0))
 		return false;
-	if (size <= sizeof(GenericBlobHeader) + sizeof(BytecodeBlobSubHeader))
-		return false;
 
-	this->data = data;
-	this->size = size;
-	this->subHeader = (const BytecodeBlobSubHeader*)((const byte*)data + sizeof(GenericBlobHeader));
-	this->bytecodeData = subHeader + 1;
-	this->bytecodeSize = size - (sizeof(GenericBlobHeader) + sizeof(BytecodeBlobSubHeader));
+	{
+		uint32 offsetAccum = 0;
+		offsetAccum += sizeof(GenericBlobHeader);
+
+		const uint32 subHeaderOffset = offsetAccum;
+		offsetAccum += sizeof(ShaderBlobSubHeader);
+
+		if (size < offsetAccum)
+			return false;
+		const ShaderBlobSubHeader* subHeader = (ShaderBlobSubHeader*)(uintptr(data) + subHeaderOffset);
+
+		const uint32 bytecodeSize = uint32(subHeader->bytecodeSizeLo16) | (uint32(subHeader->bytecodeSizeHi8) << 16);
+
+		const uint32 bytecodeOffset = offsetAccum;
+		offsetAccum += bytecodeSize;
+
+		if (offsetAccum != size)
+			return false;
+
+		this->subHeader = subHeader;
+		this->bytecode = (const void*)(uintptr(data) + bytecodeOffset);
+	}
+
 	return true;
+}
+
+ShaderBlobInfo ShaderBlobReader::getBlobInfo() const
+{
+	XAssert(subHeader);
+	ShaderBlobInfo blobInfo = {};
+	blobInfo.pipelineLayoutSourceHash = subHeader->pipelineLayoutSourceHash;
+	blobInfo.bytecodeSize = uint32(subHeader->bytecodeSizeLo16) | (uint32(subHeader->bytecodeSizeHi8) << 16);
+	blobInfo.shaderType = subHeader->shaderType;
+	return blobInfo;
 }

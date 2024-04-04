@@ -92,8 +92,10 @@ bool SourceCache::resolveText(XLib::StringViewASCII localPath, XLib::StringViewA
 	}
 
 	InplaceStringASCIIx1024 fullPath;
+	// TODO: Replace this shit with proper `Path::Combine`
 	fullPath.append(rootPath);
-	fullPath.append('/');
+	if (!fullPath.isEmpty())
+		fullPath.append('/');
 	fullPath.append(normalizedLocalPath);
 	XAssert(!fullPath.isFull());
 

@@ -82,11 +82,6 @@ uint32 DescriptorSetLayout::getBindingDescriptorOffset(uint16 bindingIndex) cons
 	return bindings[bindingIndex].descriptorOffset;
 }
 
-uint32 DescriptorSetLayout::getSerializedBlobChecksum() const
-{
-	return ((BlobFormat::Data::GenericBlobHeader*)getSerializedBlobData())->checksum;
-}
-
 DescriptorSetLayoutRef DescriptorSetLayout::Create(const DescriptorSetBindingDesc* bindings, uint16 bindingCount,
 	GenericErrorMessage& errorMessage)
 {
@@ -177,9 +172,13 @@ DescriptorSetLayoutRef DescriptorSetLayout::Create(const DescriptorSetBindingDes
 		// ...
 	}
 
-	BlobFormat::DescriptorSetLayoutBlobWriter serializedBlobWriter;
-	serializedBlobWriter.initialize(bindingCount);
-	const uint32 serializedBlobSize = serializedBlobWriter.getMemoryBlockSize();
+	BlobFormat::DescriptorSetLayoutBlobInfo blobInfo = {};
+	blobInfo.bindingCount = bindingCount;
+	blobInfo.sourceHash = sourceHash;
+
+	BlobFormat::DescriptorSetLayoutBlobWriter blobWriter;
+	blobWriter.setup(blobInfo);
+	const uint32 blobSize = blobWriter.getBlobSize();
 
 	// Calculate required memory block size.
 	uint32 memoryBlockSizeAccum = sizeof(DescriptorSetLayout);
@@ -192,8 +191,8 @@ DescriptorSetLayoutRef DescriptorSetLayout::Create(const DescriptorSetBindingDes
 	memoryBlockSizeAccum += namesBufferSize;
 	memoryBlockSizeAccum = alignUp<uint32>(memoryBlockSizeAccum, 16);
 
-	const uint32 serializedBlobRelativeOffset = memoryBlockSizeAccum;
-	memoryBlockSizeAccum += serializedBlobSize;
+	const uint32 blobDataRelativeOffset = memoryBlockSizeAccum;
+	memoryBlockSizeAccum += blobSize;
 
 	// Allocate memory block.
 	const uint32 memoryBlockSize = memoryBlockSizeAccum;
@@ -204,15 +203,15 @@ DescriptorSetLayoutRef DescriptorSetLayout::Create(const DescriptorSetBindingDes
 	DescriptorSetLayout& resultObject = *(DescriptorSetLayout*)memoryBlock;
 	DescriptorSetLayout::InternalBindingDesc* internalBindings = (DescriptorSetLayout::InternalBindingDesc*)(uintptr(memoryBlock) + internalBindingsRelativeOffset);
 	char* namesBuffer = (char*)(uintptr(memoryBlock) + namesBufferRelativeOffset);
-	void* serializedBlob = (void*)(uintptr(memoryBlock) + serializedBlobRelativeOffset);
+	void* blobData = (void*)(uintptr(memoryBlock) + blobDataRelativeOffset);
 
 	// Populate result object itself.
 	{
 		construct(resultObject);
 		resultObject.bindings = internalBindings;
 		resultObject.namesBuffer = StringViewASCII(namesBuffer, namesBufferSize);
-		resultObject.serializedBlobData = serializedBlob;
-		resultObject.serializedBlobSize = serializedBlobSize;
+		resultObject.blobData = blobData;
+		resultObject.blobSize = blobSize;
 		resultObject.sourceHash = sourceHash;
 		resultObject.descriptorCount = descriptorCount;
 		resultObject.bindingCount = bindingCount;
@@ -234,9 +233,9 @@ DescriptorSetLayoutRef DescriptorSetLayout::Create(const DescriptorSetBindingDes
 		*(namesBuffer + dst.nameOffset + src.name.getLength()) = 0;
 	}
 
-	// Populate serialized blob.
+	// Populate blob.
 	{
-		serializedBlobWriter.setMemoryBlock(serializedBlob, serializedBlobSize);
+		blobWriter.setBlobMemory(blobData, blobSize);
 		for (uint16 i = 0; i < bindingCount; i++)
 		{
 			const DescriptorSetBindingDesc& binding = bindings[i];
@@ -246,9 +245,9 @@ DescriptorSetLayoutRef DescriptorSetLayout::Create(const DescriptorSetBindingDes
 			blobBindingInfo.descriptorCount = binding.descriptorCount;
 			blobBindingInfo.descriptorType = binding.descriptorType;
 
-			serializedBlobWriter.writeBinding(i, blobBindingInfo);
+			blobWriter.writeBindingInfo(i, blobBindingInfo);
 		}
-		serializedBlobWriter.finalize(sourceHash);
+		blobWriter.finalize();
 	}
 
 	return DescriptorSetLayoutRef(&resultObject);
@@ -313,11 +312,6 @@ uint32 PipelineLayout::getStaticSamplerShaderRegister(uint16 staticSamplerIndex)
 {
 	XAssert(staticSamplerIndex < staticSamplerCount);
 	return staticSamplers[staticSamplerIndex].baseShaderRegister;
-}
-
-uint32 PipelineLayout::getSerializedBlobChecksum() const
-{
-	return ((BlobFormat::Data::GenericBlobHeader*)getSerializedBlobData())->checksum;
 }
 
 PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, uint16 bindingCount,
@@ -597,9 +591,14 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 	const void* platformData = d3dRootSignature->GetBufferPointer();
 	const uint32 platformDataSize = XCheckedCastU32(d3dRootSignature->GetBufferSize());
 
-	BlobFormat::PipelineLayoutBlobWriter serializedBlobWriter;
-	serializedBlobWriter.initialize(bindingCount, platformDataSize);
-	const uint32 serializedBlobSize = serializedBlobWriter.getMemoryBlockSize();
+	BlobFormat::PipelineLayoutBlobInfo blobInfo = {};
+	blobInfo.bindingCount = bindingCount;
+	blobInfo.platformDataSize = platformDataSize;
+	blobInfo.sourceHash = sourceHash;
+
+	BlobFormat::PipelineLayoutBlobWriter blobWriter;
+	blobWriter.setup(blobInfo);
+	const uint32 blobSize = blobWriter.getBlobSize();
 
 	// Calculate required memory block size.
 	uint32 memoryBlockSizeAccum = sizeof(PipelineLayout);
@@ -615,8 +614,8 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 	memoryBlockSizeAccum += namesBufferSize;
 	memoryBlockSizeAccum = alignUp<uint32>(memoryBlockSizeAccum, 16);
 
-	const uint32 serializedBlobRelativeOffset = memoryBlockSizeAccum;
-	memoryBlockSizeAccum += serializedBlobSize;
+	const uint32 blobDataRelativeOffset = memoryBlockSizeAccum;
+	memoryBlockSizeAccum += blobSize;
 
 	// Allocate memory block.
 	const uint32 memoryBlockSize = memoryBlockSizeAccum;
@@ -628,7 +627,7 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 	PipelineLayout::InternalBindingDesc* internalBindings = (PipelineLayout::InternalBindingDesc*)(uintptr(memoryBlock) + internalBindingsRelativeOffset);
 	PipelineLayout::InternalStaticSamplerDesc* internalStaticSamplers = (PipelineLayout::InternalStaticSamplerDesc*)(uintptr(memoryBlock) + staticSamplersRelativeOffset);
 	char* namesBuffer = (char*)(uintptr(memoryBlock) + namesBufferRelativeOffset);
-	void* serializedBlob = (void*)(uintptr(memoryBlock) + serializedBlobRelativeOffset);
+	void* blobData = (void*)(uintptr(memoryBlock) + blobDataRelativeOffset);
 
 	// Populate result object itself.
 	{
@@ -636,8 +635,8 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 		resultObject.bindings = internalBindings;
 		resultObject.staticSamplers = internalStaticSamplers;
 		resultObject.namesBuffer = StringViewASCII(namesBuffer, namesBufferSize);
-		resultObject.serializedBlobData = serializedBlob;
-		resultObject.serializedBlobSize = serializedBlobSize;
+		resultObject.blobData = blobData;
+		resultObject.blobSize = blobSize;
 		resultObject.sourceHash = sourceHash;
 		resultObject.bindingCount = bindingCount;
 		resultObject.staticSamplerCount = staticSamplerCount;
@@ -675,9 +674,9 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 		*(namesBuffer + dst.bindingNameOffset + src.bindingName.getLength()) = 0;
 	}
 
-	// Populate serialized blob.
+	// Populate blob.
 	{
-		serializedBlobWriter.setMemoryBlock(serializedBlob, serializedBlobSize);
+		blobWriter.setBlobMemory(blobData, blobSize);
 		for (uint16 i = 0; i < bindingCount; i++)
 		{
 			const PipelineBindingDesc& binding = bindings[i];
@@ -689,10 +688,10 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 			if (binding.type == PipelineBindingType::DescriptorSet)
 				blobBindingInfo.descriptorSetLayoutSourceHash = binding.descriptorSetLayout->getSourceHash();
 
-			serializedBlobWriter.writeBinding(i, blobBindingInfo);
+			blobWriter.writeBindingInfo(i, blobBindingInfo);
 		}
-		serializedBlobWriter.writePlatformData(platformData, platformDataSize);
-		serializedBlobWriter.finalize(sourceHash);
+		blobWriter.writePlatformData(platformData, platformDataSize);
+		blobWriter.finalize();
 	}
 
 	return PipelineLayoutRef(&resultObject);
@@ -700,11 +699,6 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 
 
 // Blob ////////////////////////////////////////////////////////////////////////////////////////////
-
-uint32 Blob::getChecksum() const
-{
-	return ((BlobFormat::Data::GenericBlobHeader*)getData())->checksum;
-}
 
 BlobRef Blob::Create(uint32 size)
 {
@@ -717,6 +711,43 @@ BlobRef Blob::Create(uint32 size)
 	resultObject.size = size;
 
 	return BlobRef(&resultObject);
+}
+
+
+// ShaderCompilationResult /////////////////////////////////////////////////////////////////////////
+
+ShaderCompilationResultRef ShaderCompilationResult::Compose(const ComposerSource& source)
+{
+	uintptr memoryBlockSizeAccum = 0;
+	memoryBlockSizeAccum += sizeof(ShaderCompilationResult);
+
+	const uintptr preprocessorOuputStrOffset = memoryBlockSizeAccum;
+	memoryBlockSizeAccum += source.preprocessorOuputStr.getLength() + 1;
+
+	const uintptr platformCompilerOutputStrOffset = memoryBlockSizeAccum;
+	memoryBlockSizeAccum += source.platformCompilerOutputStr.getLength() + 1;
+
+	const uintptr memoryBlockSize = memoryBlockSizeAccum;
+	void* memoryBlock = SystemHeapAllocator::Allocate(memoryBlockSize);
+	memorySet(memoryBlock, 0, memoryBlockSize);
+
+	ShaderCompilationResult& resultObject = *(ShaderCompilationResult*)memoryBlock;
+	construct(resultObject);
+
+	memoryCopy((char*)memoryBlock + preprocessorOuputStrOffset, source.preprocessorOuputStr.getData(), source.preprocessorOuputStr.getLength());
+	memoryCopy((char*)memoryBlock + platformCompilerOutputStrOffset, source.platformCompilerOutputStr.getData(), source.platformCompilerOutputStr.getLength());
+
+	resultObject.preprocessorOuputStr = StringViewASCII((char*)memoryBlock + preprocessorOuputStrOffset, source.preprocessorOuputStr.getLength());
+	resultObject.platformCompilerOutputStr = StringViewASCII((char*)memoryBlock + platformCompilerOutputStrOffset, source.platformCompilerOutputStr.getLength());
+
+	resultObject.preprocessedSourceBlob = (Blob*)source.preprocessedSourceBlob;
+	resultObject.bytecodeBlob = (Blob*)source.bytecodeBlob;
+	resultObject.disassemblyBlob = (Blob*)source.disassemblyBlob;
+	resultObject.d3dPDBBlob = (Blob*)source.d3dPDBBlob;
+
+	resultObject.status = source.status;
+
+	return ShaderCompilationResultRef(&resultObject);
 }
 
 
@@ -736,11 +767,6 @@ static bool ValidateGenericBindingName(StringViewASCII name)
 			return false;
 	}
 	return true;
-}
-
-bool ShaderCompiler::ValidateVertexBindingName(StringViewASCII name)
-{
-	return ValidateGenericBindingName(name);
 }
 
 bool ShaderCompiler::ValidateDescriptorSetBindingName(StringViewASCII name)
@@ -769,39 +795,40 @@ bool ShaderCompiler::ValidateShaderEntryPointName(StringViewASCII name)
 	return true;
 }
 
-static bool CompileShaderDXC(const PipelineLayout& pipelineLayout, const ShaderDesc& shader, ShaderType shaderType,
-	ShaderCompilationArtifactsRef& artifacts, BlobRef& compiledBytecodeBlob)
+ShaderCompilationResultRef ShaderCompiler::CompileShader(XLib::StringViewASCII sourceText,
+	const PipelineLayout& pipelineLayout, const ShaderCompilationArgs& args)
 {
-	artifacts = nullptr;
-	compiledBytecodeBlob = nullptr;
-
-	// TODO: Preprocess source text.
-	// ...
-
-	// Patch source text.
+	// Patch source text ///////////////////////////////////////////////////////////////////////////
 	DynamicStringASCII patchedSource;
-	HLSLPatcher::Error hlslPatcherError = {};
-	if (!HLSLPatcher::Patch(shader.sourceText, pipelineLayout, patchedSource, hlslPatcherError))
 	{
-		// TODO: Store XE HLSL patcher errors in artifacts.
-		TextWriteFmtStdOut(shader.sourcePath, ":",
-			hlslPatcherError.location.lineNumber, ":", hlslPatcherError.location.columnNumber,
-			": xe-hlsl-patcher: ", hlslPatcherError.message);
-		return false;
+		HLSLPatcher::Error hlslPatcherError = {};
+		if (!HLSLPatcher::Patch(sourceText, pipelineLayout, patchedSource, hlslPatcherError))
+		{
+			InplaceStringASCIIx4096 xePreprocessorOutput;
+			TextWriteFmt(xePreprocessorOutput, args.sourcePath, ":",
+				hlslPatcherError.location.lineNumber, ":", hlslPatcherError.location.columnNumber,
+				": xe-hlsl-patcher: ", hlslPatcherError.message);
+
+			ShaderCompilationResult::ComposerSource resultComposerSrc = {};
+			resultComposerSrc.status = ShaderCompilationStatus::PreprocessorError;
+			resultComposerSrc.preprocessorOuputStr = xePreprocessorOutput.getView();
+			return ShaderCompilationResult::Compose(resultComposerSrc);
+		}
 	}
 
-	// Build arguments list.
+
+	// Build argument list /////////////////////////////////////////////////////////////////////////
 	wchar displayedShaderNameW[2048] = {};
 	wchar entryPointNameW[128] = {};
-	MultiByteToWideChar(CP_ACP, 0, shader.sourcePath.getData(), uint32(shader.sourcePath.getLength()), displayedShaderNameW, countof(displayedShaderNameW));
-	MultiByteToWideChar(CP_ACP, 0, shader.entryPointName.getData(), uint32(shader.entryPointName.getLength()), entryPointNameW, countof(entryPointNameW));
+	MultiByteToWideChar(CP_ACP, 0, args.sourcePath.getData(), uint32(args.sourcePath.getLength()), displayedShaderNameW, countof(displayedShaderNameW));
+	MultiByteToWideChar(CP_ACP, 0, args.entryPointName.getData(), uint32(args.entryPointName.getLength()), entryPointNameW, countof(entryPointNameW));
 
 	InplaceArrayList<LPCWSTR, 64> dxcArgsList;
 	{
 		dxcArgsList.pushBack(displayedShaderNameW);
 
 		LPCWSTR dxcProfile = nullptr;
-		switch (shaderType)
+		switch (args.shaderType)
 		{
 			case ShaderType::Compute:		dxcProfile = L"-Tcs_6_6"; break;
 			case ShaderType::Vertex:		dxcProfile = L"-Tvs_6_6"; break;
@@ -819,7 +846,8 @@ static bool CompileShaderDXC(const PipelineLayout& pipelineLayout, const ShaderD
 		//dxcArgsList.pushBack(L"-enable-16bit-types");
 	}
 
-	// Actual compilation.
+
+	// Actual compilation //////////////////////////////////////////////////////////////////////////
 	Microsoft::WRL::ComPtr<IDxcCompiler3> dxcCompiler;
 	DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxcCompiler));
 
@@ -829,239 +857,66 @@ static bool CompileShaderDXC(const PipelineLayout& pipelineLayout, const ShaderD
 	dxcSourceBuffer.Encoding = CP_UTF8;
 
 	Microsoft::WRL::ComPtr<IDxcResult> dxcResult;
-	const HRESULT hCompileResult = dxcCompiler->Compile(&dxcSourceBuffer,
+	const HRESULT compileCallHResult = dxcCompiler->Compile(&dxcSourceBuffer,
 		dxcArgsList.getData(), dxcArgsList.getSize(), nullptr, IID_PPV_ARGS(&dxcResult));
-	if (FAILED(hCompileResult) || !dxcResult)
-		return false;
 
-	Microsoft::WRL::ComPtr<IDxcBlobUtf8> dxcErrorsBlob;
-	dxcResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&dxcErrorsBlob), nullptr);
-
-	if (dxcErrorsBlob != nullptr && dxcErrorsBlob->GetStringLength() > 0)
+	if (FAILED(compileCallHResult) || !dxcResult)
 	{
-		// TODO: Store compiler output in artifacts.
-		TextWriteFmtStdOut(dxcErrorsBlob->GetStringPointer());
+		ShaderCompilationResult::ComposerSource resultComposerSrc = {};
+		resultComposerSrc.status = ShaderCompilationStatus::PlatformCompilerCallFailed;
+		return ShaderCompilationResult::Compose(resultComposerSrc);
 	}
 
-	HRESULT hCompileStatus = E_FAIL;
-	dxcResult->GetStatus(&hCompileStatus);
 
-	if (FAILED(hCompileStatus))
-		return false;
+	// Process platform compiler result and compose XE shader compilation result ///////////////////
+	ShaderCompilationResult::ComposerSource resultComposerSrc = {};
 
-	Microsoft::WRL::ComPtr<IDxcBlob> dxcBytecodeBlob = nullptr;
-	dxcResult->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&dxcBytecodeBlob), nullptr);
-	XAssert(dxcBytecodeBlob != nullptr && dxcBytecodeBlob->GetBufferSize() > 0);
-
-	// Compose compiled blob.
-	BlobFormat::BytecodeBlobWriter blobWriter;
-	blobWriter.initialize(uint32(dxcBytecodeBlob->GetBufferSize()));
-
-	BlobRef blob = Blob::Create(blobWriter.getMemoryBlockSize());
-	blobWriter.setMemoryBlock((void*)blob->getData(), blob->getSize());
-	blobWriter.writeBytecode(dxcBytecodeBlob->GetBufferPointer(), uint32(dxcBytecodeBlob->GetBufferSize()));
-	blobWriter.finalize(shaderType, pipelineLayout.getSourceHash());
-
-	compiledBytecodeBlob = asRValue(blob);
-
-	return true;
-}
-
-bool ShaderCompiler::CompileGraphicsPipeline(
-	const PipelineLayout& pipelineLayout,
-	const GraphicsPipelineShaders& shaders,
-	const GraphicsPipelineSettings& settings,
-	GraphicsPipelineCompilationArtifacts& artifacts,
-	GraphicsPipelineCompiledBlobs& compiledBlobs,
-	GenericErrorMessage& errorMessage)
-{
-	artifacts = {};
-	compiledBlobs = {};
-
-	const bool vsEnabled = !shaders.vs.sourcePath.isEmpty();
-	const bool asEnabled = !shaders.as.sourcePath.isEmpty();
-	const bool msEnabled = !shaders.ms.sourcePath.isEmpty();
-	const bool psEnabled = !shaders.ps.sourcePath.isEmpty();
-
-	// Verify enabled shader stages combination.
-	if ((vsEnabled == msEnabled) || (!vsEnabled && !msEnabled) || (asEnabled && !msEnabled))
+	// Compilation status
 	{
-		errorMessage.text = "invalid enabled shader stages combination";
-		return false;
+		HRESULT compileStatusHResult = E_FAIL;
+		dxcResult->GetStatus(&compileStatusHResult);
+		resultComposerSrc.status = FAILED(compileStatusHResult) ?
+			ShaderCompilationStatus::PlatformCompilerError : ShaderCompilationStatus::Success;
 	}
 
-	if (settings.vertexBindingCount > 0 && !vsEnabled)
+	// Errors
 	{
-		errorMessage.text = "vertex input enabled but vertex shader disabled";
-		return false;
-	}
-
-	if (settings.vertexBindingCount > MaxVertexBindingCount)
-	{
-		errorMessage.text = "vertex input: bindings limit exceeded";
-		return false;
-	}
-
-	// Compile shaders.
-	BlobRef vsBlob = nullptr;
-	BlobRef asBlob = nullptr;
-	BlobRef msBlob = nullptr;
-	BlobRef psBlob = nullptr;
-
-	if (vsEnabled)
-	{
-		if (!CompileShaderDXC(pipelineLayout, shaders.vs, ShaderType::Vertex, artifacts.vs, vsBlob))
+		Microsoft::WRL::ComPtr<IDxcBlobUtf8> dxcErrorsBlob;
+		dxcResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&dxcErrorsBlob), nullptr);
+		if (dxcErrorsBlob != nullptr && dxcErrorsBlob->GetStringLength() > 0)
 		{
-			errorMessage.text = "VS compilation failed";
-			return false;
-		}
-	}
-	if (asEnabled)
-	{
-		if (!CompileShaderDXC(pipelineLayout, shaders.as, ShaderType::Amplification, artifacts.as, asBlob))
-		{
-			errorMessage.text = "AS compilation failed";
-			return false;
-		}
-	}
-	if (msEnabled)
-	{
-		if (!CompileShaderDXC(pipelineLayout, shaders.ms, ShaderType::Mesh, artifacts.ms, msBlob))
-		{
-			errorMessage.text = "MS compilation failed";
-			return false;
-		}
-	}
-	if (psEnabled)
-	{
-		if (!CompileShaderDXC(pipelineLayout, shaders.ps, ShaderType::Pixel, artifacts.ps, psBlob))
-		{
-			errorMessage.text = "PS compilation failed";
-			return false;
+			resultComposerSrc.platformCompilerOutputStr = StringViewASCII(
+				dxcErrorsBlob->GetStringPointer(), dxcErrorsBlob->GetStringLength());
 		}
 	}
 
-	// Compose state blob.
-
-	BlobFormat::GraphicsPipelineStateBlobWriter stateBlobWriter;
-	stateBlobWriter.beginInitialization();
-
-	if (vsEnabled) stateBlobWriter.registerBytecodeBlob(ShaderType::Vertex, vsBlob->getChecksum());
-	if (asEnabled) stateBlobWriter.registerBytecodeBlob(ShaderType::Amplification, asBlob->getChecksum());
-	if (msEnabled) stateBlobWriter.registerBytecodeBlob(ShaderType::Mesh, msBlob->getChecksum());
-	if (psEnabled) stateBlobWriter.registerBytecodeBlob(ShaderType::Pixel, psBlob->getChecksum());
-
-	// Validate and register render targets.
-	for (uint8 i = 0; i < countof(settings.colorRTFormats); i++)
+	// Bytecode
+	BlobRef bytecodeBlob = nullptr;
 	{
-		if (settings.colorRTFormats[i] == TexelViewFormat::Undefined)
-			continue;
+		Microsoft::WRL::ComPtr<IDxcBlob> dxcBytecodeBlob = nullptr;
+		dxcResult->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&dxcBytecodeBlob), nullptr);
+		XAssert(dxcBytecodeBlob != nullptr && dxcBytecodeBlob->GetBufferSize() > 0);
 
-		if (!TexelViewFormatUtils::IsValid(settings.colorRTFormats[i]))
+		// Compose bytecode blob
 		{
-			errorMessage.text = "color render targets: invalid format";
-			return false;
+			const uint32 bytecodeSize = XCheckedCastU32(dxcBytecodeBlob->GetBufferSize());
+
+			BlobFormat::ShaderBlobInfo blobInfo = {};
+			blobInfo.pipelineLayoutSourceHash = pipelineLayout.getSourceHash();
+			blobInfo.bytecodeSize = bytecodeSize;
+			blobInfo.shaderType = args.shaderType;
+
+			BlobFormat::ShaderBlobWriter blobWriter;
+			blobWriter.setup(blobInfo);
+
+			bytecodeBlob = Blob::Create(blobWriter.getBlobSize());
+			blobWriter.setBlobMemory((void*)bytecodeBlob->getData(), bytecodeBlob->getSize());
+			blobWriter.writeBytecode(dxcBytecodeBlob->GetBufferPointer(), bytecodeSize);
+			blobWriter.finalize();
 		}
-		if (!TexelViewFormatUtils::SupportsColorRTUsage(settings.colorRTFormats[i]))
-		{
-			errorMessage.text = "color render targets: format does not support render target usage";
-			return false;
-		}
-		stateBlobWriter.setColorRTFormat(i, settings.colorRTFormats[i]);
+
+		resultComposerSrc.bytecodeBlob = bytecodeBlob.get();
 	}
 
-	// TODO: `ValidateDepthStencilFormatValue`.
-	stateBlobWriter.setDepthStencilRTFormat(settings.depthStencilRTFormat);
-
-	// Validate and register vertex input layout.
-	for (uint8 i = 0; i < MaxVertexBufferCount; i++)
-	{
-		switch (settings.vertexBuffers[i].stepRate)
-		{
-			case VertexBufferStepRate::Undefined:	break;
-			case VertexBufferStepRate::PerVertex:	stateBlobWriter.enableVertexBuffer(i, false); break;
-			case VertexBufferStepRate::PerInstance:	stateBlobWriter.enableVertexBuffer(i, true);  break;
-			default:
-				errorMessage.text = "vertex input: invalid buffer step rate";
-				return false;
-		}
-	}
-
-	for (uint8 i = 0; i < settings.vertexBindingCount; i++)
-	{
-		const VertexBindingDesc& binding = settings.vertexBindings[i];
-
-		uint32 bindingNameLength = 0;
-		while (bindingNameLength < countof(binding.nameCStr) && binding.nameCStr[bindingNameLength])
-			bindingNameLength++;
-
-		if (bindingNameLength == countof(binding.nameCStr)) // No zero terminator
-		{
-			errorMessage.text = "vertex input: binding name is too long (buffer overrun)";
-			return false;
-		}
-		if (!ValidateVertexBindingName(StringViewASCII(binding.nameCStr, bindingNameLength)))
-		{
-			errorMessage.text = "vertex input: invalid binding name";
-			return false;
-		}
-		if (!TexelViewFormatUtils::SupportsVertexInputUsage(binding.format))
-		{
-			errorMessage.text = "vertex input: binding format does not support vertex input usage";
-			return false;
-		}
-		if (binding.offset + TexelViewFormatUtils::GetByteSize(binding.format) > MaxVertexBufferElementSize)
-		{
-			errorMessage.text = "vertex input: buffer element size limit exceeded";
-			return false;
-		}
-		if (binding.bufferIndex >= MaxVertexBufferCount)
-		{
-			errorMessage.text = "vertex input: invalid vertex buffer index";
-			return false;
-		}
-
-		const VertexBufferDesc& buffer = settings.vertexBuffers[binding.bufferIndex];
-		if (buffer.stepRate != VertexBufferStepRate::PerVertex && buffer.stepRate != VertexBufferStepRate::PerInstance)
-		{
-			errorMessage.text = "vertex input: invalid vertex buffer index";
-			return false;
-		}
-
-		BlobFormat::VertexBindingInfo blobBindingInfo = {};
-		static_assert(sizeof(blobBindingInfo.nameCStr) >= sizeof(binding.nameCStr));
-		memoryCopy(blobBindingInfo.nameCStr, binding.nameCStr, bindingNameLength);
-		blobBindingInfo.offset = binding.offset;
-		blobBindingInfo.format = binding.format;
-		blobBindingInfo.bufferIndex = binding.bufferIndex;
-
-		stateBlobWriter.addVertexBinding(blobBindingInfo);
-	}
-
-	XTODO("Sort vertex input bindings via buffer index and offset");
-
-	stateBlobWriter.endInitialization();
-
-	BlobRef stateBlob = Blob::Create(stateBlobWriter.getMemoryBlockSize());
-	stateBlobWriter.finalizeToMemoryBlock((void*)stateBlob->getData(), stateBlob->getSize(), pipelineLayout.getSourceHash());
-
-	compiledBlobs.stateBlob = asRValue(stateBlob);
-	compiledBlobs.vsBytecodeBlob = asRValue(vsBlob);
-	compiledBlobs.asBytecodeBlob = asRValue(asBlob);
-	compiledBlobs.msBytecodeBlob = asRValue(msBlob);
-	compiledBlobs.psBytecodeBlob = asRValue(psBlob);
-
-	return true;
-}
-
-bool ShaderCompiler::CompileComputePipeline(
-	const PipelineLayout& pipelineLayout,
-	const ShaderDesc& computeShader,
-	ShaderCompilationArtifactsRef& artifacts,
-	BlobRef& compiledBlob)
-{
-	artifacts = nullptr;
-	compiledBlob = nullptr;
-
-	return CompileShaderDXC(pipelineLayout, computeShader, ShaderType::Compute, artifacts, compiledBlob);
+	return ShaderCompilationResult::Compose(resultComposerSrc);
 }
