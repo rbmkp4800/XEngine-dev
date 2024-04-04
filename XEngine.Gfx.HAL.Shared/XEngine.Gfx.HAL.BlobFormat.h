@@ -72,17 +72,6 @@ namespace XEngine::Gfx::HAL::BlobFormat::Data
 		ShaderType shaderType;
 	};
 	static_assert(sizeof(ShaderBlobSubHeader) == 8);
-
-#if 0
-	struct VertexInputBindingRecord // 24 bytes
-	{
-		char nameCStr[20];
-		uint16 offset;
-		TexelViewFormat format;
-		uint8 bufferIndex;
-	};
-	static_assert(sizeof(VertexInputBindingRecord) == 24);
-#endif
 }
 
 namespace XEngine::Gfx::HAL::BlobFormat

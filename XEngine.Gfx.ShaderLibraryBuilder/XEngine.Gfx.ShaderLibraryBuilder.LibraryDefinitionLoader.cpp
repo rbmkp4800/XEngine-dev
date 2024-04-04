@@ -124,15 +124,6 @@ static HAL::SamplerAddressMode ParseSamplerAddressModeString(StringViewASCII str
 	return HAL::SamplerAddressMode::Undefined;
 }
 
-#if 0
-static HAL::ShaderCompiler::VertexBufferStepRate ParseVertexBufferStepRateString(StringViewASCII string)
-{
-	if (string == "per_vertex")		return HAL::ShaderCompiler::VertexBufferStepRate::PerVertex;
-	if (string == "per_instance")	return HAL::ShaderCompiler::VertexBufferStepRate::PerInstance;
-	return HAL::ShaderCompiler::VertexBufferStepRate::Undefined;
-}
-#endif
-
 static HAL::DescriptorType ParseDescriptorTypeString(StringViewASCII string)
 {
 	if (string == "read_only_buffer_descriptor")					return HAL::DescriptorType::ReadOnlyBuffer;
@@ -420,137 +411,6 @@ bool LibraryDefinitionLoader::readStaticSampler(StringViewASCII staticSamplerNam
 	return true;
 }
 
-#if 0
-bool LibraryDefinitionLoader::readVertexInputLayout(StringViewASCII vertexInputLayoutName, Cursor jsonVertexInputLayoutNameCursor)
-{
-	for (VertexInputLayoutDesc& i : vertexInputLayouts)
-	{
-		if (i.name == vertexInputLayoutName)
-		{
-			reportError("vertex inout layout redefinition", jsonVertexInputLayoutNameCursor);
-			return false;
-		}
-	}
-	
-	VertexInputLayoutDesc vertexInputLayoutDesc = {};
-	vertexInputLayoutDesc.name = vertexInputLayoutName;
-	vertexInputLayoutDesc.bindingsOffsetInAccumBuffer = vertexBindingsAccumBuffer.getSize();
-	vertexInputLayoutDesc.bindingCount = 0;
-
-	IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithArrayValue("buffers"));
-
-	jsonReader.openArray();
-	IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
-
-	uint8 vertexBufferCount = 0;
-	while (!jsonReader.isEndOfArray())
-	{
-		JSONValue jsonBufferValue = {};
-		const Cursor jsonBufferValueCursor = getJSONCursor();
-		jsonReader.readValue(jsonBufferValue);
-		IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
-
-		IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(vertexBufferCount < HAL::MaxVertexBufferCount, "vertex buffers limit exceeded", jsonBufferValueCursor);
-		const uint8 vertexBufferIndex = vertexBufferCount;
-		vertexBufferCount++;
-
-		if (jsonBufferValue.type == JSONValueType::Null)
-			continue;
-
-		IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonBufferValue.type == JSONValueType::Object, "object or null expected", jsonBufferValueCursor);
-
-		HAL::ShaderCompiler::VertexBufferDesc& vertexBufferDesc = vertexInputLayoutDesc.buffers[vertexBufferIndex];
-
-		jsonReader.openObject();
-		IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
-		{
-			StringViewASCII stepRateString = {};
-			const Cursor jsonStepRateStringCursor = getJSONCursor();
-			IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("step_rate", stepRateString));
-
-			vertexBufferDesc.stepRate = ParseVertexBufferStepRateString(stepRateString);
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(vertexBufferDesc.stepRate != HAL::ShaderCompiler::VertexBufferStepRate::Undefined,
-				"invalid vertex buffer step rate", jsonStepRateStringCursor);
-
-			const Cursor jsonElementsArrayCursor = getJSONCursor();
-			IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithArrayValue("elements"));
-
-			jsonReader.openArray();
-			IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
-
-			bool atLeastOneBindingConsumed = false;
-			uint16 vertexBindingDataOffset = 0;
-			while (!jsonReader.isEndOfArray())
-			{
-				JSONValue jsonElementValue = {};
-				const Cursor jsonElementValueCursor = getJSONCursor();
-				jsonReader.readValue(jsonElementValue);
-				IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
-				IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonElementValue.type == JSONValueType::Object, "object expected", jsonElementValueCursor);
-
-				HAL::ShaderCompiler::VertexBindingDesc vertexBindingDesc = {};
-
-				jsonReader.openObject();
-				IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
-				{
-					StringViewASCII bindingName = {};
-					const Cursor jsonBindingNameCursor = getJSONCursor();
-					IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("name", bindingName));
-					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(HAL::ShaderCompiler::ValidateVertexBindingName(bindingName), "invalid vertex binding name", jsonBindingNameCursor);
-					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(bindingName.getLength() < countof(vertexBindingDesc.nameCStr), "vertex binding name length limit exceeded", jsonBindingNameCursor);
-
-					StringViewASCII bindingFormatStr = {};
-					const Cursor jsonBindingFormatCursor = getJSONCursor();
-					IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("format", bindingFormatStr));
-
-					const HAL::TexelViewFormat bindingFormat = ParseTexelViewFormatString(bindingFormatStr);
-					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(bindingFormat != HAL::TexelViewFormat::Undefined, "invalid vertex binding format", jsonBindingFormatCursor);
-					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(HAL::TexelViewFormatUtils::SupportsVertexInputUsage(bindingFormat),
-						"format does not support vertex input usage", jsonBindingFormatCursor);
-
-					memoryCopy(vertexBindingDesc.nameCStr, bindingName.getData(), bindingName.getLength());
-					vertexBindingDesc.offset = vertexBindingDataOffset;
-					vertexBindingDesc.format = bindingFormat;
-					vertexBindingDesc.bufferIndex = vertexBufferIndex;
-
-					XTODO("Add padding");
-					vertexBindingDataOffset += HAL::TexelViewFormatUtils::GetByteSize(bindingFormat);
-
-					atLeastOneBindingConsumed = true;
-				}
-				jsonReader.closeObject();
-				IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
-
-				IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(vertexInputLayoutDesc.bindingCount < HAL::MaxVertexBindingCount, "vertex bindings limit exceeded", jsonElementValueCursor);
-				const uint8 localVertexBindingIndex = vertexInputLayoutDesc.bindingCount;
-				vertexInputLayoutDesc.bindingCount++;
-
-				vertexBindingsAccumBuffer.pushBack(vertexBindingDesc);
-				XAssert(vertexInputLayoutDesc.bindingsOffsetInAccumBuffer + vertexInputLayoutDesc.bindingCount == vertexBindingsAccumBuffer.getSize());
-			}
-
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(atLeastOneBindingConsumed, "no bindings defined for buffer", jsonElementsArrayCursor);
-
-			jsonReader.closeArray();
-			IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
-		}
-		jsonReader.closeObject();
-		IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
-	}
-
-	jsonReader.closeArray();
-	IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
-
-	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonReader.isEndOfObject(), "end of object expected", getJSONCursor());
-
-	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(vertexInputLayoutDesc.bindingCount > 0, "vertex input layout has no bindings", jsonVertexInputLayoutNameCursor);
-
-	vertexInputLayouts.pushBack(vertexInputLayoutDesc);
-
-	return true;
-}
-#endif
-
 bool LibraryDefinitionLoader::readDescriptorSetLayout(StringViewASCII descriptorSetLayoutName, Cursor jsonDescriptorSetLayoutNameCursor)
 {
 	IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithObjectValue("bindings"));
@@ -747,93 +607,7 @@ bool LibraryDefinitionLoader::readShader(StringViewASCII shaderName, Cursor json
 	IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("entry", args.entryPointName));
 	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(HAL::ShaderCompiler::ValidateShaderEntryPointName(args.entryPointName), "invalid shader entry point name", jsonEntryPointNameCursor);
 
-#if 0
-	bool vertexInputLayoutIsSet = false;
-	bool colorRTFormatsAreSet = false;
-	bool depthStencilRTFormatIsSet = false;
-
-	while (!jsonReader.isEndOfObject())
-	{
-		JSONString jsonKey = {};
-		const Cursor jsonKeyCursor = getJSONCursor();
-		jsonReader.readKey(jsonKey);
-		IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
-
-		JSONValue jsonValue = {};
-		const Cursor jsonValueCursor = getJSONCursor();
-		jsonReader.readValue(jsonValue);
-		IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
-
-		if (jsonKey.string == "vertex_input_layout" && shaderType == HAL::ShaderType::Vertex)
-		{
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!vertexInputLayoutIsSet, "vertex input layout already set", jsonKeyCursor);
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonValue.type == JSONValueType::String, "string expected", jsonValueCursor);
-
-			const VertexInputLayoutDesc* vertexInputLayout = findVertexInputLayout(jsonValue.string.string);
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(vertexInputLayout, "undefined vertex input layout", jsonValueCursor);
-
-			memoryCopy(args.vs.vertexBuffers, vertexInputLayout->buffers, sizeof(args.vs.vertexBuffers));
-			args.vs.vertexBindings = &vertexBindingsAccumBuffer[vertexInputLayout->bindingsOffsetInAccumBuffer];
-			args.vs.vertexBindingCount = vertexInputLayout->bindingCount;
-
-			vertexInputLayoutIsSet = true;
-		}
-		else if (jsonKey.string == "color_rts" && shaderType == HAL::ShaderType::Pixel)
-		{
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!colorRTFormatsAreSet, "color RT formats are already set", jsonKeyCursor);
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonValue.type == JSONValueType::Array, "array expected", jsonValueCursor);
-
-			jsonReader.openArray();
-			IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
-
-			uint8 rtCount = 0;
-			while (!jsonReader.isEndOfArray())
-			{
-				JSONValue jsonRTFormatValue = {};
-				const Cursor jsonRTFormatValueCursor = getJSONCursor();
-				jsonReader.readValue(jsonRTFormatValue);
-				IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
-
-				HAL::TexelViewFormat rtFormat = HAL::TexelViewFormat::Undefined;
-				if (jsonRTFormatValue.type != JSONValueType::Null)
-				{
-					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonRTFormatValue.type == JSONValueType::String, "string or null expected", jsonRTFormatValueCursor);
-
-					rtFormat = ParseTexelViewFormatString(jsonRTFormatValue.string.string);
-					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(rtFormat != HAL::TexelViewFormat::Undefined, "invalid format", jsonRTFormatValueCursor);
-					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(HAL::TexelViewFormatUtils::SupportsColorRTUsage(rtFormat),
-						"format does not support color RT usage", jsonRTFormatValueCursor);
-				}
-
-				IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(rtCount < HAL::MaxColorRenderTargetCount, "color RT limit exceeded", jsonRTFormatValueCursor);
-
-				args.ps.colorRTFormats[rtCount] = rtFormat;
-				rtCount++;
-			}
-
-			jsonReader.closeArray();
-			IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
-
-			colorRTFormatsAreSet = true;
-		}
-		else if (jsonKey.string == "depth_stencil_rt" && shaderType == HAL::ShaderType::Pixel)
-		{
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!depthStencilRTFormatIsSet, "depth stencil RT format is already set", jsonKeyCursor);
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonValue.type == JSONValueType::String, "string expected", jsonValueCursor);
-
-			const HAL::DepthStencilFormat rtFormat = ParseDepthStencilFormatString(jsonValue.string.string);
-			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(rtFormat != HAL::DepthStencilFormat::Undefined, "invalid depth stencil RT format", jsonValueCursor);
-
-			args.ps.depthStencilRTFormat = rtFormat;
-			depthStencilRTFormatIsSet = true;
-		}
-		else
-		{
-			reportError("invalid shader setup property", jsonKeyCursor);
-			return false;
-		}
-	}
-#endif
+	XTODO("Rewrite " __FUNCTION__ " in less constrained way");
 
 	const uint64 shaderNameXSH = XSH::Compute(shaderName);
 	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(shaderNameXSH != 0, "shader name XSH = 0. This is not allowed", jsonShaderNameCursor);
@@ -874,19 +648,6 @@ bool LibraryDefinitionLoader::readPipelineLayoutSetupProperty(
 
 	return true;
 }
-
-#if 0
-const LibraryDefinitionLoader::VertexInputLayoutDesc* LibraryDefinitionLoader::findVertexInputLayout(StringViewASCII name) const
-{
-	// TODO: Do this properly.
-	for (const VertexInputLayoutDesc& i : vertexInputLayouts)
-	{
-		if (i.name == name)
-			return &i;
-	}
-	return nullptr;
-}
-#endif
 
 bool LibraryDefinitionLoader::load(const char* jsonPath)
 {
@@ -942,8 +703,6 @@ bool LibraryDefinitionLoader::load(const char* jsonPath)
 			bool readEntryStatus = false;
 			if (entryType == "static_sampler")
 				readEntryStatus = readStaticSampler(entryName, jsonEntryNameCursor);
-			//else if (entryType == "vertex_input_layout")
-			//	readEntryStatus = readVertexInputLayout(entryName, jsonEntryNameCursor);
 			else if (entryType == "descriptor_set_layout")
 				readEntryStatus = readDescriptorSetLayout(entryName, jsonEntryNameCursor);
 			else if (entryType == "pipeline_layout")

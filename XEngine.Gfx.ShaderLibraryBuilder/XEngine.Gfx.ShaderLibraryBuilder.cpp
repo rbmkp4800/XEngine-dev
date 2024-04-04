@@ -33,16 +33,6 @@ ShaderRef Shader::Create(XLib::StringViewASCII name,
 	const uintptr entryPointNameStrOffset = memoryBlockSizeAccum;
 	memoryBlockSizeAccum += compilationArgs.entryPointName.getLength() + 1;
 
-#if 0
-	const uintptr vertexBindingsMemOffset = memoryBlockSizeAccum;
-	if (compilationArgs.type == HAL::ShaderType::Vertex)
-		memoryBlockSizeAccum += sizeof(HAL::ShaderCompiler::VertexInputBindingDesc) * compilationArgs.vs.vertexInputBindingCount;
-
-	// NOTE: This code actually assumes that 'HAL::ShaderCompiler::VertexBindingDesc::name' is inplace char array.
-	// Because of this, we do not need to explicitly allocate memory for vertex binding names as they are stored inplace.
-	XAssert(countof(compilationArgs.vs.vertexInputBindings[0].nameCStr) == sizeof(compilationArgs.vs.vertexInputBindings[0].nameCStr));
-#endif
-
 	const uintptr memoryBlockSize = memoryBlockSizeAccum;
 	void* memoryBlock = SystemHeapAllocator::Allocate(memoryBlockSize);
 	memorySet(memoryBlock, 0, memoryBlockSize);
@@ -60,23 +50,6 @@ ShaderRef Shader::Create(XLib::StringViewASCII name,
 	resultObject.compilationArgs.sourcePath = StringViewASCII((char*)memoryBlock + sourcePathStrOffset, compilationArgs.sourcePath.getLength());
 	resultObject.compilationArgs.entryPointName = StringViewASCII((char*)memoryBlock + entryPointNameStrOffset, compilationArgs.entryPointName.getLength());
 	resultObject.compilationArgs.shaderType = compilationArgs.shaderType;
-
-#if 0
-	if (compilationArgs.type == HAL::ShaderType::Vertex)
-	{
-		HAL::ShaderCompiler::VertexInputBindingDesc* internalVertexInputBindings = (HAL::ShaderCompiler::VertexInputBindingDesc*)(uintptr(memoryBlock) + vertexBindingsMemOffset);
-		memoryCopy(internalVertexInputBindings, compilationArgs.vs.vertexInputBindings, sizeof(HAL::ShaderCompiler::VertexInputBindingDesc) * compilationArgs.vs.vertexInputBindingCount);
-
-		memoryCopy(&resultObject.compilationArgs.vs.vertexBuffers, &compilationArgs.vs.vertexBuffers, sizeof(compilationArgs.vs.vertexBuffers));
-		resultObject.compilationArgs.vs.vertexInputBindings = compilationArgs.vs.vertexInputBindingCount > 0 ? internalVertexInputBindings : nullptr;
-		resultObject.compilationArgs.vs.vertexInputBindingCount = compilationArgs.vs.vertexInputBindingCount;
-	}
-	else if (compilationArgs.type == HAL::ShaderType::Pixel)
-	{
-		memoryCopy(&resultObject.compilationArgs.ps.colorRTFormats, &compilationArgs.ps.colorRTFormats, sizeof(compilationArgs.ps.colorRTFormats));
-		resultObject.compilationArgs.ps.depthStencilRTFormat = compilationArgs.ps.depthStencilRTFormat;
-	}
-#endif
 
 	return ShaderRef(&resultObject);
 }

@@ -66,45 +66,11 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 		};
 	};
 
-#if 0
-	enum class VertexBufferStepRate : uint8
-	{
-		Undefined = 0,
-		PerVertex,
-		PerInstance,
-	};
-
-	struct VertexBufferDesc
-	{
-		VertexBufferStepRate stepRate;
-	};
-
-	struct VertexInputBindingDesc
-	{
-		char nameCStr[20];
-		uint16 offset;
-		TexelViewFormat format;
-		uint8 bufferIndex;
-	};
-#endif
-
 	struct ShaderCompilationArgs
 	{
 		XLib::StringViewASCII sourcePath;
 		XLib::StringViewASCII entryPointName;
 		// Optimization, platform specific stuff, etc.
-
-#if 0
-		union
-		{
-			struct
-			{
-				VertexBufferDesc vertexBuffers[MaxVertexBufferCount];
-				VertexInputBindingDesc* vertexInputBindings;
-				uint8 vertexInputBindingCount;
-			} vs;
-		};
-#endif
 
 		ShaderType shaderType;
 	};
