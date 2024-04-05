@@ -78,13 +78,13 @@ class Game0 : public System::InputHandler
 private:
 	System::Window window;
 
-	GfxHAL::Device gfxDevice;
-	GfxHAL::CommandAllocatorHandle gfxCommandAllocator;
+	Gfx::HAL::Device gfxDevice;
+	Gfx::HAL::CommandAllocatorHandle gfxCommandAllocator;
 
-	GfxHAL::OutputHandle gfxOutput = GfxHAL::OutputHandle::Zero;
-	GfxHAL::TextureHandle gfxDepthTexture = GfxHAL::TextureHandle::Zero;
+	Gfx::HAL::OutputHandle gfxOutput = Gfx::HAL::OutputHandle::Zero;
+	Gfx::HAL::TextureHandle gfxDepthTexture = Gfx::HAL::TextureHandle::Zero;
 
-	GfxHAL::BufferHandle gfxTestBuffer = GfxHAL::BufferHandle::Zero;
+	Gfx::HAL::BufferHandle gfxTestBuffer = Gfx::HAL::BufferHandle::Zero;
 	void* mappedTestBuffer = nullptr;
 
 	Gfx::ShaderLibrary gfxShaderLibrary;
@@ -124,7 +124,7 @@ void Game0::run()
 	System::RegisterInputHandler(this);
 	//System::SetCursorEnabled(false);
 
-	GfxHAL::DeviceSettings gfxDeviceSettings = {};
+	Gfx::HAL::DeviceSettings gfxDeviceSettings = {};
 
 	gfxDeviceSettings.maxCommandAllocatorCount = 4;
 	gfxDeviceSettings.maxDescriptorAllocatorCount = 4;
@@ -133,7 +133,8 @@ void Game0::run()
 	gfxDeviceSettings.maxResourceCount = 1024;
 	gfxDeviceSettings.maxDescriptorSetLayoutCount = 64;
 	gfxDeviceSettings.maxPipelineLayoutCount = 64;
-	gfxDeviceSettings.maxPipelineCount = 64;
+	gfxDeviceSettings.maxShaderCount = 64;
+	gfxDeviceSettings.maxCompositePipelineCount = 64;
 	gfxDeviceSettings.maxOutputCount = 4;
 	gfxDeviceSettings.bindlessDescriptorPoolSize = 16;
 
@@ -143,16 +144,16 @@ void Game0::run()
 
 	gfxOutput = gfxDevice.createWindowOutput(1600, 900, window.getHandle());
 
-	GfxHAL::TextureDesc gfxDepthTextureDesc = {};
+	Gfx::HAL::TextureDesc gfxDepthTextureDesc = {};
 	gfxDepthTextureDesc.size = { 1600, 900, 1 };
-	gfxDepthTextureDesc.dimension = GfxHAL::TextureDimension::Texture2D;
-	gfxDepthTextureDesc.format = GfxHAL::TextureFormat::D16;
+	gfxDepthTextureDesc.dimension = Gfx::HAL::TextureDimension::Texture2D;
+	gfxDepthTextureDesc.format = Gfx::HAL::TextureFormat::D32;
 	gfxDepthTextureDesc.mipLevelCount = 1;
 	gfxDepthTextureDesc.enableRenderTargetUsage = true;
 
-	gfxDepthTexture = gfxDevice.createTexture(gfxDepthTextureDesc, GfxHAL::TextureLayout::DepthStencilReadWrite);
+	gfxDepthTexture = gfxDevice.createTexture(gfxDepthTextureDesc, Gfx::HAL::TextureLayout::DepthStencilReadWrite);
 
-	gfxTestBuffer = gfxDevice.createStagingBuffer(64 * 1024, GfxHAL::StagingBufferAccessMode::DeviceReadHostWrite);
+	gfxTestBuffer = gfxDevice.createStagingBuffer(64 * 1024, Gfx::HAL::StagingBufferAccessMode::DeviceReadHostWrite);
 	mappedTestBuffer = gfxDevice.getMappedBufferPtr(gfxTestBuffer);
 
 	TestVertex* vertexBuffer = (TestVertex*)mappedTestBuffer;
@@ -163,8 +164,20 @@ void Game0::run()
 
 	gfxShaderLibrary.load("XEngine.Render.Shaders.xeslib", gfxDevice);
 
-	const GfxHAL::PipelineLayoutHandle gfxTestPL = gfxShaderLibrary.getPipelineLayout("Test.PipelineLayout"_xsh);
-	const GfxHAL::PipelineHandle gfxTestGfxPipeline = gfxShaderLibrary.getPipeline("Test.GraphicsPipeline"_xsh);
+	const Gfx::HAL::PipelineLayoutHandle gfxTestPL = gfxShaderLibrary.getPipelineLayout("Test.PipelineLayout"_xsh);
+	const Gfx::HAL::ShaderHandle gfxTestVS = gfxShaderLibrary.getShader("TestVS"_xsh);
+	const Gfx::HAL::ShaderHandle gfxTestPS = gfxShaderLibrary.getShader("TestPS"_xsh);
+
+	Gfx::HAL::GraphicsPipelineDesc gfxTestGfxPipelineDesc = {};
+	gfxTestGfxPipelineDesc.vsHandle = gfxTestVS;
+	gfxTestGfxPipelineDesc.psHandle = gfxTestPS;
+	gfxTestGfxPipelineDesc.colorRenderTargetFormats[0] = Gfx::HAL::TexelViewFormat::R8G8B8A8_UNORM;
+	gfxTestGfxPipelineDesc.depthStencilRenderTargetFormat = Gfx::HAL::DepthStencilFormat::D32;
+	gfxTestGfxPipelineDesc.depthStencilState.depthReadEnable = true;
+	gfxTestGfxPipelineDesc.depthStencilState.depthWriteEnable = true;
+	gfxTestGfxPipelineDesc.depthStencilState.depthComparisonFunc = Gfx::HAL::ComparisonFunc::Less;
+
+	const Gfx::HAL::GraphicsPipelineHandle gfxTestGfxPipeline = gfxDevice.createGraphicsPipeline(gfxTestPL, gfxTestGfxPipelineDesc);
 
 	cameraPosition = { -13.0f, -7.0f, 10.0f };
 	cameraRotation = { 0.0f, -0.7f };
@@ -203,34 +216,34 @@ void Game0::run()
 		const Matrix4x4 cameraProjectionMatrix = Matrix4x4::Perspective(1.0f, 16.0f / 9.0f, 0.1f, 100.0f);
 
 		const uint32 currentBackBufferIndex = gfxDevice.getOutputCurrentBackBufferIndex(gfxOutput);
-		const GfxHAL::TextureHandle gfxCurrentBackBuffer = gfxDevice.getOutputBackBuffer(gfxOutput, currentBackBufferIndex);
+		const Gfx::HAL::TextureHandle gfxCurrentBackBuffer = gfxDevice.getOutputBackBuffer(gfxOutput, currentBackBufferIndex);
 
-		GfxHAL::CommandList gfxCommandList;
+		Gfx::HAL::CommandList gfxCommandList;
 		gfxDevice.openCommandList(gfxCommandList, gfxCommandAllocator);
 
 		gfxCommandList.textureMemoryBarrier(gfxCurrentBackBuffer,
-			GfxHAL::BarrierSync::None, GfxHAL::BarrierSync::All,
-			GfxHAL::BarrierAccess::None, GfxHAL::BarrierAccess::RenderTarget,
-			GfxHAL::TextureLayout::Present, GfxHAL::TextureLayout::RenderTarget);
+			Gfx::HAL::BarrierSync::None, Gfx::HAL::BarrierSync::All,
+			Gfx::HAL::BarrierAccess::None, Gfx::HAL::BarrierAccess::RenderTarget,
+			Gfx::HAL::TextureLayout::Present, Gfx::HAL::TextureLayout::RenderTarget);
 
-		GfxHAL::ColorRenderTarget colorRT =
+		Gfx::HAL::ColorRenderTarget colorRT =
 		{
 			.texture = gfxCurrentBackBuffer,
-			.format = GfxHAL::TexelViewFormat::R8G8B8A8_UNORM,
+			.format = Gfx::HAL::TexelViewFormat::R8G8B8A8_UNORM,
 		};
 
-		GfxHAL::DepthStencilRenderTarget dsRT = { .texture = gfxDepthTexture, };
+		Gfx::HAL::DepthStencilRenderTarget dsRT = { .texture = gfxDepthTexture, };
 
 		gfxCommandList.bindRenderTargets(1, &colorRT, &dsRT);
 		gfxCommandList.setViewport(0.0f, 0.0f, 1600.0f, 900.0f);
 		gfxCommandList.setScissor(0, 0, 1600, 900);
 
-		gfxCommandList.setPipelineType(GfxHAL::PipelineType::Graphics);
+		gfxCommandList.setPipelineType(Gfx::HAL::PipelineType::Graphics);
 		gfxCommandList.setPipelineLayout(gfxTestPL);
-		gfxCommandList.setPipeline(gfxTestGfxPipeline);
+		gfxCommandList.setGraphicsPipeline(gfxTestGfxPipeline);
 
-		gfxCommandList.bindIndexBuffer(GfxHAL::BufferPointer { gfxTestBuffer, 4096 }, GfxHAL::IndexBufferFormat::U16, 4096);
-		gfxCommandList.bindVertexBuffer(0, GfxHAL::BufferPointer { gfxTestBuffer, 0 }, sizeof(TestVertex), 4096);
+		gfxCommandList.bindIndexBuffer(Gfx::HAL::BufferPointer { gfxTestBuffer, 4096 }, Gfx::HAL::IndexBufferFormat::U16, 4096);
+		gfxCommandList.bindVertexBuffer(0, Gfx::HAL::BufferPointer { gfxTestBuffer, 0 }, sizeof(TestVertex), 4096);
 		
 		const float32x4 clearColor(0.0f, 0.1f, 0.3f, 1.0f);
 		gfxCommandList.clearColorRenderTarget(0, (float32*)&clearColor);
@@ -262,20 +275,20 @@ void Game0::run()
 			testCB->view = cameraViewMatrix;
 			testCB->viewProjection = cameraViewMatrix * cameraProjectionMatrix;
 
-			gfxCommandList.bindBuffer("SOME_CONSTANT_BUFFER"_xsh, GfxHAL::BufferBindType::Constant, testCBAllocationInfo.gpuPointer);
+			gfxCommandList.bindBuffer("SOME_CONSTANT_BUFFER"_xsh, Gfx::HAL::BufferBindType::Constant, testCBAllocationInfo.gpuPointer);
 			gfxCommandList.drawIndexed(countof(cubeIndices));
 		}
 
 		gfxCommandList.textureMemoryBarrier(gfxCurrentBackBuffer,
-			GfxHAL::BarrierSync::All, GfxHAL::BarrierSync::None,
-			GfxHAL::BarrierAccess::RenderTarget, GfxHAL::BarrierAccess::None,
-			GfxHAL::TextureLayout::RenderTarget, GfxHAL::TextureLayout::Present);
+			Gfx::HAL::BarrierSync::All, Gfx::HAL::BarrierSync::None,
+			Gfx::HAL::BarrierAccess::RenderTarget, Gfx::HAL::BarrierAccess::None,
+			Gfx::HAL::TextureLayout::RenderTarget, Gfx::HAL::TextureLayout::Present);
 
 		gfxDevice.closeCommandList(gfxCommandList);
-		gfxDevice.submitCommandList(GfxHAL::DeviceQueue::Graphics, gfxCommandList);
-		gfxDevice.submitOutputFlip(GfxHAL::DeviceQueue::Graphics, gfxOutput);
+		gfxDevice.submitCommandList(Gfx::HAL::DeviceQueue::Graphics, gfxCommandList);
+		gfxDevice.submitOutputFlip(Gfx::HAL::DeviceQueue::Graphics, gfxOutput);
 
-		const GfxHAL::DeviceQueueSyncPoint gfxEndOfQueueSyncPoint = gfxDevice.getEndOfQueueSyncPoint(GfxHAL::DeviceQueue::Graphics);
+		const Gfx::HAL::DeviceQueueSyncPoint gfxEndOfQueueSyncPoint = gfxDevice.getEndOfQueueSyncPoint(Gfx::HAL::DeviceQueue::Graphics);
 		gfxTransientAllocator.enqueueRelease(gfxEndOfQueueSyncPoint);
 		while (!gfxDevice.isQueueSyncPointReached(gfxEndOfQueueSyncPoint))
 			{ }

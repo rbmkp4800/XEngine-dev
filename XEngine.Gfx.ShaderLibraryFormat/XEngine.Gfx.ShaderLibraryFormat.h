@@ -21,6 +21,7 @@ namespace XEngine::Gfx::ShaderLibraryFormat
 		uint16 pipelineLayoutCount;
 		uint16 shaderCount;
 		uint32 blobsDataOffset;
+		uint32 blobsDataSize;
 	};
 
 	struct DescriptorSetLayoutRecord // 20 bytes

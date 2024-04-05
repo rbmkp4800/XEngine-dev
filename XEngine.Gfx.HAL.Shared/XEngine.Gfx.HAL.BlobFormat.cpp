@@ -95,7 +95,7 @@ void DescriptorSetLayoutBlobWriter::finalize()
 	subHeader->sourceHash = blobInfo.sourceHash;
 	subHeader->bindingCount = blobInfo.bindingCount;
 
-	FillGenericBlobHeader(blobMemory, blobSize, ShaderBlobSignature, 0);
+	FillGenericBlobHeader(blobMemory, blobSize, DescriptorSetLayoutBlobSignature, 0);
 	memorySet(this, 0, sizeof(*this));
 }
 
@@ -225,7 +225,7 @@ void PipelineLayoutBlobWriter::finalize()
 	subHeader->bindingCount = blobInfo.bindingCount;
 	subHeader->platformDataSize = XCheckedCastU16(blobInfo.platformDataSize);
 
-	FillGenericBlobHeader(blobMemory, blobSize, ShaderBlobSignature, 0);
+	FillGenericBlobHeader(blobMemory, blobSize, PipelineLayoutBlobSignature, 0);
 	memorySet(this, 0, sizeof(*this));
 }
 
@@ -356,7 +356,7 @@ bool ShaderBlobReader::open(const void* data, uint32 size)
 {
 	XAssert(!subHeader);
 
-	if (!ValidateGenericBlobHeader(data, size, PipelineLayoutBlobSignature, 0))
+	if (!ValidateGenericBlobHeader(data, size, ShaderBlobSignature, 0))
 		return false;
 
 	{

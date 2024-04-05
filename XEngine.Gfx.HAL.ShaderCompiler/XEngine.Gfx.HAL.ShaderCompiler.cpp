@@ -883,7 +883,7 @@ ShaderCompilationResultRef ShaderCompiler::CompileShader(XLib::StringViewASCII s
 	{
 		Microsoft::WRL::ComPtr<IDxcBlobUtf8> dxcErrorsBlob;
 		dxcResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&dxcErrorsBlob), nullptr);
-		if (dxcErrorsBlob != nullptr && dxcErrorsBlob->GetStringLength() > 0)
+		if (dxcErrorsBlob && dxcErrorsBlob->GetStringLength() > 0)
 		{
 			resultComposerSrc.platformCompilerOutputStr = StringViewASCII(
 				dxcErrorsBlob->GetStringPointer(), dxcErrorsBlob->GetStringLength());
@@ -895,12 +895,12 @@ ShaderCompilationResultRef ShaderCompiler::CompileShader(XLib::StringViewASCII s
 	{
 		Microsoft::WRL::ComPtr<IDxcBlob> dxcBytecodeBlob = nullptr;
 		dxcResult->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&dxcBytecodeBlob), nullptr);
-		XAssert(dxcBytecodeBlob != nullptr && dxcBytecodeBlob->GetBufferSize() > 0);
 
-		// Compose bytecode blob
+		if (dxcBytecodeBlob && dxcBytecodeBlob->GetBufferSize() > 0)
 		{
 			const uint32 bytecodeSize = XCheckedCastU32(dxcBytecodeBlob->GetBufferSize());
 
+			// Compose bytecode blob
 			BlobFormat::ShaderBlobInfo blobInfo = {};
 			blobInfo.pipelineLayoutSourceHash = pipelineLayout.getSourceHash();
 			blobInfo.bytecodeSize = bytecodeSize;
@@ -913,9 +913,9 @@ ShaderCompilationResultRef ShaderCompiler::CompileShader(XLib::StringViewASCII s
 			blobWriter.setBlobMemory((void*)bytecodeBlob->getData(), bytecodeBlob->getSize());
 			blobWriter.writeBytecode(dxcBytecodeBlob->GetBufferPointer(), bytecodeSize);
 			blobWriter.finalize();
-		}
 
-		resultComposerSrc.bytecodeBlob = bytecodeBlob.get();
+			resultComposerSrc.bytecodeBlob = bytecodeBlob.get();
+		}
 	}
 
 	return ShaderCompilationResult::Compose(resultComposerSrc);

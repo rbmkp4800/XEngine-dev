@@ -616,7 +616,7 @@ bool LibraryDefinitionLoader::readShader(StringViewASCII shaderName, Cursor json
 	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!LibFindShader(libraryDefinition, shaderNameXSH), "shader redefinition", jsonShaderNameCursor);
 	// TODO: We may give separate error for hash collision (that will never happen).
 
-	const ShaderRef shader = Shader::Create(shaderName, pipelineLayout.get(), pipelineLayoutNameXSH, args);
+	const ShaderRef shader = Shader::Create(shaderName, shaderNameXSH, pipelineLayout.get(), pipelineLayoutNameXSH, args);
 
 	XAssert(shader);
 	libraryDefinition.shaders.pushBack(shader);

@@ -12,17 +12,17 @@ namespace XEngine::Gfx
 	private:
 		struct DescriptorSetLayout;
 		struct PipelineLayout;
-		struct Pipeline;
+		struct Shader;
 
 	private:
 		void* memoryBlock = nullptr;
 
 		DescriptorSetLayout* descriptorSetLayoutTable = nullptr;
 		PipelineLayout* pipelineLayoutTable = nullptr;
-		Pipeline* pipelineTable = nullptr;
+		Shader* shaderTable = nullptr;
 		uint32 descriptorSetLayoutCount = 0;
 		uint32 pipelineLayoutCount = 0;
-		uint32 pipelineCount = 0;
+		uint32 shaderCount = 0;
 
 	public:
 		ShaderLibrary() = default;
@@ -33,6 +33,6 @@ namespace XEngine::Gfx
 
 		HAL::DescriptorSetLayoutHandle getDescriptorSetLayout(uint64 nameXSH) const;
 		HAL::PipelineLayoutHandle getPipelineLayout(uint64 nameXSH) const;
-		HAL::PipelineHandle getPipeline(uint64 nameXSH) const;
+		HAL::ShaderHandle getShader(uint64 nameXSH) const;
 	};
 }

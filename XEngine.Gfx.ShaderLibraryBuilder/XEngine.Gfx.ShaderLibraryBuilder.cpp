@@ -16,7 +16,7 @@ using namespace XLib;
 using namespace XEngine::Gfx;
 using namespace XEngine::Gfx::ShaderLibraryBuilder;
 
-ShaderRef Shader::Create(XLib::StringViewASCII name,
+ShaderRef Shader::Create(XLib::StringViewASCII name, uint64 nameXSH,
 	HAL::ShaderCompiler::PipelineLayout* pipelineLayout, uint64 pipelineLayoutNameXSH,
 	const HAL::ShaderCompiler::ShaderCompilationArgs& compilationArgs)
 {
@@ -45,6 +45,7 @@ ShaderRef Shader::Create(XLib::StringViewASCII name,
 	construct(resultObject);
 
 	resultObject.name = StringViewASCII((char*)memoryBlock + nameStrOffset, name.getLength());
+	resultObject.nameXSH = nameXSH;
 	resultObject.pipelineLayout = pipelineLayout;
 	resultObject.pipelineLayoutNameXSH = pipelineLayoutNameXSH;
 	resultObject.compilationArgs.sourcePath = StringViewASCII((char*)memoryBlock + sourcePathStrOffset, compilationArgs.sourcePath.getLength());
@@ -62,9 +63,9 @@ static void StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const
 	ArrayList<ShaderLibraryFormat::PipelineLayoutRecord> pipelineLayoutRecords;
 	ArrayList<ShaderLibraryFormat::ShaderRecord> shaderRecords;
 
-	descriptorSetLayoutRecords.reserve(libraryDefinition.descriptorSetLayouts.getSize());
-	pipelineLayoutRecords.reserve(libraryDefinition.pipelineLayouts.getSize());
-	shaderRecords.reserve(libraryDefinition.shaders.getSize());
+	descriptorSetLayoutRecords.resize(libraryDefinition.descriptorSetLayouts.getSize());
+	pipelineLayoutRecords.resize(libraryDefinition.pipelineLayouts.getSize());
+	shaderRecords.resize(libraryDefinition.shaders.getSize());
 
 	memorySet(descriptorSetLayoutRecords.getData(), 0, descriptorSetLayoutRecords.getByteSize());
 	memorySet(pipelineLayoutRecords.getData(), 0, pipelineLayoutRecords.getByteSize());
@@ -138,7 +139,7 @@ static void StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const
 		blobsDataSizeAccum += shaderBlob.getSize();
 	}
 
-	const uint32 blobsDataTotalSize = blobsDataSizeAccum;
+	const uint32 blobsDataSize = blobsDataSizeAccum;
 
 	const uintptr blobsDataOffset =
 		sizeof(ShaderLibraryFormat::LibraryHeader) +
@@ -152,7 +153,8 @@ static void StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const
 	header.descriptorSetLayoutCount = XCheckedCastU16(descriptorSetLayoutRecords.getSize());
 	header.pipelineLayoutCount = XCheckedCastU16(pipelineLayoutRecords.getSize());
 	header.shaderCount = XCheckedCastU16(shaderRecords.getSize());
-	header.blobsDataOffset = XCheckedCastU32(blobsDataOffset);
+	header.blobsDataOffset = uint32(blobsDataOffset);
+	header.blobsDataSize = blobsDataSize;
 
 	File file;
 	file.open(resultLibraryFilePath, FileAccessMode::Write, FileOpenMode::Override);
@@ -162,13 +164,13 @@ static void StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const
 	file.write(pipelineLayoutRecords.getData(), pipelineLayoutRecords.getByteSize());
 	file.write(shaderRecords.getData(), shaderRecords.getByteSize());
 
-	uint32 blobsDataTotalSizeCheck = 0;
+	uint32 blobsDataSizeCheck = 0;
 	for (const BlobDataView& blob : blobs)
 	{
 		file.write(blob.data, blob.size);
-		blobsDataTotalSizeCheck += blob.size;
+		blobsDataSizeCheck += blob.size;
 	}
-	XAssert(blobsDataTotalSize == blobsDataTotalSizeCheck);
+	XAssert(blobsDataSizeCheck == blobsDataSize);
 
 	file.close();
 }
@@ -239,7 +241,7 @@ int main(int argc, char* argv[])
 
 		if (compilationResult->getStatus() != HAL::ShaderCompiler::ShaderCompilationStatus::Success)
 		{
-			TextWriteFmtStdOut("Shader compilation error: ", compilationResult->getPlatformCompilerOutput(), "\n");
+			TextWriteFmtStdOut(compilationResult->getPlatformCompilerOutput(), "\n");
 			return 0;
 		}
 

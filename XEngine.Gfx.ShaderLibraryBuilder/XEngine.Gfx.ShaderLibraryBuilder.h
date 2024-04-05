@@ -20,7 +20,7 @@ namespace XEngine::Gfx::ShaderLibraryBuilder
 	{
 	private:
 		XLib::StringViewASCII name;
-		uint64 nameXSH;
+		uint64 nameXSH = 0;
 
 		HAL::ShaderCompiler::PipelineLayoutRef pipelineLayout = nullptr;
 		uint64 pipelineLayoutNameXSH = 0;
@@ -45,7 +45,7 @@ namespace XEngine::Gfx::ShaderLibraryBuilder
 		inline const HAL::ShaderCompiler::Blob& getCompiledBlob() const { return *compiledBlob.get(); }
 
 	public:
-		static ShaderRef Create(XLib::StringViewASCII name,
+		static ShaderRef Create(XLib::StringViewASCII name, uint64 nameXSH,
 			HAL::ShaderCompiler::PipelineLayout* pipelineLayout, uint64 pipelineLayoutNameXSH,
 			const HAL::ShaderCompiler::ShaderCompilationArgs& compilationArgs);
 	};

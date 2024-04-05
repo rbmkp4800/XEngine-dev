@@ -1632,6 +1632,7 @@ ShaderHandle Device::createShader(PipelineLayoutHandle pipelineLayoutHandle, con
 			d3dStateSubobjectRootSignature.pDesc = &d3dRootSignatureDesc;
 		}
 
+		// Shader bytecode
 		{
 			d3dExportDesc.Name = exportName;
 			d3dExportDesc.ExportToRename = L"*";
@@ -1646,11 +1647,12 @@ ShaderHandle Device::createShader(PipelineLayoutHandle pipelineLayoutHandle, con
 			d3dStateSubobjectShader.pDesc = &d3dDXILLibDesc;
 		}
 
+		// Program for compute shader
 		if (blobInfo.shaderType == ShaderType::Compute)
 		{
 			d3dProgramDesc.ProgramName = L"default";
 			d3dProgramDesc.NumExports = 1;
-			d3dProgramDesc.pExports = &exportName; // Is expected to be "cs".
+			d3dProgramDesc.pExports = &exportName;
 			d3dProgramDesc.NumSubobjects = 0;
 			d3dProgramDesc.ppSubobjects = nullptr;
 
