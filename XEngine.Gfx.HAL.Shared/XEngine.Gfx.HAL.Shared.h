@@ -8,7 +8,6 @@ namespace XEngine::Gfx::HAL
 	constexpr uint8 MaxPipelineBindingCount = 32;
 
 	constexpr uint8 MaxVertexBufferCount = 8;
-	constexpr uint16 MaxVertexBufferElementSize = 8192;
 	constexpr uint8 MaxVertexAttributeCount = 32;
 
 	constexpr uint8 MaxColorRenderTargetCount = 8;

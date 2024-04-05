@@ -2,7 +2,7 @@
 #include <dxgi1_6.h>
 #include "D3D12Helpers.h"
 
-#include <XLib.ByteStream.h>
+#include <XLib.Containers.ArrayList.h>
 #include <XLib.SystemHeapAllocator.h>
 
 #include <XEngine.Gfx.HAL.BlobFormat.h>
@@ -106,7 +106,15 @@ namespace // Barriers validation
 	}
 }
 
+
 // Device internal types ///////////////////////////////////////////////////////////////////////////
+
+enum class Device::CompositePipelineType : uint8
+{
+	Undefined = 0,
+	Graphics,
+	//Raytracing,
+};
 
 struct Device::PoolEntryBase
 {
@@ -135,7 +143,7 @@ struct Device::DescriptorAllocator : PoolEntryBase
 
 struct Device::CommandList : PoolEntryBase
 {
-	ID3D12GraphicsCommandList7* d3dCommandList;
+	ID3D12GraphicsCommandList10* d3dCommandList;
 };
 
 struct Device::MemoryAllocation : PoolEntryBase
@@ -171,11 +179,22 @@ struct Device::PipelineLayout : PoolEntryBase
 	uint16 bindingCount;
 };
 
-struct Device::Pipeline : PoolEntryBase
+struct Device::Shader : PoolEntryBase
 {
-	ID3D12PipelineState* d3dPipelineState;
+	ID3D12StateObject* d3dStateObject;
 	PipelineLayoutHandle pipelineLayoutHandle;
-	PipelineType type;
+	ShaderType type;
+
+	D3D12_PROGRAM_IDENTIFIER d3dProgramIdentifier; // Only valid for compute shader
+};
+
+struct Device::CompositePipeline : PoolEntryBase
+{
+	ID3D12StateObject* d3dStateObject;
+	PipelineLayoutHandle pipelineLayoutHandle;
+	CompositePipelineType type;
+
+	D3D12_PROGRAM_IDENTIFIER d3dProgramIdentifier;
 };
 
 struct Device::Output : PoolEntryBase
@@ -273,16 +292,32 @@ void CommandList::setPipelineLayout(PipelineLayoutHandle pipelineLayoutHandle)
 	currentPipelineLayoutHandle = pipelineLayoutHandle;
 }
 
-void CommandList::setPipeline(PipelineHandle pipelineHandle)
+void CommandList::setComputePipeline(ShaderHandle computeShaderHandle)
 {
 	XEAssert(isOpen);
 
-	const Device::Pipeline& pipeline = device->pipelinePool.resolveHandle(uint32(pipelineHandle));
-	XEAssert(pipeline.type == currentPipelineType);
+	const Device::Shader& shader = device->shaderPool.resolveHandle(uint32(computeShaderHandle));
+	XEAssert(shader.type == ShaderType::Compute);
+	XEAssert(shader.pipelineLayoutHandle == currentPipelineLayoutHandle);
+
+	D3D12_SET_PROGRAM_DESC d3dSetProgramDesc = {};
+	d3dSetProgramDesc.Type = D3D12_PROGRAM_TYPE_GENERIC_PIPELINE;
+	d3dSetProgramDesc.GenericPipeline.ProgramIdentifier = shader.d3dProgramIdentifier;
+	d3dCommandList->SetProgram(&d3dSetProgramDesc);
+}
+
+void CommandList::setGraphicsPipeline(GraphicsPipelineHandle graphicsPipelineHandle)
+{
+	XEAssert(isOpen);
+
+	const Device::CompositePipeline& pipeline = device->compositePipelinePool.resolveHandle(uint32(graphicsPipelineHandle));
+	XEAssert(pipeline.type == Device::CompositePipelineType::Graphics);
 	XEAssert(pipeline.pipelineLayoutHandle == currentPipelineLayoutHandle);
 
-	XEAssert(pipeline.d3dPipelineState);
-	d3dCommandList->SetPipelineState(pipeline.d3dPipelineState);
+	D3D12_SET_PROGRAM_DESC d3dSetProgramDesc = {};
+	d3dSetProgramDesc.Type = D3D12_PROGRAM_TYPE_GENERIC_PIPELINE;
+	d3dSetProgramDesc.GenericPipeline.ProgramIdentifier = pipeline.d3dProgramIdentifier;
+	d3dCommandList->SetProgram(&d3dSetProgramDesc);
 }
 
 void CommandList::setViewport(float32 left, float32 top, float32 right, float32 bottom, float32 minDepth, float32 maxDepth)
@@ -299,21 +334,6 @@ void CommandList::setScissor(uint32 left, uint32 top, uint32 right, uint32 botto
 
 	const D3D12_RECT d3dRect = { LONG(left), LONG(top), LONG(right), LONG(bottom) };
 	d3dCommandList->RSSetScissorRects(1, &d3dRect);
-}
-
-void CommandList::setRasterizerState(const RasterizerState& rasterizerState)
-{
-
-}
-
-void CommandList::setDepthStencilState(const DepthStencilState& depthStencilState)
-{
-
-}
-
-void CommandList::setColorBlendState(uint8 colorRenderTargetIndex, const ColorBlendState* colorBlendState)
-{
-
 }
 
 void CommandList::bindRenderTargets(uint8 colorRenderTargetCount, const ColorRenderTarget* colorRenderTargets,
@@ -774,8 +794,9 @@ template <> constexpr uint8 Device::Pool<Device::MemoryAllocation>			::GetHandle
 template <> constexpr uint8 Device::Pool<Device::Resource>					::GetHandleSignature() { return 5; }
 template <> constexpr uint8 Device::Pool<Device::DescriptorSetLayout>		::GetHandleSignature() { return 6; }
 template <> constexpr uint8 Device::Pool<Device::PipelineLayout>			::GetHandleSignature() { return 7; }
-template <> constexpr uint8 Device::Pool<Device::Pipeline>					::GetHandleSignature() { return 8; }
-template <> constexpr uint8 Device::Pool<Device::Output>					::GetHandleSignature() { return 9; }
+template <> constexpr uint8 Device::Pool<Device::Shader>					::GetHandleSignature() { return 8; }
+template <> constexpr uint8 Device::Pool<Device::CompositePipeline>			::GetHandleSignature() { return 9; }
+template <> constexpr uint8 Device::Pool<Device::Output>					::GetHandleSignature() { return 10; }
 
 template <typename EntryType>
 inline void Device::Pool<EntryType>::initialize(EntryType* buffer, uint16 capacity)
@@ -837,7 +858,7 @@ inline uint16 Device::Pool<EntryType>::resolveHandleToEntryIndex(uint32 handle) 
 	const uint16 entryIndex = GetHandleEntryIndex(handle);
 	XEAssert(uint8(handle >> 28) == GetHandleSignature());
 	XEAssert(entryIndex < committedEntryCount);
-	XEAssert(GetHandleGeneration(handle) == buffer[entryIndex].handleGeneration);
+	XEMasterAssert(GetHandleGeneration(handle) == buffer[entryIndex].handleGeneration);
 	XEAssert(buffer[entryIndex].isAllocated);
 	return entryIndex;
 }
@@ -1256,8 +1277,11 @@ void Device::initialize(/*const PhysicalDevice& physicalDevice, */const DeviceSe
 		const uintptr pipelineLayoutPoolMemOffset = poolsMemorySizeAccum;
 		poolsMemorySizeAccum += sizeof(PipelineLayout) * settings.maxPipelineLayoutCount;
 
-		const uintptr pipelinePoolMemOffset = poolsMemorySizeAccum;
-		poolsMemorySizeAccum += sizeof(Pipeline) * settings.maxPipelineCount;
+		const uintptr shaderPoolMemOffset = poolsMemorySizeAccum;
+		poolsMemorySizeAccum += sizeof(Shader) * settings.maxShaderCount;
+
+		const uintptr compositePipelinePoolMemOffset = poolsMemorySizeAccum;
+		poolsMemorySizeAccum += sizeof(CompositePipeline) * settings.maxCompositePipelineCount;
 
 		const uintptr outputPoolMemOffset = poolsMemorySizeAccum;
 		poolsMemorySizeAccum += sizeof(Output) * settings.maxOutputCount;
@@ -1273,7 +1297,8 @@ void Device::initialize(/*const PhysicalDevice& physicalDevice, */const DeviceSe
 		resourcePool.initialize				((Resource*)			(poolsMemory + resourcePoolMemOffset),				settings.maxResourceCount);
 		descriptorSetLayoutPool.initialize	((DescriptorSetLayout*)	(poolsMemory + descriptorSetLayoutPoolMemOffset),	settings.maxDescriptorSetLayoutCount);
 		pipelineLayoutPool.initialize		((PipelineLayout*)		(poolsMemory + pipelineLayoutPoolMemOffset),		settings.maxPipelineLayoutCount);
-		pipelinePool.initialize				((Pipeline*)			(poolsMemory + pipelinePoolMemOffset),				settings.maxPipelineCount);
+		shaderPool.initialize				((Shader*)				(poolsMemory + shaderPoolMemOffset),				settings.maxShaderCount);
+		compositePipelinePool.initialize	((CompositePipeline*)	(poolsMemory + compositePipelinePoolMemOffset),		settings.maxCompositePipelineCount);
 		outputPool.initialize				((Output*)				(poolsMemory + outputPoolMemOffset),				settings.maxOutputCount);
 	}
 
@@ -1511,338 +1536,440 @@ void Device::destroyTexture(TextureHandle textureHandle)
 	XEMasterAssertUnreachableCode();
 }
 
-DescriptorSetLayoutHandle Device::createDescriptorSetLayout(BlobDataView blob)
+DescriptorSetLayoutHandle Device::createDescriptorSetLayout(const void* blobData, uint32 blobSize)
 {
+	BlobFormat::DescriptorSetLayoutBlobReader blobReader;
+	XEMasterAssert(blobReader.open(blobData, blobSize));
+
+	const BlobFormat::DescriptorSetLayoutBlobInfo blobInfo = blobReader.getBlobInfo();
+	XEMasterAssert(blobInfo.bindingCount > 0 && blobInfo.bindingCount <= MaxDescriptorSetBindingCount);
+
 	DescriptorSetLayoutHandle descriptorSetLayoutHandle = DescriptorSetLayoutHandle::Zero;
 	DescriptorSetLayout& descriptorSetLayout = descriptorSetLayoutPool.allocate((uint32&)descriptorSetLayoutHandle);
+	descriptorSetLayout.sourceHash = blobInfo.sourceHash;
+	descriptorSetLayout.bindingCount = blobInfo.bindingCount;
 
-	BlobFormat::DescriptorSetLayoutBlobReader blobReader;
-	blobReader.open(blob.data, blob.size);
-	// TODO: Assert on open result.
-
-	const uint16 bindingCount = blobReader.getBindingCount();
-	XEMasterAssert(bindingCount > 0 && bindingCount <= MaxDescriptorSetBindingCount);
-
-	for (uint16 i = 0; i < bindingCount; i++)
-		descriptorSetLayout.bindings[i] = blobReader.getBinding(i);
-
-	descriptorSetLayout.sourceHash = blobReader.getSourceHash();
-	descriptorSetLayout.bindingCount = bindingCount;
+	for (uint16 i = 0; i < blobInfo.bindingCount; i++)
+		descriptorSetLayout.bindings[i] = blobReader.getBindingInfo(i);
 
 	return descriptorSetLayoutHandle;
 }
 
-PipelineLayoutHandle Device::createPipelineLayout(BlobDataView blob)
+PipelineLayoutHandle Device::createPipelineLayout(const void* blobData, uint32 blobSize)
 {
+	BlobFormat::PipelineLayoutBlobReader blobReader;
+	XEMasterAssert(blobReader.open(blobData, blobSize));
+
+	const BlobFormat::PipelineLayoutBlobInfo blobInfo = blobReader.getBlobInfo();
+	XEMasterAssert(blobInfo.bindingCount <= MaxPipelineBindingCount);
+
 	PipelineLayoutHandle pipelineLayoutHandle = PipelineLayoutHandle::Zero;
 	PipelineLayout& pipelineLayout = pipelineLayoutPool.allocate((uint32&)pipelineLayoutHandle);
-	XEAssert(!pipelineLayout.d3dRootSignature);
+	pipelineLayout.sourceHash = blobInfo.sourceHash;
+	pipelineLayout.bindingCount = blobInfo.bindingCount;
 
-	BlobFormat::PipelineLayoutBlobReader blobReader;
-	blobReader.open(blob.data, blob.size);
-	// TODO: Assert on open result.
-
-	const uint16 bindingCount = blobReader.getPipelineBindingCount();
-	XEMasterAssert(bindingCount <= MaxPipelineBindingCount);
-
-	for (uint16 i = 0; i < bindingCount; i++)
+	for (uint16 i = 0; i < blobInfo.bindingCount; i++)
 	{
 		// TODO: Validate binding (root parameter index, binding type etc).
-		pipelineLayout.bindings[i] = blobReader.getPipelineBinding(i);
+		pipelineLayout.bindings[i] = blobReader.getBindingInfo(i);
 	}
-
-	pipelineLayout.sourceHash = blobReader.getSourceHash();
-	pipelineLayout.bindingCount = bindingCount;
 
 	XEAssert(!pipelineLayout.d3dRootSignature);
 	HRESULT hResult = d3dDevice->CreateRootSignature(0,
-		blobReader.getPlatformData(), blobReader.getPlatformDataSize(),
+		blobReader.getPlatformDataPtr(), blobInfo.platformDataSize,
 		IID_PPV_ARGS(&pipelineLayout.d3dRootSignature));
 	XEMasterAssert(hResult == S_OK);
 
 	return pipelineLayoutHandle;
 }
 
-PipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayoutHandle, const GraphicsPipelineBlobs& blobs)
+ShaderHandle Device::createShader(PipelineLayoutHandle pipelineLayoutHandle, const void* blobData, uint32 blobSize)
 {
 	const PipelineLayout& pipelineLayout = pipelineLayoutPool.resolveHandle(uint32(pipelineLayoutHandle));
 	XEAssert(pipelineLayout.d3dRootSignature);
 
-	PipelineHandle pipelineHandle = PipelineHandle::Zero;
-	Pipeline& pipeline = pipelinePool.allocate((uint32&)pipelineHandle);
-	XEAssert(!pipeline.d3dPipelineState);
-	pipeline.pipelineLayoutHandle = pipelineLayoutHandle;
-	pipeline.type = PipelineType::Graphics;
+	BlobFormat::ShaderBlobReader blobReader;
+	XEMasterAssert(blobReader.open(blobData, blobSize));
 
-	BlobFormat::GraphicsPipelineStateBlobReader stateBlobReader;
-	XEMasterAssert(stateBlobReader.open(blobs.state.data, blobs.state.size));
-	XEMasterAssert(stateBlobReader.getPipelineLayoutSourceHash() == pipelineLayout.sourceHash);
+	const BlobFormat::ShaderBlobInfo blobInfo = blobReader.getBlobInfo();
+	XEMasterAssert(blobInfo.pipelineLayoutSourceHash == pipelineLayout.sourceHash);
+	XEMasterAssert(blobInfo.shaderType > ShaderType::Undefined && blobInfo.shaderType < ShaderType::ValueCount);
 
-	// Process shaders.
-	D3D12_SHADER_BYTECODE d3dVS = {};
-	D3D12_SHADER_BYTECODE d3dAS = {};
-	D3D12_SHADER_BYTECODE d3dMS = {};
-	D3D12_SHADER_BYTECODE d3dPS = {};
+	ShaderHandle shaderHandle = ShaderHandle::Zero;
+	Shader& shader = shaderPool.allocate((uint32&)shaderHandle);
+	shader.pipelineLayoutHandle = pipelineLayoutHandle;
+	shader.type = blobInfo.shaderType;
 
-	if (blobs.vs.data)
+	XEAssert(!shader.d3dStateObject);
+
 	{
-		BlobFormat::BytecodeBlobReader bytecodeBlobReader;
-		XEMasterAssert(bytecodeBlobReader.open(blobs.vs.data, blobs.vs.size));
-		XEMasterAssert(bytecodeBlobReader.getPipelineLayoutSourceHash() == pipelineLayout.sourceHash);
-		XEMasterAssert(stateBlobReader.isVSBytecodeBlobRegistered());
-		XEMasterAssert(stateBlobReader.getVSBytecodeBlobChecksum() == bytecodeBlobReader.getChecksum());
-		d3dVS.pShaderBytecode = bytecodeBlobReader.getBytecodeData();
-		d3dVS.BytecodeLength = bytecodeBlobReader.getBytecodeSize();
-	}
-	if (blobs.as.data)
-	{
-		BlobFormat::BytecodeBlobReader bytecodeBlobReader;
-		XEMasterAssert(bytecodeBlobReader.open(blobs.as.data, blobs.as.size));
-		XEMasterAssert(bytecodeBlobReader.getPipelineLayoutSourceHash() == pipelineLayout.sourceHash);
-		XEMasterAssert(stateBlobReader.isASBytecodeBlobRegistered());
-		XEMasterAssert(stateBlobReader.getASBytecodeBlobChecksum() == bytecodeBlobReader.getChecksum());
-		d3dAS.pShaderBytecode = bytecodeBlobReader.getBytecodeData();
-		d3dAS.BytecodeLength = bytecodeBlobReader.getBytecodeSize();
-	}
-	if (blobs.ms.data)
-	{
-		BlobFormat::BytecodeBlobReader bytecodeBlobReader;
-		XEMasterAssert(bytecodeBlobReader.open(blobs.ms.data, blobs.ms.size));
-		XEMasterAssert(bytecodeBlobReader.getPipelineLayoutSourceHash() == pipelineLayout.sourceHash);
-		XEMasterAssert(stateBlobReader.isMSBytecodeBlobRegistered());
-		XEMasterAssert(stateBlobReader.getMSBytecodeBlobChecksum() == bytecodeBlobReader.getChecksum());
-		d3dMS.pShaderBytecode = bytecodeBlobReader.getBytecodeData();
-		d3dMS.BytecodeLength = bytecodeBlobReader.getBytecodeSize();
-	}
-	if (blobs.ps.data)
-	{
-		BlobFormat::BytecodeBlobReader bytecodeBlobReader;
-		XEMasterAssert(bytecodeBlobReader.open(blobs.ps.data, blobs.ps.size));
-		XEMasterAssert(bytecodeBlobReader.getPipelineLayoutSourceHash() == pipelineLayout.sourceHash);
-		XEMasterAssert(stateBlobReader.isPSBytecodeBlobRegistered());
-		XEMasterAssert(stateBlobReader.getPSBytecodeBlobChecksum() == bytecodeBlobReader.getChecksum());
-		d3dPS.pShaderBytecode = bytecodeBlobReader.getBytecodeData();
-		d3dPS.BytecodeLength = bytecodeBlobReader.getBytecodeSize();
-	}
-
-	// Verify that all registered bytecode blobs are present.
-	if (stateBlobReader.isVSBytecodeBlobRegistered())
-		XEMasterAssert(d3dVS.pShaderBytecode);
-	if (stateBlobReader.isASBytecodeBlobRegistered())
-		XEMasterAssert(d3dAS.pShaderBytecode);
-	if (stateBlobReader.isMSBytecodeBlobRegistered())
-		XEMasterAssert(d3dMS.pShaderBytecode);
-	if (stateBlobReader.isPSBytecodeBlobRegistered())
-		XEMasterAssert(d3dPS.pShaderBytecode);
-
-	// Verify enabled shader stages combination.
-	if (d3dVS.pShaderBytecode)
-		XEMasterAssert(!d3dMS.pShaderBytecode);
-	if (d3dAS.pShaderBytecode)
-		XEMasterAssert(d3dMS.pShaderBytecode);
-	if (d3dMS.pShaderBytecode)
-		XEMasterAssert(!d3dVS.pShaderBytecode);
-
-	// Process vertex input bindings (input layout elements).
-	D3D12_INPUT_ELEMENT_DESC d3dILElements[MaxVertexBindingCount] = {};
-	if (stateBlobReader.getVertexBindingCount() > 0)
-	{
-		XEMasterAssert(d3dVS.pShaderBytecode);
-		XEMasterAssert(stateBlobReader.getVertexBindingCount() < MaxVertexBindingCount);
-
-		for (uint8 i = 0; i < stateBlobReader.getVertexBindingCount(); i++)
+		const wchar* exportName = nullptr;
+		switch (blobInfo.shaderType)
 		{
-			// NOTE: We need all this "inplace" stuff, so 'D3D12_INPUT_ELEMENT_DESC::SemanticName' can point directly into blob data.
-			const BlobFormat::VertexBindingInfo* bindingInfo = stateBlobReader.getVertexBindingInplace(i);
-
-			// Check zero terminator to make sure this is valid cstr.
-			// All chars after first zero should also be zero, so checking only the last one is ok.
-			XEMasterAssert(bindingInfo->nameCStr[countof(bindingInfo->nameCStr) - 1] == '\0');
-
-			XEMasterAssert(bindingInfo->bufferIndex < MaxVertexBufferCount);
-			XEMasterAssert(stateBlobReader.isVertexBufferUsed(bindingInfo->bufferIndex));
-
-			const bool perIstance = stateBlobReader.isVertexBufferPerInstance(bindingInfo->bufferIndex);
-
-			d3dILElements[i].SemanticName = bindingInfo->nameCStr;
-			d3dILElements[i].SemanticIndex = 0;
-			d3dILElements[i].Format = TranslateTexelViewFormatToDXGIFormat(bindingInfo->format);
-			d3dILElements[i].InputSlot = bindingInfo->bufferIndex;
-			d3dILElements[i].AlignedByteOffset = bindingInfo->offset;
-			d3dILElements[i].InputSlotClass = perIstance ? D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA : D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
-			d3dILElements[i].InstanceDataStepRate = perIstance ? 1 : 0;
+			case ShaderType::Compute:		exportName = L"cs";	break;
+			case ShaderType::Vertex:		exportName = L"vs";	break;
+			case ShaderType::Amplification:	exportName = L"as";	break;
+			case ShaderType::Mesh:			exportName = L"ms";	break;
+			case ShaderType::Pixel:			exportName = L"ps";	break;
 		}
-	}
+		XEAssert(exportName);
 
-	// Compose D3D12 Pipeline State stream.
+		XLib::InplaceArrayList<D3D12_STATE_SUBOBJECT, 3> d3dStateSubobjects;
 
-	byte d3dPSOStreamBuffer[1024]; // TODO: Proper size
-	ByteStreamWriter d3dPSOStreamWriter(d3dPSOStreamBuffer, sizeof(d3dPSOStreamBuffer));
+		D3D12_GLOBAL_ROOT_SIGNATURE d3dRootSignatureDesc = {};
+		D3D12_EXPORT_DESC d3dExportDesc = {};
+		D3D12_DXIL_LIBRARY_DESC d3dDXILLibDesc = {};
+		D3D12_GENERIC_PROGRAM_DESC d3dProgramDesc = {};
 
-	// Root signagure
-	{
-		D3D12Helpers::PipelineStateSubobjectRootSignature& d3dSubobjectRS =
-			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectRootSignature>(sizeof(void*));
-		d3dSubobjectRS.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE;
-		d3dSubobjectRS.rootSignature = pipelineLayout.d3dRootSignature;
-	}
+		D3D12_STATE_OBJECT_TYPE d3dStateObjectType = D3D12_STATE_OBJECT_TYPE_COLLECTION;
 
-	// Shaders
-	if (d3dVS.pShaderBytecode)
-	{
-		D3D12Helpers::PipelineStateSubobjectShader& d3dSubobjectVS =
-			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectShader>(sizeof(void*));
-		d3dSubobjectVS.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS;
-		d3dSubobjectVS.bytecode = d3dVS;
-	}
-	if (d3dAS.pShaderBytecode)
-	{
-		D3D12Helpers::PipelineStateSubobjectShader& d3dSubobjectAS =
-			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectShader>(sizeof(void*));
-		d3dSubobjectAS.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_AS;
-		d3dSubobjectAS.bytecode = d3dAS;
-	}
-	if (d3dMS.pShaderBytecode)
-	{
-		D3D12Helpers::PipelineStateSubobjectShader& d3dSubobjectMS =
-			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectShader>(sizeof(void*));
-		d3dSubobjectMS.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_MS;
-		d3dSubobjectMS.bytecode = d3dMS;
-	}
-	if (d3dPS.pShaderBytecode)
-	{
-		D3D12Helpers::PipelineStateSubobjectShader& d3dSubobjectPS =
-			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectShader>(sizeof(void*));
-		d3dSubobjectPS.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS;
-		d3dSubobjectPS.bytecode = d3dPS;
-	}
-
-	// Blend state
-	// ...
-
-	// Rasterizer state
-	// ...
-
-	// Depth stencil state
-	{
-		D3D12Helpers::PipelineStateSubobjectDepthStencil& d3dSubobjectDS =
-			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectDepthStencil>(sizeof(void*));
-		d3dSubobjectDS.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL;
-		d3dSubobjectDS.desc = {};
-		d3dSubobjectDS.desc.DepthEnable = TRUE;
-		d3dSubobjectDS.desc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-		d3dSubobjectDS.desc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
-	}
-
-	// Input layout
-	{
-		D3D12Helpers::PipelineStateSubobjectInputLayout& d3dSubobjectIL =
-			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectInputLayout>(sizeof(void*));
-		d3dSubobjectIL.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_INPUT_LAYOUT;
-		d3dSubobjectIL.desc.pInputElementDescs = d3dILElements;
-		d3dSubobjectIL.desc.NumElements = stateBlobReader.getVertexBindingCount();
-	}
-
-	// Primitive topology
-	{
-		D3D12Helpers::PipelineStateSubobjectPrimitiveTopology& d3dSubobjectPT =
-			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectPrimitiveTopology>(sizeof(void*));
-		d3dSubobjectPT.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PRIMITIVE_TOPOLOGY;
-		// TODO: Primitive topologies support.
-		d3dSubobjectPT.topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	}
-
-	// Render target formats
-	{
-		bool someColorRTEnabled = false;
-		for (uint8 i = 0; i < MaxColorRenderTargetCount; i++)
-			someColorRTEnabled |= stateBlobReader.getColorRTFormat(i) != TexelViewFormat::Undefined;
-
-		if (someColorRTEnabled)
+		// Root signature
 		{
-			D3D12Helpers::PipelineStateSubobjectRenderTargetFormats& d3dSubobjectRTs =
-				*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectRenderTargetFormats>(sizeof(void*));
-			d3dSubobjectRTs.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RENDER_TARGET_FORMATS;
-			d3dSubobjectRTs.formats = {};
+			d3dRootSignatureDesc.pGlobalRootSignature = pipelineLayout.d3dRootSignature;
 
-			for (uint8 i = 0; i < MaxColorRenderTargetCount; i++)
-			{
-				if (stateBlobReader.getColorRTFormat(i) != TexelViewFormat::Undefined)
-				{
-					d3dSubobjectRTs.formats.RTFormats[i] = TranslateTexelViewFormatToDXGIFormat(stateBlobReader.getColorRTFormat(i));
-					d3dSubobjectRTs.formats.NumRenderTargets = i + 1;
-				}
-			}
-			XEAssert(d3dSubobjectRTs.formats.NumRenderTargets > 0);
+			D3D12_STATE_SUBOBJECT& d3dStateSubobjectRootSignature = d3dStateSubobjects.emplaceBack();
+			d3dStateSubobjectRootSignature.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
+			d3dStateSubobjectRootSignature.pDesc = &d3dRootSignatureDesc;
 		}
+
+		{
+			d3dExportDesc.Name = exportName;
+			d3dExportDesc.ExportToRename = L"*";
+
+			d3dDXILLibDesc.DXILLibrary.pShaderBytecode = blobReader.getBytecodePtr();
+			d3dDXILLibDesc.DXILLibrary.BytecodeLength = blobInfo.bytecodeSize;
+			d3dDXILLibDesc.NumExports = 1;
+			d3dDXILLibDesc.pExports = &d3dExportDesc;
+
+			D3D12_STATE_SUBOBJECT& d3dStateSubobjectShader = d3dStateSubobjects.emplaceBack();
+			d3dStateSubobjectShader.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
+			d3dStateSubobjectShader.pDesc = &d3dDXILLibDesc;
+		}
+
+		if (blobInfo.shaderType == ShaderType::Compute)
+		{
+			d3dProgramDesc.ProgramName = L"default";
+			d3dProgramDesc.NumExports = 1;
+			d3dProgramDesc.pExports = &exportName; // Is expected to be "cs".
+			d3dProgramDesc.NumSubobjects = 0;
+			d3dProgramDesc.ppSubobjects = nullptr;
+
+			D3D12_STATE_SUBOBJECT& d3dStateSubobjectProgram = d3dStateSubobjects.emplaceBack();
+			d3dStateSubobjectProgram.Type = D3D12_STATE_SUBOBJECT_TYPE_GENERIC_PROGRAM;
+			d3dStateSubobjectProgram.pDesc = &d3dProgramDesc;
+
+			d3dStateObjectType = D3D12_STATE_OBJECT_TYPE_EXECUTABLE;
+		}
+
+		D3D12_STATE_OBJECT_DESC d3dStateObjectDesc = {};
+		d3dStateObjectDesc.Type = d3dStateObjectType;
+		d3dStateObjectDesc.NumSubobjects = d3dStateSubobjects.getSize();
+		d3dStateObjectDesc.pSubobjects = d3dStateSubobjects;
+
+		HRESULT hResult = d3dDevice->CreateStateObject(&d3dStateObjectDesc, IID_PPV_ARGS(&shader.d3dStateObject));
+		XEMasterAssert(SUCCEEDED(hResult));
 	}
 
-	// Depth stencil format
-	if (stateBlobReader.getDepthStencilRTFormat() != DepthStencilFormat::Undefined)
+	// Retrieve D3D program identifier for compute shader
+	if (blobInfo.shaderType == ShaderType::Compute)
 	{
-		D3D12Helpers::PipelineStateSubobjectDepthStencilFormat& d3dSubobjectDSFormat =
-			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectDepthStencilFormat>(sizeof(void*));
-		d3dSubobjectDSFormat.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL_FORMAT;
-		d3dSubobjectDSFormat.format = TranslateDepthStencilFormatToDXGIFormat(stateBlobReader.getDepthStencilRTFormat());
+		ID3D12StateObjectProperties1* d3dStateObjectProps = nullptr;
+		shader.d3dStateObject->QueryInterface(IID_PPV_ARGS(&d3dStateObjectProps));
+		shader.d3dProgramIdentifier = d3dStateObjectProps->GetProgramIdentifier(L"default");
+		d3dStateObjectProps->Release();
 	}
 
-	D3D12_PIPELINE_STATE_STREAM_DESC d3dPSOStreamDesc = {};
-	d3dPSOStreamDesc.SizeInBytes = d3dPSOStreamWriter.getLength();
-	d3dPSOStreamDesc.pPipelineStateSubobjectStream = d3dPSOStreamWriter.getData();
-
-	XEAssert(!pipeline.d3dPipelineState);
-	HRESULT hResult = d3dDevice->CreatePipelineState(&d3dPSOStreamDesc, IID_PPV_ARGS(&pipeline.d3dPipelineState));
-	XEMasterAssert(hResult == S_OK);
-
-	return pipelineHandle;
+	return shaderHandle;
 }
 
-PipelineHandle Device::createComputePipeline(PipelineLayoutHandle pipelineLayoutHandle, BlobDataView csBlob)
+GraphicsPipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayoutHandle, const GraphicsPipelineDesc& desc)
 {
 	const PipelineLayout& pipelineLayout = pipelineLayoutPool.resolveHandle(uint32(pipelineLayoutHandle));
 	XEAssert(pipelineLayout.d3dRootSignature);
 
-	PipelineHandle pipelineHandle = PipelineHandle::Zero;
-	Pipeline& pipeline = pipelinePool.allocate((uint32&)pipelineHandle);
-	XEAssert(!pipeline.d3dPipelineState);
+	GraphicsPipelineHandle pipelineHandle = GraphicsPipelineHandle::Zero;
+	CompositePipeline& pipeline = compositePipelinePool.allocate((uint32&)pipelineHandle);
 	pipeline.pipelineLayoutHandle = pipelineLayoutHandle;
-	pipeline.type = PipelineType::Compute;
+	pipeline.type = CompositePipelineType::Graphics;
 
-	BlobFormat::BytecodeBlobReader bytecodeBlobReader;
-	XEMasterAssert(bytecodeBlobReader.open(csBlob.data, csBlob.size));
-	XEMasterAssert(bytecodeBlobReader.getType() == ShaderType::Compute);
-	XEMasterAssert(bytecodeBlobReader.getPipelineLayoutSourceHash() == pipelineLayout.sourceHash);
+	XEAssert(!pipeline.d3dStateObject);
 
-	D3D12_SHADER_BYTECODE d3dCS = {};
-	d3dCS.pShaderBytecode = bytecodeBlobReader.getBytecodeData();
-	d3dCS.BytecodeLength = bytecodeBlobReader.getBytecodeSize();
-
-	// Compose D3D12 Pipeline State stream.
-
-	byte d3dPSOStreamBuffer[64]; // TODO: Proper size
-	ByteStreamWriter d3dPSOStreamWriter(d3dPSOStreamBuffer, sizeof(d3dPSOStreamBuffer));
-
-	{
-		D3D12Helpers::PipelineStateSubobjectRootSignature& d3dSubobjectRS =
-			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectRootSignature>(sizeof(void*));
-		d3dSubobjectRS.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE;
-		d3dSubobjectRS.rootSignature = pipelineLayout.d3dRootSignature;
-	}
+	// Verify enabled shader stages combination.
+	if (desc.vertexAttributeCount > 0)
+		XEAssert(desc.vsHandle != ShaderHandle::Zero);
+	if (desc.vsHandle != ShaderHandle::Zero)
+		XEAssert(desc.msHandle == ShaderHandle::Zero);
+	if (desc.asHandle != ShaderHandle::Zero)
+		XEAssert(desc.msHandle == ShaderHandle::Zero);
+	if (desc.msHandle != ShaderHandle::Zero)
+		XEAssert(desc.vsHandle == ShaderHandle::Zero);
+	// TODO: Blend vs render targets
 
 	{
-		D3D12Helpers::PipelineStateSubobjectShader& d3dSubobjectCS =
-			*d3dPSOStreamWriter.advanceAligned<D3D12Helpers::PipelineStateSubobjectShader>(sizeof(void*));
-		d3dSubobjectCS.type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_CS;
-		d3dSubobjectCS.bytecode = d3dCS;
+		XLib::InplaceArrayList<D3D12_STATE_SUBOBJECT, 16> d3dStateSubobjects;
+		XLib::InplaceArrayList<D3D12_STATE_SUBOBJECT*, 16> d3dProgramPSubobjects;
+		XLib::InplaceArrayList<const wchar*, 4> programExports;
+
+		D3D12_GLOBAL_ROOT_SIGNATURE d3dRootSignatureDesc = {};
+		D3D12_PRIMITIVE_TOPOLOGY_TYPE d3dPrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE(0);
+		D3D12_INPUT_ELEMENT_DESC d3dInputLayoutElements[MaxVertexAttributeCount];
+		D3D12_INPUT_LAYOUT_DESC d3dInputLayoutDesc = {};
+		D3D12_RT_FORMAT_ARRAY d3dRTFormatArray = {};
+		DXGI_FORMAT dxgiDepthStencilFormat = DXGI_FORMAT(0);
+		D3D12_RASTERIZER_DESC2 d3dRasterizerDesc = {};
+		D3D12_DEPTH_STENCIL_DESC d3dDepthStencilDesc = {};
+		D3D12_BLEND_DESC d3dBlendDesc = {};
+		D3D12_GENERIC_PROGRAM_DESC d3dProgramDesc = {};
+
+		D3D12_EXPORT_DESC d3dVSExportDesc = {};
+		D3D12_EXPORT_DESC d3dASExportDesc = {};
+		D3D12_EXPORT_DESC d3dMSExportDesc = {};
+		D3D12_EXPORT_DESC d3dPSExportDesc = {};
+
+		D3D12_EXISTING_COLLECTION_DESC d3dVSCollectionDesc = {};
+		D3D12_EXISTING_COLLECTION_DESC d3dASCollectionDesc = {};
+		D3D12_EXISTING_COLLECTION_DESC d3dMSCollectionDesc = {};
+		D3D12_EXISTING_COLLECTION_DESC d3dPSCollectionDesc = {};
+
+		// Root signature
+		{
+			d3dRootSignatureDesc.pGlobalRootSignature = pipelineLayout.d3dRootSignature;
+
+			D3D12_STATE_SUBOBJECT& d3dStateSubobjectRootSignature = d3dStateSubobjects.emplaceBack();
+			d3dStateSubobjectRootSignature.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
+			d3dStateSubobjectRootSignature.pDesc = &d3dRootSignatureDesc;
+		}
+
+		// Primitive topology
+		{
+			d3dPrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+
+			D3D12_STATE_SUBOBJECT& d3dStateSubobjectPrimitiveTopology = d3dStateSubobjects.emplaceBack();
+			d3dStateSubobjectPrimitiveTopology.Type = D3D12_STATE_SUBOBJECT_TYPE_PRIMITIVE_TOPOLOGY;
+			d3dStateSubobjectPrimitiveTopology.pDesc = &d3dPrimitiveTopologyType;
+
+			d3dProgramPSubobjects.pushBack(&d3dStateSubobjectPrimitiveTopology);
+		}
+
+		// Input layout
+		if (desc.vertexAttributeCount > 0)
+		{
+			XEMasterAssert(desc.vertexAttributeCount < MaxVertexAttributeCount);
+
+			for (uint8 i = 0; i < desc.vertexAttributeCount; i++)
+			{
+				const VertexAttribute& attribute = desc.vertexAttributes[i];
+				XEAssert(attribute.bufferIndex < MaxVertexBufferCount);
+				const bool perInstance = attribute.indexMode == VertexAttributeIndexMode::InstanceID;
+
+				D3D12_INPUT_ELEMENT_DESC& d3dElementDesc = d3dInputLayoutElements[i];
+				d3dElementDesc = {};
+				d3dElementDesc.SemanticName = attribute.name;
+				d3dElementDesc.SemanticIndex = 0;
+				d3dElementDesc.Format = TranslateTexelViewFormatToDXGIFormat(attribute.format);
+				d3dElementDesc.InputSlot = attribute.bufferIndex;
+				d3dElementDesc.AlignedByteOffset = attribute.offset;
+				d3dElementDesc.InputSlotClass = perInstance ? D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA : D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+				d3dElementDesc.InstanceDataStepRate = perInstance ? 1 : 0;
+			}
+
+			d3dInputLayoutDesc.pInputElementDescs = d3dInputLayoutElements;
+			d3dInputLayoutDesc.NumElements = desc.vertexAttributeCount;
+
+			D3D12_STATE_SUBOBJECT& d3dStateSubobjectInputLayout = d3dStateSubobjects.emplaceBack();
+			d3dStateSubobjectInputLayout.Type = D3D12_STATE_SUBOBJECT_TYPE_INPUT_LAYOUT;
+			d3dStateSubobjectInputLayout.pDesc = &d3dInputLayoutDesc;
+
+			d3dProgramPSubobjects.pushBack(&d3dStateSubobjectInputLayout);
+		}
+		
+		// Render target formats
+		{
+			static_assert(MaxColorRenderTargetCount <= countof(d3dRTFormatArray.RTFormats));
+			for (uint8 i = 0; i < MaxColorRenderTargetCount; i++)
+			{
+				const TexelViewFormat format = desc.colorRenderTargetFormats[i];
+				if (format != TexelViewFormat::Undefined)
+				{
+					XEAssert(HAL::TexelViewFormatUtils::SupportsColorRTUsage(format));
+					d3dRTFormatArray.RTFormats[i] = TranslateTexelViewFormatToDXGIFormat(format);
+					d3dRTFormatArray.NumRenderTargets = i + 1;
+				}
+			}
+
+			if (d3dRTFormatArray.NumRenderTargets > 0)
+			{
+				XEAssert(desc.psHandle != ShaderHandle::Zero);
+
+				D3D12_STATE_SUBOBJECT& d3dStateSubobjectRenderTargetFormats = d3dStateSubobjects.emplaceBack();
+				d3dStateSubobjectRenderTargetFormats.Type = D3D12_STATE_SUBOBJECT_TYPE_RENDER_TARGET_FORMATS;
+				d3dStateSubobjectRenderTargetFormats.pDesc = &d3dRTFormatArray;
+
+				d3dProgramPSubobjects.pushBack(&d3dStateSubobjectRenderTargetFormats);
+			}
+		}
+
+		// Depth stencil format
+		if (desc.depthStencilRenderTargetFormat != DepthStencilFormat::Undefined)
+		{
+			dxgiDepthStencilFormat = TranslateDepthStencilFormatToDXGIFormat(desc.depthStencilRenderTargetFormat);
+
+			D3D12_STATE_SUBOBJECT& d3dStateSubobjectDepthStencilFormat = d3dStateSubobjects.emplaceBack();
+			d3dStateSubobjectDepthStencilFormat.Type = D3D12_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL_FORMAT;
+			d3dStateSubobjectDepthStencilFormat.pDesc = &dxgiDepthStencilFormat;
+
+			d3dProgramPSubobjects.pushBack(&d3dStateSubobjectDepthStencilFormat);
+		}
+
+		// Rasterizer state
+		{
+			d3dRasterizerDesc.FillMode = TranslateRasterizerFillModeToD3D12FillMode(desc.rasterizerState.fillMode);
+			d3dRasterizerDesc.CullMode = TranslateRasterizerCullModeToD3D12CullMode(desc.rasterizerState.cullMode);
+			d3dRasterizerDesc.DepthClipEnable = TRUE;
+
+			D3D12_STATE_SUBOBJECT& d3dStateSubobjectRasterizer = d3dStateSubobjects.emplaceBack();
+			d3dStateSubobjectRasterizer.Type = D3D12_STATE_SUBOBJECT_TYPE_RASTERIZER;
+			d3dStateSubobjectRasterizer.pDesc = &d3dRasterizerDesc;
+
+			d3dProgramPSubobjects.pushBack(&d3dStateSubobjectRasterizer);
+		}
+
+		// Depth stencil state
+		{
+			d3dDepthStencilDesc.DepthEnable = desc.depthStencilState.depthReadEnable ? TRUE : FALSE;
+			d3dDepthStencilDesc.DepthWriteMask = desc.depthStencilState.depthWriteEnable ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
+			d3dDepthStencilDesc.DepthFunc = TranslateComparisonFuncToD3D12ComparisonFunc(desc.depthStencilState.depthComparisonFunc);
+
+			D3D12_STATE_SUBOBJECT& d3dStateSubobjectDepthStencil = d3dStateSubobjects.emplaceBack();
+			d3dStateSubobjectDepthStencil.Type = D3D12_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL;
+			d3dStateSubobjectDepthStencil.pDesc = &d3dDepthStencilDesc;
+
+			d3dProgramPSubobjects.pushBack(&d3dStateSubobjectDepthStencil);
+		}
+
+		// Blend state
+		{
+			XTODO(__FUNCTION__ ": implement blend state support");
+
+#if 0
+			d3dBlendDesc. ...;
+
+			D3D12_STATE_SUBOBJECT& d3dStateSubobjectBlend = d3dStateSubobjects.emplaceBack();
+			d3dStateSubobjectBlend.Type = D3D12_STATE_SUBOBJECT_TYPE_BLEND;
+			d3dStateSubobjectBlend.pDesc = &d3dBlendDesc;
+
+			d3dProgramPSubobjects.pushBack(&d3dStateSubobjectBlend);
+#endif
+		}
+
+		// VS
+		if (desc.vsHandle != ShaderHandle::Zero)
+		{
+			const Shader& vs = shaderPool.resolveHandle(uint32(desc.vsHandle));
+			XEAssert(vs.type == ShaderType::Vertex);
+			XEAssert(vs.d3dStateObject);
+
+			d3dVSExportDesc.Name = L"vs";
+
+			d3dVSCollectionDesc.pExistingCollection = vs.d3dStateObject;
+			d3dVSCollectionDesc.NumExports = 1;
+			d3dVSCollectionDesc.pExports = &d3dVSExportDesc;
+
+			D3D12_STATE_SUBOBJECT& d3dStateSubobjectVS = d3dStateSubobjects.emplaceBack();
+			d3dStateSubobjectVS.Type = D3D12_STATE_SUBOBJECT_TYPE_EXISTING_COLLECTION;
+			d3dStateSubobjectVS.pDesc = &d3dVSCollectionDesc;
+
+			programExports.pushBack(L"vs");
+		}
+
+		// AS
+		if (desc.asHandle != ShaderHandle::Zero)
+		{
+			const Shader& as = shaderPool.resolveHandle(uint32(desc.asHandle));
+			XEAssert(as.type == ShaderType::Amplification);
+			XEAssert(as.d3dStateObject);
+
+			d3dASExportDesc.Name = L"as";
+
+			d3dASCollectionDesc.pExistingCollection = as.d3dStateObject;
+			d3dASCollectionDesc.NumExports = 1;
+			d3dASCollectionDesc.pExports = &d3dASExportDesc;
+
+			D3D12_STATE_SUBOBJECT& d3dStateSubobjectAS = d3dStateSubobjects.emplaceBack();
+			d3dStateSubobjectAS.Type = D3D12_STATE_SUBOBJECT_TYPE_EXISTING_COLLECTION;
+			d3dStateSubobjectAS.pDesc = &d3dASCollectionDesc;
+
+			programExports.pushBack(L"as");
+		}
+
+		// MS
+		if (desc.msHandle != ShaderHandle::Zero)
+		{
+			const Shader& ms = shaderPool.resolveHandle(uint32(desc.msHandle));
+			XEAssert(ms.type == ShaderType::Mesh);
+			XEAssert(ms.d3dStateObject);
+
+			d3dMSExportDesc.Name = L"ms";
+
+			d3dMSCollectionDesc.pExistingCollection = ms.d3dStateObject;
+			d3dMSCollectionDesc.NumExports = 1;
+			d3dMSCollectionDesc.pExports = &d3dMSExportDesc;
+
+			D3D12_STATE_SUBOBJECT& d3dStateSubobjectMS = d3dStateSubobjects.emplaceBack();
+			d3dStateSubobjectMS.Type = D3D12_STATE_SUBOBJECT_TYPE_EXISTING_COLLECTION;
+			d3dStateSubobjectMS.pDesc = &d3dMSCollectionDesc;
+
+			programExports.pushBack(L"ms");
+		}
+
+		// PS
+		if (desc.psHandle != ShaderHandle::Zero)
+		{
+			const Shader& ps = shaderPool.resolveHandle(uint32(desc.psHandle));
+			XEAssert(ps.type == ShaderType::Pixel);
+			XEAssert(ps.d3dStateObject);
+
+			d3dPSExportDesc.Name = L"ps";
+
+			d3dPSCollectionDesc.pExistingCollection = ps.d3dStateObject;
+			d3dPSCollectionDesc.NumExports = 1;
+			d3dPSCollectionDesc.pExports = &d3dPSExportDesc;
+
+			D3D12_STATE_SUBOBJECT& d3dStateSubobjectPS = d3dStateSubobjects.emplaceBack();
+			d3dStateSubobjectPS.Type = D3D12_STATE_SUBOBJECT_TYPE_EXISTING_COLLECTION;
+			d3dStateSubobjectPS.pDesc = &d3dPSCollectionDesc;
+
+			programExports.pushBack(L"ps");
+		}
+
+		{
+			d3dProgramDesc.ProgramName = L"default";
+			d3dProgramDesc.NumExports = programExports.getSize();
+			d3dProgramDesc.pExports = programExports;
+			d3dProgramDesc.NumSubobjects = d3dProgramPSubobjects.getSize();
+			d3dProgramDesc.ppSubobjects = d3dProgramPSubobjects;
+
+			D3D12_STATE_SUBOBJECT& d3dStateSubobjectProgram = d3dStateSubobjects.emplaceBack();
+			d3dStateSubobjectProgram.Type = D3D12_STATE_SUBOBJECT_TYPE_GENERIC_PROGRAM;
+			d3dStateSubobjectProgram.pDesc = &d3dProgramDesc;
+		}
+
+		D3D12_STATE_OBJECT_DESC d3dStateObjectDesc = {};
+		d3dStateObjectDesc.Type = D3D12_STATE_OBJECT_TYPE_EXECUTABLE;
+		d3dStateObjectDesc.NumSubobjects = d3dStateSubobjects.getSize();
+		d3dStateObjectDesc.pSubobjects = d3dStateSubobjects;
+
+		HRESULT hResult = d3dDevice->CreateStateObject(&d3dStateObjectDesc, IID_PPV_ARGS(&pipeline.d3dStateObject));
+		XEMasterAssert(SUCCEEDED(hResult));
 	}
 
-	D3D12_PIPELINE_STATE_STREAM_DESC d3dPSOStreamDesc = {};
-	d3dPSOStreamDesc.SizeInBytes = d3dPSOStreamWriter.getLength();
-	d3dPSOStreamDesc.pPipelineStateSubobjectStream = d3dPSOStreamWriter.getData();
-
-	XEAssert(!pipeline.d3dPipelineState);
-	HRESULT hResult = d3dDevice->CreatePipelineState(&d3dPSOStreamDesc, IID_PPV_ARGS(&pipeline.d3dPipelineState));
-	XEMasterAssert(hResult == S_OK);
+	// Retrieve D3D program identifier
+	{
+		ID3D12StateObjectProperties1* d3dStateObjectProps = nullptr;
+		pipeline.d3dStateObject->QueryInterface(IID_PPV_ARGS(&d3dStateObjectProps));
+		pipeline.d3dProgramIdentifier = d3dStateObjectProps->GetProgramIdentifier(L"default");
+		d3dStateObjectProps->Release();
+	}
 
 	return pipelineHandle;
 }

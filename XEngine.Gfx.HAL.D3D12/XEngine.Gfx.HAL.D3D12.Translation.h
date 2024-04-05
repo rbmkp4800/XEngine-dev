@@ -192,6 +192,49 @@ namespace XEngine::Gfx::HAL
 		return D3D12_BARRIER_LAYOUT_UNDEFINED;
 	}
 
+	inline D3D12_FILL_MODE TranslateRasterizerFillModeToD3D12FillMode(RasterizerFillMode rasterizerFillMode)
+	{
+		switch (rasterizerFillMode)
+		{
+			case RasterizerFillMode::Solid:		return D3D12_FILL_MODE_SOLID;
+			case RasterizerFillMode::Wireframe:	return D3D12_FILL_MODE_WIREFRAME;
+		}
+
+		XEMasterAssertUnreachableCode();
+		return D3D12_FILL_MODE_SOLID;
+	}
+
+	inline D3D12_CULL_MODE TranslateRasterizerCullModeToD3D12CullMode(RasterizerCullMode rasterizerCullMode)
+	{
+		switch (rasterizerCullMode)
+		{
+			case RasterizerCullMode::None:	return D3D12_CULL_MODE_NONE;
+			case RasterizerCullMode::Front:	return D3D12_CULL_MODE_FRONT;
+			case RasterizerCullMode::Back:	return D3D12_CULL_MODE_BACK;
+		}
+
+		XEMasterAssertUnreachableCode();
+		return D3D12_CULL_MODE_NONE;
+	}
+
+	inline D3D12_COMPARISON_FUNC TranslateComparisonFuncToD3D12ComparisonFunc(ComparisonFunc comparisonFunc)
+	{
+		switch (comparisonFunc)
+		{
+			case ComparisonFunc::Never:			return D3D12_COMPARISON_FUNC_NEVER;			break;
+			case ComparisonFunc::Always:		return D3D12_COMPARISON_FUNC_ALWAYS;		break;
+			case ComparisonFunc::Equal:			return D3D12_COMPARISON_FUNC_EQUAL;			break;
+			case ComparisonFunc::NotEqual:		return D3D12_COMPARISON_FUNC_NOT_EQUAL;		break;
+			case ComparisonFunc::Less:			return D3D12_COMPARISON_FUNC_LESS;			break;
+			case ComparisonFunc::LessEqual:		return D3D12_COMPARISON_FUNC_LESS_EQUAL;	break;
+			case ComparisonFunc::Greater:		return D3D12_COMPARISON_FUNC_GREATER;		break;
+			case ComparisonFunc::GreaterEqual:	return D3D12_COMPARISON_FUNC_GREATER_EQUAL;	break;
+		}
+
+		XEMasterAssertUnreachableCode();
+		return D3D12_COMPARISON_FUNC_NEVER;
+	}
+
 	inline D3D12_BOX D3D12BoxFromOffsetAndSize(uint16x3 offset, uint16x3 size)
 	{
 		D3D12_BOX result = {};

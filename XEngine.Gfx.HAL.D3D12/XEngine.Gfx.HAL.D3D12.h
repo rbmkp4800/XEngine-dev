@@ -6,13 +6,12 @@
 
 #include <XEngine.Gfx.HAL.Shared.h>
 
-// TODO: Check that viewport and scissor are set when rendering.
-// TODO: Check that scissor rect is not larget than render target.
+// TODO: Validate used vs set vertex buffers when rendering.
+// TODO: Validate that viewport and scissor are set when rendering.
+// TODO: Validate that scissor rect is not larget than render target.
 // TODO: Validate color/depth-stencil RT formats when rendering.
 // TODO: Probably we can state that Texture2D is equivalent to Texture2DArray[1].
 // TODO: Handle should be 18+10+4 or 17+11+4 instead of 20+8+4.
-// TODO: Setting pipeline type should not clear pipeline layout as one layout could work for graphics and compute.
-// TODO: Depth-stencil state, rasterizer state, blend state should be provided in runtime. We assume that these settings have nothing to do with shader bytecode.
 // TODO: Implement "host visible" memory/resources via `D3D12_HEAP_TYPE_GPU_UPLOAD`.
 // TODO: Move bindings from `Device::DescriptorSetLayout` and `Device::PipelineLayout` to device internal heap (TLSF probably).
 // TODO: Look into `minImageTransferGranularity`. This is additional constraint on CLs we submit to copy queue.
@@ -35,7 +34,7 @@ struct ID3D12Device10;
 struct ID3D12CommandQueue;
 struct ID3D12Fence;
 struct ID3D12DescriptorHeap;
-struct ID3D12GraphicsCommandList7;
+struct ID3D12GraphicsCommandList10;
 
 namespace XEngine::Gfx::HAL
 {
@@ -53,8 +52,10 @@ namespace XEngine::Gfx::HAL
 	enum class BufferHandle					: uint32 { Zero = 0 };
 	enum class TextureHandle				: uint32 { Zero = 0 };
 	enum class DescriptorSetLayoutHandle	: uint32 { Zero = 0 };
-	enum class PipelineLayoutHandle			: uint32 { Zero = 0 };
-	enum class PipelineHandle				: uint32 { Zero = 0 };
+	enum class PipelineLayoutHandle			: uint32 { Zero = 0 }; // PipelineBindingLayoutHandle?
+	enum class ShaderHandle					: uint32 { Zero = 0 };
+	enum class GraphicsPipelineHandle		: uint32 { Zero = 0 };
+	//enum class RaytracingPipelineHandle		: uint32 { Zero = 0 };
 	enum class OutputHandle					: uint32 { Zero = 0 };
 
 	enum class DescriptorSet				: uint64 { Zero = 0 };
@@ -155,6 +156,7 @@ namespace XEngine::Gfx::HAL
 		Undefined = 0,
 		Graphics,
 		Compute,
+		//Raytracing,
 	};
 
 	enum class CommandListType : uint8
@@ -163,6 +165,21 @@ namespace XEngine::Gfx::HAL
 		Graphics,
 		Compute,
 		Copy,
+	};
+
+	enum class VertexAttributeIndexMode : uint8
+	{
+		VertexID = 0,
+		InstanceID,
+	};
+
+	struct VertexAttribute
+	{
+		const char* name;
+		uint16 offset;
+		TexelViewFormat format;
+		uint8 bufferIndex;
+		VertexAttributeIndexMode indexMode;
 	};
 
 	enum class RasterizerFillMode : uint8
@@ -234,12 +251,41 @@ namespace XEngine::Gfx::HAL
 
 	struct ColorBlendState
 	{
-		BlendFactor srcColorBlendFactor;
-		BlendFactor dstColorBlendFactor;
-		BlendOp colorBlendOp;
-		BlendFactor scrAlphaBlendFactor;
-		BlendFactor dstAlphaBlendFactor;
-		BlendOp alphaBlendOp;
+		struct RenderTarget
+		{
+			BlendFactor srcColorBlendFactor : 5;
+			BlendFactor dstColorBlendFactor : 5;
+			BlendOp colorBlendOp : 3;
+			BlendFactor scrAlphaBlendFactor : 5;
+			BlendFactor dstAlphaBlendFactor : 5;
+			BlendOp alphaBlendOp : 3;
+
+			bool blendEnable : 1;
+			bool writeR : 1;
+			bool writeG : 1;
+			bool writeB : 1;
+			bool writeA : 1;
+		};
+
+		RenderTarget renderTargets[MaxColorRenderTargetCount];
+	};
+
+	struct GraphicsPipelineDesc
+	{
+		const VertexAttribute* vertexAttributes;
+		uint8 vertexAttributeCount;
+
+		ShaderHandle vsHandle;
+		ShaderHandle asHandle;
+		ShaderHandle msHandle;
+		ShaderHandle psHandle;
+
+		TexelViewFormat colorRenderTargetFormats[MaxColorRenderTargetCount];
+		DepthStencilFormat depthStencilRenderTargetFormat;
+
+		RasterizerState rasterizerState;
+		DepthStencilState depthStencilState;
+		ColorBlendState colorBlendState;
 	};
 
 	struct ColorRenderTarget
@@ -381,7 +427,7 @@ namespace XEngine::Gfx::HAL
 
 	private:
 		Device* device = nullptr;
-		ID3D12GraphicsCommandList7* d3dCommandList = nullptr;
+		ID3D12GraphicsCommandList10* d3dCommandList = nullptr;
 		uint32 deviceCommandListHandle = 0;
 		CommandAllocatorHandle commandAllocatorHandle = CommandAllocatorHandle::Zero;
 
@@ -405,13 +451,12 @@ namespace XEngine::Gfx::HAL
 
 		void setPipelineType(PipelineType pipelineType);
 		void setPipelineLayout(PipelineLayoutHandle pipelineLayoutHandle);
-		void setPipeline(PipelineHandle pipelineHandle);
+		void setComputePipeline(ShaderHandle computeShaderHandle);
+		void setGraphicsPipeline(GraphicsPipelineHandle graphicsPipelineHandle);
+		//void setRaytracingPipeline(RaytracingPipelineHandle raytracingPipelineHandle);
 
 		void setViewport(float32 left, float32 top, float32 right, float32 bottom, float32 minDepth = 0.0f, float32 maxDepth = 1.0f);
 		void setScissor(uint32 left, uint32 top, uint32 right, uint32 bottom);
-		void setRasterizerState(const RasterizerState& rasterizerState);
-		void setDepthStencilState(const DepthStencilState& depthStencilState);
-		void setColorBlendState(uint8 colorRenderTargetIndex, const ColorBlendState* colorBlendState = nullptr);
 
 		void bindRenderTargets(uint8 colorRenderTargetCount, const ColorRenderTarget* colorRenderTargets,
 			const DepthStencilRenderTarget* depthStencilRenderTarget = nullptr, bool readOnlyDepth = false, bool readOnlyStencil = false);
@@ -432,6 +477,9 @@ namespace XEngine::Gfx::HAL
 		void dispatchMesh();
 		void dispatch(uint32 groupCountX, uint32 groupCountY = 1, uint32 groupCountZ = 1);
 
+		void globalMemoryBarrier(
+			BarrierSync syncBefore, BarrierSync syncAfter,
+			BarrierAccess accessBefore, BarrierAccess accessAfter);
 		void bufferMemoryBarrier(BufferHandle bufferHandle,
 			BarrierSync syncBefore, BarrierSync syncAfter,
 			BarrierAccess accessBefore, BarrierAccess accessAfter);
@@ -440,7 +488,6 @@ namespace XEngine::Gfx::HAL
 			BarrierAccess accessBefore, BarrierAccess accessAfter,
 			TextureLayout layoutBefore, TextureLayout layoutAfter,
 			const TextureSubresourceRange* subresourceRange = nullptr);
-		//void globalMemoryBarrier();
 
 		void copyBuffer(BufferHandle dstBufferHandle, uint64 dstOffset, BufferHandle srcBufferHandle, uint64 srcOffset, uint64 size);
 		void copyTexture(TextureHandle dstTextureHandle, TextureSubresource dstSubresource, uint16x3 dstOffset,
@@ -455,21 +502,6 @@ namespace XEngine::Gfx::HAL
 		//void popDebugMarker();
 	};
 
-	struct BlobDataView
-	{
-		const void* data;
-		uint32 size;
-	};
-
-	struct GraphicsPipelineBlobs
-	{
-		BlobDataView state;
-		BlobDataView vs;
-		BlobDataView as;
-		BlobDataView ms;
-		BlobDataView ps;
-	};
-
 	struct DeviceSettings
 	{
 		uint16 maxCommandAllocatorCount;
@@ -479,7 +511,8 @@ namespace XEngine::Gfx::HAL
 		uint16 maxResourceCount;
 		uint16 maxDescriptorSetLayoutCount;
 		uint16 maxPipelineLayoutCount;
-		uint16 maxPipelineCount;
+		uint16 maxShaderCount;
+		uint16 maxCompositePipelineCount;
 		uint16 maxOutputCount;
 
 		uint32 bindlessDescriptorPoolSize;
@@ -499,6 +532,8 @@ namespace XEngine::Gfx::HAL
 		friend CommandList;
 
 	private:
+		enum class CompositePipelineType : uint8;
+
 		struct Queue
 		{
 			ID3D12CommandQueue* d3dQueue;
@@ -555,7 +590,8 @@ namespace XEngine::Gfx::HAL
 		struct Resource;
 		struct DescriptorSetLayout;
 		struct PipelineLayout;
-		struct Pipeline;
+		struct Shader;
+		struct CompositePipeline;
 		struct Output;
 
 		static constexpr uint32 DescriptorAllocatorChunkSize = 1024;
@@ -585,7 +621,8 @@ namespace XEngine::Gfx::HAL
 		Pool<Resource> resourcePool;
 		Pool<DescriptorSetLayout> descriptorSetLayoutPool;
 		Pool<PipelineLayout> pipelineLayoutPool;
-		Pool<Pipeline> pipelinePool;
+		Pool<Shader> shaderPool;
+		Pool<CompositePipeline> compositePipelinePool;
 		Pool<Output> outputPool;
 
 		uint32 bindlessDescriptorPoolSize = 0;
@@ -638,15 +675,20 @@ namespace XEngine::Gfx::HAL
 		void destroyBuffer(BufferHandle bufferHandle);
 		void destroyTexture(TextureHandle textureHandle);
 
-		DescriptorSetLayoutHandle createDescriptorSetLayout(BlobDataView blob);
+		DescriptorSetLayoutHandle createDescriptorSetLayout(const void* blobData, uint32 blobSize);
 		void destroyDescriptorSetLayout(DescriptorSetLayoutHandle descriptorSetLayoutHandle);
 
-		PipelineLayoutHandle createPipelineLayout(BlobDataView blob);
+		PipelineLayoutHandle createPipelineLayout(const void* blobData, uint32 blobSize);
 		void destroyPipelineLayout(PipelineLayoutHandle pipelineLayoutHandle);
 
-		PipelineHandle createGraphicsPipeline(PipelineLayoutHandle pipelineLayoutHandle, const GraphicsPipelineBlobs& blobs);
-		PipelineHandle createComputePipeline(PipelineLayoutHandle pipelineLayoutHandle, BlobDataView csBlob);
-		void destroyPipeline(PipelineHandle pipelineHandle);
+		ShaderHandle createShader(PipelineLayoutHandle pipelineLayoutHandle, const void* blobData, uint32 blobSize);
+		void destroyShader(ShaderHandle shaderHandle);
+
+		GraphicsPipelineHandle createGraphicsPipeline(PipelineLayoutHandle pipelineLayoutHandle, const GraphicsPipelineDesc& desc);
+		void destroyGraphicsPipeline(GraphicsPipelineHandle graphicsPipelineHandle);
+
+		// RaytracingPipelineHandle createRaytracingPipeline(...);
+		// void destroyRaytracingPipeline(RaytracingPipelineHandle raytracingPipelineHandle);
 
 		OutputHandle createWindowOutput(uint16 width, uint16 height, void* platformWindowHandle);
 		// OutputHandle createDisplayOutput();
