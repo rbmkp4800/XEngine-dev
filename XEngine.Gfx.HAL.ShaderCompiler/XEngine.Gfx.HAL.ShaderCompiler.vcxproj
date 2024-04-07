@@ -35,21 +35,31 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <AdditionalIncludeDirectories>
-        $(SolutionDir)External\Microsoft.DirectXShaderCompiler\include;
-        %(AdditionalIncludeDirectories)
+$(SolutionDir)Externals\Microsoft.Direct3D.DXC\include;
+%(AdditionalIncludeDirectories)
       </AdditionalIncludeDirectories>
     </ClCompile>
     <Lib>
       <AdditionalLibraryDirectories>
-        $(SolutionDir)External\Microsoft.DirectXShaderCompiler\lib\$(Platform);
-        %(AdditionalLibraryDirectories)
+$(SolutionDir)Externals\Microsoft.Direct3D.DXC\lib\$(Platform);
+%(AdditionalLibraryDirectories)
       </AdditionalLibraryDirectories>
       <AdditionalDependencies>
-        dxcompiler.lib;
-        d3d12.lib;
-        %(AdditionalDependencies)
+dxcompiler.lib;
+d3d12.lib;
+%(AdditionalDependencies)
       </AdditionalDependencies>
     </Lib>
+  </ItemDefinitionGroup>
+
+  <ItemDefinitionGroup>
+    <PostBuildEvent>
+      <Command>
+xcopy /y $(SolutionDir)Externals\Microsoft.Direct3D.DXC\bin\$(Platform)\*.dll $(OutDir)
+xcopy /y $(SolutionDir)Externals\Microsoft.Direct3D.DXC\bin\$(Platform)\*.pdb $(OutDir)
+      </Command>
+      <Message>Copying DXC DLLs to output directory</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
 
   <ItemGroup>

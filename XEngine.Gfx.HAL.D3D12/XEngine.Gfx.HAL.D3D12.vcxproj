@@ -35,8 +35,8 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <AdditionalIncludeDirectories>
-        $(SolutionDir)External\Microsoft.Direct3D.D3D12\include;
-        %(AdditionalIncludeDirectories)
+$(SolutionDir)Externals\Microsoft.Direct3D.D3D12\include;
+%(AdditionalIncludeDirectories)
       </AdditionalIncludeDirectories>
     </ClCompile>
     <Lib>
@@ -48,8 +48,8 @@
     </Lib>
     <PostBuildEvent>
       <Command>
-        xcopy /y $(SolutionDir)External\Microsoft.Direct3D.D3D12\bin\$(Platform)\*.dll $(OutDir)D3D12\
-        xcopy /y $(SolutionDir)External\Microsoft.Direct3D.D3D12\bin\$(Platform)\*.pdb $(OutDir)D3D12\
+xcopy /y $(SolutionDir)Externals\Microsoft.Direct3D.D3D12\bin\$(Platform)\*.dll $(OutDir)D3D12\
+xcopy /y $(SolutionDir)Externals\Microsoft.Direct3D.D3D12\bin\$(Platform)\*.pdb $(OutDir)D3D12\
       </Command>
       <Message>Copying D3D12 DLLs to output directory</Message>
     </PostBuildEvent>

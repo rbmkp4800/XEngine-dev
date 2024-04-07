@@ -28,16 +28,6 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <Import Project="$(ProjectDefaultsPropsPath)" />
 
-  <ItemDefinitionGroup>
-    <PostBuildEvent>
-      <Command>
-        xcopy /y $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.dll $(OutDir)
-        xcopy /y $(SolutionDir)External\Microsoft.DirectXShaderCompiler\bin\$(Platform)\*.pdb $(OutDir)
-      </Command>
-      <Message>Copying DXC DLLs to output directory</Message>
-    </PostBuildEvent>
-  </ItemDefinitionGroup>
-
   <ItemGroup>
     <ClInclude Include="XEngine.Gfx.ShaderLibraryBuilder.h" />
     <ClInclude Include="XEngine.Gfx.ShaderLibraryBuilder.LibraryDefinitionLoader.h" />
