@@ -243,18 +243,7 @@ inline CommandList::BindingResolveResult CommandList::ResolveBindingByNameXSH(
 
 void CommandList::cleanup()
 {
-	device = nullptr;
-	d3dCommandList = nullptr;
-	deviceCommandListHandle = 0;
-	commandAllocatorHandle = CommandAllocatorHandle::Zero;
-
-	type = CommandListType::Undefined;
-	isOpen = false;
-
-	currentPipelineLayoutHandle = PipelineLayoutHandle::Zero;
-	currentPipelineType = PipelineType::Undefined;
-	setColorRenderTargetCount = 0;
-	isDepthStencilRenderTargetSet = false;
+	memorySet(this, 0, sizeof(CommandList));
 }
 
 CommandList::~CommandList()
@@ -1603,21 +1592,21 @@ ShaderHandle Device::createShader(PipelineLayoutHandle pipelineLayoutHandle, con
 	XEAssert(!shader.d3dStateObject);
 
 	{
-		const wchar* exportName = nullptr;
+		const wchar* shaderExportName = nullptr;
 		switch (blobInfo.shaderType)
 		{
-			case ShaderType::Compute:		exportName = L"cs";	break;
-			case ShaderType::Vertex:		exportName = L"vs";	break;
-			case ShaderType::Amplification:	exportName = L"as";	break;
-			case ShaderType::Mesh:			exportName = L"ms";	break;
-			case ShaderType::Pixel:			exportName = L"ps";	break;
+			case ShaderType::Compute:		shaderExportName = L"cs";	break;
+			case ShaderType::Vertex:		shaderExportName = L"vs";	break;
+			case ShaderType::Amplification:	shaderExportName = L"as";	break;
+			case ShaderType::Mesh:			shaderExportName = L"ms";	break;
+			case ShaderType::Pixel:			shaderExportName = L"ps";	break;
 		}
-		XEAssert(exportName);
+		XEAssert(shaderExportName);
 
 		XLib::InplaceArrayList<D3D12_STATE_SUBOBJECT, 3> d3dStateSubobjects;
 
 		D3D12_GLOBAL_ROOT_SIGNATURE d3dRootSignatureDesc = {};
-		D3D12_EXPORT_DESC d3dExportDesc = {};
+		D3D12_EXPORT_DESC d3dShaderExportDesc = {};
 		D3D12_DXIL_LIBRARY_DESC d3dDXILLibDesc = {};
 		D3D12_GENERIC_PROGRAM_DESC d3dProgramDesc = {};
 
@@ -1634,13 +1623,13 @@ ShaderHandle Device::createShader(PipelineLayoutHandle pipelineLayoutHandle, con
 
 		// Shader bytecode
 		{
-			d3dExportDesc.Name = exportName;
-			d3dExportDesc.ExportToRename = L"*";
+			d3dShaderExportDesc.Name = shaderExportName;
+			d3dShaderExportDesc.ExportToRename = L"*";
 
 			d3dDXILLibDesc.DXILLibrary.pShaderBytecode = blobReader.getBytecodePtr();
 			d3dDXILLibDesc.DXILLibrary.BytecodeLength = blobInfo.bytecodeSize;
 			d3dDXILLibDesc.NumExports = 1;
-			d3dDXILLibDesc.pExports = &d3dExportDesc;
+			d3dDXILLibDesc.pExports = &d3dShaderExportDesc;
 
 			D3D12_STATE_SUBOBJECT& d3dStateSubobjectShader = d3dStateSubobjects.emplaceBack();
 			d3dStateSubobjectShader.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
@@ -1652,7 +1641,7 @@ ShaderHandle Device::createShader(PipelineLayoutHandle pipelineLayoutHandle, con
 		{
 			d3dProgramDesc.ProgramName = L"default";
 			d3dProgramDesc.NumExports = 1;
-			d3dProgramDesc.pExports = &exportName;
+			d3dProgramDesc.pExports = &shaderExportName;
 			d3dProgramDesc.NumSubobjects = 0;
 			d3dProgramDesc.ppSubobjects = nullptr;
 
@@ -1712,7 +1701,6 @@ GraphicsPipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipel
 		XLib::InplaceArrayList<D3D12_STATE_SUBOBJECT*, 16> d3dProgramPSubobjects;
 		XLib::InplaceArrayList<const wchar*, 4> programExports;
 
-		D3D12_GLOBAL_ROOT_SIGNATURE d3dRootSignatureDesc = {};
 		D3D12_PRIMITIVE_TOPOLOGY_TYPE d3dPrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE(0);
 		D3D12_INPUT_ELEMENT_DESC d3dInputLayoutElements[MaxVertexAttributeCount];
 		D3D12_INPUT_LAYOUT_DESC d3dInputLayoutDesc = {};
@@ -1732,15 +1720,6 @@ GraphicsPipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipel
 		D3D12_EXISTING_COLLECTION_DESC d3dASCollectionDesc = {};
 		D3D12_EXISTING_COLLECTION_DESC d3dMSCollectionDesc = {};
 		D3D12_EXISTING_COLLECTION_DESC d3dPSCollectionDesc = {};
-
-		// Root signature
-		{
-			d3dRootSignatureDesc.pGlobalRootSignature = pipelineLayout.d3dRootSignature;
-
-			D3D12_STATE_SUBOBJECT& d3dStateSubobjectRootSignature = d3dStateSubobjects.emplaceBack();
-			d3dStateSubobjectRootSignature.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
-			d3dStateSubobjectRootSignature.pDesc = &d3dRootSignatureDesc;
-		}
 
 		// Primitive topology
 		{

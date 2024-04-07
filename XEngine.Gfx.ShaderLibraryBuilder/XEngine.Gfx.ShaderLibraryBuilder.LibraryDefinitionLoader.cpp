@@ -607,7 +607,7 @@ bool LibraryDefinitionLoader::readShader(StringViewASCII shaderName, Cursor json
 	IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("entry", args.entryPointName));
 	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(HAL::ShaderCompiler::ValidateShaderEntryPointName(args.entryPointName), "invalid shader entry point name", jsonEntryPointNameCursor);
 
-	XTODO("Rewrite " __FUNCTION__ " in less constrained way");
+	XTODO(""__FUNCTION__ ": Rewrite in less constrained way");
 
 	const uint64 shaderNameXSH = XSH::Compute(shaderName);
 	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(shaderNameXSH != 0, "shader name XSH = 0. This is not allowed", jsonShaderNameCursor);

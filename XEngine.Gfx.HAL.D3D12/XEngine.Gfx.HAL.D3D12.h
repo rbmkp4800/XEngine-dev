@@ -18,6 +18,9 @@
 // TODO: Do something about optimized clear values passed on resource creation. Warning suppressed for now.
 // TODO: `TextureLayout::Commom` allows shader write access (D3D12 UAV), but D3D12 spec says that this is only allowed using a "queue-specific" common layout. We should revisit this when implementing multi-queue support (including vulkan specifics).
 // TODO: `TextureLayout::Commom` is equivalent to `D3D12_BARRIER_LAYOUT_DIRECT_QUEUE_COMMON`, so only gfx queue is supported for now.
+// TODO: We may have to introduce version `writeDescriptorSet` that handles multiple writes so we do not have to resolve `DescriptorSet` value multiple times.
+// TODO: "Non-owning" handles? (handles that can't be used to destroy object).
+// TODO: Introduce safe "owning"/"strong" versions of handles that assert zero value on destruction.
 
 // NOTE: `CreateGraphicsPipeline` / `CreateComputePipeline` will be replaced with `CreateShader` / `CompileShader`, when
 // D3D12 GPU work graphs (including collection state objects) and VK_EXT_shader_object are ready. At that point we should
