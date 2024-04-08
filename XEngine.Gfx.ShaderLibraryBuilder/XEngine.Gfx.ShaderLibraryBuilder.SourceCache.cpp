@@ -52,20 +52,19 @@ static bool ReadTextFile(const char* path, DynamicStringASCII& resultText)
 
 inline ordering SourceCache::EntriesSearchTreeComparator::Compare(const Entry& left, const Entry& right)
 {
-	return CompareStringsOrderedCaseInsensitive(left.normalizedLocalPath, right.normalizedLocalPath);
+	return CompareStringsOrderedCaseInsensitive(left.path, right.path);
 }
 
 inline ordering SourceCache::EntriesSearchTreeComparator::Compare(const Entry& left, const StringViewASCII& right)
 {
-	return CompareStringsOrderedCaseInsensitive(left.normalizedLocalPath, right);
+	return CompareStringsOrderedCaseInsensitive(left.path, right);
 }
 
-bool SourceCache::resolveText(XLib::StringViewASCII localPath, XLib::StringViewASCII& resultText)
+bool SourceCache::resolve(StringViewASCII path, StringViewASCII& resultText)
 {
 	resultText = {};
 
 	// TODO: Proper path validation and normalization.
-	// TODO: Proper error reporting.
 
 	//if (!Path::IsValid(localPath)))
 	//	return false;
@@ -74,49 +73,40 @@ bool SourceCache::resolveText(XLib::StringViewASCII localPath, XLib::StringViewA
 	//if (!Path::HasFileName(localPath))
 	//	return false;
 
-	for (char c : localPath)
-	{
-		if (!Char::IsLetterOrDigit(c) && c != '_' && c != '-' && c != '+' && c != '.' && c != '/')
-			return false;
-	}
+	InplaceStringASCIIx1024 normalizedPath;
+	Path::Normalize(path, normalizedPath);
 
-	InplaceStringASCIIx1024 normalizedLocalPath;
-	//Path::Normalize(localPath, normalizedLocalPath);
-	normalizedLocalPath = localPath;
-
-	if (Entry* existingEntry = entrySearchTree.find(StringViewASCII(normalizedLocalPath)))
+	if (Entry* existingEntry = entrySearchTree.find(normalizedPath.getView()))
 	{
 		if (existingEntry->textWasReadSuccessfully)
 			resultText = existingEntry->text;
 		return existingEntry->textWasReadSuccessfully;
 	}
 
-	InplaceStringASCIIx1024 fullPath;
+	/*InplaceStringASCIIx1024 fullPath;
 	// TODO: Replace this shit with proper `Path::Combine`
 	fullPath.append(rootPath);
 	if (!fullPath.isEmpty())
 		fullPath.append('/');
 	fullPath.append(normalizedLocalPath);
-	XAssert(!fullPath.isFull());
+	XAssert(!fullPath.isFull());*/
 
 	DynamicStringASCII text;
-	const bool readTextResult = ReadTextFile(fullPath.getCStr(), text);
+	const bool readTextResult = ReadTextFile(normalizedPath.getCStr(), text);
 
-	if (!readTextResult)
-		TextWriteFmtStdOut("Cannot open file '", fullPath, "'\n");
+	//if (!readTextResult)
+	//	TextWriteFmtStdOut("Cannot open file '", fullPath, "'\n");
 
-	const uintptr memoryBlockSize = sizeof(Entry) + normalizedLocalPath.getLength() + 1;
+	const uintptr memoryBlockSize = sizeof(Entry) + normalizedPath.getLength() + 1;
 	void* memoryBlock = SystemHeapAllocator::Allocate(memoryBlockSize);
+	memorySet(memoryBlock, 0, memoryBlockSize);
+
+	memoryCopy((char*)memoryBlock + sizeof(Entry), normalizedPath.getData(), normalizedPath.getLength());
 
 	Entry& newEntry = *(Entry*)memoryBlock;
-	char* newEntryNormalizedLocalPath = (char*)((Entry*)memoryBlock + 1);
-
-	memoryCopy(newEntryNormalizedLocalPath, normalizedLocalPath.getData(), normalizedLocalPath.getLength());
-	newEntryNormalizedLocalPath[normalizedLocalPath.getLength()] = 0;
-
 	construct(newEntry);
 	newEntry.text = asRValue(text);
-	newEntry.normalizedLocalPath = StringViewASCII(newEntryNormalizedLocalPath, normalizedLocalPath.getLength());
+	newEntry.path = StringViewASCII((char*)memoryBlock + sizeof(Entry), normalizedPath.getLength());
 	newEntry.textWasReadSuccessfully = readTextResult;
 	entrySearchTree.insert(newEntry);
 

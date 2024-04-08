@@ -70,7 +70,6 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 
 	struct ShaderCompilationArgs
 	{
-		XLib::StringViewASCII sourcePath;
 		XLib::StringViewASCII entryPointName;
 		// Optimization, platform specific stuff, etc.
 
@@ -174,20 +173,16 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 	enum class ShaderCompilationStatus : uint8
 	{
 		Success = 0,
-		PreprocessorError,
-		PlatformCompilerError,
-		PlatformCompilerCallFailed,
+		PreprocessingError,
+		CompilationError,
+		CompilerCallFailed,
 	};
 
 	class ShaderCompilationResult : public XLib::RefCounted
 	{
-		friend ShaderCompilationResultRef CompileShader(XLib::StringViewASCII sourceText,
-			const PipelineLayout& pipelineLayout, const ShaderCompilationArgs& args);
-
 	private:
-		XLib::StringViewASCII preprocessorOuputStr;
-		XLib::StringViewASCII platformCompilerOutputStr;
-		XLib::StringViewASCII platformCompilerArgsStr;
+		XLib::StringViewASCII preprocessingOuputStr;
+		XLib::StringViewASCII compilationOutputStr;
 		XLib::StringViewASCII d3dShaderHashStr;
 
 		BlobRef preprocessedSourceBlob;
@@ -198,31 +193,14 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 		ShaderCompilationStatus status = ShaderCompilationStatus::Success;
 
 	private:
-		struct ComposerSource
-		{
-			ShaderCompilationStatus status;
-
-			XLib::StringViewASCII preprocessorOuputStr;
-			XLib::StringViewASCII platformCompilerOutputStr;
-
-			const Blob* preprocessedSourceBlob;
-			const Blob* bytecodeBlob;
-			const Blob* disassemblyBlob;
-			const Blob* d3dPDBBlob;
-		};
-
-		static ShaderCompilationResultRef Compose(const ComposerSource& source);
-
-	private:
 		ShaderCompilationResult() = default;
 		virtual ~ShaderCompilationResult() override = default;
 
 	public:
 		inline ShaderCompilationStatus getStatus() const { return status; }
 
-		inline XLib::StringViewASCII getPreprocessorOuput() const { return preprocessorOuputStr; }
-		inline XLib::StringViewASCII getPlatformCompilerOutput() const { return platformCompilerOutputStr; }
-		inline XLib::StringViewASCII getPlatformCompilerArgs() const { return platformCompilerArgsStr; }
+		inline XLib::StringViewASCII getPreprocessingOuput() const { return preprocessingOuputStr; }
+		inline XLib::StringViewASCII getCompilationOutput() const { return compilationOutputStr; }
 		inline XLib::StringViewASCII getD3DShaderHash() const { return d3dShaderHashStr; }
 
 		inline const Blob* getPreprocessedSourceBlob() const { return preprocessedSourceBlob.get(); }
@@ -231,13 +209,37 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 		inline const Blob* getD3DPDBBlob() { return d3dPDBBlob.get(); }
 
 		// ExportedCBLayoutsRef getExportedCBLayouts() const;
+
+	public:
+		struct ComposerSource
+		{
+			ShaderCompilationStatus status;
+
+			XLib::StringViewASCII preprocessingOuputStr;
+			XLib::StringViewASCII compilationOutputStr;
+
+			const Blob* preprocessedSourceBlob;
+			const Blob* bytecodeBlob;
+			const Blob* disassemblyBlob;
+			const Blob* d3dPDBBlob;
+		};
+
+		static ShaderCompilationResultRef Compose(const ComposerSource& source);
 	};
 
-	bool ValidateVertexInputBindingName(XLib::StringViewASCII name);
+	struct SourceResolutionResult
+	{
+		XLib::StringViewASCII text;
+		bool resolved;
+	};
+
+	using SourceResolverFunc = SourceResolutionResult(*)(void* context, XLib::StringViewASCII sourceFilename);
+
 	bool ValidateDescriptorSetBindingName(XLib::StringViewASCII name);
 	bool ValidatePipelineBindingName(XLib::StringViewASCII name);
 	bool ValidateShaderEntryPointName(XLib::StringViewASCII name);
 
-	ShaderCompilationResultRef CompileShader(XLib::StringViewASCII sourceText,
-		const PipelineLayout& pipelineLayout, const ShaderCompilationArgs& args);
+	ShaderCompilationResultRef CompileShader(XLib::StringViewASCII mainSourceFilename,
+		const ShaderCompilationArgs& args, const PipelineLayout& pipelineLayout,
+		SourceResolverFunc sourceResolverFunc, void* sourceResolverContext = nullptr);
 }

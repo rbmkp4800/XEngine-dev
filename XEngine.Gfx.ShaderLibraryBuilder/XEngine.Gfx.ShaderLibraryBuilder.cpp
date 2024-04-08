@@ -8,52 +8,13 @@
 
 #include <XEngine.Gfx.ShaderLibraryFormat.h>
 
-#include "XEngine.Gfx.ShaderLibraryBuilder.h"
+#include "XEngine.Gfx.ShaderLibraryBuilder.LibraryDefinition.h"
 #include "XEngine.Gfx.ShaderLibraryBuilder.LibraryDefinitionLoader.h"
 #include "XEngine.Gfx.ShaderLibraryBuilder.SourceCache.h"
 
 using namespace XLib;
 using namespace XEngine::Gfx;
 using namespace XEngine::Gfx::ShaderLibraryBuilder;
-
-ShaderRef Shader::Create(XLib::StringViewASCII name, uint64 nameXSH,
-	HAL::ShaderCompiler::PipelineLayout* pipelineLayout, uint64 pipelineLayoutNameXSH,
-	const HAL::ShaderCompiler::ShaderCompilationArgs& compilationArgs)
-{
-	// I should not be allowed to code. Sorry :(
-
-	uintptr memoryBlockSizeAccum = sizeof(Shader);
-
-	const uintptr nameStrOffset = memoryBlockSizeAccum;
-	memoryBlockSizeAccum += name.getLength() + 1;
-
-	const uintptr sourcePathStrOffset = memoryBlockSizeAccum;
-	memoryBlockSizeAccum += compilationArgs.sourcePath.getLength() + 1;
-
-	const uintptr entryPointNameStrOffset = memoryBlockSizeAccum;
-	memoryBlockSizeAccum += compilationArgs.entryPointName.getLength() + 1;
-
-	const uintptr memoryBlockSize = memoryBlockSizeAccum;
-	void* memoryBlock = SystemHeapAllocator::Allocate(memoryBlockSize);
-	memorySet(memoryBlock, 0, memoryBlockSize);
-
-	memoryCopy((char*)memoryBlock + nameStrOffset, name.getData(), name.getLength());
-	memoryCopy((char*)memoryBlock + sourcePathStrOffset, compilationArgs.sourcePath.getData(), compilationArgs.sourcePath.getLength());
-	memoryCopy((char*)memoryBlock + entryPointNameStrOffset, compilationArgs.entryPointName.getData(), compilationArgs.entryPointName.getLength());
-
-	Shader& resultObject = *(Shader*)memoryBlock;
-	construct(resultObject);
-
-	resultObject.name = StringViewASCII((char*)memoryBlock + nameStrOffset, name.getLength());
-	resultObject.nameXSH = nameXSH;
-	resultObject.pipelineLayout = pipelineLayout;
-	resultObject.pipelineLayoutNameXSH = pipelineLayoutNameXSH;
-	resultObject.compilationArgs.sourcePath = StringViewASCII((char*)memoryBlock + sourcePathStrOffset, compilationArgs.sourcePath.getLength());
-	resultObject.compilationArgs.entryPointName = StringViewASCII((char*)memoryBlock + entryPointNameStrOffset, compilationArgs.entryPointName.getLength());
-	resultObject.compilationArgs.shaderType = compilationArgs.shaderType;
-
-	return ShaderRef(&resultObject);
-}
 
 static void StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const char* resultLibraryFilePath)
 {
@@ -175,6 +136,14 @@ static void StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const
 	file.close();
 }
 
+static HAL::ShaderCompiler::SourceResolutionResult ResolveSource(void* context, StringViewASCII sourceFilename)
+{
+	SourceCache& sourceCache = *(SourceCache*)context;
+	HAL::ShaderCompiler::SourceResolutionResult result = {};
+	result.resolved = sourceCache.resolve(sourceFilename, result.text);
+	return result;
+}
+
 int main(int argc, char* argv[])
 {
 	// Parse cmd line arguments.
@@ -190,37 +159,52 @@ int main(int argc, char* argv[])
 			outLibraryFilePath = argv[i] + 5;
 	}
 
+	// TODO: Check -xxx="A B"
+
 	if (!libraryDefinitionFilePath)
 	{
-		TextWriteFmtStdOut("error: missing library definition file path");
+		TextWriteFmtStdOut("error: missing library definition file path (-libdef=XXX)");
 		return 0;
 	}
 	if (!outLibraryFilePath)
 	{
-		TextWriteFmtStdOut("error: missing output file path");
+		TextWriteFmtStdOut("error: missing output file path (-out=XXX)");
 		return 0;
 	}
 
 	// Load library definition file.
-
-	TextWriteFmtStdOut("Loading shader library definition file '", libraryDefinitionFilePath, "'\n");
-
 	LibraryDefinition libraryDefinition;
+	TextWriteFmtStdOut("Loading shader library definition file '", libraryDefinitionFilePath, "'\n");
 	if (!LibraryDefinitionLoader::Load(libraryDefinition, libraryDefinitionFilePath))
 		return 0;
 
+	// Get library source root path.
+	InplaceStringASCIIx1024 librarySourceRootPath;
+	{
+		InplaceStringASCIIx1024 a;
+		a.copyFrom(Path::RemoveFileName(libraryDefinitionFilePath));
+		if (!a.isEmpty())
+			a.append('/');
+		a.append('.');
+		Path::Normalize(a, librarySourceRootPath);
+		if (!Path::HasTrailingDirectorySeparator(librarySourceRootPath))
+			librarySourceRootPath.append('/');
+	}
+
 	// Sort pipelines by actual name, so log looks nice :sparkles:
-
 	ArrayList<Shader*> shadersToCompile;
-	shadersToCompile.reserve(libraryDefinition.shaders.getSize());
-	for (const ShaderRef& shader : libraryDefinition.shaders)
-		shadersToCompile.pushBack(shader.get());
+	{
+		shadersToCompile.reserve(libraryDefinition.shaders.getSize());
+		for (const ShaderRef& shader : libraryDefinition.shaders)
+			shadersToCompile.pushBack(shader.get());
 
-	QuickSort<Shader*>(shadersToCompile, shadersToCompile.getSize(),
-		[](const Shader* left, const Shader* right) -> bool { return String::IsLess(left->getName(), right->getName()); });
+		QuickSort<Shader*>(shadersToCompile, shadersToCompile.getSize(),
+			[](const Shader* left, const Shader* right) -> bool { return String::IsLess(left->getName(), right->getName()); });
+	}
+
+	SourceCache sourceCache;
 
 	// Actual compilation.
-	SourceCache sourceCache(Path::RemoveFileName(libraryDefinitionFilePath));
 	for (uint32 i = 0; i < shadersToCompile.getSize(); i++)
 	{
 		Shader& shader = *shadersToCompile[i];
@@ -229,21 +213,22 @@ int main(int argc, char* argv[])
 		TextWriteFmt(messageHeader, " [", i + 1, "/", shadersToCompile.getSize(), "] ", shader.getName());
 		TextWriteFmtStdOut(messageHeader, "\n");
 
-		StringViewASCII sourceText;
-		if (!sourceCache.resolveText(shader.getCompilationArgs().sourcePath, sourceText))
-		{
-			TextWriteFmtStdOut("Failed to resolve source text\n");
-			return 0;
-		}
+		InplaceStringASCIIx1024 mainSourceFilePath;
+		mainSourceFilePath.copyFrom(librarySourceRootPath);
+		mainSourceFilePath.append(shader.getMainSourceFilename());
 
 		HAL::ShaderCompiler::ShaderCompilationResultRef compilationResult =
-			HAL::ShaderCompiler::CompileShader(sourceText, shader.getPipelineLayout(), shader.getCompilationArgs());
+			HAL::ShaderCompiler::CompileShader(
+				mainSourceFilePath, shader.getCompilationArgs(), shader.getPipelineLayout(),
+				&ResolveSource, &sourceCache);
+
+		if (compilationResult->getPreprocessingOuput().getLength() > 0)
+			TextWriteFmtStdOut(compilationResult->getPreprocessingOuput(), "\n");
+		if (compilationResult->getCompilationOutput().getLength() > 0)
+			TextWriteFmtStdOut(compilationResult->getCompilationOutput(), "\n");
 
 		if (compilationResult->getStatus() != HAL::ShaderCompiler::ShaderCompilationStatus::Success)
-		{
-			TextWriteFmtStdOut(compilationResult->getPlatformCompilerOutput(), "\n");
 			return 0;
-		}
 
 		shader.setCompiledBlob(compilationResult->getBytecodeBlob());
 	}

@@ -45,7 +45,7 @@
 	"TestVS": {
 		"type": "vertex_shader",
 		"layout": "Test.PipelineLayout",
-		"path": "TestGraphics.hlsl",
+		"src": "TestGraphics.hlsl",
 		"entry": "MainVS",
 		//"vertex_input_layout": "Test.VertexInputLayout",
 	},
@@ -53,7 +53,7 @@
 	"TestPS": {
 		"type": "pixel_shader",
 		"layout": "Test.PipelineLayout",
-		"path": "TestGraphics.hlsl",
+		"src": "TestGraphics.hlsl",
 		"entry": "MainPS",
 
 		//"color_rts": [ "R8G8B8A8_UNORM" ],

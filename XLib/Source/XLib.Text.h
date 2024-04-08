@@ -159,7 +159,7 @@ namespace XLib
 	};
 
 	template <typename BaseTextWriter>
-	class TextWriterVirtualAdapter
+	class TextWriterVirtualAdapter : public TextWriterVirtualAdapterBase
 	{
 	private:
 		BaseTextWriter& baseWriter;

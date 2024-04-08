@@ -596,18 +596,19 @@ bool LibraryDefinitionLoader::readShader(StringViewASCII shaderName, Cursor json
 
 	IF_FALSE_RETURN_FALSE(readPipelineLayoutSetupProperty(pipelineLayout, pipelineLayoutNameXSH));
 
+	StringViewASCII mainSourceFilename;
 	HAL::ShaderCompiler::ShaderCompilationArgs args = {};
 	args.shaderType = shaderType;
 
 	const Cursor jsonSourcePathCursor = getJSONCursor();
-	IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("path", args.sourcePath));
-	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(ValidateShaderSourcePath(args.sourcePath), "invalid shader source path", jsonSourcePathCursor);
+	IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("src", mainSourceFilename));
+	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(ValidateShaderSourcePath(mainSourceFilename), "invalid shader source filename", jsonSourcePathCursor);
 
 	const Cursor jsonEntryPointNameCursor = getJSONCursor();
 	IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("entry", args.entryPointName));
 	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(HAL::ShaderCompiler::ValidateShaderEntryPointName(args.entryPointName), "invalid shader entry point name", jsonEntryPointNameCursor);
 
-	XTODO(""__FUNCTION__ ": Rewrite in less constrained way");
+	XTODO(__FUNCTION__ ": Rewrite in less constrained way");
 
 	const uint64 shaderNameXSH = XSH::Compute(shaderName);
 	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(shaderNameXSH != 0, "shader name XSH = 0. This is not allowed", jsonShaderNameCursor);
@@ -616,7 +617,7 @@ bool LibraryDefinitionLoader::readShader(StringViewASCII shaderName, Cursor json
 	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!LibFindShader(libraryDefinition, shaderNameXSH), "shader redefinition", jsonShaderNameCursor);
 	// TODO: We may give separate error for hash collision (that will never happen).
 
-	const ShaderRef shader = Shader::Create(shaderName, shaderNameXSH, pipelineLayout.get(), pipelineLayoutNameXSH, args);
+	const ShaderRef shader = Shader::Create(shaderName, shaderNameXSH, pipelineLayout.get(), pipelineLayoutNameXSH, mainSourceFilename, args);
 
 	XAssert(shader);
 	libraryDefinition.shaders.pushBack(shader);

@@ -1,3 +1,7 @@
+// TODO: Remove this shit :clown_face:
+#include <filesystem> // YAYKS
+#include <codecvt>
+
 #include "XLib.Path.h"
 #include "XLib.Containers.ArrayList.h"
 
@@ -29,28 +33,34 @@ StringViewASCII Path::RemoveFileName(const char* pathCStr)
 	return StringViewASCII {};
 }
 
-#if 0
-
-bool Path::NormalizeInternal(TextWriterVirtualAdapterBase& resultWriter, const char* path, uintptr lengthLimit)
+bool Path::NormalizeInternal(const char* pathCStr, TextWriterVirtualAdapterBase& resultWriter)
 {
-	struct Dir
+	// :))))00)0)0)))
+	std::wstring wpn = std::filesystem::absolute(std::filesystem::path(pathCStr)).lexically_normal().native();
+	std::string pn;
+	for (wchar_t wc : wpn)
 	{
-		uint16 srcPathOffset;
-		uint16 length;
-	};
-
-	InplaceArrayList<Dir, 256, uint16, false> resultDirs;
-	uint16 levelUpCount = 0;
-
-	for (uintptr i = 0; i < lengthLimit; i++)
-	{
-		const char c = path[i];
-
-
-
-		if (!c)
-			break;
+		char c = char(wc);
+		if (c == '\\')
+			c = '/';
+		pn.push_back(c); // :))))))))))))))))))
 	}
+
+	return resultWriter.append(pn.data(), pn.size());
 }
 
-#endif
+bool Path::NormalizeInternal(StringViewASCII path, TextWriterVirtualAdapterBase& resultWriter)
+{
+	// :))))00)0)0)))
+	std::wstring wpn = std::filesystem::absolute(std::filesystem::path(path.begin(), path.end())).lexically_normal().native();
+	std::string pn;
+	for (wchar_t wc : wpn)
+	{
+		char c = char(wc);
+		if (c == '\\')
+			c = '/';
+		pn.push_back(c); // :))))))))))))))))))
+	}
+
+	return resultWriter.append(pn.data(), pn.size());
+}

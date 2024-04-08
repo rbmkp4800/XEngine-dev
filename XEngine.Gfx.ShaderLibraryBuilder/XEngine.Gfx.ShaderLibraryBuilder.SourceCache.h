@@ -15,7 +15,7 @@ namespace XEngine::Gfx::ShaderLibraryBuilder
 		{
 			XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
 			XLib::DynamicStringASCII text;
-			XLib::StringViewASCII normalizedLocalPath; // Zero terminated. Stored after `Entry` itself.
+			XLib::StringViewASCII path; // Zero terminated. Stored after `Entry` itself.
 			//XLib::TimePoint writeTime;
 			bool textWasReadSuccessfully = false;
 		};
@@ -30,12 +30,11 @@ namespace XEngine::Gfx::ShaderLibraryBuilder
 
 	private:
 		EntrySearchTree entrySearchTree;
-		XLib::StringViewASCII rootPath;
 
 	public:
-		SourceCache(XLib::StringViewASCII rootPath) : rootPath(rootPath) {}
+		SourceCache() = default;
 		~SourceCache() = default;
 
-		bool resolveText(XLib::StringViewASCII localPath, XLib::StringViewASCII& resultText);
+		bool resolve(XLib::StringViewASCII path, XLib::StringViewASCII& resultText);
 	};
 }

@@ -7,7 +7,7 @@
 
 #include <XEngine.Gfx.HAL.ShaderCompiler.h>
 
-#include "XEngine.Gfx.ShaderLibraryBuilder.h"
+#include "XEngine.Gfx.ShaderLibraryBuilder.LibraryDefinition.h"
 
 namespace XEngine::Gfx::ShaderLibraryBuilder
 {

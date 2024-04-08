@@ -721,11 +721,11 @@ ShaderCompilationResultRef ShaderCompilationResult::Compose(const ComposerSource
 	uintptr memoryBlockSizeAccum = 0;
 	memoryBlockSizeAccum += sizeof(ShaderCompilationResult);
 
-	const uintptr preprocessorOuputStrOffset = memoryBlockSizeAccum;
-	memoryBlockSizeAccum += source.preprocessorOuputStr.getLength() + 1;
+	const uintptr preprocessingOuputStrOffset = memoryBlockSizeAccum;
+	memoryBlockSizeAccum += source.preprocessingOuputStr.getLength() + 1;
 
-	const uintptr platformCompilerOutputStrOffset = memoryBlockSizeAccum;
-	memoryBlockSizeAccum += source.platformCompilerOutputStr.getLength() + 1;
+	const uintptr compilationOutputStrOffset = memoryBlockSizeAccum;
+	memoryBlockSizeAccum += source.compilationOutputStr.getLength() + 1;
 
 	const uintptr memoryBlockSize = memoryBlockSizeAccum;
 	void* memoryBlock = SystemHeapAllocator::Allocate(memoryBlockSize);
@@ -734,11 +734,11 @@ ShaderCompilationResultRef ShaderCompilationResult::Compose(const ComposerSource
 	ShaderCompilationResult& resultObject = *(ShaderCompilationResult*)memoryBlock;
 	construct(resultObject);
 
-	memoryCopy((char*)memoryBlock + preprocessorOuputStrOffset, source.preprocessorOuputStr.getData(), source.preprocessorOuputStr.getLength());
-	memoryCopy((char*)memoryBlock + platformCompilerOutputStrOffset, source.platformCompilerOutputStr.getData(), source.platformCompilerOutputStr.getLength());
+	memoryCopy((char*)memoryBlock + preprocessingOuputStrOffset, source.preprocessingOuputStr.getData(), source.preprocessingOuputStr.getLength());
+	memoryCopy((char*)memoryBlock + compilationOutputStrOffset, source.compilationOutputStr.getData(), source.compilationOutputStr.getLength());
 
-	resultObject.preprocessorOuputStr = StringViewASCII((char*)memoryBlock + preprocessorOuputStrOffset, source.preprocessorOuputStr.getLength());
-	resultObject.platformCompilerOutputStr = StringViewASCII((char*)memoryBlock + platformCompilerOutputStrOffset, source.platformCompilerOutputStr.getLength());
+	resultObject.preprocessingOuputStr = StringViewASCII((char*)memoryBlock + preprocessingOuputStrOffset, source.preprocessingOuputStr.getLength());
+	resultObject.compilationOutputStr = StringViewASCII((char*)memoryBlock + compilationOutputStrOffset, source.compilationOutputStr.getLength());
 
 	resultObject.preprocessedSourceBlob = (Blob*)source.preprocessedSourceBlob;
 	resultObject.bytecodeBlob = (Blob*)source.bytecodeBlob;
@@ -795,127 +795,223 @@ bool ShaderCompiler::ValidateShaderEntryPointName(StringViewASCII name)
 	return true;
 }
 
-ShaderCompilationResultRef ShaderCompiler::CompileShader(XLib::StringViewASCII sourceText,
-	const PipelineLayout& pipelineLayout, const ShaderCompilationArgs& args)
+ShaderCompilationResultRef ShaderCompiler::CompileShader(XLib::StringViewASCII mainSourceFilename,
+	const ShaderCompilationArgs& args, const PipelineLayout& pipelineLayout,
+	SourceResolverFunc sourceResolverFunc, void* sourceResolverContext)
 {
-	// Patch source text ///////////////////////////////////////////////////////////////////////////
+	wchar mainSourceFilenameW[2048] = {};
+	wchar entryPointNameW[128] = {};
+	MultiByteToWideChar(CP_ACP, 0, mainSourceFilename.getData(), uint32(mainSourceFilename.getLength()), mainSourceFilenameW, countof(mainSourceFilenameW));
+	MultiByteToWideChar(CP_ACP, 0, args.entryPointName.getData(), uint32(args.entryPointName.getLength()), entryPointNameW, countof(entryPointNameW));
+
+	static Microsoft::WRL::ComPtr<IDxcUtils> dxcUtils;
+	if (!dxcUtils)
+		DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxcUtils));
+
+	Microsoft::WRL::ComPtr<IDxcCompiler3> dxcCompiler;
+	DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxcCompiler));
+
+	// Preprocess source via DXC ///////////////////////////////////////////////////////////////////
+	HRESULT preprocessingStatusHResult = E_FAIL;
+	Microsoft::WRL::ComPtr<IDxcBlobUtf8> dxcPreprocessingErrorsBlob;
+	Microsoft::WRL::ComPtr<IDxcBlobUtf8> dxcPreprocessedSourceBlob;
+	{
+		InplaceArrayList<LPCWSTR, 4> dxcArgsList;
+		dxcArgsList.pushBack(mainSourceFilenameW);
+		dxcArgsList.pushBack(L"-P");
+
+		DxcBuffer dxcMainSourceBuffer = {};
+		{
+			SourceResolutionResult mainSourceResolutionResult = sourceResolverFunc(sourceResolverContext, mainSourceFilename);
+			if (!mainSourceResolutionResult.resolved)
+			{
+				XTODO(__FUNCTION__ ": Handle case when main source file is not resolved");
+				XAssertUnreachableCode();
+				return nullptr;
+			}
+			dxcMainSourceBuffer.Ptr = mainSourceResolutionResult.text.getData();
+			dxcMainSourceBuffer.Size = mainSourceResolutionResult.text.getLength();
+			dxcMainSourceBuffer.Encoding = CP_UTF8;
+		}
+
+		struct CustomDxcIncludeHandler : public IDxcIncludeHandler
+		{
+			SourceResolverFunc sourceResolverFunc = nullptr;
+			void* sourceResolverContext = nullptr;
+
+			IDxcUtils* dxcUtils = nullptr;
+			UINT refCount = 0;
+
+			virtual HRESULT __stdcall QueryInterface(REFIID riid, void** ppvObject) override { XAssertUnreachableCode(); return 0; }
+			virtual ULONG __stdcall AddRef() override { refCount++; return refCount; }
+			virtual ULONG __stdcall Release() override { refCount--; return refCount; }
+
+			virtual HRESULT __stdcall LoadSource(LPCWSTR pFilename, IDxcBlob** ppIncludeSource) override
+			{
+				InplaceStringASCIIx1024 filename;
+				for (int i = 0; pFilename[i]; i++)
+					filename.append(char(pFilename[i]));
+
+				SourceResolutionResult resolutionResult = sourceResolverFunc(sourceResolverContext, filename);
+				if (!resolutionResult.resolved)
+				{
+					*ppIncludeSource = nullptr;
+					return E_FAIL;
+				}
+
+				IDxcBlobEncoding* dxcBlob = nullptr;
+				dxcUtils->CreateBlob(resolutionResult.text.getData(), XCheckedCastU32(resolutionResult.text.getLength()), CP_UTF8, &dxcBlob);
+				*ppIncludeSource = dxcBlob;
+				return S_OK;
+			}
+		};
+
+		CustomDxcIncludeHandler includeHandler;
+		includeHandler.sourceResolverFunc = sourceResolverFunc;
+		includeHandler.sourceResolverContext = sourceResolverContext;
+		includeHandler.dxcUtils = dxcUtils.Get();
+
+		Microsoft::WRL::ComPtr<IDxcResult> dxcResult;
+		const HRESULT compilerCallHResult = dxcCompiler->Compile(&dxcMainSourceBuffer,
+			dxcArgsList.getData(), dxcArgsList.getSize(), &includeHandler, IID_PPV_ARGS(&dxcResult));
+
+		if (FAILED(compilerCallHResult) || !dxcResult)
+		{
+			ShaderCompilationResult::ComposerSource resultComposerSrc = {};
+			resultComposerSrc.status = ShaderCompilationStatus::CompilerCallFailed;
+			return ShaderCompilationResult::Compose(resultComposerSrc);
+		}
+
+		XAssert(includeHandler.refCount == 0);
+		
+		dxcResult->GetStatus(&preprocessingStatusHResult);
+		dxcResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&dxcPreprocessingErrorsBlob), nullptr);
+		dxcResult->GetOutput(DXC_OUT_HLSL, IID_PPV_ARGS(&dxcPreprocessedSourceBlob), nullptr);
+	}
+
+	if (FAILED(preprocessingStatusHResult))
+	{
+		ShaderCompilationResult::ComposerSource resultComposerSrc = {};
+		resultComposerSrc.status = ShaderCompilationStatus::PreprocessingError;
+		resultComposerSrc.preprocessingOuputStr = StringViewASCII(
+			dxcPreprocessingErrorsBlob->GetStringPointer(), dxcPreprocessingErrorsBlob->GetBufferSize());
+		return ShaderCompilationResult::Compose(resultComposerSrc);
+	}
+
+
+	// Patch source ////////////////////////////////////////////////////////////////////////////////
 	DynamicStringASCII patchedSource;
 	{
+		StringViewASCII preprocessedSource(
+			dxcPreprocessedSourceBlob->GetStringPointer(), dxcPreprocessedSourceBlob->GetBufferSize());
+
 		HLSLPatcher::Error hlslPatcherError = {};
-		if (!HLSLPatcher::Patch(sourceText, pipelineLayout, patchedSource, hlslPatcherError))
+		if (!HLSLPatcher::Patch(preprocessedSource, pipelineLayout, patchedSource, hlslPatcherError))
 		{
+			XTODO(__FUNCTION__": HLSL patching: cursor location is invalid due to preprocessing");
+
 			InplaceStringASCIIx4096 xePreprocessorOutput;
-			TextWriteFmt(xePreprocessorOutput, args.sourcePath, ":",
+			TextWriteFmt(xePreprocessorOutput, mainSourceFilename, ":",
 				hlslPatcherError.location.lineNumber, ":", hlslPatcherError.location.columnNumber,
 				": xe-hlsl-patcher: ", hlslPatcherError.message);
 
 			ShaderCompilationResult::ComposerSource resultComposerSrc = {};
-			resultComposerSrc.status = ShaderCompilationStatus::PreprocessorError;
-			resultComposerSrc.preprocessorOuputStr = xePreprocessorOutput.getView();
+			resultComposerSrc.status = ShaderCompilationStatus::PreprocessingError;
+			resultComposerSrc.preprocessingOuputStr = xePreprocessorOutput;
 			return ShaderCompilationResult::Compose(resultComposerSrc);
 		}
 	}
 
 
-	// Build argument list /////////////////////////////////////////////////////////////////////////
-	wchar displayedShaderNameW[2048] = {};
-	wchar entryPointNameW[128] = {};
-	MultiByteToWideChar(CP_ACP, 0, args.sourcePath.getData(), uint32(args.sourcePath.getLength()), displayedShaderNameW, countof(displayedShaderNameW));
-	MultiByteToWideChar(CP_ACP, 0, args.entryPointName.getData(), uint32(args.entryPointName.getLength()), entryPointNameW, countof(entryPointNameW));
-
-	InplaceArrayList<LPCWSTR, 64> dxcArgsList;
+	// Actually compile shader via DXC /////////////////////////////////////////////////////////////
+	HRESULT compilationStatusHResult = E_FAIL;
+	Microsoft::WRL::ComPtr<IDxcBlobUtf8> dxcCompilationErrorsBlob;
+	Microsoft::WRL::ComPtr<IDxcBlob> dxcBytecodeBlob;
 	{
-		dxcArgsList.pushBack(displayedShaderNameW);
-
-		LPCWSTR dxcProfile = nullptr;
-		switch (args.shaderType)
+		// Build argument list
+		InplaceArrayList<LPCWSTR, 64> dxcArgsList;
 		{
+			dxcArgsList.pushBack(mainSourceFilenameW);
+
+			LPCWSTR dxcProfile = nullptr;
+			switch (args.shaderType)
+			{
 			case ShaderType::Compute:		dxcProfile = L"-Tcs_6_6"; break;
 			case ShaderType::Vertex:		dxcProfile = L"-Tvs_6_6"; break;
 			case ShaderType::Amplification: dxcProfile = L"-Tas_6_6"; break;
 			case ShaderType::Mesh:			dxcProfile = L"-Tms_6_6"; break;
 			case ShaderType::Pixel:			dxcProfile = L"-Tps_6_6"; break;
+			}
+			XAssert(dxcProfile);
+			dxcArgsList.pushBack(dxcProfile);
+
+			dxcArgsList.pushBack(L"-E");
+			dxcArgsList.pushBack(entryPointNameW);
+
+			dxcArgsList.pushBack(L"-Zpr"); // Row-major.
+			//dxcArgsList.pushBack(L"-enable-16bit-types");
 		}
-		XAssert(dxcProfile);
-		dxcArgsList.pushBack(dxcProfile);
 
-		dxcArgsList.pushBack(L"-E");
-		dxcArgsList.pushBack(entryPointNameW);
+		DxcBuffer dxcSourceBuffer = {};
+		dxcSourceBuffer.Ptr = patchedSource.getData();
+		dxcSourceBuffer.Size = patchedSource.getLength();
+		dxcSourceBuffer.Encoding = CP_UTF8;
 
-		dxcArgsList.pushBack(L"-Zpr"); // Row-major.
-		//dxcArgsList.pushBack(L"-enable-16bit-types");
+		Microsoft::WRL::ComPtr<IDxcResult> dxcResult;
+		const HRESULT compilerCallHResult = dxcCompiler->Compile(&dxcSourceBuffer,
+			dxcArgsList.getData(), dxcArgsList.getSize(), nullptr, IID_PPV_ARGS(&dxcResult));
+
+		if (FAILED(compilerCallHResult) || !dxcResult)
+		{
+			ShaderCompilationResult::ComposerSource resultComposerSrc = {};
+			resultComposerSrc.status = ShaderCompilationStatus::CompilerCallFailed;
+			return ShaderCompilationResult::Compose(resultComposerSrc);
+		}
+
+		dxcResult->GetStatus(&compilationStatusHResult);
+		dxcResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&dxcCompilationErrorsBlob), nullptr);
+		dxcResult->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&dxcBytecodeBlob), nullptr);
 	}
 
 
-	// Actual compilation //////////////////////////////////////////////////////////////////////////
-	Microsoft::WRL::ComPtr<IDxcCompiler3> dxcCompiler;
-	DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxcCompiler));
-
-	DxcBuffer dxcSourceBuffer = {};
-	dxcSourceBuffer.Ptr = patchedSource.getData();
-	dxcSourceBuffer.Size = patchedSource.getLength();
-	dxcSourceBuffer.Encoding = CP_UTF8;
-
-	Microsoft::WRL::ComPtr<IDxcResult> dxcResult;
-	const HRESULT compileCallHResult = dxcCompiler->Compile(&dxcSourceBuffer,
-		dxcArgsList.getData(), dxcArgsList.getSize(), nullptr, IID_PPV_ARGS(&dxcResult));
-
-	if (FAILED(compileCallHResult) || !dxcResult)
-	{
-		ShaderCompilationResult::ComposerSource resultComposerSrc = {};
-		resultComposerSrc.status = ShaderCompilationStatus::PlatformCompilerCallFailed;
-		return ShaderCompilationResult::Compose(resultComposerSrc);
-	}
-
-
-	// Process platform compiler result and compose XE shader compilation result ///////////////////
+	// Compose shader compilation result ///////////////////////////////////////////////////////////
 	ShaderCompilationResult::ComposerSource resultComposerSrc = {};
 
-	// Compilation status
+	resultComposerSrc.status = FAILED(compilationStatusHResult) ?
+		ShaderCompilationStatus::CompilationError : ShaderCompilationStatus::Success;
+	resultComposerSrc.preprocessingOuputStr = StringViewASCII(
+		dxcPreprocessingErrorsBlob->GetStringPointer(), dxcPreprocessingErrorsBlob->GetStringLength());
+	resultComposerSrc.compilationOutputStr = StringViewASCII(
+		dxcCompilationErrorsBlob->GetStringPointer(), dxcCompilationErrorsBlob->GetStringLength());
+
+	BlobRef preprocessedSourceBlob = nullptr;
+	if (dxcPreprocessedSourceBlob && dxcPreprocessedSourceBlob->GetStringLength() > 0)
 	{
-		HRESULT compileStatusHResult = E_FAIL;
-		dxcResult->GetStatus(&compileStatusHResult);
-		resultComposerSrc.status = FAILED(compileStatusHResult) ?
-			ShaderCompilationStatus::PlatformCompilerError : ShaderCompilationStatus::Success;
+		preprocessedSourceBlob = Blob::Create(XCheckedCastU32(dxcPreprocessedSourceBlob->GetStringLength()));
+		memoryCopy((void*)preprocessedSourceBlob->getData(),
+			dxcPreprocessedSourceBlob->GetStringPointer(), dxcPreprocessedSourceBlob->GetStringLength());
 	}
 
-	// Errors
-	{
-		Microsoft::WRL::ComPtr<IDxcBlobUtf8> dxcErrorsBlob;
-		dxcResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&dxcErrorsBlob), nullptr);
-		if (dxcErrorsBlob && dxcErrorsBlob->GetStringLength() > 0)
-		{
-			resultComposerSrc.platformCompilerOutputStr = StringViewASCII(
-				dxcErrorsBlob->GetStringPointer(), dxcErrorsBlob->GetStringLength());
-		}
-	}
-
-	// Bytecode
 	BlobRef bytecodeBlob = nullptr;
+	if (dxcBytecodeBlob && dxcBytecodeBlob->GetBufferSize() > 0)
 	{
-		Microsoft::WRL::ComPtr<IDxcBlob> dxcBytecodeBlob = nullptr;
-		dxcResult->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&dxcBytecodeBlob), nullptr);
+		const uint32 bytecodeSize = XCheckedCastU32(dxcBytecodeBlob->GetBufferSize());
 
-		if (dxcBytecodeBlob && dxcBytecodeBlob->GetBufferSize() > 0)
-		{
-			const uint32 bytecodeSize = XCheckedCastU32(dxcBytecodeBlob->GetBufferSize());
+		// Compose bytecode blob
+		BlobFormat::ShaderBlobInfo blobInfo = {};
+		blobInfo.pipelineLayoutSourceHash = pipelineLayout.getSourceHash();
+		blobInfo.bytecodeSize = bytecodeSize;
+		blobInfo.shaderType = args.shaderType;
 
-			// Compose bytecode blob
-			BlobFormat::ShaderBlobInfo blobInfo = {};
-			blobInfo.pipelineLayoutSourceHash = pipelineLayout.getSourceHash();
-			blobInfo.bytecodeSize = bytecodeSize;
-			blobInfo.shaderType = args.shaderType;
+		BlobFormat::ShaderBlobWriter blobWriter;
+		blobWriter.setup(blobInfo);
 
-			BlobFormat::ShaderBlobWriter blobWriter;
-			blobWriter.setup(blobInfo);
+		bytecodeBlob = Blob::Create(blobWriter.getBlobSize());
+		blobWriter.setBlobMemory((void*)bytecodeBlob->getData(), bytecodeBlob->getSize());
+		blobWriter.writeBytecode(dxcBytecodeBlob->GetBufferPointer(), bytecodeSize);
+		blobWriter.finalize();
 
-			bytecodeBlob = Blob::Create(blobWriter.getBlobSize());
-			blobWriter.setBlobMemory((void*)bytecodeBlob->getData(), bytecodeBlob->getSize());
-			blobWriter.writeBytecode(dxcBytecodeBlob->GetBufferPointer(), bytecodeSize);
-			blobWriter.finalize();
-
-			resultComposerSrc.bytecodeBlob = bytecodeBlob.get();
-		}
+		resultComposerSrc.bytecodeBlob = bytecodeBlob.get();
 	}
 
 	return ShaderCompilationResult::Compose(resultComposerSrc);

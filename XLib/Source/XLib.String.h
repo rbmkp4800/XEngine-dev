@@ -40,8 +40,10 @@ namespace XLib
 
 		inline bool startsWith(const StringView<CharType>& prefix) const;
 		inline bool startsWith(const CharType* prefixCStr) const;
+		inline bool startsWith(CharType prefix) const;
 		inline bool endsWith(const StringView<CharType>& suffix) const;
 		inline bool endsWith(const CharType* suffixCStr) const;
+		inline bool endsWith(CharType suffix) const { return length > 0 && data[length - 1] == suffix; }
 
 		inline StringView<CharType> getSubString(uintptr startIndex, uintptr length = uintptr(-1)) const;
 	};
@@ -71,6 +73,7 @@ namespace XLib
 		inline bool append(CharType c) { return pushBack(c); }
 		inline bool append(const StringView<CharType>& string);
 		inline bool append(const CharType* cstr) { return append(StringView<CharType>(cstr)); }
+		inline bool append(const CharType* data, uintptr length) { return append(StringView<CharType>(data, length)); }
 
 		inline void resize(CounterType newLength, CharType c = CharType(0));
 		inline void resizeUnsafe(CounterType newLength);
