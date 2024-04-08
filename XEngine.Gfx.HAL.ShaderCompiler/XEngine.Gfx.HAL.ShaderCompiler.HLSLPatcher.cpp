@@ -430,7 +430,7 @@ bool HLSLPatcher::processAttribute(Attribute& attribute, Error& error)
 	}*/
 	else if (attributeName.startsWith("xe::"))
 	{
-		TextWriteFmt(error.message, "unknown xe attribute '", attributeName, "'");
+		TextWriteFmt(error.message, "unknown XE attribute '", attributeName, "'");
 		error.location = attributeNameLocation;
 		return false;
 	}

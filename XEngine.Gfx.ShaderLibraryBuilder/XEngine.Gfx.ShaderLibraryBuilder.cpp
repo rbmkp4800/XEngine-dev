@@ -159,8 +159,6 @@ int main(int argc, char* argv[])
 			outLibraryFilePath = argv[i] + 5;
 	}
 
-	// TODO: Check -xxx="A B"
-
 	if (!libraryDefinitionFilePath)
 	{
 		TextWriteFmtStdOut("error: missing library definition file path (-libdef=XXX)");

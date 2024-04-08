@@ -894,7 +894,7 @@ ShaderCompilationResultRef ShaderCompiler::CompileShader(XLib::StringViewASCII m
 		ShaderCompilationResult::ComposerSource resultComposerSrc = {};
 		resultComposerSrc.status = ShaderCompilationStatus::PreprocessingError;
 		resultComposerSrc.preprocessingOuputStr = StringViewASCII(
-			dxcPreprocessingErrorsBlob->GetStringPointer(), dxcPreprocessingErrorsBlob->GetBufferSize());
+			dxcPreprocessingErrorsBlob->GetStringPointer(), dxcPreprocessingErrorsBlob->GetStringLength());
 		return ShaderCompilationResult::Compose(resultComposerSrc);
 	}
 
@@ -903,17 +903,17 @@ ShaderCompilationResultRef ShaderCompiler::CompileShader(XLib::StringViewASCII m
 	DynamicStringASCII patchedSource;
 	{
 		StringViewASCII preprocessedSource(
-			dxcPreprocessedSourceBlob->GetStringPointer(), dxcPreprocessedSourceBlob->GetBufferSize());
+			dxcPreprocessedSourceBlob->GetStringPointer(), dxcPreprocessedSourceBlob->GetStringLength());
 
 		HLSLPatcher::Error hlslPatcherError = {};
 		if (!HLSLPatcher::Patch(preprocessedSource, pipelineLayout, patchedSource, hlslPatcherError))
 		{
-			XTODO(__FUNCTION__": HLSL patching: cursor location is invalid due to preprocessing");
+			XTODO(__FUNCTION__": HLSL patching: cursor location is invalid due to preprocessing. Parse #line directives");
 
-			InplaceStringASCIIx4096 xePreprocessorOutput;
+			InplaceStringASCIIx2048 xePreprocessorOutput;
 			TextWriteFmt(xePreprocessorOutput, mainSourceFilename, ":",
 				hlslPatcherError.location.lineNumber, ":", hlslPatcherError.location.columnNumber,
-				": xe-hlsl-patcher: ", hlslPatcherError.message);
+				": XE HLSL patcher: error: ", hlslPatcherError.message);
 
 			ShaderCompilationResult::ComposerSource resultComposerSrc = {};
 			resultComposerSrc.status = ShaderCompilationStatus::PreprocessingError;

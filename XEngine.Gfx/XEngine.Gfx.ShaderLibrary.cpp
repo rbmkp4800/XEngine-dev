@@ -161,7 +161,7 @@ void ShaderLibrary::load(const char* libraryFilePath, HAL::Device& halDevice)
 
 		const uint64 pipelineLayoutNameXSH = U64From2xU32(shaderRecord.pipelineLayoutNameXSH0, shaderRecord.pipelineLayoutNameXSH1);
 		const PipelineLayout* pipelineLayout = nullptr;
-		XTODO("Use fast seach here too");
+		XTODO("Use fast search here too");
 		for (uint32 i = 0; i < pipelineLayoutCount; i++)
 		{
 			if (pipelineLayoutTable[i].nameXSH == pipelineLayoutNameXSH)
