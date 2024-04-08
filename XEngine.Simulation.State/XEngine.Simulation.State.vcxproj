@@ -15,8 +15,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{EE103A5C-3F12-4525-B46F-7C7A45EB9F69}</ProjectGuid>
-    <RootNamespace>XEngineSimulationModel</RootNamespace>
+    <ProjectGuid>{8B9C3737-A393-4B8F-B39E-9D4D945F143B}</ProjectGuid>
+    <RootNamespace>XEngineSimulationState</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
 
@@ -33,7 +33,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ClInclude Include="XEngine.Simulation.Model.h" />
+    <ClInclude Include="XEngine.Simulation.State.h" />
   </ItemGroup>
 
   <ItemGroup>
