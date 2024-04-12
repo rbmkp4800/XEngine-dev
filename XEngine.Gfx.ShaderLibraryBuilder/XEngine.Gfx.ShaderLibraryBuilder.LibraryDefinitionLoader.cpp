@@ -671,7 +671,8 @@ bool LibraryDefinitionLoader::load(const char* jsonPath)
 
 		const uint32 fileSize = XCheckedCastU32(file.getSize());
 
-		text.resizeUnsafe(fileSize);
+		// TODO: "Unsafe" resize to avoid zeroing out memory?
+		text.resize(fileSize);
 		file.read(text.getData(), fileSize);
 		file.close();
 	}

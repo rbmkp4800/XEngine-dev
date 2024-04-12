@@ -8,6 +8,11 @@
 // TODO: What should `read` return on EOF? 0 or -1?
 // TODO: Probably we can replace "read fmt" and "write fmt" with "scan" and "print"? See `java.util.Scanner`.
 
+// !!!!!!!!!!!!
+// TODO: This entire thing should be transformed into XLib.CharStream and XLib.Fmt
+// Probably we need to avoid mentioning "Text"
+// !!!!!!!!!!!!
+
 namespace XLib
 {
 	// Common text readers-writers /////////////////////////////////////////////////////////////////
@@ -290,8 +295,8 @@ namespace XLib
 
 	template <typename TextReader> inline bool TextReadFmt_HandleArg(TextReader& reader, const RFmtInt& arg);
 
-	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, char c) { return writer.append(c); }
-	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, unsigned char c) { return writer.append(c); }
+	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, char c) { writer.append(c); return true; }
+	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, unsigned char c) { writer.append(c); return true; }
 	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, const char* str);
 
 	template <typename TextWriter> inline bool TextWriteFmt_HandleArg(TextWriter& writer, unsigned short int arg) { return TextWriteInt(writer, arg); }
@@ -527,8 +532,9 @@ namespace XLib
 		while (charCount)
 		{
 			charCount--;
-			if (!writer.append(buffer[charCount]))
-				return false;
+			//if (!writer.append(buffer[charCount]))
+			//	return false;
+			writer.append(buffer[charCount]);
 		}
 
 		return true;
@@ -593,8 +599,9 @@ namespace XLib
 	{
 		while (*str)
 		{
-			if (!writer.append(*str))
-				return false;
+			//if (!writer.append(*str))
+			//	return false;
+			writer.append(*str);
 			str++;
 		}
 		return true;

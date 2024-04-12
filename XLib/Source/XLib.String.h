@@ -8,6 +8,7 @@
 // TODO: Do we need separate `pushBack()` and `append()`?
 // TODO: `DynamicString` (without type suffix) -> `DynamicStringBase`? And same for other types.
 // TODO: Do something about million template methods compiled for `InplaceString` instances.
+// TODO: Profile cost of always supporting zero terminator. Probably we may put it only when calling `getCStr`/`getData` methods.
 
 namespace XLib
 {
@@ -26,14 +27,13 @@ namespace XLib
 		inline constexpr StringView(const CharType* begin, const CharType* end) : data(end - begin ? begin : nullptr), length(end - begin) { XAssert(begin <= end); }
 		inline constexpr explicit StringView(const CharType* cstr);
 
-		inline const CharType& operator [] (uintptr index) const { return data[index]; }
-
 		inline const CharType* getData() const { return data; }
 		inline uintptr getLength() const { return length; }
-		inline bool isEmpty() const { return length == 0; }
 
 		inline const CharType* begin() const { return data; }
 		inline const CharType* end() const { return data + length; }
+
+		inline const CharType& operator [] (uintptr index) const { return data[index]; }
 
 		inline bool operator == (const StringView<CharType>& that) const;
 		inline bool operator == (const CharType* thatCStr) const;
@@ -45,7 +45,49 @@ namespace XLib
 		inline bool endsWith(const CharType* suffixCStr) const;
 		inline bool endsWith(CharType suffix) const { return length > 0 && data[length - 1] == suffix; }
 
+		inline bool isEmpty() const { return length == 0; }
+
 		inline StringView<CharType> getSubString(uintptr startIndex, uintptr length = uintptr(-1)) const;
+	};
+
+
+	template <typename CharType>
+	class VirtualStringRef final
+	{
+	public:
+		struct VTable
+		{
+			using GetDataFunc = CharType* (*)(void* stringPtr);
+			using GetLengthFunc = uintptr(*)(void* stringPtr);
+			using ResizeFunc = void (*)(void* stringPtr, uintptr length);
+
+			GetDataFunc getData = nullptr;
+			GetLengthFunc getLength = nullptr;
+			ResizeFunc resize = nullptr;
+			uintptr maxLength = 0;
+			// Some kind of RTTI?
+		};
+
+	private:
+		const VTable* vtablePtr = nullptr;
+		void* stringPtr = nullptr;
+
+	private:
+		VirtualStringRef(const VTable* vtablePtr, void* stringPtr) : vtablePtr(vtablePtr), stringPtr(stringPtr) {}
+
+	public:
+		VirtualStringRef() = default;
+		~VirtualStringRef() = default;
+
+		inline void resize(uintptr length) { XAssert(length <= vtablePtr->maxLength); vtablePtr->resize(stringPtr, length); }
+		inline void clear() { resize(0); }
+
+		inline CharType* getData() { return vtablePtr->getData(stringPtr); }
+		inline uintptr getLength() const { return vtablePtr->getLength(stringPtr); }
+		inline uintptr getMaxLength() const { return vtablePtr->maxLength; }
+
+	public:
+		static inline VirtualStringRef Construct(const VTable* vtablePtr, void* stringPtr) { return VirtualStringRef(vtablePtr, stringPtr); }
 	};
 
 
@@ -56,39 +98,44 @@ namespace XLib
 		static_assert(Capacity == uintptr(CounterType(Capacity)));
 
 	private:
+		struct VirtualStringRefVTable : public VirtualStringRef<CharType>::VTable
+		{
+			inline VirtualStringRefVTable();
+		};
+		inline static VirtualStringRefVTable virtualStringRefVTable;
+
+	private:
 		CounterType length = 0;
 		CharType buffer[Capacity];
 
 	public:
 		inline InplaceString();
+		inline InplaceString(const StringView<CharType>& string)	{ append(string); }
+		inline InplaceString(const CharType* cstr)					{ append(cstr); }
+		inline InplaceString(const CharType* data, uintptr length)	{ append(data, length); }
+
 		~InplaceString() = default;
 
-		inline InplaceString& operator = (const StringView<CharType>& that) { copyFrom(that); return *this; }
-		inline InplaceString& operator = (const CharType* thatCStr) { copyFrom(thatCStr); return *this; }
+		inline InplaceString& operator = (const StringView<CharType>& that)	{ length = 0; append(that);		return *this; }
+		inline InplaceString& operator = (const CharType* thatCStr)			{ length = 0; append(thatCStr);	return *this; }
 
-		inline bool copyFrom(StringView<CharType> string);
-		inline bool copyFrom(const CharType* cstr);
-
-		inline bool pushBack(CharType c);
-		inline bool append(CharType c) { return pushBack(c); }
-		inline bool append(const StringView<CharType>& string);
-		inline bool append(const CharType* cstr) { return append(StringView<CharType>(cstr)); }
-		inline bool append(const CharType* data, uintptr length) { return append(StringView<CharType>(data, length)); }
+		inline void append(CharType c);
+		inline void append(const StringView<CharType>& string);
+		inline void append(const CharType* cstr);
+		inline void append(const CharType* data, uintptr length) { return append(StringView<CharType>(data, length)); }
 
 		inline void resize(CounterType newLength, CharType c = CharType(0));
-		inline void resizeUnsafe(CounterType newLength);
 		inline void clear();
-		inline void truncate(CounterType newLength);
-		//inline bool recalculateLength();
 
-		inline const CharType* getCStr() const { return buffer; }
-		inline StringView<CharType> getView() const { return StringView<CharType>(buffer, length); }
 		inline CharType* getData() { return buffer; }
 		inline CounterType getLength() const { return length; }
+		inline const CharType* getCStr() const { return buffer; }
+
+		inline StringView<CharType> getView() const { return StringView<CharType>(buffer, length); }
 		inline operator StringView<CharType>() const { return getView(); }
 
-		inline bool isEmpty() const { return length == 0; }
-		inline bool isFull() const { return length + 1 == Capacity; }
+		inline VirtualStringRef<CharType> getVirtualRef() { return VirtualStringRef<CharType>::Construct(&virtualStringRefVTable, this); }
+		inline operator VirtualStringRef<CharType>() { return getVirtualRef(); }
 
 		inline CharType& operator [] (CounterType index) { return buffer[index]; }
 		inline CharType operator [] (CounterType index) const { return buffer[index]; }
@@ -100,6 +147,9 @@ namespace XLib
 		inline bool startsWith(const CharType* prefixCStr) const;
 		inline bool endsWith(const StringView<CharType>& suffix) const;
 		inline bool endsWith(const CharType* suffixCStr) const;
+
+		inline bool isEmpty() const { return length == 0; }
+		inline bool isFull() const { return length + 1 == Capacity; }
 
 	public:
 		static constexpr CounterType GetCapacity() { return Capacity; }
@@ -113,7 +163,14 @@ namespace XLib
 	private:
 		using AllocatorBase = AllocatorAdapterBase<AllocatorType>;
 
-		static constexpr CounterType IntialBufferCapacity = 16;
+		static constexpr CounterType InitialBufferCapacity = 16;
+
+	private:
+		struct VirtualStringRefVTable : public VirtualStringRef<CharType>::VTable
+		{
+			inline VirtualStringRefVTable();
+		};
+		static VirtualStringRefVTable virtualStringRefVTable;
 
 	private:
 		CharType* buffer = nullptr;
@@ -135,24 +192,26 @@ namespace XLib
 		inline DynamicString& operator = (const StringView<CharType>& that);
 		inline DynamicString& operator = (const CharType* thatCStr);
 
-		inline bool pushBack(CharType c);
-		inline bool append(CharType c) { return pushBack(c); }
+		inline bool append(CharType c);
 		inline bool append(const StringView<CharType>& string);
-		inline bool append(const CharType* cstr);
+		inline bool append(const CharType* cstr) { return append(StringView<CharType>(cstr)); }
+		inline bool append(const CharType* data, uintptr length) { return append(StringView<CharType>(data, length)); }
 
 		inline void resize(CounterType newLength, CharType c = CharType(0));
-		inline void resizeUnsafe(CounterType newLength);
 		inline void clear();
-		inline void compact();
-		inline void reserve(CounterType newMaxLength) { ensureCapacity(newMaxLength); }
 
-		inline const CharType* getCStr() const { return buffer; }
-		inline StringView<CharType> getView() const { return StringView<CharType>(buffer, length); }
+		inline void reserve(CounterType newMaxLength) { ensureCapacity(newMaxLength); }
+		inline void compact();
+
 		inline CharType* getData() { return buffer; }
 		inline CounterType getLength() const { return length; }
+		inline const CharType* getCStr() const { buffer[length] = 0; return buffer; }
+
+		inline StringView<CharType> getView() const { return StringView<CharType>(buffer, length); }
 		inline operator StringView<CharType>() const { return getView(); }
 
-		inline bool isEmpty() const { return length == 0; }
+		inline VirtualStringRef<CharType> getVirtualRef() { return VirtualStringRef<CharType>::Construct(&virtualStringRefVTable, this); }
+		inline operator VirtualStringRef<CharType>() { return getVirtualRef(); }
 
 		inline CharType& operator [] (CounterType index) { return buffer[index]; }
 		inline CharType operator [] (CounterType index) const { return buffer[index]; }
@@ -164,18 +223,16 @@ namespace XLib
 		inline bool startsWith(const CharType* prefixCStr) const;
 		inline bool endsWith(const StringView<CharType>& suffix) const;
 		inline bool endsWith(const CharType* suffixCStr) const;
+
+		inline bool isEmpty() const { return length == 0; }
 	};
 
 
-	using StringViewASCII	= StringView<charASCII>;
-	//using StringViewUTF8	= StringView<charUTF8>;
-	//using StringViewUTF16	= StringView<charUTF16>;
-	//using StringViewUTF32	= StringView<charUTF32>;
+	using StringViewASCII = StringView<charASCII>;
+	using VirtualStringRefASCII = VirtualStringRef<charASCII>;
 
 	template <uintptr Capacity, typename CounterType = uint16>
 	using InplaceStringASCII = InplaceString<charASCII, Capacity, CounterType>;
-
-	using DynamicStringASCII = DynamicString<charASCII>;
 
 	using InplaceStringASCIIx32		= InplaceString<charASCII, 31,	 uint8>;	static_assert(sizeof(InplaceStringASCIIx32) == 32);
 	using InplaceStringASCIIx64		= InplaceString<charASCII, 63,	 uint8>;	static_assert(sizeof(InplaceStringASCIIx64) == 64);
@@ -185,6 +242,8 @@ namespace XLib
 	using InplaceStringASCIIx1024	= InplaceString<charASCII, 1022, uint16>;	static_assert(sizeof(InplaceStringASCIIx1024) == 1024);
 	using InplaceStringASCIIx2048	= InplaceString<charASCII, 2046, uint16>;	static_assert(sizeof(InplaceStringASCIIx2048) == 2048);
 	using InplaceStringASCIIx4096	= InplaceString<charASCII, 4094, uint16>;	static_assert(sizeof(InplaceStringASCIIx4096) == 4096);
+
+	using DynamicStringASCII = DynamicString<charASCII>;
 
 
 	class String abstract final
@@ -212,6 +271,7 @@ namespace XLib
 		template <typename CharType> static inline bool EndsWith(const CharType* cstr, const StringView<CharType>& suffix);
 		template <typename CharType> static inline bool EndsWith(const CharType* cstr, const CharType* suffixCStr);
 	};
+
 
 	template <typename TextWriter, typename CharType>
 	inline bool TextWriteFmt_HandleArg(TextWriter& writer, const StringView<CharType>& string);
@@ -268,73 +328,80 @@ namespace XLib
 	// InplaceString ///////////////////////////////////////////////////////////////////////////////
 
 	template <typename CharType, uintptr Capacity, typename CounterType>
+	inline InplaceString<CharType, Capacity, CounterType>::VirtualStringRefVTable::VirtualStringRefVTable()
+	{
+		this->getData = [](void* stringPtr) -> CharType*
+			{
+				return ((InplaceString<CharType, Capacity, CounterType>*)stringPtr)->getData();
+			};
+
+		this->getLength = [](void* stringPtr) -> uintptr
+			{
+				return ((InplaceString<CharType, Capacity, CounterType>*)stringPtr)->getLength();
+			};
+
+		this->resize = [](void* stringPtr, uintptr length) -> void
+			{
+				XAssert(length == uintptr(CounterType(length)));
+				((InplaceString<CharType, Capacity, CounterType>*)stringPtr)->resize(CounterType(length));
+			};
+
+		this->maxLength = GetMaxLength();
+	}
+
+	template <typename CharType, uintptr Capacity, typename CounterType>
 	inline InplaceString<CharType, Capacity, CounterType>::InplaceString()
 	{
 		buffer[0] = CharType(0);
 	}
 
 	template <typename CharType, uintptr Capacity, typename CounterType>
-	inline auto InplaceString<CharType, Capacity, CounterType>::
-		copyFrom(StringView<CharType> string) -> bool
-	{
-		const bool overflow = string.getLength() > GetMaxLength();
-		length = overflow ? GetMaxLength() : CounterType(string.getLength());
-		memoryCopy(buffer, string.getData(), length * sizeof(CharType));
-		buffer[length] = CharType(0);
-		return !overflow;
-	}
-
-	template <typename CharType, uintptr Capacity, typename CounterType>
-	inline auto InplaceString<CharType, Capacity, CounterType>::
-		copyFrom(const CharType* cstr) -> bool
-	{
-		CounterType newLengthAccum = 0;
-		bool overflow = false;
-		while (cstr[newLengthAccum])
-		{
-			if (newLengthAccum == GetMaxLength())
-			{
-				overflow = true;
-				break;
-			}
-
-			buffer[newLengthAccum] = cstr[newLengthAccum];
-			newLengthAccum++;
-		}
-
-		length = newLengthAccum;
-		buffer[length] = CharType(0);
-		return !overflow;
-	}
-
-	template <typename CharType, uintptr Capacity, typename CounterType>
-	inline auto InplaceString<CharType, Capacity, CounterType>::
-		pushBack(CharType c) -> bool
+	inline void InplaceString<CharType, Capacity, CounterType>::append(CharType c)
 	{
 		if (isFull())
-			return false;
+			return;
 		buffer[length] = c;
 		length++;
 		buffer[length] = CharType(0);
-		return true;
 	}
 
 	template <typename CharType, uintptr Capacity, typename CounterType>
-	inline auto InplaceString<CharType, Capacity, CounterType>::
-		append(const StringView<CharType>& string) -> bool
+	inline void InplaceString<CharType, Capacity, CounterType>::append(const StringView<CharType>& string)
 	{
 		const CounterType fullLength = length + CounterType(string.getLength());
 		const bool overflow = fullLength > GetMaxLength();
 		const CounterType numCharsToCopy = overflow ? GetMaxLength() - length : CounterType(string.getLength());
 		memoryCopy(buffer + length, string.getData(), numCharsToCopy * sizeof(CharType));
-		length = overflow ? GetMaxLength() : fullLength;
+		length += numCharsToCopy;
 		buffer[length] = CharType(0);
-		return !overflow;
 	}
 
 	template <typename CharType, uintptr Capacity, typename CounterType>
-	inline auto InplaceString<CharType, Capacity, CounterType>::
-		clear() -> void
+	inline void InplaceString<CharType, Capacity, CounterType>::append(const CharType* cstr)
+	{
+		const CharType* cstrIt = cstr;
+		while (*cstrIt && length < GetMaxLength())
+		{
+			buffer[length] = *cstrIt;
+			length++;
+			cstrIt++;
+		}
+		buffer[length] = CharType(0);
+	}
+
+	template <typename CharType, uintptr Capacity, typename CounterType>
+	inline void InplaceString<CharType, Capacity, CounterType>::resize(CounterType newLength, CharType c)
+	{
+		XAssert(newLength <= GetMaxLength());
+		CharType* newEnd = buffer + newLength;
+		for (CharType* i = buffer + length; i < newEnd; i++)
+			*i = c;
+		length = newLength;
+		buffer[length] = CharType(0);
+	}
+
+	template <typename CharType, uintptr Capacity, typename CounterType>
+	inline void InplaceString<CharType, Capacity, CounterType>::clear()
 	{
 		length = 0;
 		buffer[0] = CharType(0);
@@ -363,7 +430,7 @@ namespace XLib
 			return;
 
 		// TODO: Maybe align up to 16 or some adaptive pow of 2.
-		capacity = max<CounterType>(requiredCapacity, capacity * 2, IntialBufferCapacity);
+		capacity = max<CounterType>(requiredCapacity, capacity * 2, InitialBufferCapacity);
 		buffer = (CharType*)AllocatorBase::reallocate(buffer, capacity * sizeof(CharType));
 	}
 
@@ -418,7 +485,7 @@ namespace XLib
 	}
 
 	template <typename CharType, typename CounterType, typename AllocatorType>
-	inline bool DynamicString<CharType, CounterType, AllocatorType>::pushBack(CharType c)
+	inline bool DynamicString<CharType, CounterType, AllocatorType>::append(CharType c)
 	{
 		ensureCapacity(length + 1);
 		buffer[length] = c;
@@ -440,36 +507,18 @@ namespace XLib
 	}
 
 	template <typename CharType, typename CounterType, typename AllocatorType>
-	inline bool DynamicString<CharType, CounterType, AllocatorType>::append(const CharType* cstr)
-	{
-		// TODO: Assert for `CounterType` overflow.
-		const CounterType stringToAppendLength = CounterType(GetCStrLength(cstr));
-		ensureCapacity(length + stringToAppendLength);
-		memoryCopy(buffer + length, cstr, stringToAppendLength + 1);
-		length += stringToAppendLength;
-		return true;
-	}
-
-	template <typename CharType, typename CounterType, typename AllocatorType>
 	inline void DynamicString<CharType, CounterType, AllocatorType>::resize(CounterType newLength, CharType c)
 	{
 		if (length < newLength)
 		{
 			ensureCapacity(newLength);
-			for (CharType* i = buffer + length; i != buffer + newLength; i++)
+			CharType* newEnd = buffer + newLength;
+			for (CharType* i = buffer + length; i < newEnd; i++)
 				*i = c;
 		}
+		length = newLength;
 		if (buffer)
-			buffer[newLength] = CharType(0);
-		length = newLength;
-	}
-
-	template <typename CharType, typename CounterType, typename AllocatorType>
-	inline void DynamicString<CharType, CounterType, AllocatorType>::resizeUnsafe(CounterType newLength)
-	{
-		ensureCapacity(newLength);
-		buffer[newLength] = CharType(0);
-		length = newLength;
+			buffer[length] = CharType(0);
 	}
 
 	template <typename CharType, typename CounterType, typename AllocatorType>
@@ -655,8 +704,9 @@ inline bool XLib::TextWriteFmt_HandleArg(TextWriter& writer, const StringView<Ch
 {
 	for (CharType c : string)
 	{
-		if (!writer.append(c))
-			return false;
+		writer.append(c);
+		//if (!writer.append(c))
+		//	return false;
 	}
 	// TODO: replace with `writer.writeChars()`.
 	return true;

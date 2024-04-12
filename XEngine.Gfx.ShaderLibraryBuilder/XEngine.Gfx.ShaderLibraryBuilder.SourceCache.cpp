@@ -1,6 +1,7 @@
 #include <XLib.FileSystem.h>
 #include <XLib.Path.h>
 #include <XLib.System.File.h>
+#include <XLib.Text.h>
 
 #include "XEngine.Gfx.ShaderLibraryBuilder.SourceCache.h"
 
@@ -37,7 +38,7 @@ static bool ReadTextFile(const char* path, DynamicStringASCII& resultText)
 	const uint32 fileSize = XCheckedCastU32(file.getSize());
 
 	DynamicStringASCII text;
-	text.resizeUnsafe(fileSize);
+	text.resize(fileSize);
 
 	const bool readResult = file.read(text.getData(), fileSize);
 
@@ -74,7 +75,8 @@ bool SourceCache::resolve(StringViewASCII path, StringViewASCII& resultText)
 	//	return false;
 
 	InplaceStringASCIIx1024 normalizedPath;
-	Path::Normalize(path, normalizedPath);
+	Path::MakeAbsolute(path, normalizedPath);
+	Path::Normalize(normalizedPath);
 
 	if (Entry* existingEntry = entrySearchTree.find(normalizedPath.getView()))
 	{

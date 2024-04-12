@@ -118,7 +118,11 @@ static void StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const
 	header.blobsDataSize = blobsDataSize;
 
 	File file;
-	file.open(resultLibraryFilePath, FileAccessMode::Write, FileOpenMode::Override);
+	if (!file.open(resultLibraryFilePath, FileAccessMode::Write, FileOpenMode::Override))
+	{
+		TextWriteFmtStdOut("error: can not open shader library for writing '", resultLibraryFilePath, "'\n");
+		return;
+	}
 
 	file.write(header);
 	file.write(descriptorSetLayoutRecords.getData(), descriptorSetLayoutRecords.getByteSize());
@@ -150,6 +154,7 @@ int main(int argc, char* argv[])
 
 	const char* libraryDefinitionFilePath = nullptr;
 	const char* outLibraryFilePath = nullptr;
+	const char* intermediateDirPath = nullptr;
 
 	for (int i = 1; i < argc; i++)
 	{
@@ -157,6 +162,8 @@ int main(int argc, char* argv[])
 			libraryDefinitionFilePath = argv[i] + 8;
 		else if (String::StartsWith(argv[i], "-out="))
 			outLibraryFilePath = argv[i] + 5;
+		else if (String::StartsWith(argv[i], "-imdir="))
+			intermediateDirPath = argv[i] + 7;
 	}
 
 	if (!libraryDefinitionFilePath)
@@ -180,11 +187,12 @@ int main(int argc, char* argv[])
 	InplaceStringASCIIx1024 librarySourceRootPath;
 	{
 		InplaceStringASCIIx1024 a;
-		a.copyFrom(Path::RemoveFileName(libraryDefinitionFilePath));
+		a.append(Path::RemoveFileName(libraryDefinitionFilePath));
 		if (!a.isEmpty())
 			a.append('/');
 		a.append('.');
-		Path::Normalize(a, librarySourceRootPath);
+		Path::MakeAbsolute(a, librarySourceRootPath);
+		Path::Normalize(librarySourceRootPath);
 		if (!Path::HasTrailingDirectorySeparator(librarySourceRootPath))
 			librarySourceRootPath.append('/');
 	}
@@ -212,7 +220,7 @@ int main(int argc, char* argv[])
 		TextWriteFmtStdOut(messageHeader, "\n");
 
 		InplaceStringASCIIx1024 mainSourceFilePath;
-		mainSourceFilePath.copyFrom(librarySourceRootPath);
+		mainSourceFilePath.append(librarySourceRootPath);
 		mainSourceFilePath.append(shader.getMainSourceFilename());
 
 		HAL::ShaderCompiler::ShaderCompilationResultRef compilationResult =

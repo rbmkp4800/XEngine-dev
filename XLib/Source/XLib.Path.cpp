@@ -1,6 +1,8 @@
+// NOTE: I should not be allowed to program.
+
 // TODO: Remove this shit :clown_face:
 #include <filesystem> // YAYKS
-#include <codecvt>
+#include <Windows.h>
 
 #include "XLib.Path.h"
 #include "XLib.Containers.ArrayList.h"
@@ -33,34 +35,105 @@ StringViewASCII Path::RemoveFileName(const char* pathCStr)
 	return StringViewASCII {};
 }
 
-bool Path::NormalizeInternal(const char* pathCStr, TextWriterVirtualAdapterBase& resultWriter)
+void Path::GetCurrentPath(VirtualStringRefASCII result)
 {
-	// :))))00)0)0)))
-	std::wstring wpn = std::filesystem::absolute(std::filesystem::path(pathCStr)).lexically_normal().native();
-	std::string pn;
-	for (wchar_t wc : wpn)
+	const DWORD requiredBufferSize = GetCurrentDirectoryA(0, nullptr);
+	XAssert(requiredBufferSize > 0);
+	const uintptr expectedLength = requiredBufferSize - 1;
+
+	if (expectedLength > result.getMaxLength())
 	{
-		char c = char(wc);
-		if (c == '\\')
-			c = '/';
-		pn.push_back(c); // :))))))))))))))))))
+		// Explicitly clip output.
+
+		constexpr uintptr internalBufferSize = 4096;
+		XAssert(requiredBufferSize <= internalBufferSize);
+
+		char internalBuffer[internalBufferSize];
+		const DWORD length = GetCurrentDirectoryA(internalBufferSize, internalBuffer);
+		XAssert(length == expectedLength);
+
+		result.resize(result.getMaxLength());
+		char* buffer = result.getData();
+		memoryCopy(buffer, internalBuffer, result.getMaxLength());
+	}
+	else
+	{
+		result.resize(expectedLength);
+		char* buffer = result.getData();
+		const DWORD length = GetCurrentDirectoryA(requiredBufferSize, buffer);
+		XAssert(length == expectedLength);
 	}
 
-	return resultWriter.append(pn.data(), pn.size());
+	char* resultData = result.getData();
+	const uintptr resultLength = result.getLength();
+
+	for (uintptr i = 0; i < resultLength; i++)
+	{
+		if (resultData[i] == '\\')
+			resultData[i] = '/';
+	}
+
+	if (resultData[resultLength - 1] != '/' && resultLength != result.getMaxLength())
+	{
+		result.resize(resultLength + 1);
+		result.getData()[resultLength] = '/';
+	}
 }
 
-bool Path::NormalizeInternal(StringViewASCII path, TextWriterVirtualAdapterBase& resultWriter)
+void Path::Normalize(StringViewASCII path, VirtualStringRefASCII result)
 {
-	// :))))00)0)0)))
-	std::wstring wpn = std::filesystem::absolute(std::filesystem::path(path.begin(), path.end())).lexically_normal().native();
-	std::string pn;
-	for (wchar_t wc : wpn)
+	std::filesystem::path p(std::string_view(path.getData(), path.getLength()));
+	p = p.lexically_normal();
+	auto np = p.native();
+
+	const uintptr resultLength = min(np.length(), result.getMaxLength());
+	result.resize(resultLength);
+	char* resultData = result.getData();
+	for (uintptr i = 0; i < resultLength; i++)
 	{
-		char c = char(wc);
+		char c = char(np[i]);
 		if (c == '\\')
 			c = '/';
-		pn.push_back(c); // :))))))))))))))))))
+		resultData[i] = c;
 	}
+}
 
-	return resultWriter.append(pn.data(), pn.size());
+void Path::Normalize(VirtualStringRefASCII result)
+{
+	std::filesystem::path p(std::string_view(result.getData(), result.getLength()));
+	p = p.lexically_normal();
+	auto np = p.native();
+	XAssert(np.length() <= result.getLength());
+	result.resize(np.length());
+	char* resultData = result.getData();
+	for (uintptr i = 0; i < np.length(); i++)
+	{
+		char c = char(np[i]);
+		if (c == '\\')
+			c = '/';
+		resultData[i] = c;
+	}
+}
+
+void Path::MakeAbsolute(StringViewASCII path, VirtualStringRefASCII result)
+{
+	std::filesystem::path p(std::string_view(path.getData(), path.getLength()));
+	p = std::filesystem::absolute(p);
+	auto np = p.native();
+
+	const uintptr resultLength = min(np.length(), result.getMaxLength());
+	result.resize(resultLength);
+	char* resultData = result.getData();
+	for (uintptr i = 0; i < resultLength; i++)
+	{
+		char c = char(np[i]);
+		if (c == '\\')
+			c = '/';
+		resultData[i] = c;
+	}
+}
+
+void Path::MakeAbsolute(const char* pathCStr, VirtualStringRefASCII result)
+{
+	MakeAbsolute(StringViewASCII(pathCStr), result);
 }

@@ -52,6 +52,7 @@
     <ClInclude Include="Source\XLib.Allocation.h" />
     <ClInclude Include="Source\XLib.AllocatorAdapterBase.h" />
     <ClInclude Include="Source\XLib.ByteStream.h" />
+    <ClInclude Include="Source\XLib.CharStream.h" />
     <ClInclude Include="Source\XLib.Color.h" />
     <ClInclude Include="Source\XLib.Containers.ArrayList.h" />
     <ClInclude Include="Source\XLib.Containers.AVLTreeLogic.h" />
