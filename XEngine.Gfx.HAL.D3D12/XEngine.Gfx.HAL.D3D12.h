@@ -21,6 +21,7 @@
 // TODO: We may have to introduce version `writeDescriptorSet` that handles multiple writes so we do not have to resolve `DescriptorSet` value multiple times.
 // TODO: "Non-owning" handles? (handles that can't be used to destroy object).
 // TODO: Introduce safe "owning"/"strong" versions of handles that assert zero value on destruction.
+// TODO: In Vulkan to create dtor you need to provide image layout explicitly. In our case for example texture access in `TextureLayout::Common` and `TextureLayout::ShaderReadOnly` will need different dtors.
 
 // NOTE: `CreateGraphicsPipeline` / `CreateComputePipeline` will be replaced with `CreateShader` / `CompileShader`, when
 // D3D12 GPU work graphs (including collection state objects) and VK_EXT_shader_object are ready. At that point we should
@@ -338,15 +339,15 @@ namespace XEngine::Gfx::HAL
 	{
 		uint8 mipLevel;
 		TextureAspect aspect;
-		uint16 arrayIndex;
+		uint16 arraySlice;
 	};
 
 	struct TextureSubresourceRange
 	{
 		uint8 baseMipLevel;
 		uint8 mipLevelCount;
-		uint16 baseArrayIndex;
-		uint16 arraySize;
+		uint16 baseArraySlice;
+		uint16 arraySliceCount;
 		// TextureAspects aspects;
 	};
 
@@ -357,8 +358,8 @@ namespace XEngine::Gfx::HAL
 		ComputeShading							= 0x0002,
 		GraphicsGeometryShading					= 0x0004,
 		GraphicsPixelShading					= 0x0008,
-		GraphicsRenderTarget					= 0x0010,
-		GraphicsDepthStencil					= 0x0020,
+		GraphicsColorRenderTarget				= 0x0010,
+		GraphicsDepthStencilRenderTarget		= 0x0020,
 		RaytracingAccelerationStructureBuild	= 0x0040,
 		RaytracingAccelerationStructureCopy		= 0x0080,
 		// Resolve,
@@ -377,7 +378,7 @@ namespace XEngine::Gfx::HAL
 		Any										= 0x0001, // This flag can't be combined with others.
 		CopySource								= 0x0002,
 		CopyDest								= 0x0004,
-		GeometryInput							= 0x0008,
+		VertexOrIndexBuffer						= 0x0008,
 		ConstantBuffer							= 0x0010,
 		ShaderRead								= 0x0020,
 		ShaderReadWrite							= 0x0040,
@@ -396,14 +397,12 @@ namespace XEngine::Gfx::HAL
 	{
 		Undefined = 0,
 		Present,
-		Common, // Copy source/dest, shader read/write.
-		CopySource,
-		CopyDest,
-		ShaderRead,
-		ShaderReadWrite,
-		RenderTarget,
-		DepthStencilRead,
-		DepthStencilReadWrite,
+		Common, // Copy source&dest, shader read&write (queue specific)
+		ShaderReadOnly,
+		ShaderReadWrite, // It seems that Vulkan does not have equivalent and VK_IMAGE_LAYOUT_GENERAL is the only option.
+		ColorRenderTarget,
+		DepthStencilRenderTarget,
+		DepthStencilRenderTargetReadOnly,
 	};
 
 	enum class CopyBufferTextureDirection : uint8
