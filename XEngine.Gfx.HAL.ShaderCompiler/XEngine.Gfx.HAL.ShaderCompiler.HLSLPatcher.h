@@ -82,7 +82,7 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 			void blankOutInputRangeUpToCurrentPosition();
 
 			XTODO("Check that this move is actually working")
-			inline XLib::DynamicStringASCII composeOuput() { return asRValue(output); }
+			inline XLib::DynamicStringASCII composeOuput() { return XLib::AsRValue(output); }
 		};
 
 	private:

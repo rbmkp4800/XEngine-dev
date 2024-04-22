@@ -47,7 +47,7 @@ static bool ReadTextFile(const char* path, DynamicStringASCII& resultText)
 	if (!readResult)
 		return false;
 
-	resultText = asRValue(text);
+	resultText = AsRValue(text);
 	return true;
 }
 
@@ -107,7 +107,7 @@ bool SourceCache::resolve(StringViewASCII path, StringViewASCII& resultText)
 
 	Entry& newEntry = *(Entry*)memoryBlock;
 	construct(newEntry);
-	newEntry.text = asRValue(text);
+	newEntry.text = AsRValue(text);
 	newEntry.path = StringViewASCII((char*)memoryBlock + sizeof(Entry), normalizedPath.getLength());
 	newEntry.textWasReadSuccessfully = readTextResult;
 	entrySearchTree.insert(newEntry);

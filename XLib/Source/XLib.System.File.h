@@ -75,7 +75,7 @@ namespace XLib
 		uint64 getPosition();
 		uint64 setPosition(sint64 offset, FilePosition origin = FilePosition::Begin);
 
-		inline bool isInitialized() { return handle != 0 && handle != (void*)-1; }
+		inline bool isOpen() { return handle != 0 && handle != (void*)-1; }
 		inline void* getHandle() { return handle; }
 
 	public:

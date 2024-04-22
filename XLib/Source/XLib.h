@@ -60,55 +60,27 @@ inline constexpr ordering compare(const LeftT& left, const RightT& right)
 
 // Type utils //////////////////////////////////////////////////////////////////////////////////
 
-namespace XLib::Internal
+namespace XLib
 {
-	template <typename T> struct RemoveReferenceHelper abstract final { using ResultType = T; };
-	template <typename T> struct RemoveReferenceHelper<T&> abstract final { using ResultType = T; };
-	template <typename T> struct RemoveReferenceHelper<T&&> abstract final { using ResultType = T; };
+	namespace Internal
+	{
+		template <typename T> struct RemoveReferenceHelper abstract final { using ResultType = T; };
+		template <typename T> struct RemoveReferenceHelper<T&> abstract final { using ResultType = T; };
+		template <typename T> struct RemoveReferenceHelper<T&&> abstract final { using ResultType = T; };
+
+		template <typename T1, typename T2> struct IsTypeEqualHelper { static constexpr bool Value = false; };
+		template <typename T> struct IsTypeEqualHelper<T, T> { static constexpr bool Value = true; };
+	}
+	template <typename T> using RemoveReference = typename Internal::RemoveReferenceHelper<T>::ResultType;
+
+	template <typename T> inline RemoveReference<T>&& AsRValue(T&& object) { return (RemoveReference<T>&&)object; }
+
+	template <typename T> inline T&& ForwardRValue(RemoveReference<T>& value) { return (T&&)value; }
+	template <typename T> inline T&& ForwardRValue(RemoveReference<T>&& value) { return (T&&)value; }
+
+	template <typename T1, typename T2>
+	concept IsTypeEqual = Internal::IsTypeEqualHelper<T1, T2>::Value;
 }
-
-template <typename T> using removeReference = typename XLib::Internal::RemoveReferenceHelper<T>::ResultType;
-
-template <typename T> inline removeReference<T>&& asRValue(T&& object) { return (removeReference<T>&&)object; }
-
-template <typename T> inline T&& forwardRValue(removeReference<T>& value) { return (T&&)value; }
-template <typename T> inline T&& forwardRValue(removeReference<T>&& value) { return (T&&)value; }
-
-template <typename resultType, typename argumentType>
-inline removeReference<resultType> as(argumentType&& value)
-{
-	static_assert(sizeof(resultType) == sizeof(argumentType));
-	return *((resultType*)&value);
-}
-
-template <typename resultType, typename argumentType>
-inline removeReference<resultType>& as(argumentType& value)
-{
-	static_assert(sizeof(resultType) == sizeof(argumentType));
-	return *((resultType*)&value);
-}
-
-template <typename resultType, typename argumentType>
-inline removeReference<resultType> to(const argumentType& value) { return resultType(value); }
-
-namespace XLib::Internal
-{
-	template <typename T> struct IsIntHelper { static constexpr bool Result = false; };
-
-	template <> struct IsIntHelper<unsigned char>		{ static constexpr bool Result = true; };
-	template <> struct IsIntHelper<signed char>			{ static constexpr bool Result = true; };
-	template <> struct IsIntHelper<unsigned short int>	{ static constexpr bool Result = true; };
-	template <> struct IsIntHelper<signed short int>	{ static constexpr bool Result = true; };
-	template <> struct IsIntHelper<unsigned int>		{ static constexpr bool Result = true; };
-	template <> struct IsIntHelper<signed int>			{ static constexpr bool Result = true; };
-	template <> struct IsIntHelper<unsigned long int>	{ static constexpr bool Result = true; };
-	template <> struct IsIntHelper<signed long int>		{ static constexpr bool Result = true; };
-	template <> struct IsIntHelper<unsigned long long int>	{ static constexpr bool Result = true; };
-	template <> struct IsIntHelper<signed long long int>	{ static constexpr bool Result = true; };
-}
-
-template <typename T>
-static constexpr bool isInt = XLib::Internal::IsIntHelper<T>::Result;
 
 
 // Construction utils //////////////////////////////////////////////////////////////////////////
@@ -121,8 +93,8 @@ namespace XLib::Internal
 inline void* operator new (size_t, XLib::Internal::PlacementNewToken, void* block) { return block; }
 inline void operator delete (void* block, XLib::Internal::PlacementNewToken, void*) {}
 
-#define construct(value, ...) (new (::XLib::Internal::PlacementNewToken(), &(value)) ::removeReference<decltype(value)>(__VA_ARGS__))
-#define destruct(value) { using XLibDestructHelperType = ::removeReference<decltype(value)>; (value).~XLibDestructHelperType(); }
+#define construct(value, ...) (new (::XLib::Internal::PlacementNewToken(), &(value)) XLib::RemoveReference<decltype(value)>(__VA_ARGS__))
+#define destruct(value) { using XLibDestructHelperType = XLib::RemoveReference<decltype(value)>; (value).~XLibDestructHelperType(); }
 
 
 // Data utils //////////////////////////////////////////////////////////////////////////////////
@@ -146,9 +118,23 @@ constexpr auto countof(T(&)[size])
 template <typename T>
 inline void swap(T& a, T& b)
 {
-	T tmp(asRValue(a));
-	a = asRValue(b);
-	b = asRValue(tmp);
+	T tmp(XLib::AsRValue(a));
+	a = XLib::AsRValue(b);
+	b = XLib::AsRValue(tmp);
+}
+
+template <typename TargetType, typename ArgType>
+inline XLib::RemoveReference<TargetType> as(ArgType&& value)
+{
+	static_assert(sizeof(TargetType) == sizeof(ArgType));
+	return *((TargetType*)&value);
+}
+
+template <typename TargetType, typename ArgType>
+inline XLib::RemoveReference<TargetType>& as(ArgType& value)
+{
+	static_assert(sizeof(TargetType) == sizeof(ArgType));
+	return *((TargetType*)&value);
 }
 
 
@@ -265,3 +251,31 @@ inline uint32	XCheckedCastU32	(uint64 a) { XAssert(a <= uint32(-1)); return uint
 #define STRINGIZE(x) STRINGIZE2(x)
 #define STRINGIZE2(x) #x
 #define XTODO(todo_message) __pragma(message( __FILE__ "(" STRINGIZE(__LINE__) "): @TODO: " todo_message))
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////
+
+#if 0
+namespace XLib::Internal
+{
+	template <typename T> struct IsIntHelper { static constexpr bool Result = false; };
+
+	template <> struct IsIntHelper<unsigned char> { static constexpr bool Result = true; };
+	template <> struct IsIntHelper<signed char> { static constexpr bool Result = true; };
+	template <> struct IsIntHelper<unsigned short int> { static constexpr bool Result = true; };
+	template <> struct IsIntHelper<signed short int> { static constexpr bool Result = true; };
+	template <> struct IsIntHelper<unsigned int> { static constexpr bool Result = true; };
+	template <> struct IsIntHelper<signed int> { static constexpr bool Result = true; };
+	template <> struct IsIntHelper<unsigned long int> { static constexpr bool Result = true; };
+	template <> struct IsIntHelper<signed long int> { static constexpr bool Result = true; };
+	template <> struct IsIntHelper<unsigned long long int> { static constexpr bool Result = true; };
+	template <> struct IsIntHelper<signed long long int> { static constexpr bool Result = true; };
+}
+
+template <typename T>
+static constexpr bool isInt = XLib::Internal::IsIntHelper<T>::Result;
+#endif

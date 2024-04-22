@@ -66,6 +66,7 @@
     <ClInclude Include="Source\XLib.Delegate.h" />
     <ClInclude Include="Source\XLib.FileSystem.h" />
     <ClInclude Include="Source\XLib.Float.Conversion.h" />
+    <ClInclude Include="Source\XLib.Fmt.h" />
     <ClInclude Include="Source\XLib.h" />
     <ClInclude Include="Source\XLib.JSON.h" />
     <ClInclude Include="Source\XLib.Math.h" />
@@ -108,6 +109,7 @@
     <ClCompile Include="Source\XLib.cpp" />
     <ClCompile Include="Source\XLib.CRC.cpp" />
     <ClCompile Include="Source\XLib.FileSystem.cpp" />
+    <ClCompile Include="Source\XLib.Fmt.cpp" />
     <ClCompile Include="Source\XLib.JSON.cpp" />
     <ClCompile Include="Source\XLib.Math.cpp" />
     <ClCompile Include="Source\XLib.Path.cpp" />

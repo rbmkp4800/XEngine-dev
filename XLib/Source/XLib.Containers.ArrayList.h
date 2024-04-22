@@ -10,6 +10,7 @@
 // TODO: Introduce `CounterType` overflows checks.
 // TODO: Maybe rename `ArrayList` to `DynamicArrayList`?
 // TODO: Asserts everywhere.
+// TODO: Remove CounterType from DynamicArrayList and just use uint32.
 
 #include "XLib.h"
 #include "XLib.AllocatorAdapterBase.h"
@@ -298,7 +299,7 @@ namespace XLib
 		Type* newBuffer = (Type*)AllocatorBase::allocate(capacity * sizeof(Type));
 
 		for (CounterType i = 0; i < size; i++)
-			construct(newBuffer[i], asRValue(buffer[i]));
+			construct(newBuffer[i], AsRValue(buffer[i]));
 
 		if (buffer)
 			AllocatorBase::release(buffer);
@@ -440,7 +441,7 @@ namespace XLib
 		pushBack(Type&& value) -> Type&
 	{
 		Type& result = buffer[size];
-		construct(result, asRValue(value));
+		construct(result, AsRValue(value));
 		size++;
 
 		return result;

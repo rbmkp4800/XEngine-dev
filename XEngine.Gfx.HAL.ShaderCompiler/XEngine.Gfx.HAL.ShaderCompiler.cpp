@@ -990,6 +990,8 @@ ShaderCompilationResultRef ShaderCompiler::CompileShader(XLib::StringViewASCII m
 		preprocessedSourceBlob = Blob::Create(XCheckedCastU32(dxcPreprocessedSourceBlob->GetStringLength()));
 		memoryCopy((void*)preprocessedSourceBlob->getData(),
 			dxcPreprocessedSourceBlob->GetStringPointer(), dxcPreprocessedSourceBlob->GetStringLength());
+
+		resultComposerSrc.preprocessedSourceBlob = preprocessedSourceBlob.get();
 	}
 
 	BlobRef bytecodeBlob = nullptr;

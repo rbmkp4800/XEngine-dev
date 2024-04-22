@@ -5,10 +5,13 @@
 #include "XLib.SystemHeapAllocator.h"
 
 // TODO: Decide what to do with `String::getCStr()` for empty string.
-// TODO: Do we need separate `pushBack()` and `append()`?
-// TODO: `DynamicString` (without type suffix) -> `DynamicStringBase`? And same for other types.
+// TODO: StringView -> StringViewBase, DynamicString -> DynamicStringBase, InplaceString -> InplaceStringBase ?
 // TODO: Do something about million template methods compiled for `InplaceString` instances.
 // TODO: Profile cost of always supporting zero terminator. Probably we may put it only when calling `getCStr`/`getData` methods.
+// TODO: Remove CounterType template from InplaceString and just use uint16.
+// TODO: Remove CounterType template from DynamicString and just use uint32.
+// TODO: String container types should be in XLib.Containers.*** but we also have non-container utils here... Also StringView is certainly not a container. Decide what to do.
+//		We may split this file into XLib.String.h and XLib.Containers.String.h
 
 namespace XLib
 {

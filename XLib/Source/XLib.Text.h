@@ -154,7 +154,7 @@ namespace XLib
 
 		inline bool append(char c);
 		inline bool append(const char* chars, uintptr charCount);
-		inline bool canAppend() const { return file && file->isInitialized(); }
+		inline bool canAppend() const { return file && file->isOpen(); }
 	};
 
 	class TextWriterVirtualAdapterBase
@@ -511,7 +511,7 @@ namespace XLib
 	template <typename TextReader, typename Result>
 	inline bool TextReadInt(TextReader& reader, Result* result, char format)
 	{
-		static_assert(isInt<Result>);
+		//static_assert(isInt<Result>);
 		return Internal::TextReadIntHelper<TextReader, sizeof(*result)>(reader, result, format);
 	}
 

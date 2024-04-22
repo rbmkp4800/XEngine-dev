@@ -1,10 +1,14 @@
+#include <stdio.h>
+
 #include <XLib.h>
 #include <XLib.Algorithm.QuickSort.h>
 #include <XLib.Containers.ArrayList.h>
 #include <XLib.CRC.h>
+#include <XLib.FileSystem.h>
+//#include <XLib.Fmt.h>
 #include <XLib.Path.h>
+#include <XLib.String.h>
 #include <XLib.System.File.h>
-#include <XLib.Text.h>
 
 #include <XEngine.Gfx.ShaderLibraryFormat.h>
 
@@ -16,8 +20,10 @@ using namespace XLib;
 using namespace XEngine::Gfx;
 using namespace XEngine::Gfx::ShaderLibraryBuilder;
 
-static void StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const char* resultLibraryFilePath)
+static void StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const char* outLibraryFilePath)
 {
+	TextWriteFmtStdOut("Storing shader library '", outLibraryFilePath, "'\n");
+
 	XTODO("Sort objects in order of XSH increase");
 
 	ArrayList<ShaderLibraryFormat::DescriptorSetLayoutRecord> descriptorSetLayoutRecords;
@@ -117,10 +123,14 @@ static void StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const
 	header.blobsDataOffset = uint32(blobsDataOffset);
 	header.blobsDataSize = blobsDataSize;
 
+	StringViewASCII outputDirPath = Path::RemoveFileName(outLibraryFilePath);
+	// TODO:
+	//FileSystem::CreateDirs(outputDirPath);
+
 	File file;
-	if (!file.open(resultLibraryFilePath, FileAccessMode::Write, FileOpenMode::Override))
+	if (!file.open(outLibraryFilePath, FileAccessMode::Write, FileOpenMode::Override))
 	{
-		TextWriteFmtStdOut("error: can not open shader library for writing '", resultLibraryFilePath, "'\n");
+		TextWriteFmtStdOut("error: Cannot open shader library for writing '", outLibraryFilePath, "'\n");
 		return;
 	}
 
@@ -176,6 +186,7 @@ int main(int argc, char* argv[])
 		TextWriteFmtStdOut("error: missing output file path (-out=XXX)");
 		return 0;
 	}
+	// TODO: `outLibraryFilePath` should have filename.
 
 	// Load library definition file.
 	LibraryDefinition libraryDefinition;
@@ -222,6 +233,9 @@ int main(int argc, char* argv[])
 		InplaceStringASCIIx1024 mainSourceFilePath;
 		mainSourceFilePath.append(librarySourceRootPath);
 		mainSourceFilePath.append(shader.getMainSourceFilename());
+		// TODO: At this point `mainSourceFilePath` should be normalized (and it is not guaranteed to be normalized right now).
+		// We either need to do normalization here or we guarantee that shader `mainSourceFilename` is relative and does not
+		// point upward.
 
 		HAL::ShaderCompiler::ShaderCompilationResultRef compilationResult =
 			HAL::ShaderCompiler::CompileShader(
@@ -237,10 +251,59 @@ int main(int argc, char* argv[])
 			return 0;
 
 		shader.setCompiledBlob(compilationResult->getBytecodeBlob());
+
+		if (intermediateDirPath)
+		{
+			const HAL::ShaderCompiler::Blob* bytecodeBlob = compilationResult->getBytecodeBlob();
+			if (bytecodeBlob)
+			{
+				XTODO("replace stdio with XLib.Fmt");
+				//InplaceStringASCIIx1024 intermObjectFilePath;
+				//intermObjectFilePath.append(intermediateDirPath);
+				//FmtPrint(intermObjectFilePath, "sh.", FmtArgInt::Hex(shader.getNameXSH()), '.', shader.getName(), ".bin");
+
+				char intermObjectFilePath[1024];
+				sprintf_s(intermObjectFilePath, "%s/SH.%016llX.%s.bin", intermediateDirPath, shader.getNameXSH(), shader.getName().getData());
+
+				File intermObjectFile;
+				intermObjectFile.open(intermObjectFilePath/*.getCStr()*/, FileAccessMode::Write, FileOpenMode::Override);
+				if (intermObjectFile.isOpen())
+				{
+					intermObjectFile.write(bytecodeBlob->getData(), bytecodeBlob->getSize());
+					intermObjectFile.close();
+				}
+				else
+				{
+					/*FmtPrintStdOut*/TextWriteFmtStdOut("error: Cannot open file '", (const char*)intermObjectFilePath, "' for writing\n");
+				}
+			}
+
+			const HAL::ShaderCompiler::Blob* preprocBlob = compilationResult->getPreprocessedSourceBlob();
+			if (preprocBlob)
+			{
+				XTODO("replace stdio with XLib.Fmt");
+				//InplaceStringASCIIx1024 intermPreprocFilePath;
+				//intermPreprocFilePath.append(intermediateDirPath);
+				//FmtPrint(intermPreprocFilePath, "sh.", FmtArgInt::Hex(shader.getNameXSH()), '.', shader.getName(), ".pp.hlsl");
+
+				char intermPreprocFilePath[1024];
+				sprintf_s(intermPreprocFilePath, "%s/SH.%016llX.%s.pp.hlsl", intermediateDirPath, shader.getNameXSH(), shader.getName().getData());
+
+				File intermPreprocFile;
+				intermPreprocFile.open(intermPreprocFilePath/*.getCStr()*/, FileAccessMode::Write, FileOpenMode::Override);
+				if (intermPreprocFile.isOpen())
+				{
+					intermPreprocFile.write(preprocBlob->getData(), preprocBlob->getSize());
+					intermPreprocFile.close();
+				}
+				else
+				{
+					/*FmtPrintStdOut*/TextWriteFmtStdOut("error: Cannot open file '", (const char*)intermPreprocFilePath, "' for writing\n");
+				}
+			}
+		}
 	}
 
-	// Store compiled shader library.
-	TextWriteFmtStdOut("Storing shader library '", outLibraryFilePath, "'\n");
 	StoreShaderLibrary(libraryDefinition, outLibraryFilePath);
 
 	return 0;

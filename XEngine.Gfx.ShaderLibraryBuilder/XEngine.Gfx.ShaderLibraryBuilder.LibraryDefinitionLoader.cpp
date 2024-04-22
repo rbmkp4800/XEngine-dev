@@ -20,76 +20,6 @@ using namespace XEngine::Gfx::ShaderLibraryBuilder;
 
 // HAL value parsers ///////////////////////////////////////////////////////////////////////////////
 
-// TODO: Use some kind of LUT instead of linear search.
-
-static HAL::TexelViewFormat ParseTexelViewFormatString(StringViewASCII string)
-{
-	if (string == "R8_UNORM")			return HAL::TexelViewFormat::R8_UNORM;
-	if (string == "R8_SNORM")			return HAL::TexelViewFormat::R8_SNORM;
-	if (string == "R8_UINT")			return HAL::TexelViewFormat::R8_UINT;
-	if (string == "R8_SINT")			return HAL::TexelViewFormat::R8_SINT;
-	if (string == "R8G8_UNORM")			return HAL::TexelViewFormat::R8G8_UNORM;
-	if (string == "R8G8_SNORM")			return HAL::TexelViewFormat::R8G8_SNORM;
-	if (string == "R8G8_UINT")			return HAL::TexelViewFormat::R8G8_UINT;
-	if (string == "R8G8_SINT")			return HAL::TexelViewFormat::R8G8_SINT;
-	if (string == "R8G8B8A8_UNORM")		return HAL::TexelViewFormat::R8G8B8A8_UNORM;
-	if (string == "R8G8B8A8_SNORM")		return HAL::TexelViewFormat::R8G8B8A8_SNORM;
-	if (string == "R8G8B8A8_UINT")		return HAL::TexelViewFormat::R8G8B8A8_UINT;
-	if (string == "R8G8B8A8_SINT")		return HAL::TexelViewFormat::R8G8B8A8_SINT;
-	if (string == "R8G8B8A8_SRGB")		return HAL::TexelViewFormat::R8G8B8A8_SRGB;
-	if (string == "R16_FLOAT")			return HAL::TexelViewFormat::R16_FLOAT;
-	if (string == "R16_UNORM")			return HAL::TexelViewFormat::R16_UNORM;
-	if (string == "R16_SNORM")			return HAL::TexelViewFormat::R16_SNORM;
-	if (string == "R16_UINT")			return HAL::TexelViewFormat::R16_UINT;
-	if (string == "R16_SINT")			return HAL::TexelViewFormat::R16_SINT;
-	if (string == "R16G16_FLOAT")		return HAL::TexelViewFormat::R16G16_FLOAT;
-	if (string == "R16G16_UNORM")		return HAL::TexelViewFormat::R16G16_UNORM;
-	if (string == "R16G16_SNORM")		return HAL::TexelViewFormat::R16G16_SNORM;
-	if (string == "R16G16_UINT")		return HAL::TexelViewFormat::R16G16_UINT;
-	if (string == "R16G16_SINT")		return HAL::TexelViewFormat::R16G16_SINT;
-	if (string == "R16G16B16A16_FLOAT")	return HAL::TexelViewFormat::R16G16B16A16_FLOAT;
-	if (string == "R16G16B16A16_UNORM")	return HAL::TexelViewFormat::R16G16B16A16_UNORM;
-	if (string == "R16G16B16A16_SNORM")	return HAL::TexelViewFormat::R16G16B16A16_SNORM;
-	if (string == "R16G16B16A16_UINT")	return HAL::TexelViewFormat::R16G16B16A16_UINT;
-	if (string == "R16G16B16A16_SINT")	return HAL::TexelViewFormat::R16G16B16A16_SINT;
-	if (string == "R32_FLOAT")			return HAL::TexelViewFormat::R32_FLOAT;
-	if (string == "R32_UINT")			return HAL::TexelViewFormat::R32_UINT;
-	if (string == "R32_SINT")			return HAL::TexelViewFormat::R32_SINT;
-	if (string == "R32G32_FLOAT")		return HAL::TexelViewFormat::R32G32_FLOAT;
-	if (string == "R32G32_UINT")		return HAL::TexelViewFormat::R32G32_UINT;
-	if (string == "R32G32_SINT")		return HAL::TexelViewFormat::R32G32_SINT;
-	if (string == "R32G32B32_FLOAT")	return HAL::TexelViewFormat::R32G32B32_FLOAT;
-	if (string == "R32G32B32_UINT")		return HAL::TexelViewFormat::R32G32B32_UINT;
-	if (string == "R32G32B32_SINT")		return HAL::TexelViewFormat::R32G32B32_SINT;
-	if (string == "R32G32B32A32_FLOAT")	return HAL::TexelViewFormat::R32G32B32A32_FLOAT;
-	if (string == "R32G32B32A32_UINT")	return HAL::TexelViewFormat::R32G32B32A32_UINT;
-	if (string == "R32G32B32A32_SINT")	return HAL::TexelViewFormat::R32G32B32A32_SINT;
-	if (string == "R24_UNORM_X8")		return HAL::TexelViewFormat::R24_UNORM_X8;
-	if (string == "X24_G8_UINT")		return HAL::TexelViewFormat::X24_G8_UINT;
-	if (string == "R32_FLOAT_X8")		return HAL::TexelViewFormat::R32_FLOAT_X8;
-	if (string == "X32_G8_UINT")		return HAL::TexelViewFormat::X32_G8_UINT;
-	return HAL::TexelViewFormat::Undefined;
-}
-
-static HAL::DepthStencilFormat ParseDepthStencilFormatString(StringViewASCII string)
-{
-	if (string == "D16")	return HAL::DepthStencilFormat::D16;
-	if (string == "D32")	return HAL::DepthStencilFormat::D32;
-	if (string == "D24S8")	return HAL::DepthStencilFormat::D24S8;
-	if (string == "D32S8")	return HAL::DepthStencilFormat::D32S8;
-	return HAL::DepthStencilFormat::Undefined;
-}
-
-static HAL::ShaderType ParseShaderTypeString(StringViewASCII string)
-{
-	if (string == "cs") return HAL::ShaderType::Compute;
-	if (string == "vs") return HAL::ShaderType::Vertex;
-	if (string == "as") return HAL::ShaderType::Amplification;
-	if (string == "ms") return HAL::ShaderType::Mesh;
-	if (string == "ps") return HAL::ShaderType::Pixel;
-	return HAL::ShaderType::Undefined;
-}
-
 static HAL::SamplerFilterMode ParseSamplerFilterModeString(StringViewASCII string)
 {
 	if (string == "min_pnt_mag_pnt_mip_pnt") return HAL::SamplerFilterMode::MinPnt_MagPnt_MipPnt;
@@ -663,7 +593,7 @@ bool LibraryDefinitionLoader::load(const char* jsonPath)
 	{
 		File file;
 		file.open(jsonPath, FileAccessMode::Read, FileOpenMode::OpenExisting);
-		if (!file.isInitialized())
+		if (!file.isOpen())
 		{
 			TextWriteFmtStdOut("Cannot open library definition file '", jsonPath, "'");
 			return false;
