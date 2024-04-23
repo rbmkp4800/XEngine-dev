@@ -108,6 +108,7 @@
 
     <ClCompile Include="Source\XLib.cpp" />
     <ClCompile Include="Source\XLib.CRC.cpp" />
+    <ClCompile Include="Source\XLib.CharStream.cpp" />
     <ClCompile Include="Source\XLib.FileSystem.cpp" />
     <ClCompile Include="Source\XLib.Fmt.cpp" />
     <ClCompile Include="Source\XLib.JSON.cpp" />

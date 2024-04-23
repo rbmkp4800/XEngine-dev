@@ -28,29 +28,30 @@ namespace XLib
 		End = 2,
 	};
 
+	enum class FileHandle : uintptr { Zero = 0 };
+
 	class File : public NonCopyable
 	{
 	private:
-		void* handle;
+		FileHandle handle = FileHandle::Zero;
 
 	public:
-		inline File() : handle(nullptr) {}
+		File() = default;
 		inline ~File() { close(); }
 
 		inline File(File&& that)
 		{
 			handle = that.handle;
-			that.handle = nullptr;
+			that.handle = FileHandle::Zero;
 		}
 		inline void operator = (File&& that)
 		{
 			close();
 			handle = that.handle;
-			that.handle = nullptr;
+			that.handle = FileHandle::Zero;
 		}
 
-		bool open(const char* name, FileAccessMode accessMode,
-			FileOpenMode openMode = FileOpenMode::OpenExisting);
+		bool open(const char* name, FileAccessMode accessMode, FileOpenMode openMode);
 		void close();
 
 		bool read(void* buffer, uintptr size);
@@ -75,12 +76,17 @@ namespace XLib
 		uint64 getPosition();
 		uint64 setPosition(sint64 offset, FilePosition origin = FilePosition::Begin);
 
-		inline bool isOpen() { return handle != 0 && handle != (void*)-1; }
-		inline void* getHandle() { return handle; }
+		inline bool isOpen() { return handle != FileHandle::Zero; }
+		inline FileHandle getHandle() { return FileHandle(handle); }
 
 	public:
-		static File& GetStdIn();
-		static File& GetStdOut();
-		static File& GetStdErr();
+		FileHandle Open(const char* name, FileAccessMode accessMode, FileOpenMode openMode);
+		bool Read(FileHandle fileHandle, );
+		bool Write(FileHandle fileHandle, const void* data, uintptr size);
+
+	public:
+		static FileHandle GetStdInHandle();
+		static FileHandle GetStdOutHandle();
+		static FileHandle GetStdErrHandle();
 	};
 }
