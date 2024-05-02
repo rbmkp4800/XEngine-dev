@@ -23,9 +23,6 @@
 // TODO: Introduce safe "owning"/"strong" versions of handles that assert zero value on destruction.
 // TODO: In Vulkan to create dtor you need to provide image layout explicitly. In our case for example texture access in `TextureLayout::Common` and `TextureLayout::ShaderReadOnly` will need different dtors.
 
-// NOTE: `CreateGraphicsPipeline` / `CreateComputePipeline` will be replaced with `CreateShader` / `CompileShader`, when
-// D3D12 GPU work graphs (including collection state objects) and VK_EXT_shader_object are ready. At that point we should
-// also rename `PipelineLayout` to something like `ShaderInputLayout`.
 
 // NOTE: Virtual textures do not support compression (CMASK/DCC) on some architectures.
 
@@ -355,19 +352,19 @@ namespace XEngine::Gfx::HAL
 	{
 		None = 0,
 		Copy									= 0x0001,
-		ComputeShading							= 0x0002,
-		GraphicsGeometryShading					= 0x0004,
-		GraphicsPixelShading					= 0x0008,
-		GraphicsColorRenderTarget				= 0x0010,
-		GraphicsDepthStencilRenderTarget		= 0x0020,
+		ComputeShader							= 0x0002,
+		PrePixelShaders							= 0x0004,
+		PixelShader								= 0x0008,
+		ColorRenderTarget						= 0x0010,
+		DepthStencilRenderTarget				= 0x0020,
 		RaytracingAccelerationStructureBuild	= 0x0040,
 		RaytracingAccelerationStructureCopy		= 0x0080,
 		// Resolve,
 		// IndirectArgument,
 
-		AllShading = ComputeShading | GraphicsGeometryShading | GraphicsPixelShading,
-		AllGraphics = GraphicsGeometryShading | GraphicsPixelShading | GraphicsRenderTarget | GraphicsDepthStencil,
-		All = Copy | ComputeShading | AllGraphics | RaytracingAccelerationStructureBuild | RaytracingAccelerationStructureCopy,
+		AllShaders = ComputeShader | PrePixelShaders | PixelShader,
+		AllGraphics = PrePixelShaders | PixelShader | ColorRenderTarget | DepthStencilRenderTarget,
+		All = Copy | ComputeShader | AllGraphics | RaytracingAccelerationStructureBuild | RaytracingAccelerationStructureCopy,
 	};
 
 	XDefineEnumFlagOperators(BarrierSync, uint16)
@@ -380,11 +377,11 @@ namespace XEngine::Gfx::HAL
 		CopyDest								= 0x0004,
 		VertexOrIndexBuffer						= 0x0008,
 		ConstantBuffer							= 0x0010,
-		ShaderRead								= 0x0020,
+		ShaderReadOnly							= 0x0020,
 		ShaderReadWrite							= 0x0040,
-		RenderTarget							= 0x0080,
-		DepthStencilRead						= 0x0100,
-		DepthStencilReadWrite					= 0x0200,
+		ColorRenderTarget						= 0x0080,
+		DepthStencilRenderTarget				= 0x0100,
+		DepthStencilRenderTargetReadOnly		= 0x0200,
 		RaytracingAccelerationStructureRead		= 0x0400, // RTAS accesses are exclusive for RT-enabled buffers (for now).
 		RaytracingAccelerationStructureWrite	= 0x0800,
 		// Resolve,

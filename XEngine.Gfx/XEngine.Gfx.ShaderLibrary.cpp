@@ -46,7 +46,7 @@ void ShaderLibrary::load(const char* libraryFilePath, HAL::Device& halDevice)
 
 	File libraryFile;
 	libraryFile.open(libraryFilePath, FileAccessMode::Read, FileOpenMode::OpenExisting);
-	XEMasterAssert(libraryFile.isInitialized());
+	XEMasterAssert(libraryFile.isOpen());
 
 	const uint64 libraryFileSize = libraryFile.getSize();
 	XEMasterAssert(libraryFileSize > sizeof(ShaderLibraryFormat::LibraryHeader));

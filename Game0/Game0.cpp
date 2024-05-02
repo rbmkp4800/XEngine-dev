@@ -151,7 +151,7 @@ void Game0::run()
 	gfxDepthTextureDesc.mipLevelCount = 1;
 	gfxDepthTextureDesc.enableRenderTargetUsage = true;
 
-	gfxDepthTexture = gfxDevice.createTexture(gfxDepthTextureDesc, Gfx::HAL::TextureLayout::DepthStencilReadWrite);
+	gfxDepthTexture = gfxDevice.createTexture(gfxDepthTextureDesc, Gfx::HAL::TextureLayout::DepthStencilRenderTarget);
 
 	gfxTestBuffer = gfxDevice.createStagingBuffer(64 * 1024, Gfx::HAL::StagingBufferAccessMode::DeviceReadHostWrite);
 	mappedTestBuffer = gfxDevice.getMappedBufferPtr(gfxTestBuffer);
@@ -168,7 +168,16 @@ void Game0::run()
 	const Gfx::HAL::ShaderHandle gfxTestVS = gfxShaderLibrary.getShader("TestVS"_xsh);
 	const Gfx::HAL::ShaderHandle gfxTestPS = gfxShaderLibrary.getShader("TestPS"_xsh);
 
+	Gfx::HAL::VertexAttribute attributes[] =
+	{
+		{ "POSITION",	0,	Gfx::HAL::TexelViewFormat::R32G32B32_FLOAT,	},
+		{ "NORMAL",		12,	Gfx::HAL::TexelViewFormat::R32G32B32_FLOAT,	},
+		{ "TEXCOORD",	24,	Gfx::HAL::TexelViewFormat::R32G32_FLOAT,	},
+	};
+
 	Gfx::HAL::GraphicsPipelineDesc gfxTestGfxPipelineDesc = {};
+	gfxTestGfxPipelineDesc.vertexAttributes = attributes;
+	gfxTestGfxPipelineDesc.vertexAttributeCount = countof(attributes);
 	gfxTestGfxPipelineDesc.vsHandle = gfxTestVS;
 	gfxTestGfxPipelineDesc.psHandle = gfxTestPS;
 	gfxTestGfxPipelineDesc.colorRenderTargetFormats[0] = Gfx::HAL::TexelViewFormat::R8G8B8A8_UNORM;
@@ -223,8 +232,8 @@ void Game0::run()
 
 		gfxCommandList.textureMemoryBarrier(gfxCurrentBackBuffer,
 			Gfx::HAL::BarrierSync::None, Gfx::HAL::BarrierSync::All,
-			Gfx::HAL::BarrierAccess::None, Gfx::HAL::BarrierAccess::RenderTarget,
-			Gfx::HAL::TextureLayout::Present, Gfx::HAL::TextureLayout::RenderTarget);
+			Gfx::HAL::BarrierAccess::None, Gfx::HAL::BarrierAccess::ColorRenderTarget,
+			Gfx::HAL::TextureLayout::Present, Gfx::HAL::TextureLayout::ColorRenderTarget);
 
 		Gfx::HAL::ColorRenderTarget colorRT =
 		{
@@ -281,8 +290,8 @@ void Game0::run()
 
 		gfxCommandList.textureMemoryBarrier(gfxCurrentBackBuffer,
 			Gfx::HAL::BarrierSync::All, Gfx::HAL::BarrierSync::None,
-			Gfx::HAL::BarrierAccess::RenderTarget, Gfx::HAL::BarrierAccess::None,
-			Gfx::HAL::TextureLayout::RenderTarget, Gfx::HAL::TextureLayout::Present);
+			Gfx::HAL::BarrierAccess::ColorRenderTarget, Gfx::HAL::BarrierAccess::None,
+			Gfx::HAL::TextureLayout::ColorRenderTarget, Gfx::HAL::TextureLayout::Present);
 
 		gfxDevice.closeCommandList(gfxCommandList);
 		gfxDevice.submitCommandList(Gfx::HAL::DeviceQueue::Graphics, gfxCommandList);

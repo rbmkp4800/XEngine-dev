@@ -1,3 +1,5 @@
+#if 0
+
 #include "XLib.CharStream.h"
 
 #include "XLib.SystemHeapAllocator.h"
@@ -40,3 +42,5 @@ FileCharStreamWriter& XLib::GetStdErrStream()
 	}
 	return StdErrStream;
 }
+
+#endif

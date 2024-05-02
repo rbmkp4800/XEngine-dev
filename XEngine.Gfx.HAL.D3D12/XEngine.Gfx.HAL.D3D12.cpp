@@ -35,14 +35,14 @@ namespace // Barriers validation
 
 		constexpr BarrierAccess bufferCompatibleAccess =
 			BarrierAccess::CopySource | BarrierAccess::CopyDest |
-			BarrierAccess::GeometryInput | BarrierAccess::ConstantBuffer |
-			BarrierAccess::ShaderRead | BarrierAccess::ShaderReadWrite;
+			BarrierAccess::VertexOrIndexBuffer | BarrierAccess::ConstantBuffer |
+			BarrierAccess::ShaderReadOnly | BarrierAccess::ShaderReadWrite;
 
 		constexpr BarrierAccess textureCompatibleAccess =
 			BarrierAccess::CopySource | BarrierAccess::CopyDest |
-			BarrierAccess::ShaderRead | BarrierAccess::ShaderReadWrite |
-			BarrierAccess::RenderTarget |
-			BarrierAccess::DepthStencilRead | BarrierAccess::DepthStencilReadWrite;
+			BarrierAccess::ShaderReadOnly | BarrierAccess::ShaderReadWrite |
+			BarrierAccess::ColorRenderTarget |
+			BarrierAccess::DepthStencilRenderTarget | BarrierAccess::DepthStencilRenderTargetReadOnly;
 
 		const BarrierAccess compatibleAccess =
 			resourceType == ResourceType::Buffer ? bufferCompatibleAccess : textureCompatibleAccess;
@@ -61,15 +61,13 @@ namespace // Barriers validation
 		BarrierAccess compatibleAccess = BarrierAccess::None;
 		switch (layout)
 		{
-			case TextureLayout::Present:				compatibleAccess = BarrierAccess::None; break;
-			case TextureLayout::Common:					compatibleAccess = BarrierAccess::CopySource | BarrierAccess::CopyDest | BarrierAccess::ShaderRead | BarrierAccess::ShaderReadWrite; break;
-			case TextureLayout::CopySource:				compatibleAccess = BarrierAccess::CopySource; break;
-			case TextureLayout::CopyDest:				compatibleAccess = BarrierAccess::CopyDest; break;
-			case TextureLayout::ShaderRead:				compatibleAccess = BarrierAccess::ShaderRead; break;
-			case TextureLayout::ShaderReadWrite:		compatibleAccess = BarrierAccess::ShaderReadWrite; break;
-			case TextureLayout::RenderTarget:			compatibleAccess = BarrierAccess::RenderTarget; break;
-			case TextureLayout::DepthStencilRead:		compatibleAccess = BarrierAccess::DepthStencilRead; break;
-			case TextureLayout::DepthStencilReadWrite:	compatibleAccess = BarrierAccess::DepthStencilReadWrite; break;
+			case TextureLayout::Present:							compatibleAccess = BarrierAccess::None; break;
+			case TextureLayout::Common:								compatibleAccess = BarrierAccess::CopySource | BarrierAccess::CopyDest | BarrierAccess::ShaderReadOnly | BarrierAccess::ShaderReadWrite; break;
+			case TextureLayout::ShaderReadOnly:						compatibleAccess = BarrierAccess::ShaderReadOnly; break;
+			case TextureLayout::ShaderReadWrite:					compatibleAccess = BarrierAccess::ShaderReadWrite; break;
+			case TextureLayout::ColorRenderTarget:					compatibleAccess = BarrierAccess::ColorRenderTarget; break;
+			case TextureLayout::DepthStencilRenderTarget:			compatibleAccess = BarrierAccess::DepthStencilRenderTarget; break;
+			case TextureLayout::DepthStencilRenderTargetReadOnly:	compatibleAccess = BarrierAccess::DepthStencilRenderTargetReadOnly; break;
 			default:
 				return false;
 		}
@@ -93,14 +91,14 @@ namespace // Barriers validation
 			compatibleSync |= BarrierSync::All;
 		if (has(access, BarrierAccess::CopySource | BarrierAccess::CopySource))
 			compatibleSync |= BarrierSync::Copy;
-		if (has(access, BarrierAccess::GeometryInput))
-			compatibleSync |= BarrierSync::GraphicsGeometryShading;
-		if (has(access, BarrierAccess::ConstantBuffer | BarrierAccess::ShaderRead | BarrierAccess::ShaderReadWrite))
-			compatibleSync |= BarrierSync::AllShading;
-		if (has(access, BarrierAccess::RenderTarget))
-			compatibleSync |= BarrierSync::GraphicsRenderTarget;
-		if (has(access, BarrierAccess::DepthStencilRead | BarrierAccess::DepthStencilReadWrite))
-			compatibleSync |= BarrierSync::GraphicsDepthStencil;
+		if (has(access, BarrierAccess::VertexOrIndexBuffer))
+			compatibleSync |= BarrierSync::PrePixelShaders;
+		if (has(access, BarrierAccess::ConstantBuffer | BarrierAccess::ShaderReadOnly | BarrierAccess::ShaderReadWrite))
+			compatibleSync |= BarrierSync::AllShaders;
+		if (has(access, BarrierAccess::ColorRenderTarget))
+			compatibleSync |= BarrierSync::ColorRenderTarget;
+		if (has(access, BarrierAccess::DepthStencilRenderTarget | BarrierAccess::DepthStencilRenderTargetReadOnly))
+			compatibleSync |= BarrierSync::DepthStencilRenderTarget;
 		// TODO: Raytracing and resolve.
 
 		// There should be at least one compatible sync.
@@ -652,8 +650,8 @@ void CommandList::textureMemoryBarrier(TextureHandle textureHandle,
 
 		d3dTextureBarrier.Subresources.IndexOrFirstMipLevel = subresourceRange->baseMipLevel;
 		d3dTextureBarrier.Subresources.NumMipLevels = subresourceRange->mipLevelCount;
-		d3dTextureBarrier.Subresources.FirstArraySlice = subresourceRange->baseArrayIndex;
-		d3dTextureBarrier.Subresources.NumArraySlices = subresourceRange->arraySize;
+		d3dTextureBarrier.Subresources.FirstArraySlice = subresourceRange->baseArraySlice;
+		d3dTextureBarrier.Subresources.NumArraySlices = subresourceRange->arraySliceCount;
 		d3dTextureBarrier.Subresources.FirstPlane = 0;
 		d3dTextureBarrier.Subresources.NumPlanes = 1; // TODO: Handle this properly.
 	}
@@ -966,7 +964,7 @@ inline void Device::DecomposeDeviceQueueSyncPoint(DeviceQueueSyncPoint syncPoint
 uint32 Device::CalculateTextureSubresourceIndex(const TextureDesc& textureDesc, const TextureSubresource& textureSubresource)
 {
 	XEAssert(textureSubresource.mipLevel < textureDesc.mipLevelCount);
-	XEAssert(textureSubresource.arrayIndex < textureDesc.size.z);
+	XEAssert(textureSubresource.arraySlice < textureDesc.size.z);
 
 	const TextureFormat format = textureDesc.format;
 	const bool hasStencil = (format == TextureFormat::D24S8 || format == TextureFormat::D32S8);
@@ -980,7 +978,7 @@ uint32 Device::CalculateTextureSubresourceIndex(const TextureDesc& textureDesc, 
 	const uint32 mipLevelCount = textureDesc.mipLevelCount;
 	const uint32 arraySize = textureDesc.size.z;
 
-	return textureSubresource.mipLevel + (textureSubresource.arrayIndex * mipLevelCount) + (planeIndex * mipLevelCount * arraySize);
+	return textureSubresource.mipLevel + (textureSubresource.arraySlice * mipLevelCount) + (planeIndex * mipLevelCount * arraySize);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1471,8 +1469,8 @@ TextureHandle Device::createTexture(const TextureDesc& desc, TextureLayout initi
 	d3dResourceDesc.Flags = d3dResourceFlags;
 
 	XEAssert(initialLayout != TextureLayout::Undefined);
-	XEAssert(imply(initialLayout == TextureLayout::RenderTarget, enableColorRT));
-	XEAssert(imply(initialLayout == TextureLayout::DepthStencilRead || initialLayout == TextureLayout::DepthStencilReadWrite, enableDepthStencilRT));
+	XEAssert(imply(initialLayout == TextureLayout::ColorRenderTarget, enableColorRT));
+	XEAssert(imply(initialLayout == TextureLayout::DepthStencilRenderTarget || initialLayout == TextureLayout::DepthStencilRenderTargetReadOnly, enableDepthStencilRT));
 	const D3D12_BARRIER_LAYOUT d3dInitialLayout = TranslateTextureLayoutToD3D12BarrierLayout(initialLayout);
 
 	if (memoryAllocation)

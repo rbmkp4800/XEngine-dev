@@ -109,23 +109,23 @@ namespace XEngine::Gfx::HAL
 			sync ^= BarrierSync::AllGraphics;
 		}
 
-		if ((sync & BarrierSync::AllShading) == BarrierSync::AllShading)
+		if ((sync & BarrierSync::AllShaders) == BarrierSync::AllShaders)
 		{
 			d3dBarrierSync |= D3D12_BARRIER_SYNC_ALL_SHADING;
-			sync ^= BarrierSync::AllShading;
+			sync ^= BarrierSync::AllShaders;
 		}
 
 		if ((sync & BarrierSync::Copy) != BarrierSync(0))
 			d3dBarrierSync |= D3D12_BARRIER_SYNC_COPY;
-		if ((sync & BarrierSync::ComputeShading) != BarrierSync(0))
+		if ((sync & BarrierSync::ComputeShader) != BarrierSync(0))
 			d3dBarrierSync |= D3D12_BARRIER_SYNC_COMPUTE_SHADING;
-		if ((sync & BarrierSync::GraphicsGeometryShading) != BarrierSync(0))
+		if ((sync & BarrierSync::PrePixelShaders) != BarrierSync(0))
 			d3dBarrierSync |= D3D12_BARRIER_SYNC_VERTEX_SHADING;
-		if ((sync & BarrierSync::GraphicsPixelShading) != BarrierSync(0))
+		if ((sync & BarrierSync::PixelShader) != BarrierSync(0))
 			d3dBarrierSync |= D3D12_BARRIER_SYNC_PIXEL_SHADING;
-		if ((sync & BarrierSync::GraphicsRenderTarget) != BarrierSync(0))
+		if ((sync & BarrierSync::ColorRenderTarget) != BarrierSync(0))
 			d3dBarrierSync |= D3D12_BARRIER_SYNC_RENDER_TARGET;
-		if ((sync & BarrierSync::GraphicsDepthStencil) != BarrierSync(0))
+		if ((sync & BarrierSync::DepthStencilRenderTarget) != BarrierSync(0))
 			d3dBarrierSync |= D3D12_BARRIER_SYNC_DEPTH_STENCIL;
 		if ((sync & BarrierSync::RaytracingAccelerationStructureBuild) != BarrierSync(0))
 			d3dBarrierSync |= D3D12_BARRIER_SYNC_BUILD_RAYTRACING_ACCELERATION_STRUCTURE;
@@ -148,20 +148,20 @@ namespace XEngine::Gfx::HAL
 			d3dBarrierAccess |= D3D12_BARRIER_ACCESS_COPY_SOURCE;
 		if ((access & BarrierAccess::CopyDest) != BarrierAccess(0))
 			d3dBarrierAccess |= D3D12_BARRIER_ACCESS_COPY_DEST;
-		if ((access & BarrierAccess::GeometryInput) != BarrierAccess(0))
+		if ((access & BarrierAccess::VertexOrIndexBuffer) != BarrierAccess(0))
 			d3dBarrierAccess |= D3D12_BARRIER_ACCESS_INDEX_BUFFER | D3D12_BARRIER_ACCESS_VERTEX_BUFFER;
 		if ((access & BarrierAccess::ConstantBuffer) != BarrierAccess(0))
 			d3dBarrierAccess |= D3D12_BARRIER_ACCESS_CONSTANT_BUFFER;
-		if ((access & BarrierAccess::ShaderRead) != BarrierAccess(0))
+		if ((access & BarrierAccess::ShaderReadOnly) != BarrierAccess(0))
 			d3dBarrierAccess |= D3D12_BARRIER_ACCESS_SHADER_RESOURCE;
 		if ((access & BarrierAccess::ShaderReadWrite) != BarrierAccess(0))
 			d3dBarrierAccess |= D3D12_BARRIER_ACCESS_UNORDERED_ACCESS;
-		if ((access & BarrierAccess::RenderTarget) != BarrierAccess(0))
+		if ((access & BarrierAccess::ColorRenderTarget) != BarrierAccess(0))
 			d3dBarrierAccess |= D3D12_BARRIER_ACCESS_RENDER_TARGET;
-		if ((access & BarrierAccess::DepthStencilRead) != BarrierAccess(0))
-			d3dBarrierAccess |= D3D12_BARRIER_ACCESS_DEPTH_STENCIL_READ;
-		if ((access & BarrierAccess::DepthStencilReadWrite) != BarrierAccess(0))
+		if ((access & BarrierAccess::DepthStencilRenderTarget) != BarrierAccess(0))
 			d3dBarrierAccess |= D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE;
+		if ((access & BarrierAccess::DepthStencilRenderTargetReadOnly) != BarrierAccess(0))
+			d3dBarrierAccess |= D3D12_BARRIER_ACCESS_DEPTH_STENCIL_READ;
 		if ((access & BarrierAccess::RaytracingAccelerationStructureRead) != BarrierAccess(0))
 			d3dBarrierAccess |= D3D12_BARRIER_ACCESS_RAYTRACING_ACCELERATION_STRUCTURE_READ;
 		if ((access & BarrierAccess::RaytracingAccelerationStructureWrite) != BarrierAccess(0))
@@ -174,16 +174,14 @@ namespace XEngine::Gfx::HAL
 	{
 		switch (textureLayout)
 		{
-			case TextureLayout::Undefined:				return D3D12_BARRIER_LAYOUT_UNDEFINED;
-			case TextureLayout::Present:				return D3D12_BARRIER_LAYOUT_PRESENT;
-			case TextureLayout::Common:					return D3D12_BARRIER_LAYOUT_DIRECT_QUEUE_COMMON;
-			case TextureLayout::CopySource:				return D3D12_BARRIER_LAYOUT_COPY_SOURCE;
-			case TextureLayout::CopyDest:				return D3D12_BARRIER_LAYOUT_COPY_DEST;
-			case TextureLayout::ShaderRead:				return D3D12_BARRIER_LAYOUT_SHADER_RESOURCE;
-			case TextureLayout::ShaderReadWrite:		return D3D12_BARRIER_LAYOUT_UNORDERED_ACCESS;
-			case TextureLayout::RenderTarget:			return D3D12_BARRIER_LAYOUT_RENDER_TARGET;
-			case TextureLayout::DepthStencilRead:		return D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_READ;
-			case TextureLayout::DepthStencilReadWrite:	return D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE;
+			case TextureLayout::Undefined:							return D3D12_BARRIER_LAYOUT_UNDEFINED;
+			case TextureLayout::Present:							return D3D12_BARRIER_LAYOUT_PRESENT;
+			case TextureLayout::Common:								return D3D12_BARRIER_LAYOUT_DIRECT_QUEUE_COMMON;
+			case TextureLayout::ShaderReadOnly:						return D3D12_BARRIER_LAYOUT_SHADER_RESOURCE;
+			case TextureLayout::ShaderReadWrite:					return D3D12_BARRIER_LAYOUT_UNORDERED_ACCESS;
+			case TextureLayout::ColorRenderTarget:					return D3D12_BARRIER_LAYOUT_RENDER_TARGET;
+			case TextureLayout::DepthStencilRenderTarget:			return D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_READ;
+			case TextureLayout::DepthStencilRenderTargetReadOnly:	return D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE;
 		}
 
 		// TODO: Maybe we want to use `D3D12_BARRIER_LAYOUT_DIRECT_QUEUE_*` and `D3D12_BARRIER_LAYOUT_COMPUTE_QUEUE_*` ?
