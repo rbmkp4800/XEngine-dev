@@ -1,3 +1,5 @@
+#if 0
+
 #include <XLib.Containers.ArrayList.h>
 #include <XLib.SystemHeapAllocator.h>
 
@@ -95,7 +97,8 @@ PassDependencyCollector::~PassDependencyCollector()
 	XEMasterAssert(!graph);
 }
 
-void PassDependencyCollector::addBufferShaderRead(BufferHandle bufferHandle)
+void PassDependencyCollector::addBufferShaderRead(BufferHandle bufferHandle,
+	ResourceShaderAccessType shaderAccessType)
 {
 	XEAssert(graph);
 
@@ -105,8 +108,8 @@ void PassDependencyCollector::addBufferShaderRead(BufferHandle bufferHandle)
 	Graph::Resource& resource = graph->resources[resourceIndex];
 	XEAssert(resource.type == HAL::ResourceType::Buffer);
 
-	XEAssert(resource.dependencyCollectorMagic != magic);
-	resource.dependencyCollectorMagic = magic;
+	//XEAssert(resource.dependencyCollectorMagic != magic);
+	//resource.dependencyCollectorMagic = magic;
 
 	const uint16 globalDependencyIndex = graph->dependencyCount + dependencyCount;
 	XEMasterAssert(globalDependencyIndex < graph->dependencyPoolSize);
@@ -115,7 +118,9 @@ void PassDependencyCollector::addBufferShaderRead(BufferHandle bufferHandle)
 	Graph::Dependency& dependency = graph->dependencies[globalDependencyIndex];
 	dependency.resourceIndex = resourceIndex;
 	dependency.passIndex = passIndex;
-	dependency.resourceAccessType = Graph::ResourceAccessType::ShaderRead;
+	dependency.barrierAccess = HAL::BarrierAccess::ShaderRead;
+	dependency.barrierSync = ;
+	dependency.dependsOnPrecedingShaderWrite = false;
 }
 
 void PassDependencyCollector::addBufferShaderWrite(BufferHandle bufferHandle, BufferHandle& modifiedBufferHandle)
@@ -131,16 +136,6 @@ enum class Graph::ResourceOrigin : uint8
 	Undefined = 0,
 	Transient,
 	External,
-};
-
-enum class Graph::ResourceAccessType : uint8
-{
-	Undefined = 0,
-	ShaderRead,
-	ShaderWrite,
-	ColorRenderTarget,
-	DepthStencilRenderTargetRead,
-	DepthStencilRenderTargetWrite,
 };
 
 struct Graph::Resource
@@ -173,6 +168,9 @@ struct Graph::Pass
 	uint16 dependenciesBaseOffset;
 	uint16 dependencyCount;
 
+	uint16 preExecutionBarrierChainHeadIdx;
+	uint16 postExecutionBarrierChainHeadIdx;
+
 	uint16 refCount;
 };
 
@@ -180,7 +178,10 @@ struct Graph::Dependency
 {
 	uint16 resourceIndex;
 	uint16 passIndex;
-	ResourceAccessType resourceAccessType;
+
+	HAL::BarrierAccess barrierAccess;
+	HAL::BarrierSync barrierSync;
+	bool dependsOnPrecedingShaderWrite;
 
 	HAL::TextureSubresourceRange textureSubresourceRange;
 	bool usesTextureSubresourceRange;
@@ -188,15 +189,58 @@ struct Graph::Dependency
 	uint16 resourceDependencyChainNextIdx;
 };
 
-inline bool Graph::IsModifyingAccess(ResourceAccessType access)
+struct Graph::Barrier
 {
-	return
-		access == ResourceAccessType::ShaderWrite ||
-		access == ResourceAccessType::ColorRenderTarget ||
-		access == ResourceAccessType::DepthStencilRenderTargetWrite;
-}
+	HAL::BarrierAccess barrierAccessBefore;
+	HAL::BarrierAccess barrierAccessAfter;
+	HAL::BarrierSync barrierSyncBefore;
+	HAL::BarrierSync barrierSyncAfter;
 
-void Graph::initialize(HAL::Device& device, uint16 resourcePoolSize, uint16 passPoolSize, uint16 dependencyPoolSize, uint32 userDataPoolSize)
+	HAL::TextureSubresourceRange textureSubresourceRange;
+	HAL::TextureLayout layoutBefore;
+	HAL::TextureLayout layoutAfter;
+
+	uint16 resourceIndex;
+
+	uint16 chainNextIdx;
+};
+
+/*inline void Graph::GetHALBarrierValuesFromDependency(const Dependency& dependency,
+	HAL::BarrierAccess& resultBarrierAccess, HAL::BarrierSync& resultBarrierSync)
+{
+	switch (dependency.resourceAccessType)
+	{
+		case ResourceAccessType::ShaderRead:
+			resultBarrierAccess = HAL::BarrierAccess::ShaderRead;
+			resultBarrierSync = ...;
+			return;
+
+		case ResourceAccessType::ShaderWrite:
+			resultBarrierAccess = HAL::BarrierAccess::ShaderRead;
+			resultBarrierSync = ...;
+			return;
+
+		case ResourceAccessType::ColorRenderTarget:
+			resultBarrierAccess = HAL::BarrierAccess::ColorRenderTarget;
+			resultBarrierSync = HAL::BarrierSync::ColorRenderTarget;
+			return;
+
+		case ResourceAccessType::DepthStencilRenderTargetRead:
+			resultBarrierAccess = HAL::BarrierAccess::DepthStencilRenderTargetRead;
+			resultBarrierSync = HAL::BarrierSync::DepthStencilRenderTarget;
+			return;
+
+		case ResourceAccessType::DepthStencilRenderTargetWrite:
+			resultBarrierAccess = HAL::BarrierAccess::DepthStencilRenderTargetWrite;
+			resultBarrierSync = HAL::BarrierSync::DepthStencilRenderTarget;
+			return;
+	}
+
+	XEAssertUnreachableCode();
+}*/
+
+void Graph::initialize(HAL::Device& device,
+	uint16 resourcePoolSize, uint16 passPoolSize, uint16 dependencyPoolSize, uint16 barrierPoolSize, uint32 userDataPoolSize)
 {
 	XEMasterAssert(!this->device);
 	memorySet(this, 0, sizeof(Graph));
@@ -205,6 +249,7 @@ void Graph::initialize(HAL::Device& device, uint16 resourcePoolSize, uint16 pass
 	this->resourcePoolSize = resourcePoolSize;
 	this->passPoolSize = passPoolSize;
 	this->dependencyPoolSize = dependencyPoolSize;
+	this->barrierPoolSize = barrierPoolSize;
 	this->userDataPoolSize = userDataPoolSize;
 
 	{
@@ -216,8 +261,11 @@ void Graph::initialize(HAL::Device& device, uint16 resourcePoolSize, uint16 pass
 		const uintptr passPoolMemOffset = poolsMemorySizeAccum;
 		poolsMemorySizeAccum += sizeof(Pass) * passPoolSize;
 
-		const uintptr dependenciesPoolMemOffset = poolsMemorySizeAccum;
+		const uintptr dependencyPoolMemOffset = poolsMemorySizeAccum;
 		poolsMemorySizeAccum += sizeof(Dependency) * dependencyPoolSize;
+
+		const uintptr barrierPoolMemoryOffset = poolsMemorySizeAccum;
+		poolsMemorySizeAccum += sizeof(Barrier) * barrierPoolSize;
 
 		const uintptr userDataPoolMemOffset = poolsMemorySizeAccum;
 		poolsMemorySizeAccum += userDataPoolSize;
@@ -228,7 +276,8 @@ void Graph::initialize(HAL::Device& device, uint16 resourcePoolSize, uint16 pass
 
 		resources = (Resource*)(poolsMemory + resourcePoolMemOffset);
 		passes = (Pass*)(poolsMemory + passPoolMemOffset);
-		dependencies = (Dependency*)(poolsMemory + dependenciesPoolMemOffset);
+		dependencies = (Dependency*)(poolsMemory + dependencyPoolMemOffset);
+		barriers = (Barrier*)(poolsMemory + barrierPoolMemoryOffset);
 		userDataPool = poolsMemory + userDataPoolMemOffset;
 	}
 }
@@ -330,10 +379,10 @@ void Graph::compile()
 		{
 			const Dependency& dependency = dependencies[i];
 
-			if (IsModifyingAccess(dependency.resourceAccessType))
-				passes[dependency.passIndex].refCount++;
-			else
+			if (HAL::IsBarrierAccessReadOnly(dependency.barrierAccess))
 				resources[dependency.resourceIndex].refCount++;
+			else
+				passes[dependency.passIndex].refCount++;
 		}
 
 		XLib::InplaceArrayList<uint16, MaxResourceCount> unreferencedResourcesStack;
@@ -351,7 +400,8 @@ void Graph::compile()
 				unrefResDepChainIter != uint16(-1);
 				unrefResDepChainIter = dependencies[unrefResDepChainIter].resourceDependencyChainNextIdx)
 			{
-				if (!IsModifyingAccess(dependencies[unrefResDepChainIter].resourceAccessType))
+				//if (!IsModifyingAccess(dependencies[unrefResDepChainIter].resourceAccessType))
+				if (HAL::IsBarrierAccessReadOnly(dependencies[unrefResDepChainIter].barrierAccess))
 					continue;
 
 				Pass& unrefPass = passes[dependencies[unrefResDepChainIter].passIndex];
@@ -363,7 +413,8 @@ void Graph::compile()
 				for (uint16 i = 0; i < unrefPass.dependencyCount; i++)
 				{
 					const Dependency& unrefDep = dependencies[unrefPass.dependenciesBaseOffset + i];
-					if (!IsModifyingAccess(unrefDep.resourceAccessType))
+					//if (!IsModifyingAccess(unrefDep.resourceAccessType))
+					if (HAL::IsBarrierAccessReadOnly(unrefDep.barrierAccess))
 					{
 						Resource& newUnrefRes = resources[unrefDep.resourceIndex];
 						XEAssert(newUnrefRes.refCount > 0);
@@ -377,12 +428,6 @@ void Graph::compile()
 		}
 	}
 
-	// Remove unreferenced elements from resource dependency chains.
-
-	// Compute aliased resource locations.
-
-	// Compute first and last use of resource (to do aliasing).
-
 	// Compute resource barriers.
 	for (uint16 resourceIndex = 0; resourceIndex < resourceCount; resourceIndex++)
 	{
@@ -391,50 +436,90 @@ void Graph::compile()
 			continue;
 		XEAssert(resource.dependencyChainHeadIdx != uint16(-1));
 
-		uint16 prevPassGroupTailIdx = uint16(-1);
-		uint16 currPassGroupHeadIdx = uint16(-1);
-
-		for (uint16 depChainIter = resource.dependencyChainHeadIdx;
-			depChainIter != uint16(-1);
-			depChainIter = dependencies[depChainIter].resourceDependencyChainNextIdx)
+		if (resource.type == HAL::ResourceType::Buffer)
 		{
-			const Dependency& dependency = dependencies[depChainIter];
-			const Pass& pass = passes[dependency.passIndex];
+			HAL::BarrierAccess emittedBarrierAccess = HAL::BarrierAccess::None;
+			HAL::BarrierSync emittedBarrierSync = HAL::BarrierSync::None;
 
-			if (pass.refCount == 0)
-				continue;
+			//Barrier* emittedBarrierSignal = nullptr;
+			//Barrier* emittedBarrierWait = nullptr;
+			Barrier* emittedBarrier = nullptr;
 
+			for (uint16 depChainIter = resource.dependencyChainHeadIdx;
+				depChainIter != uint16(-1);
+				depChainIter = dependencies[depChainIter].resourceDependencyChainNextIdx)
+			{
+				const Dependency& dependency = dependencies[depChainIter];
+				Pass& pass = passes[dependency.passIndex];
+
+				if (pass.refCount == 0)
+					continue;
+
+				XEAssert(dependency.barrierAccess != HAL::BarrierAccess::None);
+
+				const bool readToReadTransition =
+					emittedBarrierAccess != HAL::BarrierAccess::None &&
+					HAL::IsBarrierAccessReadOnly(emittedBarrierAccess) &&
+					HAL::IsBarrierAccessReadOnly(dependency.barrierAccess);
+
+				const bool shaderWriteToShaderWriteWithoutSync =
+					!dependency.dependsOnPrecedingShaderWrite &&
+					emittedBarrierAccess == HAL::BarrierAccess::ShaderReadWrite &&
+					dependency.barrierAccess == HAL::BarrierAccess::ShaderReadWrite;
+
+				if (readToReadTransition || shaderWriteToShaderWriteWithoutSync)
+				{
+					// Extend already emitted barrier.
+					XEAssert(emittedBarrier);
+					emittedBarrier->barrierAccessAfter |= dependency.barrierAccess;
+					emittedBarrier->barrierSyncAfter |= dependency.barrierSync;
+				}
+				else
+				{
+					// Emit new barrier.
+
+					const bool shouldUseSplitBarrier = false;
+					if (shouldUseSplitBarrier)
+					{
+						XAssertNotImplemented();
+					}
+					else
+					{
+						XEMasterAssert(barrierCount < barrierPoolSize);
+						const uint16 barrierIndex = barrierCount;
+						barrierCount++;
+
+						Barrier& barrier = barriers[barrierIndex];
+						barrier.resourceIndex = resourceIndex;
+						barrier.barrierAccessBefore = emittedBarrierAccess;
+						barrier.barrierAccessAfter = dependency.barrierAccess;
+						barrier.barrierSyncBefore = emittedBarrierSync;
+						barrier.barrierSyncAfter = dependency.barrierSync;
+						barrier.chainNextIdx = uint16(-1);
+
+						if (emittedBarrier)
+							emittedBarrier->chainNextIdx = barrierIndex;
+						else
+							pass.preExecutionBarrierChainHeadIdx = barrierIndex;
+
+						emittedBarrier = &barrier;
+					}
+
+					emittedBarrierAccess = dependency.barrierAccess;
+					emittedBarrierSync = dependency.barrierSync;
+				}
+			}
+		}
+		else if (resource.type == HAL::ResourceType::Texture)
+		{
 
 		}
-
-
-		
+		else
+			XEAssertUnreachableCode();
 	}
 
+	// Compute aliased resource locations.
 
-
-
-
-	/*struct Barrier
-	{
-		uint16 resourceIndex;
-
-		HAL::BarrierSync syncBefore;
-		HAL::BarrierSync syncAfter;
-		HAL::BarrierAccess accessBefore;
-		HAL::BarrierAccess accessAfter;
-
-		HAL::TextureLayout textureLayoutBefore;
-		HAL::TextureLayout textureLayoutAfter;
-
-		HAL::TextureSubresourceRange textureSubresourceRange;
-
-		uint16 prev;
-		uint16 next;
-	};*/
-
-
-	// Separate pass to check for possible "early-flushes" of split-barriers.
 }
 
 void Graph::execute(HAL::CommandAllocatorHandle commandAllocator, HAL::DescriptorAllocatorHandle descriptorAllocator,
@@ -511,3 +596,5 @@ void Graph::execute(HAL::CommandAllocatorHandle commandAllocator, HAL::Descripto
 	resources.clear();
 	passes.clear();
 }
+
+#endif
