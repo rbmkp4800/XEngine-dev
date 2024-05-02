@@ -1,4 +1,4 @@
-$ulrNupkgD3D12 = "https://www.nuget.org/api/v2/package/Microsoft.Direct3D.D3D12/1.613.2"
+$ulrNupkgD3D12 = "https://www.nuget.org/api/v2/package/Microsoft.Direct3D.D3D12/1.613.3"
 $ulrNupkgDXC   = "https://www.nuget.org/api/v2/package/Microsoft.Direct3D.DXC/1.8.2403.24"
 
 $myTempFolder = "$($ENV:Temp)/rbmkp4800.XEngine-Externals-temp"

@@ -180,8 +180,8 @@ namespace XEngine::Gfx::HAL
 			case TextureLayout::ShaderReadOnly:						return D3D12_BARRIER_LAYOUT_SHADER_RESOURCE;
 			case TextureLayout::ShaderReadWrite:					return D3D12_BARRIER_LAYOUT_UNORDERED_ACCESS;
 			case TextureLayout::ColorRenderTarget:					return D3D12_BARRIER_LAYOUT_RENDER_TARGET;
-			case TextureLayout::DepthStencilRenderTarget:			return D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_READ;
-			case TextureLayout::DepthStencilRenderTargetReadOnly:	return D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE;
+			case TextureLayout::DepthStencilRenderTarget:			return D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE;
+			case TextureLayout::DepthStencilRenderTargetReadOnly:	return D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_READ;
 		}
 
 		// TODO: Maybe we want to use `D3D12_BARRIER_LAYOUT_DIRECT_QUEUE_*` and `D3D12_BARRIER_LAYOUT_COMPUTE_QUEUE_*` ?

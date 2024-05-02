@@ -1,5 +1,3 @@
-#define D3D12_STATE_OBJECT_BUG_WORKAROUND 1
-
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include "D3D12Helpers.h"
@@ -186,11 +184,6 @@ struct Device::Shader : PoolEntryBase
 	ShaderType type;
 
 	D3D12_PROGRAM_IDENTIFIER d3dProgramIdentifier; // Only valid for compute shader
-
-#if D3D12_STATE_OBJECT_BUG_WORKAROUND
-	void* bytecode;
-	uint32 bytecodeSize;
-#endif
 };
 
 struct Device::CompositePipeline : PoolEntryBase
@@ -1675,12 +1668,6 @@ ShaderHandle Device::createShader(PipelineLayoutHandle pipelineLayoutHandle, con
 		d3dStateObjectProps->Release();
 	}
 
-#if D3D12_STATE_OBJECT_BUG_WORKAROUND
-	shader.bytecode = new char[blobInfo.bytecodeSize];
-	shader.bytecodeSize = blobInfo.bytecodeSize;
-	memcpy(shader.bytecode, blobReader.getBytecodePtr(), blobInfo.bytecodeSize);
-#endif
-
 	return shaderHandle;
 }
 
@@ -1731,14 +1718,6 @@ GraphicsPipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipel
 		D3D12_EXISTING_COLLECTION_DESC d3dASCollectionDesc = {};
 		D3D12_EXISTING_COLLECTION_DESC d3dMSCollectionDesc = {};
 		D3D12_EXISTING_COLLECTION_DESC d3dPSCollectionDesc = {};
-
-#if D3D12_STATE_OBJECT_BUG_WORKAROUND
-		D3D12_GLOBAL_ROOT_SIGNATURE d3dRootSignatureDesc = {};
-		D3D12_DXIL_LIBRARY_DESC d3dVSLibDesc = {};
-		D3D12_DXIL_LIBRARY_DESC d3dASLibDesc = {};
-		D3D12_DXIL_LIBRARY_DESC d3dMSLibDesc = {};
-		D3D12_DXIL_LIBRARY_DESC d3dPSLibDesc = {};
-#endif
 
 		// Primitive topology
 		{
@@ -1862,103 +1841,6 @@ GraphicsPipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipel
 #endif
 		}
 
-#if D3D12_STATE_OBJECT_BUG_WORKAROUND
-
-		// Root signature
-		{
-			d3dRootSignatureDesc.pGlobalRootSignature = pipelineLayout.d3dRootSignature;
-
-			D3D12_STATE_SUBOBJECT& d3dStateSubobjectRootSignature = d3dStateSubobjects.emplaceBack();
-			d3dStateSubobjectRootSignature.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
-			d3dStateSubobjectRootSignature.pDesc = &d3dRootSignatureDesc;
-		}
-
-		// VS
-		if (desc.vsHandle != ShaderHandle::Zero)
-		{
-			const Shader& vs = shaderPool.resolveHandle(uint32(desc.vsHandle));
-			XEAssert(vs.type == ShaderType::Vertex);
-
-			d3dVSExportDesc.Name = L"vs";
-			d3dVSExportDesc.ExportToRename = L"*";
-
-			d3dVSLibDesc.DXILLibrary.pShaderBytecode = vs.bytecode;
-			d3dVSLibDesc.DXILLibrary.BytecodeLength = vs.bytecodeSize;
-			d3dVSLibDesc.NumExports = 1;
-			d3dVSLibDesc.pExports = &d3dVSExportDesc;
-
-			D3D12_STATE_SUBOBJECT& d3dStateSubobjectVS = d3dStateSubobjects.emplaceBack();
-			d3dStateSubobjectVS.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
-			d3dStateSubobjectVS.pDesc = &d3dVSLibDesc;
-
-			programExports.pushBack(L"vs");
-		}
-
-		// AS
-		if (desc.asHandle != ShaderHandle::Zero)
-		{
-			const Shader& as = shaderPool.resolveHandle(uint32(desc.asHandle));
-			XEAssert(as.type == ShaderType::Amplification);
-
-			d3dASExportDesc.Name = L"as";
-			d3dASExportDesc.ExportToRename = L"*";
-
-			d3dASLibDesc.DXILLibrary.pShaderBytecode = as.bytecode;
-			d3dASLibDesc.DXILLibrary.BytecodeLength = as.bytecodeSize;
-			d3dASLibDesc.NumExports = 1;
-			d3dASLibDesc.pExports = &d3dASExportDesc;
-
-			D3D12_STATE_SUBOBJECT& d3dStateSubobjectAS = d3dStateSubobjects.emplaceBack();
-			d3dStateSubobjectAS.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
-			d3dStateSubobjectAS.pDesc = &d3dASLibDesc;
-
-			programExports.pushBack(L"as");
-		}
-
-		// MS
-		if (desc.msHandle != ShaderHandle::Zero)
-		{
-			const Shader& ms = shaderPool.resolveHandle(uint32(desc.msHandle));
-			XEAssert(ms.type == ShaderType::Mesh);
-
-			d3dMSExportDesc.Name = L"ms";
-			d3dMSExportDesc.ExportToRename = L"*";
-
-			d3dMSLibDesc.DXILLibrary.pShaderBytecode = ms.bytecode;
-			d3dMSLibDesc.DXILLibrary.BytecodeLength = ms.bytecodeSize;
-			d3dMSLibDesc.NumExports = 1;
-			d3dMSLibDesc.pExports = &d3dMSExportDesc;
-
-			D3D12_STATE_SUBOBJECT& d3dStateSubobjectMS = d3dStateSubobjects.emplaceBack();
-			d3dStateSubobjectMS.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
-			d3dStateSubobjectMS.pDesc = &d3dMSLibDesc;
-
-			programExports.pushBack(L"ms");
-		}
-
-		// PS
-		if (desc.psHandle != ShaderHandle::Zero)
-		{
-			const Shader& ps = shaderPool.resolveHandle(uint32(desc.psHandle));
-			XEAssert(ps.type == ShaderType::Pixel);
-
-			d3dPSExportDesc.Name = L"ps";
-			d3dPSExportDesc.ExportToRename = L"*";
-
-			d3dPSLibDesc.DXILLibrary.pShaderBytecode = ps.bytecode;
-			d3dPSLibDesc.DXILLibrary.BytecodeLength = ps.bytecodeSize;
-			d3dPSLibDesc.NumExports = 1;
-			d3dPSLibDesc.pExports = &d3dPSExportDesc;
-
-			D3D12_STATE_SUBOBJECT& d3dStateSubobjectPS = d3dStateSubobjects.emplaceBack();
-			d3dStateSubobjectPS.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
-			d3dStateSubobjectPS.pDesc = &d3dPSLibDesc;
-
-			programExports.pushBack(L"ps");
-		}
-
-#else
-
 		// VS
 		if (desc.vsHandle != ShaderHandle::Zero)
 		{
@@ -2038,8 +1920,6 @@ GraphicsPipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipel
 
 			programExports.pushBack(L"ps");
 		}
-
-#endif
 
 		{
 			d3dProgramDesc.ProgramName = L"default";
