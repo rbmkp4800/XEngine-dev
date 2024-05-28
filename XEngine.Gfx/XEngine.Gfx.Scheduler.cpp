@@ -1,5 +1,4 @@
-#if 0
-
+#include <XLib.Algorithm.QuickSort.h>
 #include <XLib.Containers.ArrayList.h>
 #include <XLib.SystemHeapAllocator.h>
 
@@ -8,6 +7,13 @@
 using namespace XEngine::Gfx;
 using namespace XEngine::Gfx::Scheduler;
 
+XTODO("Implement proper handles");
+
+
+static inline HAL::BarrierSync TranslateSchedulerShaderStageToHALBarrierSync(Scheduler::ShaderStage shaderStage)
+{
+
+}
 
 // TransientResourcePool ///////////////////////////////////////////////////////////////////////////
 
@@ -48,13 +54,18 @@ void TransientResourcePool::initialize(HAL::Device& device,
 	this->deviceMemoryPoolSize = deviceMemoryPoolSize;
 }
 
-PassExecutionContext::PassExecutionContext(HAL::Device& device, const Graph& graph, HAL::DescriptorAllocatorHandle descriptorAllocator,
-	TransientUploadMemoryAllocator& transientUploadMemoryAllocator, TransientResourcePool& transientResourcePool) :
+PassExecutionContext::PassExecutionContext(
+	HAL::Device& device,
+	const Graph& graph,
+	HAL::DescriptorAllocatorHandle descriptorAllocator,
+	TransientUploadMemoryAllocator& transientUploadMemoryAllocator,
+	const uint32* transientResourceHandles)
+	:
 	device(device),
 	graph(graph),
 	descriptorAllocator(descriptorAllocator),
 	transientUploadMemoryAllocator(transientUploadMemoryAllocator),
-	transientResourcePool(transientResourcePool)
+	transientResourceHandles(transientResourceHandles)
 { }
 
 HAL::DescriptorSet PassExecutionContext::allocateDescriptorSet(HAL::DescriptorSetLayoutHandle descriptorSetLayout)
@@ -62,31 +73,31 @@ HAL::DescriptorSet PassExecutionContext::allocateDescriptorSet(HAL::DescriptorSe
 	return device.allocateDescriptorSet(descriptorAllocator, descriptorSetLayout);
 }
 
-UploadMemoryAllocationInfo PassExecutionContext::allocateUploadMemory(uint32 size)
+UploadBufferPointer PassExecutionContext::allocateUploadMemory(uint32 size)
 {
 	return transientUploadMemoryAllocator.allocate(size);
 }
 
-HAL::TextureHandle PassExecutionContext::resolveTexture(Scheduler::TextureHandle texture)
+HAL::BufferHandle PassExecutionContext::resolveBuffer(BufferHandle bufferHandle)
 {
-	const uint32 resourceIndex = uint32(texture);
-	XEAssert(resourceIndex < graph.resources.getSize());
-	const Graph::Resource& resource = graph.resources[resourceIndex];
-	XAssert(resource.type == HAL::ResourceType::Texture);
+	// TODO: Probably we should have just `resourceHandles` that has transient and non-transient handles together?
 
-	if (resource.lifetime == Graph::ResourceLifetime::Transient)
-	{
-		XEAssert(resource.transientResourcePoolEntryIndex < transientResourcePool.entries.getSize());
-		const TransientResourcePool::Entry& transientResourcePoolEntry =
-			transientResourcePool.entries[resource.transientResourcePoolEntryIndex];
-		XEAssert(transientResourcePoolEntry.type == TransientResourcePool::EntryType::Texture);
-		return transientResourcePoolEntry.texture.handle;
-	}
-	else
-	{
-		XEAssert(resource.lifetime == Graph::ResourceLifetime::External);
-		return resource.externalTextureHandle;
-	}
+	const uint16 resourceIndex = uint16(bufferHandle);
+	XEAssert(resourceIndex < graph.resourceCount);
+	const Graph::Resource& resource = graph.resources[resourceIndex];
+	XEAssert(resource.type == HAL::ResourceType::Buffer);
+
+	return resource.isImported ? resource.importedBufferHandle : HAL::BufferHandle(transientResourceHandles[resourceIndex]);
+}
+
+HAL::TextureHandle PassExecutionContext::resolveTexture(TextureHandle textureHandle)
+{
+	const uint16 resourceIndex = uint16(textureHandle);
+	XEAssert(resourceIndex < graph.resourceCount);
+	const Graph::Resource& resource = graph.resources[resourceIndex];
+	XEAssert(resource.type == HAL::ResourceType::Texture);
+
+	return resource.isImported ? resource.importedTextureHandle : HAL::TextureHandle(transientResourceHandles[resourceIndex]);
 }
 
 
@@ -97,67 +108,113 @@ PassDependencyCollector::~PassDependencyCollector()
 	XEMasterAssert(!graph);
 }
 
-void PassDependencyCollector::addBufferShaderRead(BufferHandle bufferHandle,
-	ResourceShaderAccessType shaderAccessType)
+void PassDependencyCollector::addBufferAcces(BufferHandle bufferHandle,
+	HAL::BarrierAccess access, HAL::BarrierSync sync)
 {
+	// TODO: Should we check something like no write bits set when read is set?
+	XEAssert(access != HAL::BarrierAccess::None);
+	XEAssert(sync != HAL::BarrierSync::None);
+
 	XEAssert(graph);
+	XEAssert(graph->issuedPassDependencyCollector == this);
+	XEAssert(graph->passCount > 0);
 
-	const uint16 resourceIndex = ...;
-	const uint16 passIndex = graph->passCount;
-
+	const uint16 resourceIndex = uint16(bufferHandle);
 	Graph::Resource& resource = graph->resources[resourceIndex];
 	XEAssert(resource.type == HAL::ResourceType::Buffer);
 
 	//XEAssert(resource.dependencyCollectorMagic != magic);
 	//resource.dependencyCollectorMagic = magic;
 
-	const uint16 globalDependencyIndex = graph->dependencyCount + dependencyCount;
-	XEMasterAssert(globalDependencyIndex < graph->dependencyPoolSize);
-	dependencyCount++;
+	const uint16 passIndex = graph->passCount - 1;
+	Graph::Pass& pass = graph->passes[passIndex];
+	XEAssert(pass.dependenciesBaseOffset + pass.dependencyCount == graph->dependencyCount);
 
-	Graph::Dependency& dependency = graph->dependencies[globalDependencyIndex];
+	const uint16 dependencyIndex = graph->dependencyCount;
+	XEMasterAssert(dependencyIndex < graph->dependencyPoolSize);
+	graph->dependencyCount++;
+	pass.dependencyCount++;
+
+	Graph::Dependency& dependency = graph->dependencies[dependencyIndex];
+	dependency = {};
 	dependency.resourceIndex = resourceIndex;
 	dependency.passIndex = passIndex;
-	dependency.barrierAccess = HAL::BarrierAccess::ShaderRead;
-	dependency.barrierSync = ;
-	dependency.dependsOnPrecedingShaderWrite = false;
+	dependency.access = access;
+	dependency.sync = sync;
+	dependency.dependsOnPrecedingShaderWrite = true; // ????
+	dependency.resourceDependencyChainNextIdx = uint16(-1);
+
+	if (resource.dependencyChainHeadIdx == uint16(-1))
+		resource.dependencyChainHeadIdx = dependencyIndex;
+	else
+		graph->dependencies[resource.dependencyChainTailIdx].resourceDependencyChainNextIdx = dependencyIndex;
+
+	resource.dependencyChainTailIdx = dependencyIndex;
 }
 
-void PassDependencyCollector::addBufferShaderWrite(BufferHandle bufferHandle, BufferHandle& modifiedBufferHandle)
+void PassDependencyCollector::addTextureAccess(TextureHandle textureHandle,
+	HAL::BarrierAccess access, HAL::BarrierSync sync,
+	HAL::TextureSubresourceRange* subresourceRange)
 {
+	XEAssert(graph);
+}
 
+void PassDependencyCollector::addBufferShaderRead(BufferHandle bufferHandle, ShaderStage shaderStage)
+{
+	addBufferAcces(bufferHandle, HAL::BarrierAccess::ShaderReadOnly, TranslateSchedulerShaderStageToHALBarrierSync(shaderStage));
+}
+
+void PassDependencyCollector::addBufferShaderWrite(BufferHandle bufferHandle, ShaderStage shaderStage,
+	bool dependsOnPrecedingShaderWrite)
+{
+	XTODO(__FUNCTION__ ": `dependsOnPrecedingShaderWrite` is dropped here");
+	addBufferAcces(bufferHandle, HAL::BarrierAccess::ShaderReadWrite, TranslateSchedulerShaderStageToHALBarrierSync(shaderStage));
+}
+
+void PassDependencyCollector::close()
+{
+	XEAssert(graph);
+	XEAssert(graph->issuedPassDependencyCollector == this);
+
+	graph->issuedPassDependencyCollector = nullptr;
+	graph = nullptr;
 }
 
 
 // Graph ///////////////////////////////////////////////////////////////////////////////////////////
 
-enum class Graph::ResourceOrigin : uint8
-{
-	Undefined = 0,
-	Transient,
-	External,
-};
-
 struct Graph::Resource
 {
 	union
 	{
-		uint32 transientBufferSize;
-		HAL::TextureDesc transientTextureDesc;
-		HAL::BufferHandle externalBufferHandle;
-		HAL::TextureHandle externalTextureHandle;
+		struct
+		{
+			union
+			{
+				uint32 bufferSize;
+				HAL::TextureDesc textureDesc;
+			};
+			uint64 resourceNameXSH;
+		} transient;
+
+		struct
+		{
+			uint32 resourceHandle;
+		} imported;
 	};
 
-	//uint32 transientResourcePoolEntryIndex;
-
 	HAL::ResourceType type;
-	ResourceOrigin origin;
-	uint8 handleGeneration;
+	bool isImported;
+	//uint8 handleGeneration;
 
 	//uint16 dependencyCollectorMagic;
 	uint16 dependencyChainHeadIdx;
+	uint16 dependencyChainTailIdx;
 
-	uint16 refCount;
+	uint16 firstUsagePassIndex;
+	uint16 lastUsagePassIndex;
+
+	//uint16 refCount;
 };
 
 struct Graph::Pass
@@ -171,7 +228,7 @@ struct Graph::Pass
 	uint16 preExecutionBarrierChainHeadIdx;
 	uint16 postExecutionBarrierChainHeadIdx;
 
-	uint16 refCount;
+	//uint16 refCount;
 };
 
 struct Graph::Dependency
@@ -179,8 +236,8 @@ struct Graph::Dependency
 	uint16 resourceIndex;
 	uint16 passIndex;
 
-	HAL::BarrierAccess barrierAccess;
-	HAL::BarrierSync barrierSync;
+	HAL::BarrierAccess access;
+	HAL::BarrierSync sync;
 	bool dependsOnPrecedingShaderWrite;
 
 	HAL::TextureSubresourceRange textureSubresourceRange;
@@ -191,10 +248,10 @@ struct Graph::Dependency
 
 struct Graph::Barrier
 {
-	HAL::BarrierAccess barrierAccessBefore;
-	HAL::BarrierAccess barrierAccessAfter;
-	HAL::BarrierSync barrierSyncBefore;
-	HAL::BarrierSync barrierSyncAfter;
+	HAL::BarrierAccess accessBefore;
+	HAL::BarrierAccess accessAfter;
+	HAL::BarrierSync syncBefore;
+	HAL::BarrierSync syncAfter;
 
 	HAL::TextureSubresourceRange textureSubresourceRange;
 	HAL::TextureLayout layoutBefore;
@@ -204,40 +261,6 @@ struct Graph::Barrier
 
 	uint16 chainNextIdx;
 };
-
-/*inline void Graph::GetHALBarrierValuesFromDependency(const Dependency& dependency,
-	HAL::BarrierAccess& resultBarrierAccess, HAL::BarrierSync& resultBarrierSync)
-{
-	switch (dependency.resourceAccessType)
-	{
-		case ResourceAccessType::ShaderRead:
-			resultBarrierAccess = HAL::BarrierAccess::ShaderRead;
-			resultBarrierSync = ...;
-			return;
-
-		case ResourceAccessType::ShaderWrite:
-			resultBarrierAccess = HAL::BarrierAccess::ShaderRead;
-			resultBarrierSync = ...;
-			return;
-
-		case ResourceAccessType::ColorRenderTarget:
-			resultBarrierAccess = HAL::BarrierAccess::ColorRenderTarget;
-			resultBarrierSync = HAL::BarrierSync::ColorRenderTarget;
-			return;
-
-		case ResourceAccessType::DepthStencilRenderTargetRead:
-			resultBarrierAccess = HAL::BarrierAccess::DepthStencilRenderTargetRead;
-			resultBarrierSync = HAL::BarrierSync::DepthStencilRenderTarget;
-			return;
-
-		case ResourceAccessType::DepthStencilRenderTargetWrite:
-			resultBarrierAccess = HAL::BarrierAccess::DepthStencilRenderTargetWrite;
-			resultBarrierSync = HAL::BarrierSync::DepthStencilRenderTarget;
-			return;
-	}
-
-	XEAssertUnreachableCode();
-}*/
 
 void Graph::initialize(HAL::Device& device,
 	uint16 resourcePoolSize, uint16 passPoolSize, uint16 dependencyPoolSize, uint16 barrierPoolSize, uint32 userDataPoolSize)
@@ -295,82 +318,108 @@ void Graph::destroy()
 	device = nullptr;
 }
 
-Scheduler::BufferHandle Graph::createTransientBuffer(uint32 size)
+BufferHandle Graph::createTransientBuffer(uint32 size, uint64 nameXSH)
 {
 	XEMasterAssert(resourceCount < resourcePoolSize);
 	const uint16 resourceIndex = resourceCount;
 	resourceCount++;
 
 	Resource& resource = resources[resourceIndex];
+	resource = {};
+	resource.transient.bufferSize = size;
+	resource.transient.resourceNameXSH = nameXSH;
 	resource.type = HAL::ResourceType::Buffer;
-	resource.origin = ResourceOrigin::Transient;
-	resource.transientBufferSize = size;
-	resource. ... = ...;
+	resource.isImported = false;
+	resource.dependencyChainHeadIdx = uint16(-1);
+	resource.dependencyChainTailIdx = uint16(-1);
+	//resource.refCount = 0;
 
-	return ComposeBufferHandle(resourceIndex);
+	return BufferHandle(resourceIndex);
 }
 
-Scheduler::TextureHandle Graph::createTransientTexture(const HAL::TextureDesc& textureDesc)
+TextureHandle Graph::createTransientTexture(HAL::TextureDesc textureDesc, uint64 nameXSH)
 {
-	...;
+	XEMasterAssert(resourceCount < resourcePoolSize);
+	const uint16 resourceIndex = resourceCount;
+	resourceCount++;
+
+	Resource& resource = resources[resourceIndex];
+	resource = {};
+	resource.transient.textureDesc = textureDesc;
+	resource.transient.resourceNameXSH = nameXSH;
+	resource.type = HAL::ResourceType::Texture;
+	resource.isImported = false;
+	resource.dependencyChainHeadIdx = uint16(-1);
+	resource.dependencyChainTailIdx = uint16(-1);
+	//resource.refCount = 0;
+
+	return TextureHandle(resourceIndex);
 }
 
-Scheduler::TextureHandle Graph::importExternalTexture(HAL::TextureHandle texture, HAL::TextureLayout defaultLayout)
+BufferHandle Graph::importExternalBuffer(HAL::BufferHandle bufferHandle)
 {
-	...;
+	XEMasterAssert(resourceCount < resourcePoolSize);
+	const uint16 resourceIndex = resourceCount;
+	resourceCount++;
+
+	Resource& resource = resources[resourceIndex];
+	resource = {};
+	resource.imported.resourceHandle = uint32(bufferHandle);
+	resource.type = HAL::ResourceType::Buffer;
+	resource.isImported = true;
+	resource.dependencyChainHeadIdx = uint16(-1);
+	resource.dependencyChainTailIdx = uint16(-1);
+	//resource.refCount = 0;
+
+	return BufferHandle(resourceIndex);
 }
 
-void Graph::issuePassDependencyCollector(PassDependencyCollector& dependencyCollector)
+TextureHandle Graph::importExternalTexture(HAL::TextureHandle textureHandle, HAL::TextureLayout defaultLayout)
 {
-	XEMasterAssert(!issuedPassDependencyCollector);
-	XEAssert(!dependencyCollector.graph);
+	XEMasterAssert(resourceCount < resourcePoolSize);
+	const uint16 resourceIndex = resourceCount;
+	resourceCount++;
 
-	??? issuedPassDependencyCollectorMagic++;
-	const uint16 magic = ...;
+	Resource& resource = resources[resourceIndex];
+	resource = {};
+	resource.imported.resourceHandle = uint32(textureHandle);
+	resource.type = HAL::ResourceType::Texture;
+	resource.isImported = true;
+	resource.dependencyChainHeadIdx = uint16(-1);
+	resource.dependencyChainTailIdx = uint16(-1);
+	//resource.refCount = 0;
 
-	dependencyCollector.graph = this;
-	dependencyCollector.dependencyCount = 0;
-	dependencyCollector.magic = magic;
-	issuedPassDependencyCollector = &dependencyCollector;
-	issuedPassDependencyCollectorMagic = magic;
+	... ?? defaultLayout ??;
+
+	return TextureHandle(resourceIndex);
 }
 
 void Graph::addPass(PassType type, PassDependencyCollector& dependencyCollector,
 	PassExecutorFunc executorFunc, const void* userData)
 {
-	XEAssert(issuedPassDependencyCollector);
-	XEMasterAssert(&dependencyCollector == issuedPassDependencyCollector);
-	XEMasterAssert(dependencyCollector.magic == issuedPassDependencyCollectorMagic);
+	XEAssert(!issuedPassDependencyCollector);
 
 	XEMasterAssert(passCount < passPoolSize);
 	const uint16 passIndex = passCount;
 	passCount++;
 
-	const uint16 dependenciesBaseOffset = dependencyCount;
-	dependencyCount += dependencyCollector.dependencyCount;
-
 	Pass& pass = passes[passIndex];
 	pass.executporFunc = executorFunc;
 	pass.userData = userData;
-	pass.dependenciesBaseOffset = dependenciesBaseOffset;
-	pass.dependencyCount = dependencyCollector.dependencyCount;
-	pass.refCount = 0;
+	pass.dependenciesBaseOffset = dependencyCount;
+	pass.dependencyCount = 0;
+	//pass.refCount = 0;
 
-	dependencyCollector.graph = nullptr;
-	dependencyCollector.dependencyCount = 0;
-	dependencyCollector.magic = 0;
-	issuedPassDependencyCollector = nullptr;
-
-	// TODO: Check multiple accesses for same resource.
-	...;
-
-	return ComposePassHandle(passIndex);
+	XEAssert(!dependencyCollector.graph);
+	dependencyCollector.graph = this;
+	issuedPassDependencyCollector = &dependencyCollector;
 }
 
 void Graph::compile()
 {
 	XEAssert(device);
 
+#if 0
 	// Compute refcount for resources and passes.
 	// Simple graph flood-fill from unreferenced resources.
 	// "FrameGraph: Extensible Rendering Architecture in Frostbite" by Yuriy O'Donnell
@@ -379,7 +428,7 @@ void Graph::compile()
 		{
 			const Dependency& dependency = dependencies[i];
 
-			if (HAL::IsBarrierAccessReadOnly(dependency.barrierAccess))
+			if (HAL::BarrierAccessUtils::IsReadOnly(dependency.access))
 				resources[dependency.resourceIndex].refCount++;
 			else
 				passes[dependency.passIndex].refCount++;
@@ -401,7 +450,7 @@ void Graph::compile()
 				unrefResDepChainIter = dependencies[unrefResDepChainIter].resourceDependencyChainNextIdx)
 			{
 				//if (!IsModifyingAccess(dependencies[unrefResDepChainIter].resourceAccessType))
-				if (HAL::IsBarrierAccessReadOnly(dependencies[unrefResDepChainIter].barrierAccess))
+				if (HAL::BarrierAccessUtils::IsReadOnly(dependencies[unrefResDepChainIter].access))
 					continue;
 
 				Pass& unrefPass = passes[dependencies[unrefResDepChainIter].passIndex];
@@ -414,7 +463,7 @@ void Graph::compile()
 				{
 					const Dependency& unrefDep = dependencies[unrefPass.dependenciesBaseOffset + i];
 					//if (!IsModifyingAccess(unrefDep.resourceAccessType))
-					if (HAL::IsBarrierAccessReadOnly(unrefDep.barrierAccess))
+					if (HAL::BarrierAccessUtils::IsReadOnly(unrefDep.access))
 					{
 						Resource& newUnrefRes = resources[unrefDep.resourceIndex];
 						XEAssert(newUnrefRes.refCount > 0);
@@ -427,23 +476,21 @@ void Graph::compile()
 			}
 		}
 	}
+#endif
 
-	// Compute resource barriers.
+	// Emit resource barriers.
 	for (uint16 resourceIndex = 0; resourceIndex < resourceCount; resourceIndex++)
 	{
 		const Resource& resource = resources[resourceIndex];
-		if (resource.refCount == 0)
-			continue;
-		XEAssert(resource.dependencyChainHeadIdx != uint16(-1));
+		//if (resource.refCount == 0)
+		//	continue;
+		//XEAssert(resource.dependencyChainHeadIdx != uint16(-1));
 
 		if (resource.type == HAL::ResourceType::Buffer)
 		{
+			Barrier* emittedBarrier = nullptr;
 			HAL::BarrierAccess emittedBarrierAccess = HAL::BarrierAccess::None;
 			HAL::BarrierSync emittedBarrierSync = HAL::BarrierSync::None;
-
-			//Barrier* emittedBarrierSignal = nullptr;
-			//Barrier* emittedBarrierWait = nullptr;
-			Barrier* emittedBarrier = nullptr;
 
 			for (uint16 depChainIter = resource.dependencyChainHeadIdx;
 				depChainIter != uint16(-1);
@@ -452,63 +499,57 @@ void Graph::compile()
 				const Dependency& dependency = dependencies[depChainIter];
 				Pass& pass = passes[dependency.passIndex];
 
-				if (pass.refCount == 0)
-					continue;
-
-				XEAssert(dependency.barrierAccess != HAL::BarrierAccess::None);
+				//if (pass.refCount == 0)
+				//	continue;
 
 				const bool readToReadTransition =
 					emittedBarrierAccess != HAL::BarrierAccess::None &&
-					HAL::IsBarrierAccessReadOnly(emittedBarrierAccess) &&
-					HAL::IsBarrierAccessReadOnly(dependency.barrierAccess);
+					HAL::BarrierAccessUtils::IsReadOnly(emittedBarrierAccess) &&
+					HAL::BarrierAccessUtils::IsReadOnly(dependency.access);
 
 				const bool shaderWriteToShaderWriteWithoutSync =
 					!dependency.dependsOnPrecedingShaderWrite &&
 					emittedBarrierAccess == HAL::BarrierAccess::ShaderReadWrite &&
-					dependency.barrierAccess == HAL::BarrierAccess::ShaderReadWrite;
+					dependency.access == HAL::BarrierAccess::ShaderReadWrite;
 
 				if (readToReadTransition || shaderWriteToShaderWriteWithoutSync)
 				{
 					// Extend already emitted barrier.
+					emittedBarrierAccess |= dependency.access;
+					emittedBarrierSync |= dependency.sync;
+
 					XEAssert(emittedBarrier);
-					emittedBarrier->barrierAccessAfter |= dependency.barrierAccess;
-					emittedBarrier->barrierSyncAfter |= dependency.barrierSync;
+					emittedBarrier->accessAfter |= dependency.access;
+					emittedBarrier->syncAfter |= dependency.sync;
 				}
 				else
 				{
 					// Emit new barrier.
 
-					const bool shouldUseSplitBarrier = false;
-					if (shouldUseSplitBarrier)
-					{
-						XAssertNotImplemented();
-					}
+					XEMasterAssert(barrierCount < barrierPoolSize);
+					const uint16 newBarrierIndex = barrierCount;
+					barrierCount++;
+
+					Barrier& newBarrier = barriers[newBarrierIndex];
+					newBarrier.resourceIndex = resourceIndex;
+					newBarrier.accessBefore = emittedBarrierAccess;
+					newBarrier.accessAfter = dependency.access;
+					newBarrier.syncBefore = emittedBarrierSync;
+					newBarrier.syncAfter = dependency.sync;
+					newBarrier.chainNextIdx = uint16(-1);
+
+					if (emittedBarrier)
+						emittedBarrier->chainNextIdx = newBarrierIndex;
 					else
-					{
-						XEMasterAssert(barrierCount < barrierPoolSize);
-						const uint16 barrierIndex = barrierCount;
-						barrierCount++;
+						pass.preExecutionBarrierChainHeadIdx = newBarrierIndex;
 
-						Barrier& barrier = barriers[barrierIndex];
-						barrier.resourceIndex = resourceIndex;
-						barrier.barrierAccessBefore = emittedBarrierAccess;
-						barrier.barrierAccessAfter = dependency.barrierAccess;
-						barrier.barrierSyncBefore = emittedBarrierSync;
-						barrier.barrierSyncAfter = dependency.barrierSync;
-						barrier.chainNextIdx = uint16(-1);
-
-						if (emittedBarrier)
-							emittedBarrier->chainNextIdx = barrierIndex;
-						else
-							pass.preExecutionBarrierChainHeadIdx = barrierIndex;
-
-						emittedBarrier = &barrier;
-					}
-
-					emittedBarrierAccess = dependency.barrierAccess;
-					emittedBarrierSync = dependency.barrierSync;
+					emittedBarrier = &newBarrier;
+					emittedBarrierAccess = dependency.access;
+					emittedBarrierSync = dependency.sync;
 				}
 			}
+
+			XTODO(__FUNCTION__ ": Emit last barrier to NONE state (will need this for aliasing to work properly)");
 		}
 		else if (resource.type == HAL::ResourceType::Texture)
 		{
@@ -518,14 +559,143 @@ void Graph::compile()
 			XEAssertUnreachableCode();
 	}
 
-	// Compute aliased resource locations.
-
+	// Compute transient resource lifetime conflict matrix (if we ever need one).
+	// ...
 }
 
 void Graph::execute(HAL::CommandAllocatorHandle commandAllocator, HAL::DescriptorAllocatorHandle descriptorAllocator,
 	TransientUploadMemoryAllocator& transientUploadMemoryAllocator, TransientResourcePool& transientResourcePool)
 {
 	XEAssert(device);
+
+
+	// Compute transient resources locations.
+
+	struct TransientResourceLocation
+	{
+		uint16 offset;
+		uint16 size;
+	};
+
+	// NOTE: We need to store separate size here, as it can be different from actual resource size.
+	// This can happen when we inherit resource location from previous run, but resource shrinks in size.
+	// We still consider entire memory range of inherited resource as occupied when placing new resources.
+	// To properly "shrink" resource we need 
+	// ^^^ This is bullshit.
+
+	TransientResourceLocation transientResourceLocations[MaxResourceCount];
+
+	{
+		// [REMOVE_THIS_STUPID COMMENT] Transient resources are ordered from large to small.
+		//struct SizeOrderedResourceListItem
+		//{
+		//	uint16 size;
+		//	uint16 resourceIndex;
+		//};
+
+		XLib::InplaceArrayList<uint32, MaxResourceCount> sizeOrderedResourceList;
+
+		for (uint16 i = 0; i < resourceCount; i++)
+		{
+			const Resource resource = resources[i];
+			if (resource.isImported)
+				continue;
+
+			sizeOrderedResourceList.pushBack();
+		}
+
+		XLib::QuickSort(sizeOrderedResourceList.getData(), sizeOrderedResourceList.getSize());
+
+		// ConflictingResourceBoundary value encoding:
+		//	bit 0: boundary begin/end flag (begin - 1, end - 0)
+		//	bits 1..15: boundary offset
+		XLib::InplaceArrayList<uint16, MaxResourceCount * 2> conflictingResourceBoundaries;
+
+		// Iterate through all transient resources from largest to smallest
+		// Place 
+		for (uint16 sizeOrderedResourceIdx = 0; sizeOrderedResourceIdx < sizeOrderedResourceList.getSize(); sizeOrderedResourceIdx++)
+		{
+			const uint32 sizeOrderedResourceListItem = sizeOrderedResourceList[sizeOrderedResourceIdx];
+			const uint16 resourceIndex = ... sizeOrderedResourceListItem;
+			const uint16 resourceSize = ... sizeOrderedResourceListItem;
+
+			const Resource& resource = resources[resourceIndex];
+
+			// Iterate over already placed resources.
+			// Generate conflicting resource boundaries list.
+			conflictingResourceBoundaries.clear();
+			for (uint16 i = 0; i < sizeOrderedResourceIdx; i++)
+			{
+				const uint16 alreadyPlacedResourceIndex = ...;
+				const uint16 alreadyPlaced
+				const Resource& alreadyPlacedResource = resources[alreadyPlacedResourceIndex];
+
+				const bool lifetimesOverlap =
+					resource.firstUsagePassIndex <= alreadyPlacedResource.lastUsagePassIndex &&
+					resource.lastUsagePassIndex  >= alreadyPlacedResource.firstUsagePassIndex;
+
+				if (lifetimesOverlap)
+				{
+					const TransientResourceLocation& location = transientResourceLocations[alreadyPlacedResourceIndex];
+					const uint16 beginOffset = location.offset;
+					const uint16 endOffset = location.offset + location.size;
+
+					conflictingResourceBoundaries.pushBack((beginOffset << 1) | 1);
+					conflictingResourceBoundaries.pushBack((endOffset   << 1) | 0);
+				}
+			}
+
+			// Sort conflicting resource boundaries list by memory offset.
+			XLib::QuickSort<uint16>(conflictingResourceBoundaries.getData(), conflictingResourceBoundaries.getSize());
+
+			// Add fake begin boundary representing end of entire transient memory heap.
+			{
+				const uint16 transientResourceHeapEndOffset = ...;
+				conflictingResourceBoundaries.pushBack((transientResourceHeapEndOffset << 1) | 1);
+			}
+
+			// Iterate over conflicting resource boundaries.
+			// Look for free ranges. Find smallest free range that fits the resource.
+			uint16 conflictCount = 0;
+			uint16 suitableRangeSize = uint16(-1);
+			uint16 suitableRangeOffset = 0;
+			uint16 currentRangeOffset = 0;
+			for (uint16 conflictingResourceBoundary : conflictingResourceBoundaries)
+			{
+				const uint16 boundaryOffset = conflictingResourceBoundary >> 1;
+				const uint16 isBeginBoundary = conflictingResourceBoundary & 1;
+
+				if (conflictCount == 0)
+				{
+					// This is free range.
+					XAssert(boundaryOffset > currentRangeOffset);
+					const uint16 rangeSize = boundaryOffset - currentRangeOffset;
+
+					if (rangeSize >= resourceSize &&
+						suitableRangeSize > rangeSize)
+					{
+						suitableRangeSize = rangeSize;
+						suitableRangeOffset = currentRangeOffset;
+					}
+				}
+
+				conflictCount += (isBeginBoundary << 1) - 1;
+				XEAssert(conflictCount < 0x8000);
+			}
+
+			// Check if no suitable range found.
+			XEMasterAssert(suitableRangeSize != uint16(-1));
+
+			// Set resource location to found free range.
+			TransientResourceLocation& resourceLocation = transientResourceLocations[resourceIndex];
+			resourceLocation.offset = suitableRangeOffset;
+			resourceLocation.size = resourceSize;
+		}
+	}
+
+	// Allocate transient resources.
+	uint32 transientResourceHandles[MaxResourceCount];
+
 
 	uint64 transientResourcePoolMemoryUsed = 0;
 	for (Resource& resource : resources)
@@ -596,5 +766,3 @@ void Graph::execute(HAL::CommandAllocatorHandle commandAllocator, HAL::Descripto
 	resources.clear();
 	passes.clear();
 }
-
-#endif

@@ -1,14 +1,12 @@
 #pragma once
 
-#if 0
-
 #include <XLib.h>
 #include <XLib.NonCopyable.h>
 #include <XEngine.Gfx.HAL.D3D12.h>
 
 #include "XEngine.Gfx.Allocation.h"
 
-// TODO: We may avoid using super-long split-barriers via just monitoring ongoing sync. If we do same sync that will cover our barrier, we flush our ending-barrier.
+// TODO: Split barriers?
 
 namespace XEngine::Gfx::Scheduler
 {
@@ -26,7 +24,7 @@ namespace XEngine::Gfx::Scheduler
 		Copy,
 	};
 
-	enum class ResourceShaderAccessType : uint8
+	enum class ShaderStage : uint8
 	{
 		Any = 0,
 		Compute,
@@ -74,21 +72,21 @@ namespace XEngine::Gfx::Scheduler
 		const Graph& graph;
 		HAL::DescriptorAllocatorHandle descriptorAllocator;
 		TransientUploadMemoryAllocator& transientUploadMemoryAllocator;
-		TransientResourcePool& transientResourcePool;
+		const uint32* transientResourceHandles;
 
 	private:
 		PassExecutionContext(HAL::Device& device, const Graph& graph,
 			HAL::DescriptorAllocatorHandle descriptorAllocator,
 			TransientUploadMemoryAllocator& transientUploadMemoryAllocator,
-			TransientResourcePool& transientResourcePool);
+			const uint32* transientResourceHandles);
 		~PassExecutionContext() = default;
 
 	public:
 		HAL::DescriptorSet allocateDescriptorSet(HAL::DescriptorSetLayoutHandle descriptorSetLayout);
-		UploadMemoryAllocationInfo allocateUploadMemory(uint32 size);
+		UploadBufferPointer allocateUploadMemory(uint32 size);
 
-		HAL::BufferHandle resolveBuffer(BufferHandle buffer);
-		HAL::TextureHandle resolveTexture(TextureHandle texture);
+		HAL::BufferHandle resolveBuffer(BufferHandle bufferHandle);
+		HAL::TextureHandle resolveTexture(TextureHandle textureHandle);
 	};
 
 	class PassDependencyCollector final : public XLib::NonCopyable
@@ -97,30 +95,36 @@ namespace XEngine::Gfx::Scheduler
 
 	private:
 		Graph* graph = nullptr;
-		uint16 dependencyCount = 0;
-		uint16 magic = 0;
+		//uint16 magic = 0;
+
+	//private:
+	//	void addDependeny(HAL::ResourceType resourceType, uint32 resourceHandle, HAL::BarrierAccess access, HAL::BarrierSync sync);
 
 	public:
 		PassDependencyCollector() = default;
 		~PassDependencyCollector();
 
-		//void addVertexOrIndexBufferRead(BufferHandle bufferHandle);
-		//void addConstantBufferRead();
-		//void addIndirectArgumentBufferRead();
-		//void addRaytracingAccelerationStructureBufferRead();
+		void addBufferAcces(BufferHandle bufferHandle,
+			HAL::BarrierAccess access, HAL::BarrierSync sync);
+		void addTextureAccess(TextureHandle textureHandle,
+			HAL::BarrierAccess access, HAL::BarrierSync sync,
+			HAL::TextureSubresourceRange* subresourceRange);
+
+		//void addManualBufferAccess(BufferHandle bufferHandle);
+		//void addManualTextureAccess(TextureHandle textureHandle);
 
 		void addBufferShaderRead(BufferHandle bufferHandle,
-			ResourceShaderAccessType shaderAccessType = ResourceShaderAccessType::Any);
+			ShaderStage shaderStage = ShaderStage::Any);
 		void addBufferShaderWrite(BufferHandle bufferHandle,
-			ResourceShaderAccessType shaderAccessType = ResourceShaderAccessType::Any,
+			ShaderStage shaderStage = ShaderStage::Any,
 			bool dependsOnPrecedingShaderWrite = true);
 
 		void addTextureShaderRead(TextureHandle textureHandle,
 			const HAL::TextureSubresourceRange* subresourceRange = nullptr,
-			ResourceShaderAccessType shaderAccessType = ResourceShaderAccessType::Any);
+			ShaderStage shaderStage = ShaderStage::Any);
 		void addTextureShaderWrite(TextureHandle textureHandle,
 			const HAL::TextureSubresourceRange* subresourceRange = nullptr,
-			ResourceShaderAccessType shaderAccessType = ResourceShaderAccessType::Any,
+			ShaderStage shaderStage = ShaderStage::Any,
 			bool dependsOnPrecedingShaderWrite = true);
 
 		void addColorRenderTarget(TextureHandle textureHandle,
@@ -147,15 +151,10 @@ namespace XEngine::Gfx::Scheduler
 		static constexpr uint16 MaxPassCount = 1 << MaxPassCountLog2;
 		static constexpr uint16 MaxDenendencyCount = 1 << MaxDenendencyCountLog2;
 
-		enum class ResourceOrigin : uint8;
-
 		struct Resource;
 		struct Pass;
-		struct Dependency; // Access?? Same resource-pass pair can have multiple common items (subresource access) so it seems that `Access` is more appropriate.
+		struct Dependency;
 		struct Barrier;
-
-		//static inline void GetHALBarrierValuesFromDependency(const Dependency& dependency,
-		//	HAL::BarrierAccess& resultBarrierAccess, HAL::BarrierSync& resultBarrierSync);
 
 	private:
 		HAL::Device* device = nullptr;
@@ -181,7 +180,7 @@ namespace XEngine::Gfx::Scheduler
 		uint32 userDataAllocatedSize = 0;
 
 		PassDependencyCollector* issuedPassDependencyCollector = nullptr;
-		uint16 issuedPassDependencyCollectorMagic = 0;
+		//uint16 issuedPassDependencyCollectorMagic = 0;
 
 	public:
 		Graph() = default;
@@ -191,10 +190,10 @@ namespace XEngine::Gfx::Scheduler
 			uint16 resourcePoolSize, uint16 passPoolSize, uint16 dependencyPoolSize, uint16 barrierPoolSize, uint32 userDataPoolSize);
 		void destroy();
 
-		BufferHandle createTransientBuffer(uint32 size);
-		TextureHandle createTransientTexture(const HAL::TextureDesc& textureDesc);
-		BufferHandle importExternalBuffer(HAL::BufferHandle buffer);
-		TextureHandle importExternalTexture(HAL::TextureHandle texture, HAL::TextureLayout defaultLayout);
+		BufferHandle createTransientBuffer(uint32 size, uint64 nameXSH);
+		TextureHandle createTransientTexture(HAL::TextureDesc textureDesc, uint64 nameXSH);
+		BufferHandle importExternalBuffer(HAL::BufferHandle bufferHandle);
+		TextureHandle importExternalTexture(HAL::TextureHandle textureHandle, HAL::TextureLayout defaultLayout);
 		//void createVirtualCPUResource();
 
 		void* allocateUserData(uint32 size);
@@ -210,5 +209,3 @@ namespace XEngine::Gfx::Scheduler
 			TransientUploadMemoryAllocator& transientUploadMemoryAllocator, TransientResourcePool& transientResourcePool);
 	};
 }
-
-#endif

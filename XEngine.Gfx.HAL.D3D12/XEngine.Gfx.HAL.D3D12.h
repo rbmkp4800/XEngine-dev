@@ -476,9 +476,9 @@ namespace XEngine::Gfx::HAL
 		void dispatchMesh();
 		void dispatch(uint32 groupCountX, uint32 groupCountY = 1, uint32 groupCountZ = 1);
 
-		void globalMemoryBarrier(
-			BarrierSync syncBefore, BarrierSync syncAfter,
-			BarrierAccess accessBefore, BarrierAccess accessAfter);
+		//void globalMemoryBarrier(
+		//	BarrierSync syncBefore, BarrierSync syncAfter,
+		//	BarrierAccess accessBefore, BarrierAccess accessAfter);
 		void bufferMemoryBarrier(BufferHandle bufferHandle,
 			BarrierSync syncBefore, BarrierSync syncAfter,
 			BarrierAccess accessBefore, BarrierAccess accessAfter);
@@ -734,4 +734,10 @@ namespace XEngine::Gfx::HAL
 	// EnumerateVRs
 
 	uint16x3 CalculateMipLevelSize(uint16x3 srcSize, uint8 mipLevel);
+
+	class BarrierAccessUtils abstract final
+	{
+	public:
+		static inline bool IsReadOnly(BarrierAccess barrierAccess);
+	};
 }
