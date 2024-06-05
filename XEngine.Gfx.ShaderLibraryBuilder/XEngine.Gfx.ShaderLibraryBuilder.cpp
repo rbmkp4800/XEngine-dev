@@ -5,7 +5,7 @@
 #include <XLib.Containers.ArrayList.h>
 #include <XLib.CRC.h>
 #include <XLib.FileSystem.h>
-//#include <XLib.Fmt.h>
+#include <XLib.Fmt.h>
 #include <XLib.Path.h>
 #include <XLib.String.h>
 #include <XLib.System.File.h>
@@ -22,7 +22,7 @@ using namespace XEngine::Gfx::ShaderLibraryBuilder;
 
 static void StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const char* outLibraryFilePath)
 {
-	TextWriteFmtStdOut("Storing shader library '", outLibraryFilePath, "'\n");
+	FmtPrintStdOut("Storing shader library '", outLibraryFilePath, "'\n");
 
 	XTODO("Sort objects in order of XSH increase");
 
@@ -130,11 +130,11 @@ static void StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const
 	File file;
 	if (!file.open(outLibraryFilePath, FileAccessMode::Write, FileOpenMode::Override))
 	{
-		TextWriteFmtStdOut("error: Cannot open shader library for writing '", outLibraryFilePath, "'\n");
+		FmtPrintStdOut("error: Cannot open shader library for writing '", outLibraryFilePath, "'\n");
 		return;
 	}
 
-	file.write(header);
+	file.write(&header, sizeof(header));
 	file.write(descriptorSetLayoutRecords.getData(), descriptorSetLayoutRecords.getByteSize());
 	file.write(pipelineLayoutRecords.getData(), pipelineLayoutRecords.getByteSize());
 	file.write(shaderRecords.getData(), shaderRecords.getByteSize());
@@ -178,19 +178,19 @@ int main(int argc, char* argv[])
 
 	if (!libraryDefinitionFilePath)
 	{
-		TextWriteFmtStdOut("error: missing library definition file path (-libdef=XXX)");
+		FmtPrintStdOut("error: missing library definition file path (-libdef=XXX)");
 		return 0;
 	}
 	if (!outLibraryFilePath)
 	{
-		TextWriteFmtStdOut("error: missing output file path (-out=XXX)");
+		FmtPrintStdOut("error: missing output file path (-out=XXX)");
 		return 0;
 	}
 	// TODO: `outLibraryFilePath` should have filename.
 
 	// Load library definition file.
 	LibraryDefinition libraryDefinition;
-	TextWriteFmtStdOut("Loading shader library definition file '", libraryDefinitionFilePath, "'\n");
+	FmtPrintStdOut("Loading shader library definition file '", libraryDefinitionFilePath, "'\n");
 	if (!LibraryDefinitionLoader::Load(libraryDefinition, libraryDefinitionFilePath))
 		return 0;
 
@@ -227,8 +227,8 @@ int main(int argc, char* argv[])
 		Shader& shader = *shadersToCompile[i];
 
 		InplaceStringASCIIx256 messageHeader;
-		TextWriteFmt(messageHeader, " [", i + 1, "/", shadersToCompile.getSize(), "] ", shader.getName());
-		TextWriteFmtStdOut(messageHeader, "\n");
+		FmtPrintStr(messageHeader, " [", i + 1, "/", shadersToCompile.getSize(), "] ", shader.getName());
+		FmtPrintStdOut(messageHeader, "\n");
 
 		InplaceStringASCIIx1024 mainSourceFilePath;
 		mainSourceFilePath.append(librarySourceRootPath);
@@ -243,9 +243,9 @@ int main(int argc, char* argv[])
 				&ResolveSource, &sourceCache);
 
 		if (compilationResult->getPreprocessingOuput().getLength() > 0)
-			TextWriteFmtStdOut(compilationResult->getPreprocessingOuput(), "\n");
+			FmtPrintStdOut(compilationResult->getPreprocessingOuput(), "\n");
 		if (compilationResult->getCompilationOutput().getLength() > 0)
-			TextWriteFmtStdOut(compilationResult->getCompilationOutput(), "\n");
+			FmtPrintStdOut(compilationResult->getCompilationOutput(), "\n");
 
 		if (compilationResult->getStatus() != HAL::ShaderCompiler::ShaderCompilationStatus::Success)
 			return 0;
@@ -257,16 +257,12 @@ int main(int argc, char* argv[])
 			const HAL::ShaderCompiler::Blob* bytecodeBlob = compilationResult->getBytecodeBlob();
 			if (bytecodeBlob)
 			{
-				XTODO("replace stdio with XLib.Fmt");
-				//InplaceStringASCIIx1024 intermObjectFilePath;
-				//intermObjectFilePath.append(intermediateDirPath);
-				//FmtPrint(intermObjectFilePath, "sh.", FmtArgInt::Hex(shader.getNameXSH()), '.', shader.getName(), ".bin");
-
-				char intermObjectFilePath[1024];
-				sprintf_s(intermObjectFilePath, "%s/SH.%016llX.%s.bin", intermediateDirPath, shader.getNameXSH(), shader.getName().getData());
+				InplaceStringASCIIx1024 intermObjectFilePath;
+				FmtPrintStr(intermObjectFilePath,
+					intermediateDirPath, "/sh.", FmtArgHex64(shader.getNameXSH(), 16), ".", shader.getName(), ".bin");
 
 				File intermObjectFile;
-				intermObjectFile.open(intermObjectFilePath/*.getCStr()*/, FileAccessMode::Write, FileOpenMode::Override);
+				intermObjectFile.open(intermObjectFilePath.getCStr(), FileAccessMode::Write, FileOpenMode::Override);
 				if (intermObjectFile.isOpen())
 				{
 					intermObjectFile.write(bytecodeBlob->getData(), bytecodeBlob->getSize());
@@ -274,23 +270,19 @@ int main(int argc, char* argv[])
 				}
 				else
 				{
-					/*FmtPrintStdOut*/TextWriteFmtStdOut("error: Cannot open file '", (const char*)intermObjectFilePath, "' for writing\n");
+					FmtPrintStdOut("error: Cannot open file '", intermObjectFilePath, "' for writing\n");
 				}
 			}
 
 			const HAL::ShaderCompiler::Blob* preprocBlob = compilationResult->getPreprocessedSourceBlob();
 			if (preprocBlob)
 			{
-				XTODO("replace stdio with XLib.Fmt");
-				//InplaceStringASCIIx1024 intermPreprocFilePath;
-				//intermPreprocFilePath.append(intermediateDirPath);
-				//FmtPrint(intermPreprocFilePath, "sh.", FmtArgInt::Hex(shader.getNameXSH()), '.', shader.getName(), ".pp.hlsl");
-
-				char intermPreprocFilePath[1024];
-				sprintf_s(intermPreprocFilePath, "%s/SH.%016llX.%s.pp.hlsl", intermediateDirPath, shader.getNameXSH(), shader.getName().getData());
+				InplaceStringASCIIx1024 intermPreprocFilePath;
+				FmtPrintStr(intermPreprocFilePath,
+					intermediateDirPath, "/sh.", FmtArgHex64(shader.getNameXSH(), 16), '.', shader.getName(), ".pp.hlsl");
 
 				File intermPreprocFile;
-				intermPreprocFile.open(intermPreprocFilePath/*.getCStr()*/, FileAccessMode::Write, FileOpenMode::Override);
+				intermPreprocFile.open(intermPreprocFilePath.getCStr(), FileAccessMode::Write, FileOpenMode::Override);
 				if (intermPreprocFile.isOpen())
 				{
 					intermPreprocFile.write(preprocBlob->getData(), preprocBlob->getSize());
@@ -298,7 +290,7 @@ int main(int argc, char* argv[])
 				}
 				else
 				{
-					/*FmtPrintStdOut*/TextWriteFmtStdOut("error: Cannot open file '", (const char*)intermPreprocFilePath, "' for writing\n");
+					FmtPrintStdOut("error: Cannot open file '", intermPreprocFilePath, "' for writing\n");
 				}
 			}
 		}

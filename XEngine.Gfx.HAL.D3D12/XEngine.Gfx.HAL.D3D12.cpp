@@ -2,8 +2,8 @@
 #include <dxgi1_6.h>
 #include "D3D12Helpers.h"
 
+#include <XLib.Allocation.h>
 #include <XLib.Containers.ArrayList.h>
-#include <XLib.SystemHeapAllocator.h>
 
 #include <XEngine.Gfx.HAL.BlobFormat.h>
 

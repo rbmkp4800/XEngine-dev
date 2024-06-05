@@ -1,8 +1,7 @@
 #pragma once
 
 #include "XLib.h"
-#include "XLib.AllocatorAdapterBase.h"
-#include "XLib.SystemHeapAllocator.h"
+#include "XLib.Allocation.h"
 
 // TODO: Decide what to do with `String::getCStr()` for empty string.
 // TODO: StringView -> StringViewBase, DynamicString -> DynamicStringBase, InplaceString -> InplaceStringBase ?

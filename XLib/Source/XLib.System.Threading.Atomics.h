@@ -86,6 +86,7 @@ namespace XLib
 		template <typename Type> static inline Type Decrement(volatile Type& target) { return Core<sizeof(Type)>::Decrement((typename Core<sizeof(Type)>::Type*)&target); }
 		template <typename Type> static inline Type Load(volatile Type& target) { return target; }
 		template <typename Type> static inline void Store(volatile Type& target, Type value) { target = value; }
+
 		template <typename Type> static inline Type LoadAcquire(volatile Type& target)
 		{
 			FenceAcquire();

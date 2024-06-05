@@ -3,84 +3,81 @@
 #include "XLib.h"
 #include "XLib.NonCopyable.h"
 
-// TODO: Rename `File::isInitialized` to `File::isOpen`.
-// TODO: Properly replace `uint32` with `uintptr` everywhere. For now it is hacked just to remove compilation warnings.
+// TODO: Introduce `XLib::SystemErrorCode` enum and return it everywhere instead of bool.
 
 namespace XLib
 {
 	enum class FileAccessMode : uint32
 	{
-		Read = 0x8000'0000,
-		Write = 0x4000'0000,
-		ReadWrite = 0xC000'0000,
+		Undefined = 0,
+		Read,
+		Write,
+		ReadWrite,
 	};
 
 	enum class FileOpenMode : uint32
 	{
-		Override = 2,
-		OpenExisting = 3,
+		Undefined = 0,
+		OpenExisting,
+		Override,
 	};
 
-	enum class FilePosition : uint32
+	enum class FileOffsetOrigin : uint32
 	{
-		Begin = 0,
-		Current = 1,
-		End = 2,
+		Undefined = 0,
+		Begin,
+		Current,
+		End,
+	};
+
+	enum class FileHandle : uint64 { Zero = 0, };
+
+	struct FileOpenResult
+	{
+		FileHandle fileHandle;
+		bool openResult; // TODO: This should be `SystemErrorCode`
 	};
 
 	class File : public NonCopyable
 	{
+	public:
+		FileOpenResult Open(const char* name, FileAccessMode accessMode, FileOpenMode openMode);
+		void Close(FileHandle fileHandle);
+
+		bool Read(FileHandle fileHandle, void* buffer, uintptr bufferSize, uintptr* outReadSize = nullptr);
+		bool Write(FileHandle fileHandle, const void* buffer, uintptr size);
+		bool Flush(FileHandle fileHandle);
+
+		uint64 GetSize(FileHandle fileHandle);
+		uint64 GetPosition(FileHandle fileHandle);
+		uint64 SetPosition(FileHandle fileHandle, sint64 offset, FileOffsetOrigin origin = FileOffsetOrigin::Begin);
+
 	private:
-		void* handle;
+		FileHandle handle = FileHandle::Zero;
 
 	public:
-		inline File() : handle(nullptr) {}
+		File() = default;
 		inline ~File() { close(); }
 
-		inline File(File&& that)
-		{
-			handle = that.handle;
-			that.handle = nullptr;
-		}
-		inline void operator = (File&& that)
-		{
-			close();
-			handle = that.handle;
-			that.handle = nullptr;
-		}
+		inline File(File&& that);
+		inline void operator = (File&& that);
 
-		bool open(const char* name, FileAccessMode accessMode,
-			FileOpenMode openMode = FileOpenMode::OpenExisting);
+		bool open(const char* name, FileAccessMode accessMode, FileOpenMode openMode);
 		void close();
 
-		bool read(void* buffer, uintptr size);
-		bool read(void* buffer, uintptr bufferSize, uintptr& readSize);
-		bool write(const void* buffer, uintptr size);
-		void flush();
+		inline bool read(void* buffer, uintptr bufferSize, uintptr* outReadSize = nullptr) { return File::Read(handle, buffer, bufferSize, outReadSize); }
+		inline bool write(const void* buffer, uintptr size) { return File::Write(handle, buffer, size); }
+		inline bool flush() { return File::Flush(handle); }
 
-		template <typename Type>
-		inline bool read(Type& value)
-		{
-			uintptr readSize = 0;
-			bool result = read(&value, sizeof(Type), readSize);
-			return readSize == sizeof(Type) && result;
-		}
-		template <typename Type>
-		inline bool write(const Type& value)
-		{
-			return write(&value, sizeof(Type));
-		}
+		inline uint64 getSize() { return File::GetSize(handle); }
+		inline uint64 getPosition() { return File::GetPosition(handle);}
+		inline uint64 setPosition(sint64 offset, FileOffsetOrigin origin = FileOffsetOrigin::Begin) { return File::SetPosition(handle, offset, origin); }
 
-		uint64 getSize();
-		uint64 getPosition();
-		uint64 setPosition(sint64 offset, FilePosition origin = FilePosition::Begin);
-
-		inline bool isOpen() { return handle != 0 && handle != (void*)-1; }
-		inline void* getHandle() { return handle; }
-
-	public:
-		static File& GetStdIn();
-		static File& GetStdOut();
-		static File& GetStdErr();
+		inline bool isOpen() { return handle != FileHandle::Zero; }
+		inline FileHandle getHandle() { return handle; }
 	};
+
+	FileHandle GetStdInFileHandle();
+	FileHandle GetStdOutFileHandle();
+	FileHandle GetStdErrFileHandle();
 }

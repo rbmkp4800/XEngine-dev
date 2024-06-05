@@ -4,6 +4,8 @@
 #include "XLib.NonCopyable.h"
 #include "XLib.System.File.h"
 
+// TODO: Do something about file buffers.
+
 namespace XLib
 {
 #if 0
@@ -39,9 +41,9 @@ namespace XLib
 
 		inline void open(const char* data, uintptr length) { begin = data; end = data + length; current = data; }
 
-		char peek() const { return isEndOfStream() ? *current : 0; }
-		char get() { return isEndOfStream() ? *current++ : 0; }
-		bool isEndOfStream() const { return current != end && *current != 0; }
+		inline char peek() const { return isEndOfStream() ? *current : 0; }
+		inline char get() { return isEndOfStream() ? *current++ : 0; }
+		inline bool isEndOfStream() const { return current != end && *current != 0; }
 
 	};
 
@@ -65,10 +67,14 @@ namespace XLib
 	class FileCharStreamReader : public NonCopyable
 	{
 	private:
+		static constexpr uint32 BufferSize = 4096;
+
+	private:
+		char buffer[BufferSize];
 		FileHandle fileHandle = FileHandle::Zero;
-		byte* buffer = nullptr;
-		uint32 bufferSize = 0;
-		uint32 bufferOffet = 0;
+		//byte* buffer = nullptr;
+		//uint32 bufferSize = 0;
+		//uint32 bufferOffet = 0;
 
 	public:
 		FileCharStreamReader() = default;

@@ -13,9 +13,8 @@
 // TODO: Remove CounterType from DynamicArrayList and just use uint32.
 
 #include "XLib.h"
-#include "XLib.AllocatorAdapterBase.h"
+#include "XLib.Allocation.h"
 #include "XLib.NonCopyable.h"
-#include "XLib.SystemHeapAllocator.h"
 
 namespace XLib
 {

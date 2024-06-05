@@ -13,9 +13,6 @@ using sint64 = signed long long int;
 using float32 = float;
 using float64 = double;
 
-using uint = unsigned;
-using sint = signed;
-
 using byte = uint8;
 
 using charASCII = char;

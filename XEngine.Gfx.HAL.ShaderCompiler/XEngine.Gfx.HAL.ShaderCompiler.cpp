@@ -3,11 +3,10 @@
 #include <dxcapi.h>
 #include <wrl/client.h>
 
+#include <XLib.Allocation.h>
 #include <XLib.Containers.ArrayList.h>
+#include <XLib.Fmt.h>
 #include <XLib.String.h>
-#include <XLib.SystemHeapAllocator.h>
-#include <XLib.System.Threading.Atomics.h>
-#include <XLib.Text.h>
 
 #include <XEngine.Gfx.HAL.BlobFormat.h>
 #include <XEngine.XStringHash.h>

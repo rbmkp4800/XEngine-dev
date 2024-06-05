@@ -1,5 +1,5 @@
+#include <XLib.Allocation.h>
 #include <XLib.System.File.h>
-#include <XLib.SystemHeapAllocator.h>
 
 #include <XEngine.Gfx.ShaderLibraryFormat.h>
 
@@ -49,10 +49,11 @@ void ShaderLibrary::load(const char* libraryFilePath, HAL::Device& halDevice)
 	XEMasterAssert(libraryFile.isOpen());
 
 	const uint64 libraryFileSize = libraryFile.getSize();
+	XEMasterAssert(libraryFileSize != uint64(-1));
 	XEMasterAssert(libraryFileSize > sizeof(ShaderLibraryFormat::LibraryHeader));
 
 	ShaderLibraryFormat::LibraryHeader libraryHeader = {};
-	libraryFile.read(libraryHeader);
+	libraryFile.read(&libraryHeader, sizeof(libraryHeader));
 	XEMasterAssert(libraryHeader.signature == ShaderLibraryFormat::LibrarySignature);
 	XEMasterAssert(libraryHeader.version == ShaderLibraryFormat::LibraryCurrentVersion);
 	XEMasterAssert(libraryHeader.pipelineLayoutCount > 0);

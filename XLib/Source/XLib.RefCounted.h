@@ -1,8 +1,8 @@
 #pragma once
 
 #include "XLib.h"
+#include "XLib.Allocation.h"
 #include "XLib.NonCopyable.h"
-#include "XLib.SystemHeapAllocator.h"
 
 // NOTE: For now object should be allocated via SystemHeapAllocator.
 

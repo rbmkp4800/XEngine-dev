@@ -2,22 +2,14 @@
 
 #include "XLib.System.File.h"
 
+#undef min
+#undef max
+
 // TODO: Make StdIn, StdOut, StdErr getters thread safe.
 
 using namespace XLib;
 
-static_assert(DWORD(FileAccessMode::Read) == GENERIC_READ, "FileAccessMode::Read must be equal to GENERIC_READ");
-static_assert(DWORD(FileAccessMode::Write) == GENERIC_WRITE, "FileAccessMode::Write must be equal to GENERIC_WRITE");
-static_assert(DWORD(FileAccessMode::ReadWrite) == (GENERIC_READ | GENERIC_WRITE), "FileAccessMode::ReadWrite must be equal to GENERIC_READ | GENERIC_WRITE");
-
-static_assert(DWORD(FileOpenMode::Override) == CREATE_ALWAYS, "FileOpenMode::Override must be equal to CREATE_ALWAYS");
-static_assert(DWORD(FileOpenMode::OpenExisting) == OPEN_EXISTING, "FileOpenMode::OpenExisting must be equal to OPEN_EXISTING");
-
-static_assert(DWORD(FilePosition::Begin) == FILE_BEGIN, "FilePosition::Begin must be equal to FILE_BEGIN");
-static_assert(DWORD(FilePosition::Current) == FILE_CURRENT, "FilePosition::Current must be equal to FILE_CURRENT");
-static_assert(DWORD(FilePosition::End) == FILE_END, "FilePosition::End must be equal to FILE_END");
-
-namespace
+/*namespace
 {
 	File StdIn;
 	File StdOut;
@@ -26,153 +18,198 @@ namespace
 	bool StdInIsInitialized = false;
 	bool StdOutIsInitialized = false;
 	bool StdErrIsInitialized = false;
+}*/
+
+FileOpenResult File::Open(const char* name, FileAccessMode accessMode, FileOpenMode openMode)
+{
+	DWORD winDesiredAccess = 0;
+	switch (accessMode)
+	{
+		case FileAccessMode::Read:		winDesiredAccess = GENERIC_READ;					break;
+		case FileAccessMode::Write:		winDesiredAccess = GENERIC_WRITE;					break;
+		case FileAccessMode::ReadWrite:	winDesiredAccess = GENERIC_READ | GENERIC_WRITE;	break;
+		default: XAssertUnreachableCode();
+	}
+
+	DWORD winCreationDisposition = 0;
+	switch (openMode)
+	{
+		case FileOpenMode::OpenExisting:	winCreationDisposition = OPEN_EXISTING;	break;
+		case FileOpenMode::Override:		winCreationDisposition = CREATE_ALWAYS;	break;
+		default: XAssertUnreachableCode();
+	}
+
+	HANDLE hFile = CreateFileA(name, winDesiredAccess, 0, nullptr, winCreationDisposition, FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (hFile == INVALID_HANDLE_VALUE)
+		return FileOpenResult { FileHandle::Zero, false };
+
+	XAssert(hFile);
+	return FileOpenResult { FileHandle(uintptr(hFile)), true };
+}
+
+void File::Close(FileHandle fileHandle)
+{
+	XAssert(fileHandle != FileHandle::Zero);
+	CloseHandle(HANDLE(fileHandle));
+}
+
+bool File::Read(FileHandle fileHandle, void* buffer, uintptr bufferSize, uintptr* outReadSize)
+{
+	XAssert(fileHandle != FileHandle::Zero);
+
+	uintptr totalReadSizeAccum = 0;
+	while (totalReadSizeAccum < bufferSize)
+	{
+		const DWORD iterSizeToRead = DWORD(max<uintptr>(bufferSize - totalReadSizeAccum, 0x8000'0000));
+		DWORD iterReadSize = 0;
+
+		if (!ReadFile(HANDLE(fileHandle), buffer, iterSizeToRead, &iterReadSize, nullptr))
+			return false;
+
+		totalReadSizeAccum += iterReadSize;
+
+		if (iterReadSize < iterSizeToRead)
+			break;
+	}
+
+	if (outReadSize)
+		*outReadSize = totalReadSizeAccum;
+	else if (totalReadSizeAccum < bufferSize)
+		return false; // Unexpected EOF
+
+	return true;
+}
+
+bool File::Write(FileHandle fileHandle, const void* data, uintptr size)
+{
+	XAssert(fileHandle != FileHandle::Zero);
+
+	uintptr totalWrittenSizeAccum = 0;
+	while (totalWrittenSizeAccum < size)
+	{
+		const DWORD iterSizeToWrite = DWORD(max<uintptr>(size - totalWrittenSizeAccum, 0x8000'0000));
+		DWORD iterWrittenSize = 0;
+
+		if (!WriteFile(HANDLE(fileHandle), data, iterSizeToWrite, &iterWrittenSize, nullptr))
+			return false;
+
+		totalWrittenSizeAccum += iterWrittenSize;
+
+		if (iterWrittenSize < iterSizeToWrite)
+			return false;
+	}
+
+	return true;
+}
+
+bool File::Flush(FileHandle fileHandle)
+{
+	XAssert(fileHandle != FileHandle::Zero);
+
+	if (!FlushFileBuffers(HANDLE(fileHandle)))
+		return false;
+	return true;
+}
+
+uint64 File::GetSize(FileHandle fileHandle)
+{
+	XAssert(fileHandle != FileHandle::Zero);
+
+	LARGE_INTEGER size = {};
+	if (!GetFileSizeEx(HANDLE(fileHandle), &size))
+		return uint64(-1);
+	return size.QuadPart;
+}
+
+uint64 File::GetPosition(FileHandle fileHandle)
+{
+	XAssert(fileHandle != FileHandle::Zero);
+
+	LARGE_INTEGER distance = {};
+	LARGE_INTEGER position = {};
+	if (!SetFilePointerEx(HANDLE(fileHandle), distance, &position, FILE_CURRENT))
+		return uint64(-1);
+	return position.QuadPart;
+}
+
+uint64 File::SetPosition(FileHandle fileHandle, sint64 offset, FileOffsetOrigin origin)
+{
+	XAssert(fileHandle != FileHandle::Zero);
+
+	DWORD winOrigin = 0;
+	switch (origin)
+	{
+		case FileOffsetOrigin::Begin:	winOrigin = FILE_BEGIN;		break;
+		case FileOffsetOrigin::Current:	winOrigin = FILE_CURRENT;	break;
+		case FileOffsetOrigin::End:		winOrigin = FILE_END;		break;
+		default: XAssertUnreachableCode();
+	}
+
+	LARGE_INTEGER distance = {};
+	LARGE_INTEGER position = {};
+	distance.QuadPart = offset;
+	if (!SetFilePointerEx(HANDLE(fileHandle), distance, &position, winOrigin))
+		return uint64(-1);
+	return position.QuadPart;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+File::File(File&& that)
+{
+	handle = that.handle;
+	that.handle = FileHandle::Zero;
+}
+
+void File::operator = (File&& that)
+{
+	close();
+	handle = that.handle;
+	that.handle = FileHandle::Zero;
 }
 
 bool File::open(const char* name, FileAccessMode accessMode, FileOpenMode openMode)
 {
-	handle = CreateFileA(name, DWORD(accessMode), 0, nullptr, DWORD(openMode), FILE_ATTRIBUTE_NORMAL, nullptr);
-	return handle != INVALID_HANDLE_VALUE;
+	close();
+
+	FileOpenResult fileOpenResult = File::Open(name, accessMode, openMode);
+	if (!fileOpenResult.openResult)
+		return false;
+	handle = fileOpenResult.fileHandle;
+	return true;
 }
 
 void File::close()
 {
-	if (handle)
-		CloseHandle(handle);
-	handle = nullptr;
+	if (handle != FileHandle::Zero)
+	{
+		Close(handle);
+		handle = FileHandle::Zero;
+	}
 }
 
-bool File::read(void* buffer, uintptr _size)
-{
-	// TODO: Do this properly.
-	if (_size > uint32(-1))
-		*(int*)nullptr = 0;
-	const uint32 size = uint32(_size);
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	DWORD readSize = 0;
-	BOOL result = ReadFile(handle, buffer, size, &readSize, nullptr);
-	if (!result)
-	{
-		//Debug::LogLastSystemError(SysErrorDbgMsgFmt);
-		return false;
-	}
-	if (readSize != size)
-	{
-		// Debug::Warning(...);
-		return false;
-	}
-	return true;
+FileHandle XLib::GetStdInFileHandle()
+{
+	static HANDLE hStdIn = GetStdHandle(STD_INPUT_HANDLE);
+	if (hStdIn == INVALID_HANDLE_VALUE)
+		return FileHandle::Zero;
+	return FileHandle(uintptr(hStdIn));
 }
 
-bool File::read(void* buffer, uintptr _bufferSize, uintptr& readSize)
+FileHandle XLib::GetStdOutFileHandle()
 {
-	// TODO: Do this properly.
-	if (_bufferSize > uint32(-1))
-		*(int*)nullptr = 0;
-	const uint32 bufferSize = uint32(_bufferSize);
-
-	DWORD _readSize = 0;
-	BOOL result = ReadFile(handle, buffer, bufferSize, &_readSize, nullptr);
-	if (!result)
-	{
-		//Debug::LogLastSystemError(SysErrorDbgMsgFmt);
-		return false;
-	}
-	readSize = _readSize;
-	return true;
+	static HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (hStdOut == INVALID_HANDLE_VALUE)
+		return FileHandle::Zero;
+	return FileHandle(uintptr(hStdOut));
 }
 
-bool File::write(const void* buffer, uintptr _size)
+FileHandle XLib::GetStdErrFileHandle()
 {
-	// TODO: Do this properly.
-	if (_size > uint32(-1))
-		*(int*)nullptr = 0;
-	const uint32 size = uint32(_size);
-
-	DWORD writtenSize = 0;
-	BOOL result = WriteFile(handle, buffer, size, &writtenSize, nullptr);
-	if (!result)
-	{
-		//Debug::LogLastSystemError(SysErrorDbgMsgFmt);
-		return false;
-	}
-	if (writtenSize != size)
-		return false;
-	return true;
-}
-
-void File::flush()
-{
-	//if (!FlushFileBuffers(handle))
-	//	Debug::LogLastSystemError(SysErrorDbgMsgFmt);
-}
-
-uint64 File::getSize()
-{
-	LARGE_INTEGER size;
-	if (!GetFileSizeEx(handle, &size))
-	{
-		//Debug::LogLastSystemError(SysErrorDbgMsgFmt);
-		return uint64(-1);
-	}
-	return size.QuadPart;
-}
-
-uint64 File::getPosition()
-{
-	LARGE_INTEGER distance, postion;
-	distance.QuadPart = 0;
-	if (!SetFilePointerEx(handle, distance, &postion, FILE_CURRENT))
-	{
-		//Debug::LogLastSystemError(SysErrorDbgMsgFmt);
-		return uint64(-1);
-	}
-	return postion.QuadPart;
-}
-
-uint64 File::setPosition(sint64 offset, FilePosition origin)
-{
-	LARGE_INTEGER distance, postion;
-	distance.QuadPart = offset;
-	if (!SetFilePointerEx(handle, distance, &postion, DWORD(origin)))
-	{
-		//Debug::LogLastSystemError(SysErrorDbgMsgFmt);
-		return uint64(-1);
-	}
-	return postion.QuadPart;
-}
-
-File& File::GetStdIn()
-{
-	if (!StdInIsInitialized)
-	{
-		const HANDLE hStdIn = GetStdHandle(STD_INPUT_HANDLE);
-		if (hStdIn != INVALID_HANDLE_VALUE)
-			StdIn.handle = hStdIn;
-		StdInIsInitialized = true;
-	}
-	return StdIn;
-}
-
-File& File::GetStdOut()
-{
-	if (!StdOutIsInitialized)
-	{
-		const HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
-		if (hStdOut != INVALID_HANDLE_VALUE)
-			StdOut.handle = hStdOut;
-		StdOutIsInitialized = true;
-	}
-	return StdOut;
-}
-
-File& File::GetStdErr()
-{
-	if (!StdErrIsInitialized)
-	{
-		const HANDLE hStdErr = GetStdHandle(STD_ERROR_HANDLE);
-		if (hStdErr != INVALID_HANDLE_VALUE)
-			StdErr.handle = hStdErr;
-		StdErrIsInitialized = true;
-	}
-	return StdErr;
+	static HANDLE hStdErr = GetStdHandle(STD_ERROR_HANDLE);
+	if (hStdErr == INVALID_HANDLE_VALUE)
+		return FileHandle::Zero;
+	return FileHandle(uintptr(hStdErr));
 }
