@@ -3,23 +3,26 @@
 #include "XLib.h"
 #include "XLib.NonCopyable.h"
 #include "XLib.System.File.h"
+#include "XLib.String.h"
 
 namespace XLib
 {
-	// CharStreamReader
+	// CharStreamReader:
 	//	peek() -> char
 	//	get() -> char
 	//	read(???)
 	//	isEndOfStream() -> bool
 
-	// CharStreamWriter
+	// CharStreamWriter:
 	//	put(char c)
 	//	write(const char* data, uintptr length)
+	//	write(const char* cstr)
 
-	// Char stream can not contain NUL character
-	// For char stream reader NUL character is considered end of stream.
+	// Char stream can not contain NUL characters.
+	// For char stream reader NUL character is considered end-of-stream.
+	// After end-of-stream is hit char reader pick/get will return NUL.
 	// `CharStreamWriter::put(NUL)` has no effect.
-	// `CharStreamWriter::write(...)` stops at first NUL character.
+	// `CharStreamWriter::write(data, length)` assumes that there is no NUL characters in input data.
 
 #if 0
 	template <typename T>
@@ -60,6 +63,7 @@ namespace XLib
 		inline const char* getCurrentPtr() const { return current; }
 
 		inline char peek() const { return isEndOfStream() ? *current : 0; }
+		inline char peek(uint32 offset) const;
 		inline char get() { return isEndOfStream() ? *current++ : 0; }
 		//inline void read(...);
 		inline bool isEndOfStream() const { return current != end && *current != 0; }
@@ -69,20 +73,21 @@ namespace XLib
 	{
 	private:
 		char* buffer = nullptr;
-		uintptr bufferCapacity = 0;
-		uintptr streamLength = 0;
+		uintptr bufferSize = 0;
+		uintptr bufferOffset = 0;
 
 	public:
 		MemoryCharStreamWriter() = default;
 		~MemoryCharStreamWriter() = default;
 
-		inline MemoryCharStreamWriter(char* buffer, uintptr bufferCapacity) : buffer(buffer), bufferCapacity(bufferCapacity) {}
-		inline void open(char* buffer, uintptr bufferCapacity) { this->buffer = buffer; this->bufferCapacity = bufferCapacity; streamLength = 0; }
+		inline MemoryCharStreamWriter(char* buffer, uintptr bufferSize) : buffer(buffer), bufferSize(bufferSize) {}
+		inline void open(char* buffer, uintptr bufferSize) { this->buffer = buffer; this->bufferSize = bufferSize; bufferOffset = 0; }
 
-		inline void nullTerminate();
+		void nullTerminate();
 
 		inline void put(char c);
-		inline void write(const char* data, uintptr length);
+		void write(const char* data, uintptr length);
+		void write(const char* cstr);
 	};
 
 
@@ -94,7 +99,7 @@ namespace XLib
 		FileHandle fileHandle = FileHandle::Zero;
 		char* buffer = nullptr;
 		uint32 bufferSize = 0;
-		uint32 bufferOffet = 0;
+		uint32 bufferOffset = 0;
 		bool fileHandleIsInternal = false;
 		bool bufferIsInternal = false;
 
@@ -109,6 +114,7 @@ namespace XLib
 		inline bool isOpen() const { return fileHandle != FileHandle::Zero; }
 
 		inline char peek() const;
+		inline char peek(uint32 offset) const;
 		inline char get();
 		inline bool isEndOfStream() const;
 	};
@@ -119,7 +125,7 @@ namespace XLib
 		FileHandle fileHandle = FileHandle::Zero;
 		char* buffer = nullptr;
 		uint32 bufferSize = 0;
-		uint32 bufferOffet = 0;
+		uint32 bufferOffset = 0;
 		bool fileHandleIsInternal = false;
 		bool bufferIsInternal = false;
 
@@ -135,13 +141,40 @@ namespace XLib
 		inline bool isOpen() const { return fileHandle != FileHandle::Zero; }
 
 		inline void put(char c);
-		inline void write(const char* data, uintptr length);
+		void write(const char* data, uintptr length);
+		void write(const char* cstr);
 	};
 
 
 	////////////////////////////////////////////////////////////////////////////////////////////////
 
-	class VirtualStringWriter;
+	class VirtualStringWriter : public NonCopyable
+	{
+	private:
+		static constexpr uint32 BufferExponentialGrowthFactor = 2;
+
+	private:
+		VirtualStringRefASCII virtualStringRef;
+		char* buffer = nullptr;
+		uint32 bufferSize = 0;
+		uint32 bufferOffset = 0;
+		uint32 maxBufferSize = 0;
+
+	private:
+		void growBufferExponentially(uint32 minRequiredBufferSize);
+
+	public:
+		VirtualStringWriter() = default;
+		inline VirtualStringWriter(VirtualStringRefASCII virutalStringRef) { open(virutalStringRef); }
+		inline ~VirtualStringWriter() { flush(); }
+
+		void open(VirtualStringRefASCII virutalStringRef);
+		void flush();
+
+		inline void put(char c);
+		void write(const char* data, uintptr length);
+		void write(const char* cstr);
+	};
 
 
 	// Line-column tracking stream wrappers ////////////////////////////////////////////////////////
@@ -158,10 +191,12 @@ namespace XLib
 		void advanceLineColumnNumbers(char c);
 
 	public:
-		LineColumnTrackingCharStreamReaderWrapper(InnerCharStreamReader& innerReader) : innerReader(innerReader) {}
+		inline LineColumnTrackingCharStreamReaderWrapper(InnerCharStreamReader& innerReader) : innerReader(innerReader) {}
+		~LineColumnTrackingCharStreamReaderWrapper() = default;
 
 		inline char peek() const { return innerReader.peek(); }
-		inline char get() { const char c = innerReader.get(); advanceLocation(c); return c; }
+		inline char peek(uint32 offset) const { return innerReader.peek(offset); }
+		inline char get() { const char c = innerReader.get(); advanceLineColumnNumbers(c); return c; }
 		inline bool isEndOfStream() const { return innerReader.isEndOfStream(); }
 
 		inline uint32 getLineNumber() const { return lineNumber + 1; }
@@ -189,32 +224,12 @@ namespace XLib
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // DEFINITION //////////////////////////////////////////////////////////////////////////////////////
 
-inline void XLib::MemoryCharStreamWriter::nullTerminate()
-{
-	if (streamLength < bufferCapacity)
-		buffer[streamLength] = 0;
-	else
-		buffer[bufferCapacity - 1] = 0;
-}
-
 inline void XLib::MemoryCharStreamWriter::put(char c)
 {
-	if (streamLength < bufferCapacity && c)
+	if (bufferOffset < bufferSize && c)
 	{
-		buffer[streamLength] = c;
-		streamLength++;
-	}
-}
-
-inline void XLib::MemoryCharStreamWriter::write(const char* data, uintptr length)
-{
-	for (uintptr i = 0; i < length; i++)
-	{
-		if (!data[i])
-			break;
-
-		buffer[streamLength] = data[i];
-		streamLength++;
+		buffer[bufferOffset] = c;
+		bufferOffset++;
 	}
 }
 
@@ -223,24 +238,27 @@ inline void XLib::FileCharStreamWriter::put(char c)
 	if (!c)
 		return;
 
-	buffer[bufferOffet] = c;
-	bufferOffet++;
-	if (bufferOffet == bufferSize)
+	buffer[bufferOffset] = c;
+	bufferOffset++;
+	if (bufferOffset == bufferSize)
 		flush();
 }
 
-inline void XLib::FileCharStreamWriter::write(const char* data, uintptr length)
+inline void XLib::VirtualStringWriter::put(char c)
 {
-	for (uintptr i = 0; i < length; i++)
-	{
-		if (!data[i])
-			break;
+	if (!c)
+		return;
 
-		buffer[bufferOffet] = data[i];
-		bufferOffet++;
-		if (bufferOffet == bufferSize)
-			flush();
+	const uint32 requiredBufferSize = bufferOffset + 2;
+	if (bufferSize < requiredBufferSize)
+	{
+		if (bufferSize == maxBufferSize)
+			return;
+		growBufferExponentially(requiredBufferSize);
 	}
+
+	buffer[bufferOffset] = c;
+	bufferOffset++;
 }
 
 template <typename InnerCharStreamReader>

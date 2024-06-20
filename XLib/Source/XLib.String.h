@@ -55,17 +55,22 @@ namespace XLib
 
 	////////////////////////////////////////////////////////////////////////////////////////////////
 
+	// NOTE: Buffer size includes null terminator (so max length is equal to buffer size minus 1).
+	// NOTE: `VirtualStringInterface::setLength()` does not reallocate buffer, so sufficient buffer space should be allocated prior to calling.
+
 	class VirtualStringInterface abstract
 	{
 	public:
-		virtual uint32 getMaxBufferCapacity() const = 0;
-		virtual uint32 getBufferCapacity() const = 0;
-		virtual void reserveBufferCapacity(uint32 capacity) const = 0;
+		virtual uint32 getMaxBufferSize() const = 0;
+		virtual uint32 getBufferSize() const = 0;
+		virtual void growBuffer(uint32 minRequiredBufferSize) const = 0;
+		virtual char* getBuffer() const = 0;
 
 		virtual uint32 getLength() const = 0;
 		virtual void setLength(uint32 length) const = 0;
 
-		virtual char* getBuffer() const = 0;
+		inline uint32 getMaxLength() const;
+		inline void growBufferToFitLength(uint32 minRequiredLength) const;
 	};
 
 	template <typename CharType>
@@ -78,14 +83,13 @@ namespace XLib
 		VirtualStringRef() = default;
 		~VirtualStringRef() = default;
 
-		virtual uint32 getMaxBufferCapacity() const override { *(int*)0 = 0; return 0; }
-		virtual uint32 getBufferCapacity() const override { *(int*)0 = 0; return 0; }
-		virtual void reserveBufferCapacity(uint32 capacity) const override { *(int*)0 = 0; }
+		virtual uint32 getMaxBufferSize() const override { *(int*)0 = 0; return 0; }
+		virtual uint32 getBufferSize() const override { *(int*)0 = 0; return 0; }
+		virtual void growBuffer(uint32 minRequiredBufferSize) const override { *(int*)0 = 0; }
+		virtual CharType* getBuffer() const override { *(int*)0 = 0; return nullptr; }
 
 		virtual uint32 getLength() const override { *(int*)0 = 0; return 0; }
 		virtual void setLength(uint32 length) const override { *(int*)0 = 0; }
-
-		virtual CharType* getBuffer() const override { *(int*)0 = 0; return nullptr; }
 	};
 
 	template <typename CharType>
@@ -110,17 +114,17 @@ namespace XLib
 
 	////////////////////////////////////////////////////////////////////////////////////////////////
 
-	template <typename CharType, uint16 Capacity>
+	template <typename CharType, uint16 BufferSize>
 	class InplaceString
 	{
-		static_assert(Capacity > 1); // At least one character (+1 for cstr zero terminator).
+		static_assert(BufferSize > 1); // At least one character (+1 for cstr zero terminator).
 
 	private:
 		class VirtualRef;
 
 	private:
 		uint16 length = 0;
-		CharType buffer[Capacity];
+		CharType buffer[BufferSize];
 
 	public:
 		inline InplaceString();
@@ -134,12 +138,15 @@ namespace XLib
 		inline InplaceString& operator = (const CharType* thatCStr)			{ length = 0; append(thatCStr);	return *this; }
 
 		inline void append(CharType c);
+		inline bool append(CharType c, uint32 count);
 		inline void append(const StringView<CharType>& string);
 		inline void append(const CharType* cstr);
 		inline void append(const CharType* data, uintptr length) { return append(StringView<CharType>(data, length)); }
 
-		inline void resize(uint16 newLength, CharType c = CharType(0));
 		inline void clear();
+		inline void truncate(uint32 newTruncatedLength);
+
+		inline void setLength(uint32 length);
 
 		inline CharType* getData() { return buffer; }
 		inline uint16 getLength() const { return length; }
@@ -163,11 +170,11 @@ namespace XLib
 		inline bool endsWith(const CharType* suffixCStr) const;
 
 		inline bool isEmpty() const { return length == 0; }
-		inline bool isFull() const { return length + 1 == Capacity; }
+		inline bool isFull() const { return length + 1 == BufferSize; }
 
 	public:
-		static constexpr uint16 GetCapacity() { return Capacity; }
-		static constexpr uint16 GetMaxLength() { return Capacity - 1; }
+		static constexpr uint16 GetBufferSize() { return BufferSize; }
+		static constexpr uint16 GetMaxLength() { return BufferSize - 1; }
 	};
 
 
@@ -179,15 +186,13 @@ namespace XLib
 
 		class VirtualRef;
 
-		static constexpr uint32 InitialBufferCapacity = 16;
+		static constexpr uint32 InitialBufferSize = 16;
+		static constexpr uint32 BufferExponentialGrowthFactor = 2;
 
 	private:
 		CharType* buffer = nullptr;
-		uint32 capacity = 0;
+		uint32 bufferSize = 0;
 		uint32 length = 0;
-
-	private:
-		inline void ensureCapacity(uint32 requiredLength);
 
 	public:
 		DynamicString() = default;
@@ -202,15 +207,24 @@ namespace XLib
 		inline DynamicString& operator = (const CharType* thatCStr);
 
 		inline bool append(CharType c);
+		inline bool append(CharType c, uint32 count);
 		inline bool append(const StringView<CharType>& string);
 		inline bool append(const CharType* cstr) { return append(StringView<CharType>(cstr)); }
 		inline bool append(const CharType* data, uintptr length) { return append(StringView<CharType>(data, length)); }
 
-		inline void resize(uint32 newLength, CharType c = CharType(0));
 		inline void clear();
+		inline void truncate(uint32 newTruncatedLength);
 
-		inline void reserve(uint32 newMaxLength) { ensureCapacity(newMaxLength); }
-		inline void compact();
+		void growBuffer(uint32 minRequiredBufferSize);
+		void growBufferExponentially(uint32 minRequiredBufferSize);
+		void shrinkBuffer();
+
+		inline void growBufferToFitLength(uint32 minRequiredLength) { growBuffer(minRequiredLength + 1); }
+		inline void growBufferExponentiallyToFitLength(uint32 minRequiredLength) { growBufferExponentiallyToFitLength(minRequiredLength + 1); }
+
+		inline uint32 getBufferSize() const { return bufferSize; }
+
+		inline void setLength(uint32 length);
 
 		inline CharType* getData() { return buffer; }
 		inline uint32 getLength() const { return length; }
@@ -244,8 +258,8 @@ namespace XLib
 	using VirtualStringRefASCII = VirtualStringRef<charASCII>;
 	using VirtualStringFacadeASCII = VirtualStringFacade<charASCII>;
 
-	template <uint16 Capacity>
-	using InplaceStringASCII = InplaceString<charASCII, Capacity>;
+	template <uint16 BufferSize>
+	using InplaceStringASCII = InplaceString<charASCII, BufferSize>;
 
 	using InplaceStringASCIIx32		= InplaceString<charASCII, 30>;		static_assert(sizeof(InplaceStringASCIIx32) == 32);
 	using InplaceStringASCIIx64		= InplaceString<charASCII, 62>;		static_assert(sizeof(InplaceStringASCIIx64) == 64);
@@ -331,35 +345,49 @@ inline constexpr XLib::StringView<CharType> XLib::StringView<CharType>::FromCStr
 }
 
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+inline uint32 XLib::VirtualStringInterface::getMaxLength() const
+{ 
+	const uint32 maxBufferSize = getMaxBufferSize();
+	XAssert(maxBufferSize > 0);
+	return maxBufferSize - 1;
+}
+
+inline void XLib::VirtualStringInterface::growBufferToFitLength(uint32 minRequiredLength) const
+{
+	growBuffer(minRequiredLength + 1);
+}
+
+
 // InplaceString ///////////////////////////////////////////////////////////////////////////////////
 
-template <typename CharType, uint16 Capacity>
-class XLib::InplaceString<CharType, Capacity>::VirtualRef : public XLib::VirtualStringInterface
+template <typename CharType, uint16 BufferSize>
+class XLib::InplaceString<CharType, BufferSize>::VirtualRef : public XLib::VirtualStringInterface
 {
 private:
-	InplaceString<CharType, Capacity>* stringPtr;
+	InplaceString<CharType, BufferSize>* stringPtr;
 
 public:
-	VirtualRef(InplaceString<CharType, Capacity>* stringPtr) : stringPtr(stringPtr) {}
+	VirtualRef(InplaceString<CharType, BufferSize>* stringPtr) : stringPtr(stringPtr) {}
 
-	virtual uint32 getMaxBufferCapacity() const override { return Capacity; }
-	virtual uint32 getBufferCapacity() const override { return Capacity; }
-	virtual void reserveBufferCapacity(uint32 capacity) const override { XAssert(capacity <= Capacity); } // TODO: Revisit this.
+	virtual uint32 getMaxBufferSize() const override { return BufferSize; }
+	virtual uint32 getBufferSize() const override { return BufferSize; }
+	virtual void growBuffer(uint32 minRequiredBufferSize) const override { XAssert(minRequiredBufferSize <= BufferSize); }
+	virtual CharType* getBuffer() const { return stringPtr->buffer; }
 
 	virtual uint32 getLength() const override { return stringPtr->length; }
-	virtual void setLength(uint32 length) const { XAssert(length <= uint32(Capacity)); return stringPtr->resize(uint16(length)); } // TODO: Revisit this.
-
-	virtual CharType* getBuffer() const { return stringPtr->buffer; }
+	virtual void setLength(uint32 length) const { return stringPtr->setLength(length); }
 };
 
-template <typename CharType, uint16 Capacity>
-inline XLib::InplaceString<CharType, Capacity>::InplaceString()
+template <typename CharType, uint16 BufferSize>
+inline XLib::InplaceString<CharType, BufferSize>::InplaceString()
 {
 	buffer[0] = CharType(0);
 }
 
-template <typename CharType, uint16 Capacity>
-inline void XLib::InplaceString<CharType, Capacity>::append(CharType c)
+template <typename CharType, uint16 BufferSize>
+inline void XLib::InplaceString<CharType, BufferSize>::append(CharType c)
 {
 	if (isFull())
 		return;
@@ -368,8 +396,8 @@ inline void XLib::InplaceString<CharType, Capacity>::append(CharType c)
 	buffer[length] = CharType(0);
 }
 
-template <typename CharType, uint16 Capacity>
-inline void XLib::InplaceString<CharType, Capacity>::append(const StringView<CharType>& string)
+template <typename CharType, uint16 BufferSize>
+inline void XLib::InplaceString<CharType, BufferSize>::append(const StringView<CharType>& string)
 {
 	const uintptr fullLength = length + string.getLength();
 	const bool overflow = fullLength > uintptr(GetMaxLength());
@@ -379,8 +407,8 @@ inline void XLib::InplaceString<CharType, Capacity>::append(const StringView<Cha
 	buffer[length] = CharType(0);
 }
 
-template <typename CharType, uint16 Capacity>
-inline void XLib::InplaceString<CharType, Capacity>::append(const CharType* cstr)
+template <typename CharType, uint16 BufferSize>
+inline void XLib::InplaceString<CharType, BufferSize>::append(const CharType* cstr)
 {
 	const CharType* cstrIt = cstr;
 	while (*cstrIt && length < GetMaxLength())
@@ -392,46 +420,44 @@ inline void XLib::InplaceString<CharType, Capacity>::append(const CharType* cstr
 	buffer[length] = CharType(0);
 }
 
-template <typename CharType, uint16 Capacity>
-inline void XLib::InplaceString<CharType, Capacity>::resize(uint16 newLength, CharType c)
-{
-	XAssert(newLength <= GetMaxLength());
-	CharType* newEnd = buffer + newLength;
-	for (CharType* i = buffer + length; i < newEnd; i++)
-		*i = c;
-	length = newLength;
-	buffer[length] = CharType(0);
-}
-
-template <typename CharType, uint16 Capacity>
-inline void XLib::InplaceString<CharType, Capacity>::clear()
+template <typename CharType, uint16 BufferSize>
+inline void XLib::InplaceString<CharType, BufferSize>::clear()
 {
 	length = 0;
 	buffer[0] = CharType(0);
 }
 
-template <typename CharType, uint16 Capacity>
-inline XLib::VirtualStringRef<CharType> XLib::InplaceString<CharType, Capacity>::getVirtualRef()
+template <typename CharType, uint16 BufferSize>
+inline void XLib::InplaceString<CharType, BufferSize>::setLength(uint32 length)
+{
+	const uint32 requiredBufferSize = length + 1;
+	XAssert(requiredBufferSize <= BufferSize);
+	this->length = uint16(length);
+	buffer[length] = 0;
+}
+
+template <typename CharType, uint16 BufferSize>
+inline XLib::VirtualStringRef<CharType> XLib::InplaceString<CharType, BufferSize>::getVirtualRef()
 {
 	VirtualRef virtualRef(this);
 	static_assert(sizeof(VirtualRef) == sizeof(XLib::VirtualStringRef<CharType>));
 	return (XLib::VirtualStringRef<CharType>&)virtualRef;
 }
 
-template <typename CharType, uint16 Capacity>
-inline bool XLib::InplaceString<CharType, Capacity>::operator == (const StringView<CharType>& that) const
+template <typename CharType, uint16 BufferSize>
+inline bool XLib::InplaceString<CharType, BufferSize>::operator == (const StringView<CharType>& that) const
 {
 	return String::IsEqual(StringView<CharType>(*this), that);
 }
 
-template <typename CharType, uint16 Capacity>
-inline bool XLib::InplaceString<CharType, Capacity>::operator == (const CharType* thatCStr) const
+template <typename CharType, uint16 BufferSize>
+inline bool XLib::InplaceString<CharType, BufferSize>::operator == (const CharType* thatCStr) const
 {
 	return String::IsEqual(StringView<CharType>(*this), thatCStr);
 }
 
-template <typename CharType, uint16 Capacity>
-inline bool XLib::InplaceString<CharType, Capacity>::startsWith(const CharType* prefixCStr) const
+template <typename CharType, uint16 BufferSize>
+inline bool XLib::InplaceString<CharType, BufferSize>::startsWith(const CharType* prefixCStr) const
 {
 	return String::StartsWith(StringView<CharType>(*this), prefixCStr);
 }
@@ -448,29 +474,14 @@ private:
 public:
 	VirtualRef(DynamicString<CharType, AllocatorType>* stringPtr) : stringPtr(stringPtr) {}
 
-	virtual uint32 getMaxBufferCapacity() const override { return uint32(-1); }
-	virtual uint32 getBufferCapacity() const override { return stringPtr->capacity; }
-
-	// TODO: Revisit this. `reserve` accepts not new buffer capacity but new max length.
-	virtual void reserveBufferCapacity(uint32 capacity) const override { stringPtr->reserve(capacity); }
+	virtual uint32 getMaxBufferSize() const override { return uint32(-1); }
+	virtual uint32 getBufferSize() const override { return stringPtr->bufferSize; }
+	virtual void growBuffer(uint32 minRequiredBufferSize) const override { stringPtr->growBuffer(minRequiredBufferSize); }
+	virtual CharType* getBuffer() const { return stringPtr->buffer; }
 
 	virtual uint32 getLength() const override { return stringPtr->length; }
-	virtual void setLength(uint32 length) const { return stringPtr->resize(length); } // TODO: Revisit this.
-
-	virtual CharType* getBuffer() const { return stringPtr->buffer; }
+	virtual void setLength(uint32 length) const { return stringPtr->setLength(length); }
 };
-
-template <typename CharType, typename AllocatorType>
-inline void XLib::DynamicString<CharType, AllocatorType>::ensureCapacity(uint32 requiredLength)
-{
-	const uint32 requiredCapacity = requiredLength + 1;
-	if (requiredCapacity <= capacity)
-		return;
-
-	// TODO: Maybe align up to 16 or some adaptive pow of 2.
-	capacity = max<uint32>(requiredCapacity, capacity * 2, InitialBufferCapacity);
-	buffer = (CharType*)AllocatorBase::reallocate(buffer, capacity * sizeof(CharType));
-}
 
 template <typename CharType, typename AllocatorType>
 inline XLib::DynamicString<CharType, AllocatorType>::~DynamicString()
@@ -478,7 +489,7 @@ inline XLib::DynamicString<CharType, AllocatorType>::~DynamicString()
 	if (buffer)
 		AllocatorBase::release(buffer);
 	buffer = nullptr;
-	capacity = 0;
+	bufferSize = 0;
 	length = 0;
 }
 
@@ -486,11 +497,11 @@ template <typename CharType, typename AllocatorType>
 inline XLib::DynamicString<CharType, AllocatorType>::DynamicString(DynamicString&& that)
 {
 	buffer = that.buffer;
-	capacity = that.capacity;
+	bufferSize = that.bufferSize;
 	length = that.length;
 
 	that.buffer = nullptr;
-	that.capacity = 0;
+	that.bufferSize = 0;
 	that.length = 0;
 }
 
@@ -501,11 +512,11 @@ inline auto XLib::DynamicString<CharType, AllocatorType>::operator = (DynamicStr
 		AllocatorBase::release(buffer);
 
 	buffer = that.buffer;
-	capacity = that.capacity;
+	bufferSize = that.bufferSize;
 	length = that.length;
 
 	that.buffer = nullptr;
-	that.capacity = 0;
+	that.bufferSize = 0;
 	that.length = 0;
 
 	return *this;
@@ -515,7 +526,11 @@ template <typename CharType, typename AllocatorType>
 inline auto XLib::DynamicString<CharType, AllocatorType>::operator = (const CharType* thatCStr) -> DynamicString&
 {
 	const uint32 thatLength = XCheckedCastU32(String::GetCStrLength(thatCStr));
-	ensureCapacity(thatLength);
+
+	const uint32 requiredBufferSize = thatLength + 1;
+	if (bufferSize < requiredBufferSize)
+		growBufferExponentially(requiredBufferSize);
+
 	memoryCopy(buffer, thatCStr, thatLength + 1);
 	length = thatLength;
 	return *this;
@@ -524,7 +539,10 @@ inline auto XLib::DynamicString<CharType, AllocatorType>::operator = (const Char
 template <typename CharType, typename AllocatorType>
 inline bool XLib::DynamicString<CharType, AllocatorType>::append(CharType c)
 {
-	ensureCapacity(length + 1);
+	const uint32 requiredBufferSize = length + 2;
+	if (bufferSize < requiredBufferSize)
+		growBufferExponentially(requiredBufferSize);
+
 	buffer[length] = c;
 	length++;
 	buffer[length] = CharType(0);
@@ -535,26 +553,15 @@ template <typename CharType, typename AllocatorType>
 inline bool XLib::DynamicString<CharType, AllocatorType>::append(const StringView<CharType>& string)
 {
 	const uint32 stringToAppendLength = XCheckedCastU32(string.getLength());
-	ensureCapacity(length + stringToAppendLength);
+
+	const uint32 requiredBufferSize = length + stringToAppendLength + 1;
+	if (bufferSize < requiredBufferSize)
+		growBufferExponentially(requiredBufferSize);
+
 	memoryCopy(buffer + length, string.getData(), stringToAppendLength);
 	length += stringToAppendLength;
 	buffer[length] = CharType(0);
 	return true;
-}
-
-template <typename CharType, typename AllocatorType>
-inline void XLib::DynamicString<CharType, AllocatorType>::resize(uint32 newLength, CharType c)
-{
-	if (length < newLength)
-	{
-		ensureCapacity(newLength);
-		CharType* newEnd = buffer + newLength;
-		for (CharType* i = buffer + length; i < newEnd; i++)
-			*i = c;
-	}
-	length = newLength;
-	if (buffer)
-		buffer[length] = CharType(0);
 }
 
 template <typename CharType, typename AllocatorType>
@@ -566,15 +573,64 @@ inline void XLib::DynamicString<CharType, AllocatorType>::clear()
 }
 
 template <typename CharType, typename AllocatorType>
-inline void XLib::DynamicString<CharType, AllocatorType>::compact()
+inline void XLib::DynamicString<CharType, AllocatorType>::truncate(uint32 newTruncatedLength)
 {
-	if (capacity > length + 1)
+	XAssert(length >= newTruncatedLength);
+	length = newTruncatedLength;
+	if (buffer)
+		buffer[length] = 0;
+}
+
+template <typename CharType, typename AllocatorType>
+void XLib::DynamicString<CharType, AllocatorType>::growBuffer(uint32 minRequiredBufferSize)
+{
+	if (minRequiredBufferSize <= bufferSize)
+		return;
+
+	// TODO: Maybe align up to 16 or some adaptive pow of 2.
+	bufferSize = minRequiredBufferSize;
+	buffer = (CharType*)AllocatorBase::reallocate(buffer, bufferSize * sizeof(CharType));
+}
+
+template <typename CharType, typename AllocatorType>
+void XLib::DynamicString<CharType, AllocatorType>::growBufferExponentially(uint32 minRequiredBufferSize)
+{
+	if (minRequiredBufferSize <= bufferSize)
+		return;
+
+	// TODO: Maybe align up to 16 or some adaptive pow of 2.
+	bufferSize = max<uint32>(minRequiredBufferSize, bufferSize * BufferExponentialGrowthFactor, InitialBufferSize);
+	buffer = (CharType*)AllocatorBase::reallocate(buffer, bufferSize * sizeof(CharType));
+}
+
+template <typename CharType, typename AllocatorType>
+void XLib::DynamicString<CharType, AllocatorType>::shrinkBuffer()
+{
+	// TODO: Revisit this.
+
+	if (!length && buffer)
 	{
-		capacity = length + 1;
-		buffer = (CharType*)AllocatorBase::reallocate(buffer, capacity * sizeof(CharType));
+		AllocatorBase::release(buffer);
+		buffer = nullptr;
+		bufferSize = 0;
+		return;
 	}
 
-	// TODO: Handle case for length == 0
+	if (bufferSize > length + 1)
+	{
+		bufferSize = length + 1;
+		buffer = (CharType*)AllocatorBase::reallocate(buffer, bufferSize * sizeof(CharType));
+	}
+}
+
+template <typename CharType, typename AllocatorType>
+inline void XLib::DynamicString<CharType, AllocatorType>::setLength(uint32 length)
+{
+	const uint32 requiredBufferSize = length + 1;
+	XAssert(requiredBufferSize <= bufferSize);
+	this->length = length;
+	if (buffer)
+		buffer[length] = 0;
 }
 
 template <typename CharType, typename AllocatorType>

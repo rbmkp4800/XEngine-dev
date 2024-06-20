@@ -1,5 +1,3 @@
-#include <stdio.h>
-
 #include <XLib.h>
 #include <XLib.Algorithm.QuickSort.h>
 #include <XLib.Containers.ArrayList.h>

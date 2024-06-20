@@ -1,10 +1,10 @@
 #pragma once
 
 #include "XLib.h"
+#include "XLib.CharStream.h"
 #include "XLib.Containers.BitArray.h"
 #include "XLib.NonCopyable.h"
 #include "XLib.String.h"
-#include "XLib.Text.h"
 
 namespace XLib
 {
@@ -70,8 +70,22 @@ namespace XLib
 	private:
 		enum class State : uint8;
 
+		class CharsReader : public XLib::LineColumnTrackingCharStreamReaderWrapper<XLib::MemoryCharStreamReader>
+		{
+		private:
+			using Base = XLib::LineColumnTrackingCharStreamReaderWrapper<XLib::MemoryCharStreamReader>;
+
+		private:
+			XLib::MemoryCharStreamReader innerMemoryReader;
+
+		public:
+			inline CharsReader() : Base(innerMemoryReader) {}
+			inline void open(const char* data, uintptr length) { innerMemoryReader.open(data, length); }
+			inline const char* getCurrentPtr() const { return innerMemoryReader.getCurrentPtr(); }
+		};
+
 	private:
-		MemoryTextReaderWithLocation textReader;
+		CharsReader charsReader;
 		InplaceBitArray<64> nestingStackBits; // Each bit is one nested scope. 0 - object, 1 - array.
 		uint8 nestingStackSize = 0;
 		State state = State(0);
@@ -114,9 +128,9 @@ namespace XLib
 		bool isInsideRootScope() const;
 
 		inline JSONErrorCode getErrorCode() const { return errorCode; }
-		inline uint32 getLineNumer() const { return textReader.getLineNumber(); }
-		inline uint32 getColumnNumer() const { return textReader.getColumnNumber(); }
-		inline uintptr getOffset() const { return textReader.getOffset(); }
+		inline uint32 getLineNumer() const { return charsReader.getLineNumber(); }
+		inline uint32 getColumnNumer() const { return charsReader.getColumnNumber(); }
+		//inline uintptr getOffset() const { return charsReader.getOffset(); }
 	};
 
 	const char* JSONErrorCodeToString(JSONErrorCode code);

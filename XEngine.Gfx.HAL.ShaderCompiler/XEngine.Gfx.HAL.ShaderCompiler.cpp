@@ -910,7 +910,7 @@ ShaderCompilationResultRef ShaderCompiler::CompileShader(XLib::StringViewASCII m
 			XTODO(__FUNCTION__": HLSL patching: cursor location is invalid due to preprocessing. Parse #line directives");
 
 			InplaceStringASCIIx2048 xePreprocessorOutput;
-			TextWriteFmt(xePreprocessorOutput, mainSourceFilename, ":",
+			FmtPrintStr(xePreprocessorOutput, mainSourceFilename, ":",
 				hlslPatcherError.location.lineNumber, ":", hlslPatcherError.location.columnNumber,
 				": XE HLSL patcher: error: ", hlslPatcherError.message);
 

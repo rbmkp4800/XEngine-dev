@@ -1,3 +1,5 @@
+#include "XLib.Fmt.h"
+
 #include "XLib.JSON.h"
 
 using namespace XLib;
@@ -20,9 +22,9 @@ enum class JSONReader::State : uint8
 
 bool JSONReader::tryConsumeChar(char c)
 {
-	if (textReader.peekChar() != c)
+	if (charsReader.peek() != c)
 		return false;
-	textReader.getChar();
+	charsReader.get();
 	return true;
 }
 
@@ -30,39 +32,28 @@ bool JSONReader::skipWhitespaceAndComments()
 {
 	for (;;)
 	{
-		TextSkipWhitespaces(textReader);
+		FmtSkipWhitespaces(charsReader);
 
-		if (textReader.peekChar() != '/')
-			break;
-		if (textReader.getAvailableBytes() < 2)
+		if (charsReader.peek() != '/')
 			break;
 
-		const char* potentialCommentStartPtr = textReader.getCurrentPtr();
-
-		const bool isSingleLineComment = potentialCommentStartPtr[1] == '/';
-		const bool isMultilineComment = potentialCommentStartPtr[1] == '*';
-
-		if (!isSingleLineComment && !isMultilineComment)
-			break;
-
-		textReader.getChar();
-		textReader.getChar();
-		XAssert(textReader.getCurrentPtr() == potentialCommentStartPtr + 2);
-
-		if (isSingleLineComment)
+		if (charsReader.peek(1) == '/')
 		{
-			while (textReader.canGetChar() && textReader.getChar() != '\n') {}
+			FmtSkipToNewLine(charsReader);
 		}
-		else
+		else if (charsReader.peek(1) == '*')
 		{
-			for (;;)
+			charsReader.get();
+			charsReader.get();
+
+			for(;;)
 			{
-				if (textReader.getChar() == '*' && textReader.peekChar() == '/')
+				if (charsReader.get() == '*' && charsReader.peek() == '/')
 				{
-					textReader.getChar();
+					charsReader.get();
 					break;
 				}
-				if (!textReader.canGetChar())
+				if (charsReader.isEndOfStream())
 				{
 					errorCode = JSONErrorCode::UnexpectedEndOfFile;
 					return false;
@@ -76,34 +67,34 @@ bool JSONReader::skipWhitespaceAndComments()
 
 bool JSONReader::parseString(JSONString& result)
 {
-	const char openingDoubleQuote = textReader.getChar();
+	const char openingDoubleQuote = charsReader.get();
 	XAssert(openingDoubleQuote == '\"');
 
-	const char* stringBeginPtr = textReader.getCurrentPtr();
+	const char* stringBeginPtr = charsReader.getCurrentPtr();
 
 	uintptr unescapedLength = 0;
 	bool isEscaped = false;
 	for (;;)
 	{
-		if (!textReader.canGetChar())
+		if (charsReader.isEndOfStream())
 		{
 			errorCode = JSONErrorCode::UnexpectedEndOfFile;
 			return false;
 		}
 
-		const char c = textReader.peekChar();
+		const char c = charsReader.peek();
 
 		if (c == '\"')
 			break;
 
 		if (c == '\\')
 		{
-			textReader.getChar();
+			charsReader.get();
 
-			const char e = textReader.peekChar();
+			const char e = charsReader.peek();
 			if (e == '\"' || e == '\\' || e == '/' || e == 'b' || e == 'f' || e == 'n' || e == 'r' || e == 't')
 			{
-				textReader.getChar();
+				charsReader.get();
 			}
 			else if (e == 'u')
 			{
@@ -130,15 +121,15 @@ bool JSONReader::parseString(JSONString& result)
 		}
 		else
 		{
-			textReader.getChar();
+			charsReader.get();
 		}
 
 		unescapedLength++;
 	}
 
-	const char* stringEndPtr = textReader.getCurrentPtr();
+	const char* stringEndPtr = charsReader.getCurrentPtr();
 
-	const char closingDoubleQuote = textReader.getChar();
+	const char closingDoubleQuote = charsReader.get();
 	XAssert(closingDoubleQuote == '\"');
 
 	result.string = StringViewASCII(stringBeginPtr, stringEndPtr);
@@ -152,12 +143,12 @@ bool JSONReader::parseString(JSONString& result)
 
 bool JSONReader::parseIdentifier(StringViewASCII& result)
 {
-	const char* identifierBeginPtr = textReader.getCurrentPtr();
-	const char identifierStartChar = textReader.getChar();
+	const char* identifierBeginPtr = charsReader.getCurrentPtr();
+	const char identifierStartChar = charsReader.get();
 	XAssert(IsIdentifierStartCharacter(identifierStartChar));
-	while (IsIdentifierPartCharacter(textReader.peekChar()))
-		textReader.getChar();
-	const char* identifierEndPtr = textReader.getCurrentPtr();
+	while (IsIdentifierPartCharacter(charsReader.peek()))
+		charsReader.get();
+	const char* identifierEndPtr = charsReader.getCurrentPtr();
 
 	result = StringViewASCII(identifierBeginPtr, identifierEndPtr);
 	return true;
@@ -171,7 +162,7 @@ bool JSONReader::parseNumber(JSONNumber& result)
 
 bool JSONReader::parseKey(JSONString& result)
 {
-	const char c = textReader.peekChar();
+	const char c = charsReader.peek();
 	if (c == '\"')
 	{
 		if (!parseString(result))
@@ -198,7 +189,7 @@ bool JSONReader::parseKey(JSONString& result)
 
 bool JSONReader::parseLiteralValue(JSONValue& result)
 {
-	const char c = textReader.peekChar();
+	const char c = charsReader.peek();
 	if (c == '\"')
 	{
 		if (!parseString(result.string))
@@ -256,7 +247,7 @@ bool JSONReader::consumeCommaAndSkipToNextElementOrPrepareScopeClose()
 	const bool isRootScope = nestingStackSize == 0;
 	if (isRootScope)
 	{
-		if (textReader.canGetChar())
+		if (!charsReader.isEndOfStream())
 		{
 			errorCode = JSONErrorCode::UnexpectedTextAfterRootElement;
 			return false;
@@ -267,7 +258,7 @@ bool JSONReader::consumeCommaAndSkipToNextElementOrPrepareScopeClose()
 
 	// Not root scope.
 
-	if (!textReader.canGetChar())
+	if (charsReader.isEndOfStream())
 	{
 		errorCode = JSONErrorCode::UnexpectedEndOfFile;
 		return false;
@@ -280,7 +271,7 @@ bool JSONReader::consumeCommaAndSkipToNextElementOrPrepareScopeClose()
 	XAssert(nestingStackSize > 0 && nestingStackSize <= 64);
 	const bool currentScopeIsArray = nestingStackBits.isSet(nestingStackSize - 1);
 
-	if (textReader.peekChar() == (currentScopeIsArray ? ']' : '}'))
+	if (charsReader.peek() == (currentScopeIsArray ? ']' : '}'))
 		state = currentScopeIsArray ? State::PendingArrayScopeEnd : State::PendingObjectScopeEnd;
 	else if (commaConsumed)
 		state = currentScopeIsArray ? State::PendingValue : State::PendingKey;
@@ -300,7 +291,7 @@ bool JSONReader::openDocument(const char* text, uintptr length)
 	state = State::Undefined;
 	errorCode = JSONErrorCode::Success;
 
-	textReader.initialize(text, length);
+	charsReader.open(text, length);
 	if (!skipWhitespaceAndComments())
 		return false;
 
@@ -313,7 +304,7 @@ bool JSONReader::readKey(JSONString& result)
 	XAssert(errorCode == JSONErrorCode::Success);
 	XAssert(state == State::PendingKey);
 
-	if (!textReader.canGetChar())
+	if (charsReader.isEndOfStream())
 	{
 		errorCode = JSONErrorCode::UnexpectedEndOfFile;
 		return false;
@@ -322,7 +313,7 @@ bool JSONReader::readKey(JSONString& result)
 		return false;
 	if (!skipWhitespaceAndComments())
 		return false;
-	if (!textReader.canGetChar())
+	if (charsReader.isEndOfStream())
 	{
 		errorCode = JSONErrorCode::UnexpectedEndOfFile;
 		return false;
@@ -344,19 +335,19 @@ bool JSONReader::readValue(JSONValue& result)
 	XAssert(errorCode == JSONErrorCode::Success);
 	XAssert(state == State::PendingValue);
 
-	if (!textReader.canGetChar())
+	if (charsReader.isEndOfStream())
 	{
 		errorCode = JSONErrorCode::UnexpectedEndOfFile;
 		return false;
 	}
 
-	if (textReader.peekChar() == '{')
+	if (charsReader.peek() == '{')
 	{
 		result.type = JSONValueType::Object;
 		state = State::PendingObjectScopeBegin;
 		return true;
 	}
-	if (textReader.peekChar() == '[')
+	if (charsReader.peek() == '[')
 	{
 		result.type = JSONValueType::Array;
 		state = State::PendingArrayScopeBegin;
@@ -382,13 +373,13 @@ bool JSONReader::openObject()
 	nestingStackBits.reset(nestingStackSize);
 	nestingStackSize++;
 
-	const char leftCurlyBracket = textReader.getChar();
+	const char leftCurlyBracket = charsReader.get();
 	XAssert(leftCurlyBracket == '{');
 
 	if (!skipWhitespaceAndComments())
 		return false;
 
-	state = textReader.peekChar() == '}' ? State::PendingObjectScopeEnd : State::PendingKey;
+	state = charsReader.peek() == '}' ? State::PendingObjectScopeEnd : State::PendingKey;
 	return true;
 }
 
@@ -401,7 +392,7 @@ bool JSONReader::closeObject()
 	XAssert(!nestingStackBits.isSet(nestingStackSize - 1));
 	nestingStackSize--;
 
-	const char rightCurlyBracket = textReader.getChar();
+	const char rightCurlyBracket = charsReader.get();
 	XAssert(rightCurlyBracket == '}');
 
 	return consumeCommaAndSkipToNextElementOrPrepareScopeClose();
@@ -420,13 +411,13 @@ bool JSONReader::openArray()
 	nestingStackBits.set(nestingStackSize);
 	nestingStackSize++;
 
-	const char leftSquareBracket = textReader.getChar();
+	const char leftSquareBracket = charsReader.get();
 	XAssert(leftSquareBracket == '[');
 
 	if (!skipWhitespaceAndComments())
 		return false;
 
-	state = textReader.peekChar() == ']' ? State::PendingArrayScopeEnd : State::PendingValue;
+	state = charsReader.peek() == ']' ? State::PendingArrayScopeEnd : State::PendingValue;
 	return true;
 }
 
@@ -439,7 +430,7 @@ bool JSONReader::closeArray()
 	XAssert(nestingStackBits.isSet(nestingStackSize - 1));
 	nestingStackSize--;
 
-	const char rightSquareBracket = textReader.getChar();
+	const char rightSquareBracket = charsReader.get();
 	XAssert(rightSquareBracket == ']');
 
 	return consumeCommaAndSkipToNextElementOrPrepareScopeClose();

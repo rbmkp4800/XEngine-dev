@@ -11,6 +11,7 @@
 // TODO: Maybe rename `ArrayList` to `DynamicArrayList`?
 // TODO: Asserts everywhere.
 // TODO: Remove CounterType from DynamicArrayList and just use uint32.
+// TODO: Do for `DynamicArrayList` same thing I did for `DynamicString`: `growBuffer`, `growBufferExponentially` etc.
 
 #include "XLib.h"
 #include "XLib.Allocation.h"
@@ -290,7 +291,7 @@ namespace XLib
 		}
 
 		const bool expandedExistingBufferInplace =
-			AllocatorBase::reallocateInplace(buffer, capacity * sizeof(Type));
+			AllocatorBase::tryReallocateInplace(buffer, capacity * sizeof(Type));
 		if (expandedExistingBufferInplace)
 			return;
 

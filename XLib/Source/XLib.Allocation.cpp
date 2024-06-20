@@ -20,13 +20,6 @@ void SystemHeapAllocator::Release(void* ptr)
 	HeapFree(GetProcessHeap(), 0, ptr);
 }
 
-bool SystemHeapAllocator::TryResize(void* ptr, uintptr size)
-{
-	XAssert(ptr);
-	XAssert(size);
-	return HeapReAlloc(GetProcessHeap(), HEAP_REALLOC_IN_PLACE_ONLY, ptr, size) != nullptr;
-}
-
 void* SystemHeapAllocator::Reallocate(void* ptr, uintptr size)
 {
 	if (!size)
@@ -40,4 +33,11 @@ void* SystemHeapAllocator::Reallocate(void* ptr, uintptr size)
 		return HeapReAlloc(GetProcessHeap(), 0, ptr, size);
 	else
 		return HeapAlloc(GetProcessHeap(), 0, size);
+}
+
+bool SystemHeapAllocator::TryReallocateInplace(void* ptr, uintptr size)
+{
+	XAssert(ptr);
+	XAssert(size);
+	return HeapReAlloc(GetProcessHeap(), HEAP_REALLOC_IN_PLACE_ONLY, ptr, size) != nullptr;
 }

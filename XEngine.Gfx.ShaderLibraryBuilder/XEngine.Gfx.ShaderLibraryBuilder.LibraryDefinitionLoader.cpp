@@ -1,6 +1,6 @@
+#include <XLib.Fmt.h>
 #include <XLib.String.h>
 #include <XLib.System.File.h>
-#include <XLib.Text.h>
 
 #include <XEngine.XStringHash.h>
 
@@ -143,7 +143,7 @@ static Shader* LibFindShader(LibraryDefinition& lib, uint64 nameXSH)
 void LibraryDefinitionLoader::reportError(const char* message, Cursor jsonCursor)
 {
 	// TODO: Print absolute path.
-	TextWriteFmtStdOut(jsonPath, ':', jsonCursor.lineNumber, ':', jsonCursor.columnNumber,
+	FmtPrintStdOut(jsonPath, ':', jsonCursor.lineNumber, ':', jsonCursor.columnNumber,
 		": error: ", message, '\n');
 }
 
@@ -153,7 +153,7 @@ void LibraryDefinitionLoader::reportJSONError()
 	XAssert(jsonError != JSONErrorCode::Success);
 
 	// TODO: Print absolute path.
-	TextWriteFmtStdOut(jsonPath, ':', jsonReader.getLineNumer(), ':', jsonReader.getColumnNumer(),
+	FmtPrintStdOut(jsonPath, ':', jsonReader.getLineNumer(), ':', jsonReader.getColumnNumer(),
 		": error: JSON: ", JSONErrorCodeToString(jsonError), '\n');
 }
 
@@ -179,7 +179,7 @@ bool LibraryDefinitionLoader::consumeKeyWithObjectValue(StringViewASCII& resultK
 bool LibraryDefinitionLoader::consumeSpecificKeyWithStringValue(const char* expectedKey, StringViewASCII& resultStringValue)
 {
 	InplaceStringASCIIx128 propertyExpectedErrorMessage;
-	TextWriteFmt(propertyExpectedErrorMessage, '\'', expectedKey, "' property expected");
+	FmtPrintStr(propertyExpectedErrorMessage, '\'', expectedKey, "' property expected");
 
 	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!jsonReader.isEndOfObject(), propertyExpectedErrorMessage.getCStr(), getJSONCursor());
 
@@ -203,7 +203,7 @@ bool LibraryDefinitionLoader::consumeSpecificKeyWithStringValue(const char* expe
 bool LibraryDefinitionLoader::consumeSpecificKeyWithObjectValue(const char* expectedKey)
 {
 	InplaceStringASCIIx128 propertyExpectedErrorMessage;
-	TextWriteFmt(propertyExpectedErrorMessage, '\'', expectedKey, "' property expected");
+	FmtPrintStr(propertyExpectedErrorMessage, '\'', expectedKey, "' property expected");
 
 	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!jsonReader.isEndOfObject(), propertyExpectedErrorMessage.getCStr(), getJSONCursor());
 
@@ -226,7 +226,7 @@ bool LibraryDefinitionLoader::consumeSpecificKeyWithObjectValue(const char* expe
 bool LibraryDefinitionLoader::consumeSpecificKeyWithArrayValue(const char* expectedKey)
 {
 	InplaceStringASCIIx128 propertyExpectedErrorMessage;
-	TextWriteFmt(propertyExpectedErrorMessage, '\'', expectedKey, "' property expected");
+	FmtPrintStr(propertyExpectedErrorMessage, '\'', expectedKey, "' property expected");
 
 	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!jsonReader.isEndOfObject(), propertyExpectedErrorMessage.getCStr(), getJSONCursor());
 
@@ -595,14 +595,13 @@ bool LibraryDefinitionLoader::load(const char* jsonPath)
 		file.open(jsonPath, FileAccessMode::Read, FileOpenMode::OpenExisting);
 		if (!file.isOpen())
 		{
-			TextWriteFmtStdOut("Cannot open library definition file '", jsonPath, "'");
+			FmtPrintStdOut("Cannot open library definition file '", jsonPath, "'");
 			return false;
 		}
 
 		const uint32 fileSize = XCheckedCastU32(file.getSize());
-
-		// TODO: "Unsafe" resize to avoid zeroing out memory?
-		text.resize(fileSize);
+		text.growBufferToFitLength(fileSize);
+		text.setLength(fileSize);
 		file.read(text.getData(), fileSize);
 		file.close();
 	}

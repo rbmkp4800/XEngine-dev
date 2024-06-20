@@ -1,3 +1,5 @@
+#include <XLib.Fmt.h>
+
 #include "XEngine.Gfx.HAL.ShaderCompiler.HLSLPatcher.h"
 
 using namespace XLib;
@@ -104,43 +106,31 @@ bool HLSLPatcher::Lexer::advance(Error& error)
 
 	for (;;)
 	{
-		TextSkipWhitespaces(textReader);
+		FmtSkipWhitespaces(charsReader);
 
-		if (textReader.peekChar() != '/')
+		if (charsReader.peek() != '/')
 			break;
-		if (textReader.getAvailableBytes() < 2)
-			break;
-
-		const char* potentialCommentStartPtr = textReader.getCurrentPtr();
-
-		const bool isSingleLineComment = potentialCommentStartPtr[1] == '/';
-		const bool isMultilineComment = potentialCommentStartPtr[1] == '*';
-
-		if (!isSingleLineComment && !isMultilineComment)
-			break;
-
-		textReader.getChar();
-		textReader.getChar();
-		XAssert(textReader.getCurrentPtr() == potentialCommentStartPtr + 2);
-
-		if (isSingleLineComment)
+		if (charsReader.peek(1) == '/')
 		{
-			while (textReader.canGetChar() && textReader.getChar() != '\n') {}
+			FmtSkipToNewLine(charsReader);
 		}
-		else
+		else if (charsReader.peek(1) == '*')
 		{
-			for (;;)
+			charsReader.get();
+			charsReader.get();
+
+			for(;;)
 			{
-				if (textReader.getChar() == '*' && textReader.peekChar() == '/')
+				if (charsReader.get() == '*' && charsReader.peek() == '/')
 				{
-					textReader.getChar();
+					charsReader.get();
 					break;
 				}
-				if (!textReader.canGetChar())
+				if (charsReader.isEndOfStream())
 				{
 					error.message = "lexer: unexpected end-of-file in multiline comment";
-					error.location.lineNumber = textReader.getLineNumber();
-					error.location.lineNumber = textReader.getColumnNumber();
+					error.location.lineNumber = charsReader.getLineNumber();
+					error.location.columnNumber = charsReader.getColumnNumber();
 					return false;
 				}
 			}
@@ -149,36 +139,40 @@ bool HLSLPatcher::Lexer::advance(Error& error)
 
 	// Process lexeme.
 
-	if (!textReader.canGetChar())
+	if (charsReader.isEndOfStream())
 	{
 		currentLexeme.string = {};
-		currentLexeme.location.lineNumber = textReader.getLineNumber();
-		currentLexeme.location.columnNumber = textReader.getColumnNumber();
+		currentLexeme.location.lineNumber = charsReader.getLineNumber();
+		currentLexeme.location.columnNumber = charsReader.getColumnNumber();
 		currentLexeme.type = LexemeType::EndOfStream;
 		return true;
 	}
 
-	const uint32 lexemeBeginLineNumber = textReader.getLineNumber();
-	const uint32 lexemeBeginColumnNumber = textReader.getColumnNumber();
-	const char* lexemeBegin = textReader.getCurrentPtr();
+	const uint32 lexemeBeginLineNumber = charsReader.getLineNumber();
+	const uint32 lexemeBeginColumnNumber = charsReader.getColumnNumber();
+	const char* lexemeBeginPtr = charsReader.getCurrentPtr();
 
-	if (Char::IsLetter(textReader.peekCharUnsafe()) || textReader.peekCharUnsafe() == '_')
+	const char lexemeFirstChar = charsReader.peek();
+
+	// Identifier
+	if (Char::IsLetter(lexemeFirstChar) || lexemeFirstChar == '_')
 	{
-		textReader.getCharUnsafe();
+		charsReader.get();
 
-		while (textReader.canGetChar() && (Char::IsLetterOrDigit(textReader.peekCharUnsafe()) || textReader.peekCharUnsafe() == '_'))
-			textReader.getCharUnsafe();
+		while (Char::IsLetterOrDigit(charsReader.peek()) || charsReader.peek() == '_')
+			charsReader.get();
 
-		currentLexeme.string = StringViewASCII(lexemeBegin, textReader.getCurrentPtr());
+		currentLexeme.string = StringViewASCII(lexemeBeginPtr, charsReader.getCurrentPtr());
 		currentLexeme.location.lineNumber = lexemeBeginLineNumber;
 		currentLexeme.location.columnNumber = lexemeBeginColumnNumber;
 		currentLexeme.type = LexemeType::Identifier;
 		return true;
 	}
 
-	if (textReader.peekCharUnsafe() == '\"')
+	// String literal
+	if (lexemeFirstChar == '\"')
 	{
-		textReader.getCharUnsafe();
+		charsReader.get();
 
 		enum class EscapeState : uint8
 		{
@@ -190,15 +184,15 @@ bool HLSLPatcher::Lexer::advance(Error& error)
 
 		for (;;)
 		{
-			if (!textReader.canGetChar())
+			if (charsReader.isEndOfStream())
 			{
 				error.message = "lexer: unexpected end-of-file in string literal";
-				error.location.lineNumber = textReader.getLineNumber();
-				error.location.lineNumber = textReader.getColumnNumber();
+				error.location.lineNumber = charsReader.getLineNumber();
+				error.location.columnNumber = charsReader.getColumnNumber();
 				return false;
 			}
 
-			const char c = textReader.peekChar();
+			const char c = charsReader.peek();
 
 			if (c == '\"')
 			{
@@ -221,8 +215,8 @@ bool HLSLPatcher::Lexer::advance(Error& error)
 				else
 				{
 					error.message = "lexer: unexpected end-of-line in string literal";
-					error.location.lineNumber = textReader.getLineNumber();
-					error.location.lineNumber = textReader.getColumnNumber();
+					error.location.lineNumber = charsReader.getLineNumber();
+					error.location.columnNumber = charsReader.getColumnNumber();
 					return false;
 				}
 			}
@@ -237,28 +231,29 @@ bool HLSLPatcher::Lexer::advance(Error& error)
 					escapeState = EscapeState::Normal;
 			}
 
-			textReader.getChar();
+			charsReader.get();
 		}
 
-		const char closingQuote = textReader.getChar();
+		const char closingQuote = charsReader.get();
 		XAssert(closingQuote == '\"');
 
-		currentLexeme.string = StringViewASCII(lexemeBegin, textReader.getCurrentPtr());
+		currentLexeme.string = StringViewASCII(lexemeBeginPtr, charsReader.getCurrentPtr());
 		currentLexeme.location.lineNumber = lexemeBeginLineNumber;
 		currentLexeme.location.columnNumber = lexemeBeginColumnNumber;
 		currentLexeme.type = LexemeType::StringLiteral;
 		return true;
 	}
 
+	// Numeric literal
 	// This is dummy implementation that works as far as we do not need to lex numeric literals properly :)
-	if (Char::IsDigit(textReader.peekCharUnsafe()))
+	if (Char::IsDigit(lexemeFirstChar))
 	{
-		textReader.getCharUnsafe();
+		charsReader.get();
 
-		while (textReader.canGetChar() && (Char::IsLetterOrDigit(textReader.peekCharUnsafe()) || textReader.peekCharUnsafe() == '_'))
-			textReader.getCharUnsafe();
+		while (Char::IsLetterOrDigit(charsReader.peek()) || charsReader.peek() == '_')
+			charsReader.get();
 
-		currentLexeme.string = StringViewASCII(lexemeBegin, textReader.getCurrentPtr());
+		currentLexeme.string = StringViewASCII(lexemeBeginPtr, charsReader.getCurrentPtr());
 		currentLexeme.location.lineNumber = lexemeBeginLineNumber;
 		currentLexeme.location.columnNumber = lexemeBeginColumnNumber;
 		currentLexeme.type = LexemeType::NumericLiteral;
@@ -266,27 +261,25 @@ bool HLSLPatcher::Lexer::advance(Error& error)
 	}
 
 
-	if (textReader.getAvailableBytes() >= 2 &&
-		textReader.getCurrentPtr()[0] == ':' &&
-		textReader.getCurrentPtr()[1] == ':')
+	if (lexemeFirstChar == ':' && charsReader.peek(1) == ':')
 	{
-		textReader.getChar();
-		textReader.getChar();
-		currentLexeme.string = StringViewASCII(lexemeBegin, textReader.getCurrentPtr());
+		charsReader.get();
+		charsReader.get();
+		currentLexeme.string = StringViewASCII(lexemeBeginPtr, charsReader.getCurrentPtr());
 		currentLexeme.location.lineNumber = lexemeBeginLineNumber;
 		currentLexeme.location.columnNumber = lexemeBeginColumnNumber;
 		currentLexeme.type = LexemeType::DoubleColon;
 		return true;
 	}
 
-	if (textReader.peekCharUnsafe() > 32 && textReader.peekCharUnsafe() < 127)
+	if (lexemeFirstChar > 32 && lexemeFirstChar < 127)
 	{
-		const char c = textReader.getCharUnsafe();
+		charsReader.get();
 
-		currentLexeme.string = StringViewASCII(lexemeBegin, textReader.getCurrentPtr());
+		currentLexeme.string = StringViewASCII(lexemeBeginPtr, charsReader.getCurrentPtr());
 		currentLexeme.location.lineNumber = lexemeBeginLineNumber;
 		currentLexeme.location.columnNumber = lexemeBeginColumnNumber;
-		currentLexeme.type = LexemeType(c);
+		currentLexeme.type = LexemeType(lexemeFirstChar);
 		return true;
 	}
 
@@ -430,7 +423,7 @@ bool HLSLPatcher::processAttribute(Attribute& attribute, Error& error)
 	}*/
 	else if (attributeName.startsWith("xe::"))
 	{
-		TextWriteFmt(error.message, "unknown XE attribute '", attributeName, "'");
+		FmtPrintStr(error.message, "unknown XE attribute '", attributeName, "'");
 		error.location = attributeNameLocation;
 		return false;
 	}
@@ -510,7 +503,7 @@ bool HLSLPatcher::processVariableDefinitionForBinding(const BindingInfo& binding
 
 		// Write ':register(s#);' to output.
 		InplaceStringASCIIx32 registerString;
-		TextWriteFmt(registerString, ":register(s", bindingInfo.staticSampler.shaderRegister, ");");
+		FmtPrintStr(registerString, ":register(s", bindingInfo.staticSampler.shaderRegister, ");");
 		composer.write(registerString);
 		composer.blankOutInputRangeUpToCurrentPosition();
 
@@ -629,10 +622,7 @@ bool HLSLPatcher::processVariableDefinitionForBinding(const BindingInfo& binding
 			XAssertUnreachableCode();
 
 		InplaceStringASCIIx32 registerString;
-		registerString.append(":register(");
-		registerString.append(shaderRegisterChar);
-		TextWriteFmt(registerString, bindingInfo.resource.shaderRegister);
-		registerString.append(");");
+		FmtPrintStr(registerString, ":register(", shaderRegisterChar, registerString, bindingInfo.resource.shaderRegister, ");");
 		composer.write(registerString);
 	}
 
@@ -651,7 +641,7 @@ bool HLSLPatcher::ExtractBindingInfo(const PipelineLayout& pipelineLayout,
 	{
 		if (!bindingNestedName.isEmpty())
 		{
-			TextWriteFmt(error.message, "pipeline binding '", bindingRootName, "': nested binding name is not expected");
+			FmtPrintStr(error.message, "pipeline binding '", bindingRootName, "': nested binding name is not expected");
 			error.location = bindingNestedNameLocation;
 			return false;
 		}
@@ -664,7 +654,7 @@ bool HLSLPatcher::ExtractBindingInfo(const PipelineLayout& pipelineLayout,
 	const sint16 pipelineBindingIndex = pipelineLayout.findBinding(bindingRootName);
 	if (pipelineBindingIndex < 0)
 	{
-		TextWriteFmt(error.message, "unknown pipeline binding '", bindingRootName, "'");
+		FmtPrintStr(error.message, "unknown pipeline binding '", bindingRootName, "'");
 		error.location = bindingRootNameLocation;
 		return false;
 	}
@@ -678,7 +668,7 @@ bool HLSLPatcher::ExtractBindingInfo(const PipelineLayout& pipelineLayout,
 
 	if (pipelineBinding.type == PipelineBindingType::InplaceConstants)
 	{
-		TextWriteFmt(error.message, "pipeline binding '", bindingRootName, "': inplace constants bindings are not supported for now");
+		FmtPrintStr(error.message, "pipeline binding '", bindingRootName, "': inplace constants bindings are not supported for now");
 		error.location = bindingRootNameLocation;
 		return false;
 	}
@@ -704,7 +694,7 @@ bool HLSLPatcher::ExtractBindingInfo(const PipelineLayout& pipelineLayout,
 	{
 		if (bindingNestedName.isEmpty())
 		{
-			TextWriteFmt(error.message, "pipeline binding '", bindingRootName, "': descriptor set binding name missing");
+			FmtPrintStr(error.message, "pipeline binding '", bindingRootName, "': descriptor set binding name missing");
 			error.location = bindingRootNameLocation;
 			return false;
 		}
@@ -715,7 +705,7 @@ bool HLSLPatcher::ExtractBindingInfo(const PipelineLayout& pipelineLayout,
 
 		if (descriptorSetBindingIndex < 0)
 		{
-			TextWriteFmt(error.message, "unknown descriptor set binding '", bindingNestedName, "'");
+			FmtPrintStr(error.message, "unknown descriptor set binding '", bindingNestedName, "'");
 			error.location = bindingNestedNameLocation;
 			return false;
 		}
@@ -741,7 +731,7 @@ bool HLSLPatcher::ExtractBindingInfo(const PipelineLayout& pipelineLayout,
 	}
 	else if (pipelineBinding.type == PipelineBindingType::DescriptorArray)
 	{
-		TextWriteFmt(error.message, "pipeline binding '", bindingRootName, "': descriptor array bindings are not supported for now");
+		FmtPrintStr(error.message, "pipeline binding '", bindingRootName, "': descriptor array bindings are not supported for now");
 		error.location = bindingRootNameLocation;
 		return false;
 	}
@@ -751,7 +741,7 @@ bool HLSLPatcher::ExtractBindingInfo(const PipelineLayout& pipelineLayout,
 	if (pipelineBinding.type != PipelineBindingType::DescriptorSet &&
 		!bindingNestedName.isEmpty())
 	{
-		TextWriteFmt(error.message, "pipeline binding '", bindingRootName, "': nested binding name is not expected");
+		FmtPrintStr(error.message, "pipeline binding '", bindingRootName, "': nested binding name is not expected");
 		error.location = bindingNestedNameLocation;
 		return false;
 	}

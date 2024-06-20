@@ -17,7 +17,7 @@ namespace XLib
 
 		void* allocate(uintptr size) { return AllocatorType::Allocate(size); }
 		void* reallocate(void* ptr, uintptr size) { return AllocatorType::Reallocate(ptr, size); }
-		bool reallocateInplace(void* ptr, uintptr size) { return AllocatorType::ReallocateInplace(ptr, size); }
+		bool tryReallocateInplace(void* ptr, uintptr size) { return AllocatorType::TryReallocateInplace(ptr, size); }
 		void release(void* ptr) { AllocatorType::Release(ptr); }
 	};
 
@@ -33,7 +33,7 @@ namespace XLib
 
 		void* allocate(uintptr size) { return allocatorInstance->allocate(size); }
 		void* reallocate(void* ptr, uintptr size) { return allocatorInstance->reallocate(ptr, size); }
-		bool reallocateInplace(void* ptr, uintptr size) { return allocatorInstance->reallocateInplace(ptr, size); }
+		bool tryReallocateInplace(void* ptr, uintptr size) { return allocatorInstance->tryReallocateInplace(ptr, size); }
 		void release(void* ptr) { allocatorInstance->release(ptr); }
 	};
 
@@ -57,8 +57,8 @@ namespace XLib
 	public:
 		static void* Allocate(uintptr size, uint32 alignment = 0);
 		static void Release(void* ptr);
-		static bool TryResize(void* ptr, uintptr newSize);
 		static void* Reallocate(void* ptr, uintptr newSize, uint32 newAlignment = 0);
+		static bool TryReallocateInplace(void* ptr, uintptr newSize);
 
 		template <typename AllocatorType>
 		static void Override();
@@ -70,8 +70,8 @@ namespace XLib
 
 		static void* Allocate(uintptr size);
 		static void Release(void* ptr);
-		static bool TryResize(void* ptr, uintptr size);
 		static void* Reallocate(void* ptr, uintptr size);
+		static bool TryReallocateInplace(void* ptr, uintptr size);
 	};
 
 	class FixedBlockLinearAllocator : public XLib::NonCopyable

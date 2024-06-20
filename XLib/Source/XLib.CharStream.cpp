@@ -5,6 +5,39 @@
 
 using namespace XLib;
 
+
+// Memory streams //////////////////////////////////////////////////////////////////////////////////
+
+void MemoryCharStreamWriter::nullTerminate()
+{
+	if (bufferOffset < bufferSize)
+		buffer[bufferOffset] = 0;
+	else
+		buffer[bufferSize - 1] = 0;
+}
+
+void MemoryCharStreamWriter::write(const char* data, uintptr length)
+{
+	const uintptr clippedLength = min<uintptr>(length, bufferSize - bufferOffset);
+	memoryCopy(buffer + bufferOffset, data, clippedLength);
+}
+
+void MemoryCharStreamWriter::write(const char* cstr)
+{
+	const char *srcIt = cstr;
+	char* bufferIt = buffer + bufferOffset;
+	char* bufferEnd = buffer + bufferSize;
+	while (*srcIt && bufferIt != bufferEnd)
+	{
+		*bufferIt = *srcIt;
+		srcIt++;
+		bufferIt++;
+	}
+
+	bufferOffset = bufferIt - buffer;
+}
+
+
 // File streams ////////////////////////////////////////////////////////////////////////////////////
 
 bool FileCharStreamReader::open(const char* name, uint32 bufferSize, void* externalBuffer)
@@ -16,14 +49,16 @@ bool FileCharStreamReader::open(const char* name, uint32 bufferSize, void* exter
 	if (!fileOpenResult.status)
 		return false;
 
-	fileHandle = fileOpenResult.handle;
-	fileHandleIsInternal = true;
+	this->fileHandle = fileOpenResult.handle;
+	this->fileHandleIsInternal = true;
 
-	bufferIsInternal = externalBuffer == nullptr;
-	buffer = (char*)(bufferIsInternal ? externalBuffer : SystemHeapAllocator::Allocate(bufferSize));
+	this->bufferIsInternal = externalBuffer == nullptr;
+	this->buffer = (char*)(bufferIsInternal ? externalBuffer : SystemHeapAllocator::Allocate(bufferSize));
 
 	this->bufferSize = bufferSize;
-	this->bufferOffet = 0;
+	this->bufferOffset = 0;
+
+	return true;
 }
 
 void FileCharStreamReader::open(FileHandle fileHandle, uint32 bufferSize, void* externalBuffer)
@@ -37,20 +72,16 @@ void FileCharStreamReader::open(FileHandle fileHandle, uint32 bufferSize, void* 
 	this->buffer = (char*)(bufferIsInternal ? externalBuffer : SystemHeapAllocator::Allocate(bufferSize));
 
 	this->bufferSize = bufferSize;
-	this->bufferOffet = 0;
+	this->bufferOffset = 0;
 }
 
 void FileCharStreamReader::close()
 {
 	if (fileHandleIsInternal && fileHandle != FileHandle::Zero)
-	{
 		File::Close(fileHandle);
-	}
 
 	if (bufferIsInternal && buffer)
-	{
 		SystemHeapAllocator::Release(buffer);
-	}
 
 	memorySet(this, 0, sizeof(*this));
 }
@@ -66,28 +97,176 @@ void FileCharStreamWriter::open(FileHandle fileHandle, uint32 bufferSize, void* 
 	this->buffer = (char*)(bufferIsInternal ? externalBuffer : SystemHeapAllocator::Allocate(bufferSize));
 
 	this->bufferSize = bufferSize;
-	this->bufferOffet = 0;
+	this->bufferOffset = 0;
 }
 
 void FileCharStreamWriter::close()
 {
+	flush();
+
 	if (fileHandleIsInternal && fileHandle != FileHandle::Zero)
-	{
 		File::Close(fileHandle);
-	}
 
 	if (bufferIsInternal && buffer)
-	{
 		SystemHeapAllocator::Release(buffer);
-	}
 
 	memorySet(this, 0, sizeof(*this));
 }
 
 void FileCharStreamWriter::flush()
 {
-	File::Write(fileHandle, buffer, bufferOffet);
-	bufferOffet = 0;
+	if (bufferOffset > 0)
+		File::Write(fileHandle, buffer, bufferOffset);
+	bufferOffset = 0;
+}
+
+void FileCharStreamWriter::write(const char* data, uintptr length)
+{
+	if (length > bufferSize)
+	{
+		File::Write(fileHandle, buffer, bufferOffset);
+		File::Write(fileHandle, data, length);
+		bufferOffset = 0;
+	}
+	else
+	{
+		const uint32 bufferFreeSpaceSize = bufferSize - bufferOffset;
+		if (length >= bufferFreeSpaceSize)
+		{
+			const uint32 firstCopySize = bufferFreeSpaceSize;
+			const uint32 secondCopySize = uint32(length) - firstCopySize;
+			File::Write(fileHandle, buffer, bufferSize);
+			bufferOffset = secondCopySize;
+			if (secondCopySize > 0)
+				memoryCopy(buffer, data + firstCopySize, secondCopySize);
+		}
+		else
+		{
+			memoryCopy(buffer + bufferOffset, data, length);
+			bufferOffset += uint32(length);
+		}
+	}
+
+	XAssert(bufferOffset < bufferSize);
+}
+
+void FileCharStreamWriter::write(const char* cstr)
+{
+	const char *srcIt = cstr;
+	char* bufferIt = buffer + bufferOffset;
+	char* bufferEnd = buffer + bufferSize;
+
+	for (;;)
+	{
+		while (*srcIt && bufferIt != bufferEnd)
+		{
+			*bufferIt = *srcIt;
+			srcIt++;
+			bufferIt++;
+		}
+
+		bufferOffset = uint32(bufferEnd - buffer);
+
+		if (bufferOffset == bufferSize)
+		{
+			File::Write(fileHandle, buffer, bufferOffset);
+			bufferOffset = 0;
+			bufferIt = buffer;
+		}
+
+		if (!*srcIt)
+			break;
+	}
+
+	XAssert(bufferOffset < bufferSize);
+}
+
+void VirtualStringWriter::growBufferExponentially(uint32 minRequiredBufferSize)
+{
+	if (minRequiredBufferSize <= bufferSize)
+		return;
+
+	// TODO: Maybe align up to 16 or some adaptive pow of 2.
+
+	uint32 newBufferSize = minRequiredBufferSize;
+	XAssert(newBufferSize <= maxBufferSize);
+
+	const uint32 expGrownBufferSize = min<uint32>(bufferSize * BufferExponentialGrowthFactor, maxBufferSize);
+	if (newBufferSize < expGrownBufferSize)
+		newBufferSize = expGrownBufferSize;
+
+	virtualStringRef.growBuffer(newBufferSize);
+	buffer = virtualStringRef.getBuffer();
+	bufferSize = virtualStringRef.getBufferSize();
+	XAssert(bufferSize >= newBufferSize);
+}
+
+void VirtualStringWriter::write(const char* data, uintptr length)
+{
+	const uint32 lengthU32 = XCheckedCastU32(length);
+
+	uint32 clippedLength = lengthU32;
+	const uint32 requiredBufferSize = bufferOffset + lengthU32 + 1;
+	if (bufferSize < requiredBufferSize)
+	{
+		const bool overflow = maxBufferSize < requiredBufferSize;
+		growBufferExponentially(overflow ? maxBufferSize : requiredBufferSize);
+
+		if (overflow)
+		{
+			const uint32 maxLength = maxBufferSize - 1;
+			clippedLength = maxLength - bufferOffset;
+		}
+	}
+
+	memoryCopy(buffer + bufferOffset, data, clippedLength);
+}
+
+void VirtualStringWriter::write(const char* cstr)
+{
+	const char *srcIt = cstr;
+	char* bufferIt = buffer + bufferOffset;
+	char* bufferEnd = buffer + bufferSize - 1;
+
+	while (*srcIt)
+	{
+		if (bufferIt == bufferEnd)
+		{
+			bufferOffset = uint32(bufferIt - buffer);
+
+			if (bufferSize == maxBufferSize)
+				return;
+
+			const uint32 requiredBufferSize = bufferOffset + 2;
+			const bool overflow = maxBufferSize < requiredBufferSize;
+			growBufferExponentially(overflow ? maxBufferSize : requiredBufferSize);
+
+			bufferIt = buffer + bufferOffset;
+			bufferEnd = buffer + bufferSize - 1;
+		}
+
+		*bufferIt = *srcIt;
+		srcIt++;
+		bufferIt++;
+	}
+
+	bufferOffset = uint32(bufferIt - buffer);
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void VirtualStringWriter::open(VirtualStringRefASCII virutalStringRef)
+{
+	buffer = virtualStringRef.getBuffer();
+	bufferSize = virtualStringRef.getBufferSize();
+	bufferOffset = virtualStringRef.getLength();
+	maxBufferSize = virtualStringRef.getMaxBufferSize();
+}
+
+void VirtualStringWriter::flush()
+{
+	virtualStringRef.setLength(bufferOffset);
 }
 
 

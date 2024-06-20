@@ -1,7 +1,6 @@
 #include <XLib.FileSystem.h>
 #include <XLib.Path.h>
 #include <XLib.System.File.h>
-#include <XLib.Text.h>
 
 #include "XEngine.Gfx.ShaderLibraryBuilder.SourceCache.h"
 
@@ -38,7 +37,8 @@ static bool ReadTextFile(const char* path, DynamicStringASCII& resultText)
 	const uint32 fileSize = XCheckedCastU32(file.getSize());
 
 	DynamicStringASCII text;
-	text.resize(fileSize);
+	text.growBufferToFitLength(fileSize);
+	text.setLength(fileSize);
 
 	const bool readResult = file.read(text.getData(), fileSize);
 

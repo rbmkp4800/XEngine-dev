@@ -1,9 +1,9 @@
 #pragma once
 
 #include <XLib.h>
+#include <XLib.CharStream.h>
 #include <XLib.NonCopyable.h>
 #include <XLib.String.h>
-#include <XLib.Text.h>
 
 #include <XEngine.Gfx.HAL.Shared.h>
 
@@ -48,21 +48,41 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 		class Lexer
 		{
 		private:
-			XLib::MemoryTextReaderWithLocation textReader;
+			class CharsReader : public XLib::LineColumnTrackingCharStreamReaderWrapper<XLib::MemoryCharStreamReader>
+			{
+			private:
+				using Base = XLib::LineColumnTrackingCharStreamReaderWrapper<XLib::MemoryCharStreamReader>;
+
+			private:
+				XLib::MemoryCharStreamReader innerMemoryReader;
+
+			public:
+				inline CharsReader(const char* data, uintptr length) : innerMemoryReader(data, length), Base(innerMemoryReader) {}
+
+				inline const char* getBeginPtr() const { return innerMemoryReader.getBeginPtr(); }
+				inline const char* getEndPtr() const { return innerMemoryReader.getEndPtr(); }
+				inline const char* getCurrentPtr() const { return innerMemoryReader.getCurrentPtr(); }
+			};
+
+		private:
+			CharsReader charsReader;
 			Lexeme currentLexeme = {};
 
 		public:
-			inline Lexer(XLib::StringViewASCII sourceText) : textReader(sourceText.getData(), sourceText.getLength()) {}
+			inline Lexer(XLib::StringViewASCII sourceText) : charsReader(sourceText.getData(), sourceText.getLength()) {}
 			~Lexer() = default;
 
 			bool advance(Error& error);
 
 			inline Lexeme peekLexeme() const { return currentLexeme; }
 			inline bool hasLexeme() const { return currentLexeme.type != LexemeType(0); }
-			inline const char* getBeginPtr() const { return textReader.getBeginPtr(); }
-			inline const char* getEndPtr() const { return textReader.getEndPtr(); }
+
+			inline const char* getBeginPtr() const { return charsReader.getBeginPtr(); }
+			inline const char* getEndPtr() const { return charsReader.getEndPtr(); }
 		};
 
+
+		XTODO("Do we need `HLSLPatcher::OutputComposer` as separate nested class or we can just put this logic into `HLSLPatcher`?")
 		// Composes output via ranges of input data (via lexer) or user provided data.
 		// TODO: Maintains consistent line/column location with input, via whitespaces and #line directives.
 		class OutputComposer

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "XLib.h"
 #include "XLib.CharStream.h"
 #include "XLib.String.h"
@@ -113,7 +115,7 @@ namespace XLib
 	//void FmtGetDecFP32();
 	//void FmtGetDecFP64();
 	//void FmtGetLine();
-	//void FmtSkipToNewLine();
+	template <typename CharStreamReader> inline void FmtSkipToNewLine(CharStreamReader& reader);
 	template <typename CharStreamReader> inline void FmtSkipWhitespaces(CharStreamReader& reader);
 
 
@@ -387,6 +389,21 @@ inline void XLib::FmtPutHex64(CharStreamWriter& writer, uint64 value, uint8 lzWi
 }
 
 
+template <typename CharStreamReader>
+inline void XLib::FmtSkipToNewLine(CharStreamReader& reader)
+{
+	while (!reader.isEndOfStream() && reader.get() != '\n')
+	{ }
+}
+
+template <typename CharStreamReader>
+inline void XLib::FmtSkipWhitespaces(CharStreamReader& reader)
+{
+	while (Char::IsWhitespace(reader.peek()))
+		reader.get();
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template <typename CharStreamWriter, typename ... FmtArgs>
@@ -419,4 +436,12 @@ inline void XLib::FmtPrintDbgOut(const FmtArgs& ... fmtArgs)
 	FmtPrint(bufferStream, fmtArgs ...);
 	bufferStream.nullTerminate();
 	Debug::Output(buffer);
+}
+
+template <typename ... FmtArgs>
+inline void XLib::FmtPrintStr(VirtualStringRefASCII string, const FmtArgs& ... fmtArgs)
+{
+	VirtualStringWriter stringWriter(string);
+	FmtPrint(stringWriter, fmtArgs ...);
+	stringWriter.flush();
 }
