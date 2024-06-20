@@ -2,23 +2,12 @@
 
 #include "XLib.System.File.h"
 
+#include "XLib.System.Threading.Atomics.h"
+
 #undef min
 #undef max
 
-// TODO: Make StdIn, StdOut, StdErr getters thread safe.
-
 using namespace XLib;
-
-/*namespace
-{
-	File StdIn;
-	File StdOut;
-	File StdErr;
-
-	bool StdInIsInitialized = false;
-	bool StdOutIsInitialized = false;
-	bool StdErrIsInitialized = false;
-}*/
 
 FileOpenResult File::Open(const char* name, FileAccessMode accessMode, FileOpenMode openMode)
 {
@@ -60,7 +49,7 @@ bool File::Read(FileHandle fileHandle, void* buffer, uintptr bufferSize, uintptr
 	uintptr totalReadSizeAccum = 0;
 	while (totalReadSizeAccum < bufferSize)
 	{
-		const DWORD iterSizeToRead = DWORD(max<uintptr>(bufferSize - totalReadSizeAccum, 0x8000'0000));
+		const DWORD iterSizeToRead = DWORD(min<uintptr>(bufferSize - totalReadSizeAccum, 0x8000'0000));
 		DWORD iterReadSize = 0;
 
 		if (!ReadFile(HANDLE(fileHandle), buffer, iterSizeToRead, &iterReadSize, nullptr))
@@ -87,7 +76,7 @@ bool File::Write(FileHandle fileHandle, const void* data, uintptr size)
 	uintptr totalWrittenSizeAccum = 0;
 	while (totalWrittenSizeAccum < size)
 	{
-		const DWORD iterSizeToWrite = DWORD(max<uintptr>(size - totalWrittenSizeAccum, 0x8000'0000));
+		const DWORD iterSizeToWrite = DWORD(min<uintptr>(size - totalWrittenSizeAccum, 0x8000'0000));
 		DWORD iterWrittenSize = 0;
 
 		if (!WriteFile(HANDLE(fileHandle), data, iterSizeToWrite, &iterWrittenSize, nullptr))
@@ -173,9 +162,9 @@ bool File::open(const char* name, FileAccessMode accessMode, FileOpenMode openMo
 	close();
 
 	FileOpenResult fileOpenResult = File::Open(name, accessMode, openMode);
-	if (!fileOpenResult.openResult)
+	if (!fileOpenResult.status)
 		return false;
-	handle = fileOpenResult.fileHandle;
+	handle = fileOpenResult.handle;
 	return true;
 }
 
@@ -190,26 +179,82 @@ void File::close()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+static HANDLE StdIn = NULL;
+static HANDLE StdOut = NULL;
+static HANDLE StdErr = NULL;
+
+static volatile uint16 StdInInitGuard = 0;
+static volatile uint16 StdOutInitGuard = 0;
+static volatile uint16 StdErrInitGuard = 0;
+
 FileHandle XLib::GetStdInFileHandle()
 {
-	static HANDLE hStdIn = GetStdHandle(STD_INPUT_HANDLE);
-	if (hStdIn == INVALID_HANDLE_VALUE)
-		return FileHandle::Zero;
-	return FileHandle(uintptr(hStdIn));
+	for (;;)
+	{
+		const uint16 guardValue = Atomics::Load<uint16>(StdInInitGuard);
+
+		if (guardValue == 2)
+			break;
+
+		if (guardValue == 0)
+		{
+			if (Atomics::CompareExchange<uint16>(StdInInitGuard, 0, 1))
+			{
+				StdIn = GetStdHandle(STD_INPUT_HANDLE);
+				XAssert(StdIn);
+
+				Atomics::Store<uint16>(StdInInitGuard, 2);
+			}
+		}
+	}
+
+	return FileHandle(uintptr(StdIn));
 }
 
 FileHandle XLib::GetStdOutFileHandle()
 {
-	static HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
-	if (hStdOut == INVALID_HANDLE_VALUE)
-		return FileHandle::Zero;
-	return FileHandle(uintptr(hStdOut));
+	for (;;)
+	{
+		const uint16 guardValue = Atomics::Load<uint16>(StdOutInitGuard);
+
+		if (guardValue == 2)
+			break;
+
+		if (guardValue == 0)
+		{
+			if (Atomics::CompareExchange<uint16>(StdOutInitGuard, 0, 1))
+			{
+				StdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+				XAssert(StdOut);
+
+				Atomics::Store<uint16>(StdOutInitGuard, 2);
+			}
+		}
+	}
+
+	return FileHandle(uintptr(StdOut));
 }
 
 FileHandle XLib::GetStdErrFileHandle()
 {
-	static HANDLE hStdErr = GetStdHandle(STD_ERROR_HANDLE);
-	if (hStdErr == INVALID_HANDLE_VALUE)
-		return FileHandle::Zero;
-	return FileHandle(uintptr(hStdErr));
+	for (;;)
+	{
+		const uint16 guardValue = Atomics::Load<uint16>(StdErrInitGuard);
+
+		if (guardValue == 2)
+			break;
+
+		if (guardValue == 0)
+		{
+			if (Atomics::CompareExchange<uint16>(StdErrInitGuard, 0, 1))
+			{
+				StdErr = GetStdHandle(STD_ERROR_HANDLE);
+				XAssert(StdErr);
+
+				Atomics::Store<uint16>(StdErrInitGuard, 2);
+			}
+		}
+	}
+
+	return FileHandle(uintptr(StdErr));
 }

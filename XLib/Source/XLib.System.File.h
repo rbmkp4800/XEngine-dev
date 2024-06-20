@@ -34,23 +34,24 @@ namespace XLib
 
 	struct FileOpenResult
 	{
-		FileHandle fileHandle;
-		bool openResult; // TODO: This should be `SystemErrorCode`
+		FileHandle handle;
+		bool status;
+		// TODO: `SystemErrorCode`
 	};
 
 	class File : public NonCopyable
 	{
 	public:
-		FileOpenResult Open(const char* name, FileAccessMode accessMode, FileOpenMode openMode);
-		void Close(FileHandle fileHandle);
+		static FileOpenResult Open(const char* name, FileAccessMode accessMode, FileOpenMode openMode);
+		static void Close(FileHandle fileHandle);
 
-		bool Read(FileHandle fileHandle, void* buffer, uintptr bufferSize, uintptr* outReadSize = nullptr);
-		bool Write(FileHandle fileHandle, const void* buffer, uintptr size);
-		bool Flush(FileHandle fileHandle);
+		static bool Read(FileHandle fileHandle, void* buffer, uintptr bufferSize, uintptr* outReadSize = nullptr);
+		static bool Write(FileHandle fileHandle, const void* buffer, uintptr size);
+		static bool Flush(FileHandle fileHandle);
 
-		uint64 GetSize(FileHandle fileHandle);
-		uint64 GetPosition(FileHandle fileHandle);
-		uint64 SetPosition(FileHandle fileHandle, sint64 offset, FileOffsetOrigin origin = FileOffsetOrigin::Begin);
+		static uint64 GetSize(FileHandle fileHandle);
+		static uint64 GetPosition(FileHandle fileHandle);
+		static uint64 SetPosition(FileHandle fileHandle, sint64 offset, FileOffsetOrigin origin = FileOffsetOrigin::Begin);
 
 	private:
 		FileHandle handle = FileHandle::Zero;

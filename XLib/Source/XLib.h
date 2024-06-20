@@ -185,6 +185,27 @@ auto min(const T1& a, const T2 b)
 #endif
 
 
+// Char utils //////////////////////////////////////////////////////////////////////////////////
+
+namespace XLib
+{
+	// TODO: Should it really be here?
+	class Char abstract final
+	{
+	public:
+		static inline bool IsDigit(char c) { return c >= '0' && c <= '9'; }
+		static inline bool IsLetter(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
+		static inline bool IsLetterOrDigit(char c) { return IsLetter(c) || IsDigit(c); }
+		static inline bool IsLower(char c) { return c >= 'a' && c <= 'z'; }
+		static inline bool IsUpper(char c) { return c >= 'A' && c <= 'Z'; }
+		static inline bool IsWhitespace(char c) { return c == ' ' || c == '\f' || c == '\n' || c == '\r' || c == '\t' || c == '\v'; }
+
+		static inline char ToUpper(char c) { return (c >= 'a' && c <= 'z') ? c - 'a' + 'A' : c; }
+		static inline char ToLower(char c) { return (c >= 'A' && c <= 'Z') ? c - 'A' + 'a' : c; }
+	};
+}
+
+
 // Bitwise utils ///////////////////////////////////////////////////////////////////////////////
 
 uint8 countLeadingZeros32(uint32 value);

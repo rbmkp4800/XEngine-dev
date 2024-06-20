@@ -40,7 +40,7 @@ namespace XLib
 			static uint16 Exchange(volatile uint16* target, uint16 value);
 			static uint16 Increment(volatile uint16* target);
 			static uint16 Decrement(volatile uint16* target);
-			static bool CompareExchange(volatile uint16* target, uint16 exchange, uint16 comparand);
+			static bool CompareExchange(volatile uint16* target, uint16 comparand, uint16 exchange);
 			static uint16 And(volatile uint16* target, uint16 value);
 			static uint16 Or(volatile uint16* target, uint16 value);
 			static uint16 Xor(volatile uint16* target, uint16 value);
@@ -54,7 +54,7 @@ namespace XLib
 			static uint32 Exchange(volatile uint32* target, uint32 value);
 			static uint32 Increment(volatile uint32* target);
 			static uint32 Decrement(volatile uint32* target);
-			static bool CompareExchange(volatile uint32* target, uint32 exchange, uint32 comparand);
+			static bool CompareExchange(volatile uint32* target, uint32 comparand, uint32 exchange);
 			static uint32 And(volatile uint32* target, uint32 value);
 			static uint32 Or(volatile uint32* target, uint32 value);
 			static uint32 Xor(volatile uint32* target, uint32 value);
@@ -68,7 +68,7 @@ namespace XLib
 			static uint64 Exchange(volatile uint64* target, uint64 value);
 			static uint64 Increment(volatile uint64* target);
 			static uint64 Decrement(volatile uint64* target);
-			static bool CompareExchange(volatile uint64* target, uint64 exchange, uint64 comparand);
+			static bool CompareExchange(volatile uint64* target, uint64 comparand, uint64 exchange);
 			static uint64 And(volatile uint64* target, uint64 value);
 			static uint64 Or(volatile uint64* target, uint64 value);
 			static uint64 Xor(volatile uint64* target, uint64 value);
@@ -81,7 +81,7 @@ namespace XLib
 		template <typename Type> static inline Type And(volatile Type& target, Type value) { return Core<sizeof(Type)>::And((typename Core<sizeof(Type)>::Type*)&target, Core<sizeof(Type)>::Type(value)); }
 		template <typename Type> static inline Type Or(volatile Type& target, Type value) { return Core<sizeof(Type)>::Or((typename Core<sizeof(Type)>::Type*)&target, Core<sizeof(Type)>::Type(value)); }
 		template <typename Type> static inline Type Xor(volatile Type& target, Type value) { return Core<sizeof(Type)>::Xor((typename Core<sizeof(Type)>::Type*)&target, Core<sizeof(Type)>::Type(value)); }
-		template <typename Type> static inline bool CompareExchange(volatile Type& target, Type exchange, Type comparand) { return Core<sizeof(Type)>::CompareExchange((typename Core<sizeof(Type)>::Type*)&target, Core<sizeof(Type)>::Type(exchange), Core<sizeof(Type)>::Type(comparand)); }
+		template <typename Type> static inline bool CompareExchange(volatile Type& target, Type comparand, Type exchange) { return Core<sizeof(Type)>::CompareExchange((typename Core<sizeof(Type)>::Type*)&target, Core<sizeof(Type)>::Type(comparand), Core<sizeof(Type)>::Type(exchange)); }
 		template <typename Type> static inline Type Increment(volatile Type& target) { return Core<sizeof(Type)>::Increment((typename Core<sizeof(Type)>::Type*)&target); }
 		template <typename Type> static inline Type Decrement(volatile Type& target) { return Core<sizeof(Type)>::Decrement((typename Core<sizeof(Type)>::Type*)&target); }
 		template <typename Type> static inline Type Load(volatile Type& target) { return target; }
@@ -121,7 +121,7 @@ namespace XLib
 		inline Type exchange(Type a) { return Atomics::Exchange(value, a); }
 		inline Type increment() { return Atomics::Increment(value); }
 		inline Type decrement() { return Atomics::Decrement(value); }
-		inline bool compareExchange(Type exchange, Type comparand) { return Atomics::CompareExchange(value, exchange, comparand); }
+		inline bool compareExchange(Type comparand, Type exchange) { return Atomics::CompareExchange(value, comparand, exchange); }
 		/*inline Type and() { return Atomics::And(value); }
 		inline Type or() { return Atomics::Or(value); }
 		inline Type xor() { return Atomics::Xor(value); }*/

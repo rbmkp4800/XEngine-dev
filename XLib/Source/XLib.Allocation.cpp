@@ -16,6 +16,7 @@ void* SystemHeapAllocator::Allocate(uintptr size)
 
 void SystemHeapAllocator::Release(void* ptr)
 {
+	XAssert(ptr);
 	HeapFree(GetProcessHeap(), 0, ptr);
 }
 

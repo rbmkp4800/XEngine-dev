@@ -114,13 +114,10 @@ namespace XLib
 	//void FmtGetDecFP64();
 	//void FmtGetLine();
 	//void FmtSkipToNewLine();
-	//void FmtSkipWhitespaces();
+	template <typename CharStreamReader> inline void FmtSkipWhitespaces(CharStreamReader& reader);
 
 
 	// Fmt print ///////////////////////////////////////////////////////////////////////////////////
-
-	template <typename ArgType>
-	struct FmtPrintArgHandler {};
 
 	template <typename CharStreamWriter, typename ... FmtArgs>
 	inline void FmtPrint(CharStreamWriter& writer, const FmtArgs& ... args);
@@ -134,8 +131,8 @@ namespace XLib
 	template <uint32 BufferSize = 1024, typename ... FmtArgs>
 	inline void FmtPrintDbgOut(const FmtArgs& ... fmtArgs);
 
-	template <typename StringType, typename ... FmtArgs>
-	inline void FmtPrintStr(StringType& string, const FmtArgs& ... fmtArgs);
+	template <typename ... FmtArgs>
+	inline void FmtPrintStr(VirtualStringRefASCII string, const FmtArgs& ... fmtArgs);
 
 
 	// Fmt print arguments /////////////////////////////////////////////////////////////////////////
@@ -256,209 +253,40 @@ namespace XLib
 
 	// Fmt print argument handlers /////////////////////////////////////////////////////////////////
 
-	// Literal characters
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, signed char arg)				{ writer.put(arg); }
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, unsigned char arg)			{ writer.put(arg); }
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, signed short int arg)			{ FmtPutDecS16(writer, arg); }
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, unsigned short int arg)		{ FmtPutDecU16(writer, arg); }
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, signed int arg)				{ FmtPutDecS32(writer, arg); }
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, unsigned int arg)				{ FmtPutDecU32(writer, arg); }
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, signed long int arg)			{ FmtPutDecS32(writer, arg); }
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, unsigned long int arg)		{ FmtPutDecU32(writer, arg); }
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, signed long long int arg)		{ FmtPutDecS64(writer, arg); }
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, unsigned long long int arg)	{ FmtPutDecU64(writer, arg); }
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, float arg)					{ FmtPutDecFP32(writer, arg); }
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, double arg)					{ FmtPutDecFP64(writer, arg); }
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, const char* arg)				{ writer.write(arg, uintptr(-1)); }
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, StringViewASCII arg)			{ writer.write(arg.getData(), arg.getLength()); }
 
-	template <>
-	struct FmtPrintArgHandler<char>
-	{
-		template <typename CharStreamWriter>
-		static void Handle(CharStreamWriter& writer, char arg);
-	};
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, FmtArgDecU8 arg)	{ FmtPutDecU8(writer, arg.value, arg.lzWidth); }
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, FmtArgDecU16 arg)	{ FmtPutDecU16(writer, arg.value, arg.lzWidth); }
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, FmtArgDecU32 arg)	{ FmtPutDecU32(writer, arg.value, arg.lzWidth); }
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, FmtArgDecU64 arg)	{ FmtPutDecU64(writer, arg.value, arg.lzWidth); }
 
-	template <>
-	struct FmtPrintArgHandler<unsigned char>
-	{
-		template <typename CharStreamWriter>
-		static void Handle(CharStreamWriter& writer, unsigned char arg);
-	};
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, FmtArgDecS8 arg)	{ FmtPutDecS8(writer, arg.value, arg.lzWidth, arg.showPlus); }
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, FmtArgDecS16 arg)	{ FmtPutDecS16(writer, arg.value, arg.lzWidth, arg.showPlus); }
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, FmtArgDecS32 arg)	{ FmtPutDecS32(writer, arg.value, arg.lzWidth, arg.showPlus); }
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, FmtArgDecS64 arg)	{ FmtPutDecS64(writer, arg.value, arg.lzWidth, arg.showPlus); }
 
-	// Liternal numerics
-
-	template <>
-	struct FmtPrintArgHandler<uint16>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, uint16 arg) { FmtPrintArgHandler<FmtArgDecU16>::Handle(FmtArgDecU16(arg)); }
-	};
-
-	template <>
-	struct FmtPrintArgHandler<sint16>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, sint16 arg) { FmtPrintArgHandler<FmtArgDecS16>::Handle(FmtArgDecS16(arg)); }
-	};
-
-	template <>
-	struct FmtPrintArgHandler<uint32>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, uint32 arg) { FmtPrintArgHandler<FmtArgDecU32>::Handle(FmtArgDecU32(arg)); }
-	};
-
-	template <>
-	struct FmtPrintArgHandler<sint32>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, sint32 arg) { FmtPrintArgHandler<FmtArgDecS32>::Handle(FmtArgDecS32(arg)); }
-	};
-
-	template <>
-	struct FmtPrintArgHandler<uint64>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, uint64 arg) { FmtPrintArgHandler<FmtArgDecU64>::Handle(FmtArgDecU64(arg)); }
-	};
-
-	template <>
-	struct FmtPrintArgHandler<sint64>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, sint64 arg) { FmtPrintArgHandler<FmtArgDecS64>::Handle(FmtArgDecS64(arg)); }
-	};
-
-	template <>
-	struct FmtPrintArgHandler<float32>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, float32 arg) { FmtPrintArgHandler<FmtArgFP32>::Handle(FmtArgFP32(arg)); }
-	};
-
-	template <>
-	struct FmtPrintArgHandler<float64>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, float64 arg) { FmtPrintArgHandler<FmtArgFP64>::Handle(FmtArgFP64(arg)); }
-	};
-
-	// Strings
-
-	template <>
-	struct FmtPrintArgHandler<const char*>
-	{
-		template <typename CharStreamWriter>
-		static void Handle(CharStreamWriter& writer, const char* arg);
-	};
-
-	template <uintptr CharArraySize>
-	struct FmtPrintArgHandler<char[CharArraySize]>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, const char* arg) { FmtPrintArgHandler<const char*>::Handle(writer, arg); ...; /* Do we really need to turn this into cstr? */ }
-	};
-
-	template <>
-	struct FmtPrintArgHandler<StringView<char>>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, const StringView<char>& arg) { writer.write(arg.getData(), arg.getLength()); }
-	};
-
-	template <uintptr Capacity, typename CounterType>
-	struct FmtPrintArgHandler<InplaceString<char, Capacity, CounterType>>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, const StringView<char>& arg) { FmtPrintArgHandler<StringView<char>>::Handle(writer, arg); }
-	};
-
-	template <typename CounterType, typename AllocatorType>
-	struct FmtPrintArgHandler<DynamicString<char, CounterType, AllocatorType>>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, const StringView<char>& arg) { FmtPrintArgHandler<StringView<char>>::Handle(writer, arg); }
-	};
-
-	// Fmt args
-
-	template <>
-	struct FmtPrintArgHandler<FmtArgDecU8>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, FmtArgDecU8 arg) { FmtPutDecU8(arg.value, arg.lzWidth); }
-	};
-
-	template <>
-	struct FmtPrintArgHandler<FmtArgDecU16>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, FmtArgDecU16 arg) { FmtPutDecU16(arg.value, arg.lzWidth); }
-	};
-
-	template <>
-	struct FmtPrintArgHandler<FmtArgDecU32>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, FmtArgDecU32 arg) { FmtPutDecU32(arg.value, arg.lzWidth); }
-	};
-
-	template <>
-	struct FmtPrintArgHandler<FmtArgDecU64>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, FmtArgDecU64 arg) { FmtPutDecU64(arg.value, arg.lzWidth); }
-	};
-
-
-	template <>
-	struct FmtPrintArgHandler<FmtArgDecS8>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, FmtArgDecS8 arg) { FmtPutDecS8(arg.value, arg.lzWidth, arg.showPlus); }
-	};
-
-	template <>
-	struct FmtPrintArgHandler<FmtArgDecS16>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, FmtArgDecS16 arg) { FmtPutDecS16(arg.value, arg.lzWidth, arg.showPlus); }
-	};
-
-	template <>
-	struct FmtPrintArgHandler<FmtArgDecS32>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, FmtArgDecS32 arg) { FmtPutDecS32(arg.value, arg.lzWidth, arg.showPlus); }
-	};
-
-	template <>
-	struct FmtPrintArgHandler<FmtArgDecS64>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, FmtArgDecS64 arg) { FmtPutDecS64(arg.value, arg.lzWidth, arg.showPlus); }
-	};
-
-
-	template <>
-	struct FmtPrintArgHandler<FmtArgHex8>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, FmtArgHex8 arg) { FmtPutHex8(arg.value, arg.lzWidth); }
-	};
-
-	template <>
-	struct FmtPrintArgHandler<FmtArgHex16>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, FmtArgHex16 arg) { FmtPutHex16(arg.value, arg.lzWidth); }
-	};
-
-	template <>
-	struct FmtPrintArgHandler<FmtArgHex32>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, FmtArgHex32 arg) { FmtPutHex32(arg.value, arg.lzWidth); }
-	};
-
-	template <>
-	struct FmtPrintArgHandler<FmtArgHex64>
-	{
-		template <typename CharStreamWriter>
-		static inline void Handle(CharStreamWriter& writer, FmtArgHex64 arg) { FmtPutHex64(arg.value, arg.lzWidth); }
-	};
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, FmtArgHex8 arg)	{ FmtPutHex8(writer, arg.value, arg.lzWidth); }
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, FmtArgHex16 arg)	{ FmtPutHex16(writer, arg.value, arg.lzWidth); }
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, FmtArgHex32 arg)	{ FmtPutHex32(writer, arg.value, arg.lzWidth); }
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, FmtArgHex64 arg)	{ FmtPutHex64(writer, arg.value, arg.lzWidth); }
 }
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// Definitions /////////////////////////////////////////////////////////////////////////////////////
+// DEFINITION //////////////////////////////////////////////////////////////////////////////////////
 
 template <typename CharStreamWriter>
 inline void XLib::FmtPutDecU8(CharStreamWriter& writer, uint8 value, uint8 lzWidth)
@@ -564,7 +392,7 @@ inline void XLib::FmtPutHex64(CharStreamWriter& writer, uint64 value, uint8 lzWi
 template <typename CharStreamWriter, typename ... FmtArgs>
 inline void XLib::FmtPrint(CharStreamWriter& writer, const FmtArgs& ... args)
 {
-	((void)FmtPrintArgHandler<FmtArgs>::Handle(writer, args), ...);
+	((void)FmtPrintArgPut(writer, args), ...);
 }
 
 template <typename ... FmtArgs>
@@ -587,8 +415,8 @@ template <uint32 BufferSize, typename ... FmtArgs>
 inline void XLib::FmtPrintDbgOut(const FmtArgs& ... fmtArgs)
 {
 	char buffer[BufferSize];
-	MemoryCharStreamWriter bufferStream(...);
+	MemoryCharStreamWriter bufferStream(buffer, BufferSize);
 	FmtPrint(bufferStream, fmtArgs ...);
-	bufferStream.zeroTerminate();
+	bufferStream.nullTerminate();
 	Debug::Output(buffer);
 }

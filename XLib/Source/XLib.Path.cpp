@@ -35,52 +35,55 @@ StringViewASCII Path::RemoveFileName(const char* pathCStr)
 	return StringViewASCII {};
 }
 
-void Path::GetCurrentPath(VirtualStringRefASCII result)
+void Path::GetCurrentPath(VirtualStringRefASCII resultPath)
 {
-	const DWORD requiredBufferSize = GetCurrentDirectoryA(0, nullptr);
-	XAssert(requiredBufferSize > 0);
-	const uintptr expectedLength = requiredBufferSize - 1;
+	// Including null-terminator.
+	const DWORD requiredBufferCapacity = GetCurrentDirectoryA(0, nullptr);
+	XAssert(requiredBufferCapacity > 0);
+	//const uintptr expectedLength = requiredBufferSize - 1;
 
-	if (expectedLength > result.getMaxLength())
+	const uint32 resultMaxBufferCapacity = resultPath.getMaxBufferCapacity();
+	if (requiredBufferCapacity > resultMaxBufferCapacity)
 	{
 		// Explicitly clip output.
 
-		constexpr uintptr internalBufferSize = 4096;
-		XAssert(requiredBufferSize <= internalBufferSize);
+		char internalBuffer[4096];
+		XAssert(requiredBufferCapacity <= countof(internalBuffer));
+		const DWORD length = GetCurrentDirectoryA(countof(internalBuffer), internalBuffer);
+		XAssert(length + 1 == requiredBufferCapacity);
 
-		char internalBuffer[internalBufferSize];
-		const DWORD length = GetCurrentDirectoryA(internalBufferSize, internalBuffer);
-		XAssert(length == expectedLength);
+		resultPath.reserveBufferCapacity(resultMaxBufferCapacity);
+		char* buffer = resultPath.getBuffer();
 
-		result.resize(result.getMaxLength());
-		char* buffer = result.getData();
-		memoryCopy(buffer, internalBuffer, result.getMaxLength());
+		const uint32 clippedLength = resultMaxBufferCapacity - 1;
+		memoryCopy(buffer, internalBuffer, clippedLength);
+		resultPath.setLength(clippedLength);
 	}
 	else
 	{
-		result.resize(expectedLength);
-		char* buffer = result.getData();
-		const DWORD length = GetCurrentDirectoryA(requiredBufferSize, buffer);
-		XAssert(length == expectedLength);
+		resultPath.reserveBufferCapacity(requiredBufferCapacity);
+		char* buffer = resultPath.getBuffer();
+
+		// Not including null-terminator.
+		const DWORD length = GetCurrentDirectoryA(requiredBufferCapacity, buffer);
+		XAssert(length + 1 == requiredBufferCapacity);
+
+		resultPath.setLength(length);
 	}
 
-	char* resultData = result.getData();
-	const uintptr resultLength = result.getLength();
-
+	// Normalize all slashes.
+	char* resultData = resultPath.getBuffer();
+	const uintptr resultLength = resultPath.getLength();
 	for (uintptr i = 0; i < resultLength; i++)
 	{
 		if (resultData[i] == '\\')
 			resultData[i] = '/';
 	}
 
-	if (resultData[resultLength - 1] != '/' && resultLength != result.getMaxLength())
-	{
-		result.resize(resultLength + 1);
-		result.getData()[resultLength] = '/';
-	}
+	Path::AddTrailingDirectorySeparator(resultPath);
 }
 
-void Path::Normalize(StringViewASCII path, VirtualStringRefASCII result)
+void Path::Normalize(StringViewASCII path, VirtualStringRefASCII resultPath)
 {
 	std::filesystem::path p(std::string_view(path.getData(), path.getLength()));
 	p = p.lexically_normal();
@@ -98,9 +101,9 @@ void Path::Normalize(StringViewASCII path, VirtualStringRefASCII result)
 	}
 }
 
-void Path::Normalize(VirtualStringRefASCII result)
+void Path::Normalize(VirtualStringRefASCII path)
 {
-	std::filesystem::path p(std::string_view(result.getData(), result.getLength()));
+	std::filesystem::path p(std::string_view(path.getBuffer(), path.getLength()));
 	p = p.lexically_normal();
 	auto np = p.native();
 	XAssert(np.length() <= result.getLength());
@@ -115,7 +118,7 @@ void Path::Normalize(VirtualStringRefASCII result)
 	}
 }
 
-void Path::MakeAbsolute(StringViewASCII path, VirtualStringRefASCII result)
+void Path::MakeAbsolute(StringViewASCII path, VirtualStringRefASCII resultPath)
 {
 	std::filesystem::path p(std::string_view(path.getData(), path.getLength()));
 	p = std::filesystem::absolute(p);
@@ -133,7 +136,27 @@ void Path::MakeAbsolute(StringViewASCII path, VirtualStringRefASCII result)
 	}
 }
 
-void Path::MakeAbsolute(const char* pathCStr, VirtualStringRefASCII result)
+void Path::MakeAbsolute(const char* pathCStr, VirtualStringRefASCII resultPath)
 {
-	MakeAbsolute(StringViewASCII(pathCStr), result);
+	MakeAbsolute(StringViewASCII::FromCStr(pathCStr), resultPath);
 }
+
+void Path::AddTrailingDirectorySeparator(VirtualStringRefASCII path)
+{
+	char* pathData = path.getBuffer();
+	uint32 pathLength = path.getLength();
+
+	if (Path::HasTrailingDirectorySeparator(StringViewASCII(pathData, pathLength)))
+		return;
+
+	const uint32 newLength = pathLength + 1;
+	const uint32 newBufferCapacity = newLength + 1;
+	if (newBufferCapacity > path.getMaxBufferCapacity())
+		return;
+
+	path.reserveBufferCapacity(newBufferCapacity);
+	path.setLength(newLength);
+	pathData = path.getBuffer();
+	pathData[pathLength] = '/';
+}
+

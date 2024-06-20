@@ -48,7 +48,7 @@ namespace XLib
 
 		static_assert(sizeof(MethodPointer<DummyClass>) == sizeof(void*), "invalid environment");
 
-		template <uint methodPointerSize, class Class>
+		template <uint8 methodPointerSize, class Class>
 		struct MethodPointerConverter abstract
 		{
 			// This type of method pointer not supported.
