@@ -255,6 +255,7 @@ namespace XLib
 
 	// Fmt print argument handlers /////////////////////////////////////////////////////////////////
 
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, char arg)						{ writer.put(arg); }
 	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, signed char arg)				{ writer.put(arg); }
 	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, unsigned char arg)			{ writer.put(arg); }
 	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, signed short int arg)			{ FmtPutDecS16(writer, arg); }
@@ -267,7 +268,7 @@ namespace XLib
 	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, unsigned long long int arg)	{ FmtPutDecU64(writer, arg); }
 	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, float arg)					{ FmtPutDecFP32(writer, arg); }
 	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, double arg)					{ FmtPutDecFP64(writer, arg); }
-	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, const char* arg)				{ writer.write(arg, uintptr(-1)); }
+	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, const char* arg)				{ writer.write(arg); }
 	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, StringViewASCII arg)			{ writer.write(arg.getData(), arg.getLength()); }
 
 	template <typename CharStreamWriter> inline void FmtPrintArgPut(CharStreamWriter& writer, FmtArgDecU8 arg)	{ FmtPutDecU8(writer, arg.value, arg.lzWidth); }

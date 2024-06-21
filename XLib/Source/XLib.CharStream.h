@@ -2,8 +2,8 @@
 
 #include "XLib.h"
 #include "XLib.NonCopyable.h"
-#include "XLib.System.File.h"
 #include "XLib.String.h"
+#include "XLib.System.File.h"
 
 namespace XLib
 {
@@ -62,11 +62,11 @@ namespace XLib
 		inline const char* getEndPtr() const { return end; }
 		inline const char* getCurrentPtr() const { return current; }
 
-		inline char peek() const { return isEndOfStream() ? *current : 0; }
+		inline char peek() const { return current < end ? *current : 0; }
 		inline char peek(uint32 offset) const;
-		inline char get() { return isEndOfStream() ? *current++ : 0; }
+		inline char get() { return (current < end && *current != 0) ? *current++ : 0; }
 		//inline void read(...);
-		inline bool isEndOfStream() const { return current != end && *current != 0; }
+		inline bool isEndOfStream() const { return current == end || *current == 0; }
 	};
 
 	class MemoryCharStreamWriter : public NonCopyable
@@ -165,10 +165,10 @@ namespace XLib
 
 	public:
 		VirtualStringWriter() = default;
-		inline VirtualStringWriter(VirtualStringRefASCII virutalStringRef) { open(virutalStringRef); }
+		inline VirtualStringWriter(VirtualStringRefASCII virtualStringRef) { open(virtualStringRef); }
 		inline ~VirtualStringWriter() { flush(); }
 
-		void open(VirtualStringRefASCII virutalStringRef);
+		void open(VirtualStringRefASCII virtualStringRef);
 		void flush();
 
 		inline void put(char c);
@@ -221,8 +221,21 @@ namespace XLib
 	FileCharStreamWriter& GetStdErrStream();
 }
 
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // DEFINITION //////////////////////////////////////////////////////////////////////////////////////
+
+inline char XLib::MemoryCharStreamReader::peek(uint32 offset) const
+{
+	for (uint32 i = 0; i < offset; i++)
+	{
+		if (!current[i])
+			return 0;
+		if (current + i == end)
+			return 0;
+	}
+	return current[offset];
+}
 
 inline void XLib::MemoryCharStreamWriter::put(char c)
 {

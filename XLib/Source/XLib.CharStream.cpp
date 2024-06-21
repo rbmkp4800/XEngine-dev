@@ -165,7 +165,7 @@ void FileCharStreamWriter::write(const char* cstr)
 			bufferIt++;
 		}
 
-		bufferOffset = uint32(bufferEnd - buffer);
+		bufferOffset = uint32(bufferIt - buffer);
 
 		if (bufferOffset == bufferSize)
 		{
@@ -185,12 +185,12 @@ void VirtualStringWriter::growBufferExponentially(uint32 minRequiredBufferSize)
 {
 	if (minRequiredBufferSize <= bufferSize)
 		return;
+	XAssert(minRequiredBufferSize <= maxBufferSize);
 
 	// TODO: Maybe align up to 16 or some adaptive pow of 2.
+	// TODO: Revisit this.
 
 	uint32 newBufferSize = minRequiredBufferSize;
-	XAssert(newBufferSize <= maxBufferSize);
-
 	const uint32 expGrownBufferSize = min<uint32>(bufferSize * BufferExponentialGrowthFactor, maxBufferSize);
 	if (newBufferSize < expGrownBufferSize)
 		newBufferSize = expGrownBufferSize;
@@ -220,6 +220,7 @@ void VirtualStringWriter::write(const char* data, uintptr length)
 	}
 
 	memoryCopy(buffer + bufferOffset, data, clippedLength);
+	bufferOffset += lengthU32;
 }
 
 void VirtualStringWriter::write(const char* cstr)
@@ -256,8 +257,9 @@ void VirtualStringWriter::write(const char* cstr)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void VirtualStringWriter::open(VirtualStringRefASCII virutalStringRef)
+void VirtualStringWriter::open(VirtualStringRefASCII virtualStringRef)
 {
+	this->virtualStringRef = virtualStringRef;
 	buffer = virtualStringRef.getBuffer();
 	bufferSize = virtualStringRef.getBufferSize();
 	bufferOffset = virtualStringRef.getLength();

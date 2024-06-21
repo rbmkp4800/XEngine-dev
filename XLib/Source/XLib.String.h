@@ -58,6 +58,7 @@ namespace XLib
 	// NOTE: Buffer size includes null terminator (so max length is equal to buffer size minus 1).
 	// NOTE: `VirtualStringInterface::setLength()` does not reallocate buffer, so sufficient buffer space should be allocated prior to calling.
 
+	template <typename CharType>
 	class VirtualStringInterface abstract
 	{
 	public:
@@ -74,22 +75,26 @@ namespace XLib
 	};
 
 	template <typename CharType>
-	class VirtualStringRef final : public VirtualStringInterface
+	class VirtualStringRef
 	{
 	private:
+		void* vtable;
 		void* stringPtr = nullptr;
 
 	public:
 		VirtualStringRef() = default;
 		~VirtualStringRef() = default;
 
-		virtual uint32 getMaxBufferSize() const override { *(int*)0 = 0; return 0; }
-		virtual uint32 getBufferSize() const override { *(int*)0 = 0; return 0; }
-		virtual void growBuffer(uint32 minRequiredBufferSize) const override { *(int*)0 = 0; }
-		virtual CharType* getBuffer() const override { *(int*)0 = 0; return nullptr; }
+		inline uint32 getMaxBufferSize() const { return ((VirtualStringInterface<CharType>*)this)->getMaxBufferSize(); }
+		inline uint32 getBufferSize() const { return ((VirtualStringInterface<CharType>*)this)->getBufferSize(); }
+		inline void growBuffer(uint32 minRequiredBufferSize) const { ((VirtualStringInterface<CharType>*)this)->growBuffer(minRequiredBufferSize); }
+		inline CharType* getBuffer() const { return ((VirtualStringInterface<CharType>*)this)->getBuffer(); }
 
-		virtual uint32 getLength() const override { *(int*)0 = 0; return 0; }
-		virtual void setLength(uint32 length) const override { *(int*)0 = 0; }
+		inline uint32 getLength() const { return ((VirtualStringInterface<CharType>*)this)->getLength(); }
+		inline void setLength(uint32 length) const { ((VirtualStringInterface<CharType>*)this)->setLength(length); }
+
+		inline uint32 getMaxLength() const { return ((VirtualStringInterface<CharType>*)this)->getMaxLength(); }
+		inline void growBufferToFitLength(uint32 minRequiredLength) const { ((VirtualStringInterface<CharType>*)this)->growBufferToFitLength(minRequiredLength); }
 	};
 
 	template <typename CharType>
@@ -347,14 +352,16 @@ inline constexpr XLib::StringView<CharType> XLib::StringView<CharType>::FromCStr
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-inline uint32 XLib::VirtualStringInterface::getMaxLength() const
+template <typename CharType>
+inline uint32 XLib::VirtualStringInterface<CharType>::getMaxLength() const
 { 
 	const uint32 maxBufferSize = getMaxBufferSize();
 	XAssert(maxBufferSize > 0);
 	return maxBufferSize - 1;
 }
 
-inline void XLib::VirtualStringInterface::growBufferToFitLength(uint32 minRequiredLength) const
+template <typename CharType>
+inline void XLib::VirtualStringInterface<CharType>::growBufferToFitLength(uint32 minRequiredLength) const
 {
 	growBuffer(minRequiredLength + 1);
 }
@@ -363,7 +370,7 @@ inline void XLib::VirtualStringInterface::growBufferToFitLength(uint32 minRequir
 // InplaceString ///////////////////////////////////////////////////////////////////////////////////
 
 template <typename CharType, uint16 BufferSize>
-class XLib::InplaceString<CharType, BufferSize>::VirtualRef : public XLib::VirtualStringInterface
+class XLib::InplaceString<CharType, BufferSize>::VirtualRef : public XLib::VirtualStringInterface<CharType>
 {
 private:
 	InplaceString<CharType, BufferSize>* stringPtr;
@@ -466,7 +473,7 @@ inline bool XLib::InplaceString<CharType, BufferSize>::startsWith(const CharType
 // DynamicString ///////////////////////////////////////////////////////////////////////////////////
 
 template <typename CharType, typename AllocatorType>
-class XLib::DynamicString<CharType, AllocatorType>::VirtualRef : public XLib::VirtualStringInterface
+class XLib::DynamicString<CharType, AllocatorType>::VirtualRef : public XLib::VirtualStringInterface<CharType>
 {
 private:
 	DynamicString<CharType, AllocatorType>* stringPtr;

@@ -284,6 +284,12 @@ namespace XLib
 		XAssert(newCapacity > 0);
 		capacity = newCapacity;
 
+		if (!buffer)
+		{
+			buffer = (Type*)AllocatorBase::allocate(capacity * sizeof(Type));
+			return;
+		}
+
 		if constexpr (!IsSafe)
 		{
 			buffer = (Type*)AllocatorBase::reallocate(buffer, capacity * sizeof(Type));
