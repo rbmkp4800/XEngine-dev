@@ -64,9 +64,9 @@ static bool ParseCmdArgs(int argc, char* argv[], CmdArgs& cmdArgs)
 		FmtPrintStdOut("error: missing output library file path (-out=XXX)\n");
 		return false;
 	}
-	if (cmdArgs.outLibraryFilePath.isEmpty())
+	if (cmdArgs.intermediateDirPath.isEmpty())
 	{
-		FmtPrintStdOut("warning: missing output file path (-out=XXX). Incremental building is not available\n");
+		FmtPrintStdOut("warning: missing intermediate dir path (-imdir=XXX). Incremental building is disabled\n");
 	}
 
 	if (!Path::HasFileName(cmdArgs.libraryDefinitionFilePath))
@@ -383,6 +383,8 @@ int main(int argc, char* argv[])
 		return 1;
 
 	StoreIncrementalBuildCacheIndex(cmdArgs, libraryDefinition);
+
+	FmtPrintStdOut("Shader library build succeeded\n");
 
 	return 0;
 }

@@ -363,6 +363,7 @@ namespace XEngine::Gfx::HAL
 		// IndirectArgument,
 
 		AllShaders = ComputeShader | PrePixelShaders | PixelShader,
+		AllGraphicsShaders = PrePixelShaders | PixelShader,
 		AllGraphics = PrePixelShaders | PixelShader | ColorRenderTarget | DepthStencilRenderTarget,
 		All = Copy | ComputeShader | AllGraphics | RaytracingAccelerationStructureBuild | RaytracingAccelerationStructureCopy,
 	};

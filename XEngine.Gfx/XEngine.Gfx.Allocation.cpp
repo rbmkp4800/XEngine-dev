@@ -180,12 +180,12 @@ void TransientUploadMemoryAllocator::initialize(HAL::Device& device, uint8 poolS
 	mappedUploadMemoryPoolBuffer = (byte*)device.getMappedBufferPtr(uploadMemoryPoolBuffer);
 }
 
-UploadMemoryAllocationInfo TransientUploadMemoryAllocator::allocate(uint32 size)
+UploadBufferPointer TransientUploadMemoryAllocator::allocate(uint32 size)
 {
 	const uint32 baseAllocationSize = divRoundUp(size, AllocationAlignment);
 	const uint32 allocationOffset = uint32(baseAllocator.allocate(uint16(baseAllocationSize))) * AllocationAlignment;
 
-	UploadMemoryAllocationInfo result = {};
+	UploadBufferPointer result = {};
 	result.gpuPointer.buffer = uploadMemoryPoolBuffer;
 	result.gpuPointer.offset = allocationOffset;
 	result.cpuPointer = mappedUploadMemoryPoolBuffer + allocationOffset;

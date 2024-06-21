@@ -50,7 +50,7 @@ namespace XEngine::Gfx
 		inline HAL::Device* getDevice() { return device; }
 	};
 
-	struct UploadMemoryAllocationInfo
+	struct UploadBufferPointer
 	{
 		HAL::BufferPointer gpuPointer;
 		void* cpuPointer;
@@ -58,6 +58,9 @@ namespace XEngine::Gfx
 
 	class TransientUploadMemoryAllocator : public XLib::NonCopyable
 	{
+	public:
+		static constexpr uint32 AllocationAlignment = HAL::ConstantBufferBindAlignment;
+
 	private:
 		CircularAllocatorWithGPUReleaseQueue baseAllocator;
 
@@ -65,15 +68,12 @@ namespace XEngine::Gfx
 		byte* mappedUploadMemoryPoolBuffer = nullptr;
 
 	public:
-		static constexpr uint32 AllocationAlignment = HAL::ConstantBufferBindAlignment;
-
-	public:
 		TransientUploadMemoryAllocator() = default;
 		~TransientUploadMemoryAllocator();
 
 		void initialize(HAL::Device& device, uint8 poolSizeLog2);
 
-		UploadMemoryAllocationInfo allocate(uint32 size);
+		UploadBufferPointer allocate(uint32 size);
 		void enqueueRelease(HAL::DeviceQueueSyncPoint syncPoint) { baseAllocator.enqueueRelease(syncPoint); }
 	};
 }

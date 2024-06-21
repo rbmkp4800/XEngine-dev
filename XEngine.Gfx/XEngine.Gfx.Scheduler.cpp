@@ -1,6 +1,6 @@
 #include <XLib.Algorithm.QuickSort.h>
+#include <XLib.Allocation.h>
 #include <XLib.Containers.ArrayList.h>
-#include <XLib.SystemHeapAllocator.h>
 
 #include "XEngine.Gfx.Scheduler.h"
 
@@ -12,19 +12,29 @@ XTODO("Implement proper handles");
 
 static inline HAL::BarrierSync TranslateSchedulerShaderStageToHALBarrierSync(Scheduler::ShaderStage shaderStage)
 {
-
+	switch (shaderStage)
+	{
+		case ShaderStage::Any:		return HAL::BarrierSync::AllShaders;
+		case ShaderStage::Compute:	return HAL::BarrierSync::ComputeShader;
+		case ShaderStage::Graphics:	return HAL::BarrierSync::AllGraphicsShaders;
+		case ShaderStage::PrePixel:	return HAL::BarrierSync::PrePixelShaders;
+		case ShaderStage::Pixel:	return HAL::BarrierSync::PixelShader;
+	}
+	XEAssertUnreachableCode();
+	return HAL::BarrierSync::None;
 }
 
-// TransientResourcePool ///////////////////////////////////////////////////////////////////////////
 
-enum class TransientResourcePool::EntryType : uint8
+// TransientResourceCache ///////////////////////////////////////////////////////////////////////////
+
+enum class TransientResourceCache::EntryType : uint8
 {
 	Undefined = 0,
 	Buffer,
 	Texture,
 };
 
-struct TransientResourcePool::Entry
+struct TransientResourceCache::Entry
 {
 	union
 	{
@@ -44,7 +54,7 @@ struct TransientResourcePool::Entry
 	EntryType type;
 };
 
-void TransientResourcePool::initialize(HAL::Device& device,
+void TransientResourceCache::initialize(HAL::Device& device,
 	HAL::DeviceMemoryAllocationHandle deviceMemoryPool, uint64 deviceMemoryPoolSize)
 {
 	// TODO: State asserts
@@ -54,50 +64,43 @@ void TransientResourcePool::initialize(HAL::Device& device,
 	this->deviceMemoryPoolSize = deviceMemoryPoolSize;
 }
 
-PassExecutionContext::PassExecutionContext(
+GraphExecutionContext::GraphExecutionContext(
 	HAL::Device& device,
 	const Graph& graph,
-	HAL::DescriptorAllocatorHandle descriptorAllocator,
-	TransientUploadMemoryAllocator& transientUploadMemoryAllocator,
-	const uint32* transientResourceHandles)
-	:
+	HAL::DescriptorAllocatorHandle transientDescriptorAllocator,
+	TransientUploadMemoryAllocator& transientUploadMemoryAllocator) :
 	device(device),
 	graph(graph),
-	descriptorAllocator(descriptorAllocator),
-	transientUploadMemoryAllocator(transientUploadMemoryAllocator),
-	transientResourceHandles(transientResourceHandles)
+	transientDescriptorAllocator(transientDescriptorAllocator),
+	transientUploadMemoryAllocator(transientUploadMemoryAllocator)
 { }
 
-HAL::DescriptorSet PassExecutionContext::allocateDescriptorSet(HAL::DescriptorSetLayoutHandle descriptorSetLayout)
+HAL::DescriptorSet GraphExecutionContext::allocateDescriptorSet(HAL::DescriptorSetLayoutHandle descriptorSetLayout)
 {
-	return device.allocateDescriptorSet(descriptorAllocator, descriptorSetLayout);
+	return device.allocateDescriptorSet(transientDescriptorAllocator, descriptorSetLayout);
 }
 
-UploadBufferPointer PassExecutionContext::allocateUploadMemory(uint32 size)
+UploadBufferPointer GraphExecutionContext::allocateUploadMemory(uint32 size)
 {
 	return transientUploadMemoryAllocator.allocate(size);
 }
 
-HAL::BufferHandle PassExecutionContext::resolveBuffer(BufferHandle bufferHandle)
+HAL::BufferHandle GraphExecutionContext::resolveBuffer(BufferHandle bufferHandle)
 {
-	// TODO: Probably we should have just `resourceHandles` that has transient and non-transient handles together?
-
 	const uint16 resourceIndex = uint16(bufferHandle);
 	XEAssert(resourceIndex < graph.resourceCount);
 	const Graph::Resource& resource = graph.resources[resourceIndex];
 	XEAssert(resource.type == HAL::ResourceType::Buffer);
-
-	return resource.isImported ? resource.importedBufferHandle : HAL::BufferHandle(transientResourceHandles[resourceIndex]);
+	return HAL::BufferHandle(resource.halResourceHandle);
 }
 
-HAL::TextureHandle PassExecutionContext::resolveTexture(TextureHandle textureHandle)
+HAL::TextureHandle GraphExecutionContext::resolveTexture(TextureHandle textureHandle)
 {
 	const uint16 resourceIndex = uint16(textureHandle);
 	XEAssert(resourceIndex < graph.resourceCount);
 	const Graph::Resource& resource = graph.resources[resourceIndex];
 	XEAssert(resource.type == HAL::ResourceType::Texture);
-
-	return resource.isImported ? resource.importedTextureHandle : HAL::TextureHandle(transientResourceHandles[resourceIndex]);
+	return HAL::TextureHandle(resource.halResourceHandle);
 }
 
 
@@ -187,21 +190,11 @@ struct Graph::Resource
 {
 	union
 	{
-		struct
-		{
-			union
-			{
-				uint32 bufferSize;
-				HAL::TextureDesc textureDesc;
-			};
-			uint64 resourceNameXSH;
-		} transient;
-
-		struct
-		{
-			uint32 resourceHandle;
-		} imported;
+		uint32 bufferSize;
+		HAL::TextureDesc textureDesc;
 	};
+	uint64 transientResourceNameXSH;
+	uint32 halResourceHandle;
 
 	HAL::ResourceType type;
 	bool isImported;
@@ -263,17 +256,19 @@ struct Graph::Barrier
 };
 
 void Graph::initialize(HAL::Device& device,
-	uint16 resourcePoolSize, uint16 passPoolSize, uint16 dependencyPoolSize, uint16 barrierPoolSize, uint32 userDataPoolSize)
+	TransientResourceCache& transientResourceCache,
+	const GraphSettings& settings)
 {
 	XEMasterAssert(!this->device);
 	memorySet(this, 0, sizeof(Graph));
 
 	this->device = &device;
-	this->resourcePoolSize = resourcePoolSize;
-	this->passPoolSize = passPoolSize;
-	this->dependencyPoolSize = dependencyPoolSize;
-	this->barrierPoolSize = barrierPoolSize;
-	this->userDataPoolSize = userDataPoolSize;
+	this->transientResourceCache = &transientResourceCache;
+	this->resourcePoolSize = settings.resourcePoolSize;
+	this->passPoolSize = settings.passPoolSize;
+	this->dependencyPoolSize = settings.dependencyPoolSize;
+	this->barrierPoolSize = settings.barrierPoolSize;
+	this->userDataPoolSize = settings.userDataPoolSize;
 
 	{
 		uintptr poolsMemorySizeAccum = 0;
@@ -310,86 +305,93 @@ void Graph::destroy()
 	if (!device)
 		return;
 
+	// TODO: Revisit this.
 	XLib::SystemHeapAllocator::Release(poolsMemory);
-	poolsMemory = nullptr;
-
-	// TODO: Maybe some checks & cleanup?
-
-	device = nullptr;
+	memorySet(this, 0, sizeof(Graph));
 }
 
 BufferHandle Graph::createTransientBuffer(uint32 size, uint64 nameXSH)
 {
+	XEAssert(device);
+	XEAssert(!isCompiled);
+
 	XEMasterAssert(resourceCount < resourcePoolSize);
 	const uint16 resourceIndex = resourceCount;
 	resourceCount++;
 
 	Resource& resource = resources[resourceIndex];
 	resource = {};
-	resource.transient.bufferSize = size;
-	resource.transient.resourceNameXSH = nameXSH;
+	resource.bufferSize = size;
+	resource.transientResourceNameXSH = nameXSH;
 	resource.type = HAL::ResourceType::Buffer;
 	resource.isImported = false;
 	resource.dependencyChainHeadIdx = uint16(-1);
 	resource.dependencyChainTailIdx = uint16(-1);
-	//resource.refCount = 0;
 
 	return BufferHandle(resourceIndex);
 }
 
 TextureHandle Graph::createTransientTexture(HAL::TextureDesc textureDesc, uint64 nameXSH)
 {
+	XEAssert(device);
+	XEAssert(!isCompiled);
+
 	XEMasterAssert(resourceCount < resourcePoolSize);
 	const uint16 resourceIndex = resourceCount;
 	resourceCount++;
 
 	Resource& resource = resources[resourceIndex];
 	resource = {};
-	resource.transient.textureDesc = textureDesc;
-	resource.transient.resourceNameXSH = nameXSH;
+	resource.textureDesc = textureDesc;
+	resource.transientResourceNameXSH = nameXSH;
 	resource.type = HAL::ResourceType::Texture;
 	resource.isImported = false;
 	resource.dependencyChainHeadIdx = uint16(-1);
 	resource.dependencyChainTailIdx = uint16(-1);
-	//resource.refCount = 0;
 
 	return TextureHandle(resourceIndex);
 }
 
 BufferHandle Graph::importExternalBuffer(HAL::BufferHandle bufferHandle)
 {
+	XEAssert(device);
+	XEAssert(!isCompiled);
+
 	XEMasterAssert(resourceCount < resourcePoolSize);
 	const uint16 resourceIndex = resourceCount;
 	resourceCount++;
 
 	Resource& resource = resources[resourceIndex];
 	resource = {};
-	resource.imported.resourceHandle = uint32(bufferHandle);
+	// TODO: Fill `resource.bufferSize` just in case.
+	resource.halResourceHandle = uint32(bufferHandle);
 	resource.type = HAL::ResourceType::Buffer;
 	resource.isImported = true;
 	resource.dependencyChainHeadIdx = uint16(-1);
 	resource.dependencyChainTailIdx = uint16(-1);
-	//resource.refCount = 0;
 
 	return BufferHandle(resourceIndex);
 }
 
 TextureHandle Graph::importExternalTexture(HAL::TextureHandle textureHandle, HAL::TextureLayout defaultLayout)
 {
+	XEAssert(device);
+	XEAssert(!isCompiled);
+
 	XEMasterAssert(resourceCount < resourcePoolSize);
 	const uint16 resourceIndex = resourceCount;
 	resourceCount++;
 
 	Resource& resource = resources[resourceIndex];
 	resource = {};
-	resource.imported.resourceHandle = uint32(textureHandle);
+	// TODO: Fill `resource.textureDesc` just in case.
+	resource.halResourceHandle = uint32(textureHandle);
 	resource.type = HAL::ResourceType::Texture;
 	resource.isImported = true;
 	resource.dependencyChainHeadIdx = uint16(-1);
 	resource.dependencyChainTailIdx = uint16(-1);
-	//resource.refCount = 0;
 
-	... ?? defaultLayout ??;
+	XEAssert(defaultLayout == HAL::TextureLayout::Common);
 
 	return TextureHandle(resourceIndex);
 }
@@ -397,6 +399,8 @@ TextureHandle Graph::importExternalTexture(HAL::TextureHandle textureHandle, HAL
 void Graph::addPass(PassType type, PassDependencyCollector& dependencyCollector,
 	PassExecutorFunc executorFunc, const void* userData)
 {
+	XEAssert(device);
+	XEAssert(!isCompiled);
 	XEAssert(!issuedPassDependencyCollector);
 
 	XEMasterAssert(passCount < passPoolSize);
@@ -418,6 +422,9 @@ void Graph::addPass(PassType type, PassDependencyCollector& dependencyCollector,
 void Graph::compile()
 {
 	XEAssert(device);
+	XEAssert(!isCompiled);
+	XEAssert(!issuedPassDependencyCollector);
+	XEAssert(passCount > 0);
 
 #if 0
 	// Compute refcount for resources and passes.
@@ -478,7 +485,8 @@ void Graph::compile()
 	}
 #endif
 
-	// Emit resource barriers.
+
+	// Generate resource barriers.
 	for (uint16 resourceIndex = 0; resourceIndex < resourceCount; resourceIndex++)
 	{
 		const Resource& resource = resources[resourceIndex];
@@ -486,11 +494,14 @@ void Graph::compile()
 		//	continue;
 		//XEAssert(resource.dependencyChainHeadIdx != uint16(-1));
 
-		if (resource.type == HAL::ResourceType::Buffer)
+		//if (resource.type == HAL::ResourceType::Buffer)
 		{
-			Barrier* emittedBarrier = nullptr;
-			HAL::BarrierAccess emittedBarrierAccess = HAL::BarrierAccess::None;
-			HAL::BarrierSync emittedBarrierSync = HAL::BarrierSync::None;
+			Barrier* prevBarrier = nullptr;
+			HAL::BarrierAccess prevBarrierAccess = HAL::BarrierAccess::None;
+			HAL::BarrierSync prevBarrierSync = HAL::BarrierSync::None;
+
+			// (T_T)
+			HAL::TextureLayout prevTextureLayout = HAL::TextureLayout::Common;
 
 			for (uint16 depChainIter = resource.dependencyChainHeadIdx;
 				depChainIter != uint16(-1);
@@ -503,70 +514,74 @@ void Graph::compile()
 				//	continue;
 
 				const bool readToReadTransition =
-					emittedBarrierAccess != HAL::BarrierAccess::None &&
-					HAL::BarrierAccessUtils::IsReadOnly(emittedBarrierAccess) &&
+					prevBarrierAccess != HAL::BarrierAccess::None &&
+					HAL::BarrierAccessUtils::IsReadOnly(prevBarrierAccess) &&
 					HAL::BarrierAccessUtils::IsReadOnly(dependency.access);
 
 				const bool shaderWriteToShaderWriteWithoutSync =
 					!dependency.dependsOnPrecedingShaderWrite &&
-					emittedBarrierAccess == HAL::BarrierAccess::ShaderReadWrite &&
+					prevBarrierAccess == HAL::BarrierAccess::ShaderReadWrite &&
 					dependency.access == HAL::BarrierAccess::ShaderReadWrite;
 
 				if (readToReadTransition || shaderWriteToShaderWriteWithoutSync)
 				{
 					// Extend already emitted barrier.
-					emittedBarrierAccess |= dependency.access;
-					emittedBarrierSync |= dependency.sync;
+					prevBarrierAccess |= dependency.access;
+					prevBarrierSync |= dependency.sync;
 
-					XEAssert(emittedBarrier);
-					emittedBarrier->accessAfter |= dependency.access;
-					emittedBarrier->syncAfter |= dependency.sync;
+					XEAssert(prevBarrier);
+					prevBarrier->accessAfter |= dependency.access;
+					prevBarrier->syncAfter |= dependency.sync;
 				}
 				else
 				{
-					// Emit new barrier.
-
+					// Generate new barrier.
 					XEMasterAssert(barrierCount < barrierPoolSize);
 					const uint16 newBarrierIndex = barrierCount;
 					barrierCount++;
 
 					Barrier& newBarrier = barriers[newBarrierIndex];
+					newBarrier = {};
 					newBarrier.resourceIndex = resourceIndex;
-					newBarrier.accessBefore = emittedBarrierAccess;
+					newBarrier.accessBefore = prevBarrierAccess;
 					newBarrier.accessAfter = dependency.access;
-					newBarrier.syncBefore = emittedBarrierSync;
+					newBarrier.syncBefore = prevBarrierSync;
 					newBarrier.syncAfter = dependency.sync;
 					newBarrier.chainNextIdx = uint16(-1);
 
-					if (emittedBarrier)
-						emittedBarrier->chainNextIdx = newBarrierIndex;
+					if (resource.type == HAL::ResourceType::Texture)
+					{
+						newBarrier.layoutBefore = prevTextureLayout;
+						newBarrier.layoutAfter = ...;
+						...;
+					}
+
+					if (prevBarrier)
+						prevBarrier->chainNextIdx = newBarrierIndex;
 					else
 						pass.preExecutionBarrierChainHeadIdx = newBarrierIndex;
 
-					emittedBarrier = &newBarrier;
-					emittedBarrierAccess = dependency.access;
-					emittedBarrierSync = dependency.sync;
+					prevBarrier = &newBarrier;
+					prevBarrierAccess = dependency.access;
+					prevBarrierSync = dependency.sync;
 				}
 			}
 
-			XTODO(__FUNCTION__ ": Emit last barrier to NONE state (will need this for aliasing to work properly)");
+			// TODO: Generate last barrier to NONE state (will need this for aliasing to work properly
+
+			XTODO(__FUNCTION__ ": ");
 		}
-		else if (resource.type == HAL::ResourceType::Texture)
+		/*else if (resource.type == HAL::ResourceType::Texture)
 		{
 
 		}
 		else
-			XEAssertUnreachableCode();
+			XEAssertUnreachableCode();*/
 	}
+
 
 	// Compute transient resource lifetime conflict matrix (if we ever need one).
 	// ...
-}
-
-void Graph::execute(HAL::CommandAllocatorHandle commandAllocator, HAL::DescriptorAllocatorHandle descriptorAllocator,
-	TransientUploadMemoryAllocator& transientUploadMemoryAllocator, TransientResourcePool& transientResourcePool)
-{
-	XEAssert(device);
 
 
 	// Compute transient resources locations.
@@ -584,6 +599,8 @@ void Graph::execute(HAL::CommandAllocatorHandle commandAllocator, HAL::Descripto
 	// ^^^ This is bullshit.
 
 	TransientResourceLocation transientResourceLocations[MaxResourceCount];
+
+#if 0
 
 	{
 		// [REMOVE_THIS_STUPID COMMENT] Transient resources are ordered from large to small.
@@ -628,7 +645,7 @@ void Graph::execute(HAL::CommandAllocatorHandle commandAllocator, HAL::Descripto
 			{
 				const uint16 alreadyPlacedResourceIndex = ...;
 				const uint16 alreadyPlaced
-				const Resource& alreadyPlacedResource = resources[alreadyPlacedResourceIndex];
+					const Resource& alreadyPlacedResource = resources[alreadyPlacedResourceIndex];
 
 				const bool lifetimesOverlap =
 					resource.firstUsagePassIndex <= alreadyPlacedResource.lastUsagePassIndex &&
@@ -693,76 +710,99 @@ void Graph::execute(HAL::CommandAllocatorHandle commandAllocator, HAL::Descripto
 		}
 	}
 
-	// Allocate transient resources.
-	uint32 transientResourceHandles[MaxResourceCount];
+#else
 
-
-	uint64 transientResourcePoolMemoryUsed = 0;
-	for (Resource& resource : resources)
+	uint32 transientResourceHeapOffsetAccum = 0;
+	for (uint16 resourceIndex = 0; resourceIndex < resourceCount; resourceIndex++)
 	{
-		if (resource.lifetime != ResourceLifetime::Transient)
+		const Resource resource = resources[resourceIndex];
+		if (resource.isImported)
 			continue;
+
+		TransientResourceLocation& resourceLocation = transientResourceLocations[resourceIndex];
 
 		if (resource.type == HAL::ResourceType::Buffer)
 		{
-			const uint64 requiredMemorySize = alignUp<uint64>(resource.transientBufferSize, 65536);
-			const uint64 memoryOffset = transientResourcePoolMemoryUsed;
-			transientResourcePoolMemoryUsed += requiredMemorySize;
-
-			const HAL::BufferHandle buffer =
-				device->createBuffer(resource.transientBufferSize);
-
-			resource.transientResourcePoolEntryIndex = transientResourcePool.entries.getSize();
-
-			TransientResourcePool::Entry transientResourcePoolEntry = {};
-			transientResourcePoolEntry.type = TransientResourcePool::EntryType::Buffer;
-			transientResourcePoolEntry.buffer.handle = buffer;
-			transientResourcePool.entries.pushBack(transientResourcePoolEntry);
+			resourceLocation.offset = transientResourceHeapOffsetAccum;
+			resourceLocation.size = XCheckedCastU16(
+				divRoundUp<uint64>(resource.bufferSize, TransientResourceCache::AllocationAlignment));
 		}
 		else if (resource.type == HAL::ResourceType::Texture)
 		{
 			const HAL::ResourceAllocationInfo textureAllocationInfo =
-				device->getTextureAllocationInfo(resource.transientTextureDesc);
+				device->getTextureAllocationInfo(resource.textureDesc);
+			XEAssert(textureAllocationInfo.alignment <= TransientResourceCache::AllocationAlignment);
 
-			const uint64 requiredMemorySize = alignUp<uint64>(textureAllocationInfo.size, 65536); // TODO: Do we need alignUp here?
-			const uint64 memoryOffset = transientResourcePoolMemoryUsed;
-			transientResourcePoolMemoryUsed += requiredMemorySize;
+			resourceLocation.offset = transientResourceHeapOffsetAccum;
+			resourceLocation.size = XCheckedCastU16(
+				divRoundUp<uint64>(textureAllocationInfo.size, TransientResourceCache::AllocationAlignment));
+		}
 
-			const HAL::TextureHandle texture =
-				device->createTexture(resource.transientTextureDesc, HAL::TextureLayout::Common,
-					//transientResourcePool.deviceMemoryPool, memoryOffset);
-					HAL::DeviceMemoryAllocationHandle::Zero);
+		transientResourceHeapOffsetAccum += resourceLocation.size;
+	}
 
-			resource.transientResourcePoolEntryIndex = transientResourcePool.entries.getSize();
+#endif
 
-			TransientResourcePool::Entry transientResourcePoolEntry = {};
-			transientResourcePoolEntry.type = TransientResourcePool::EntryType::Texture;
-			transientResourcePoolEntry.texture.handle = texture;
-			transientResourcePool.entries.pushBack(transientResourcePoolEntry);
+
+	// Allocate transient resources.
+
+	// NOTE: This is a placeholder code.
+	uint32 transientResourceHeapOffsetAccum = 0;
+	for (uint16 resourceIndex = 0; resourceIndex < resourceCount; resourceIndex++)
+	{
+		Resource resource = resources[resourceIndex];
+		if (resource.isImported)
+			continue;
+
+		if (resource.type == HAL::ResourceType::Buffer)
+		{
+			const HAL::BufferHandle bufferHandle = device->createBuffer(resource.bufferSize);
+			resource.halResourceHandle = uint32(bufferHandle);
+		}
+		else if (resource.type == HAL::ResourceType::Texture)
+		{
+			const HAL::TextureHandle textureHandle = device->createTexture(resource.textureDesc, HAL::TextureLayout::Common);
+			resource.halResourceHandle = uint32(textureHandle);
 		}
 	}
 
+	isCompiled = true;
+}
+
+void Graph::execute(HAL::CommandAllocatorHandle commandAllocator,
+	HAL::DescriptorAllocatorHandle transientDescriptorAllocator,
+	TransientUploadMemoryAllocator& transientUploadMemoryAllocator) const
+{
+	XEAssert(device);
+	XEAssert(isCompiled);
+
+	GraphExecutionContext context(*device, *this,
+		transientDescriptorAllocator, transientUploadMemoryAllocator);
+
+	HAL::CommandList commandList;
+	device->openCommandList(commandList, commandAllocator);
+
+	for (uint16 passIndex = 0; passIndex < passCount; passIndex++)
 	{
-		PassExecutionContext context(*device, *this, transientDescriptorAllocator,
-			transientUploadMemoryAllocator, transientResourcePool);
+		const Pass& pass = passes[passIndex];
+		pass.executporFunc(context, *device, commandList, pass.userData);
 
-		HAL::CommandList commandList;
-		device->openCommandList(commandList, commandAllocator);
-
-		for (Pass& pass : passes)
-			pass.executporFunc(context, *device, commandList, pass.userData);
-
-		device->closeCommandList(commandList);
-		device->submitCommandList(HAL::DeviceQueue::Graphics, commandList);
+		// Emit barriers.
+		...;
 	}
+
+	device->closeCommandList(commandList);
+	device->submitCommandList(HAL::DeviceQueue::Graphics, commandList);
 
 	const HAL::DeviceQueueSyncPoint sp = device->getEndOfQueueSyncPoint(HAL::DeviceQueue::Graphics);
 	transientUploadMemoryAllocator.enqueueRelease(sp);
 	while (!device->isQueueSyncPointReached(sp))
 		{ }
+}
 
-	transientResourcePool.reset();
-
-	resources.clear();
-	passes.clear();
+void Graph::reset()
+{
+	XEAssert(device);
+	// Graph re-recoding and transient resource reuse is not implemented for now.
+	XEAssertUnreachableCode();
 }

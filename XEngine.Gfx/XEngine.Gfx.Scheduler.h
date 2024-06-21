@@ -11,7 +11,7 @@
 namespace XEngine::Gfx::Scheduler
 {
 	class Graph;
-	class PassExecutionContext;
+	class GraphExecutionContext;
 
 	enum class BufferHandle : uint32 {};
 	enum class TextureHandle : uint32 {};
@@ -33,18 +33,20 @@ namespace XEngine::Gfx::Scheduler
 		Pixel,
 	};
 
-	using PassExecutorFunc = void(*)(PassExecutionContext& executionBroker,
+	using PassExecutorFunc = void(*)(GraphExecutionContext& executionBroker,
 		HAL::Device& device, HAL::CommandList& commandList, const void* userData);
 
-	class TransientResourcePool : public XLib::NonCopyable
+	class TransientResourceCache : public XLib::NonCopyable
 	{
 		friend Graph;
-		friend PassExecutionContext;
+		friend GraphExecutionContext;
 
 	private:
 		enum class EntryType : uint8;
 
 		struct Entry;
+
+		static constexpr uint32 AllocationAlignment = 0x10000;
 
 	private:
 		HAL::Device* device = nullptr;
@@ -55,31 +57,29 @@ namespace XEngine::Gfx::Scheduler
 		uint16 entryCount = 0;
 
 	public:
-		TransientResourcePool() = default;
-		~TransientResourcePool() = default;
+		TransientResourceCache() = default;
+		~TransientResourceCache() = default;
 
 		void initialize(HAL::Device& device, HAL::DeviceMemoryAllocationHandle deviceMemoryPool, uint64 deviceMemoryPoolSize);
 
 		//inline HAL::DeviceMemoryAllocationHandle getMemoryPool() const { return deviceMemoryPool; }
 	};
 
-	class PassExecutionContext final : public XLib::NonCopyable
+	class GraphExecutionContext final : public XLib::NonCopyable
 	{
 		friend Graph;
 
 	private:
 		HAL::Device& device;
 		const Graph& graph;
-		HAL::DescriptorAllocatorHandle descriptorAllocator;
+		HAL::DescriptorAllocatorHandle transientDescriptorAllocator;
 		TransientUploadMemoryAllocator& transientUploadMemoryAllocator;
-		const uint32* transientResourceHandles;
 
 	private:
-		PassExecutionContext(HAL::Device& device, const Graph& graph,
-			HAL::DescriptorAllocatorHandle descriptorAllocator,
-			TransientUploadMemoryAllocator& transientUploadMemoryAllocator,
-			const uint32* transientResourceHandles);
-		~PassExecutionContext() = default;
+		GraphExecutionContext(HAL::Device& device, const Graph& graph,
+			HAL::DescriptorAllocatorHandle transientDescriptorAllocator,
+			TransientUploadMemoryAllocator& transientUploadMemoryAllocator);
+		~GraphExecutionContext() = default;
 
 	public:
 		HAL::DescriptorSet allocateDescriptorSet(HAL::DescriptorSetLayoutHandle descriptorSetLayout);
@@ -137,9 +137,18 @@ namespace XEngine::Gfx::Scheduler
 		void close();
 	};
 
+	struct GraphSettings
+	{
+		uint16 resourcePoolSize;
+		uint16 passPoolSize;
+		uint16 dependencyPoolSize;
+		uint16 barrierPoolSize;
+		uint32 userDataPoolSize;
+	};
+
 	class Graph final : public XLib::NonCopyable
 	{
-		friend PassExecutionContext;
+		friend GraphExecutionContext;
 		friend PassDependencyCollector;
 
 	private:
@@ -158,8 +167,9 @@ namespace XEngine::Gfx::Scheduler
 
 	private:
 		HAL::Device* device = nullptr;
-		byte* poolsMemory = nullptr;
+		TransientResourceCache* transientResourceCache = nullptr;
 
+		byte* poolsMemory = nullptr;
 		Resource* resources = nullptr;
 		Pass* passes = nullptr;
 		Dependency* dependencies = nullptr;
@@ -181,13 +191,15 @@ namespace XEngine::Gfx::Scheduler
 
 		PassDependencyCollector* issuedPassDependencyCollector = nullptr;
 		//uint16 issuedPassDependencyCollectorMagic = 0;
+		bool isCompiled = false;
 
 	public:
 		Graph() = default;
 		inline ~Graph() { destroy(); }
 
 		void initialize(HAL::Device& device,
-			uint16 resourcePoolSize, uint16 passPoolSize, uint16 dependencyPoolSize, uint16 barrierPoolSize, uint32 userDataPoolSize);
+			TransientResourceCache& transientResourceCache,
+			const GraphSettings& settings);
 		void destroy();
 
 		BufferHandle createTransientBuffer(uint32 size, uint64 nameXSH);
@@ -203,9 +215,10 @@ namespace XEngine::Gfx::Scheduler
 
 		void compile();
 
-		uint64 getTransientResourcePoolMemoryRequirement() const;
+		void execute(HAL::CommandAllocatorHandle commandAllocator,
+			HAL::DescriptorAllocatorHandle transientDescriptorAllocator,
+			TransientUploadMemoryAllocator& transientUploadMemoryAllocator) const;
 
-		void execute(HAL::CommandAllocatorHandle commandAllocator, HAL::DescriptorAllocatorHandle descriptorAllocator,
-			TransientUploadMemoryAllocator& transientUploadMemoryAllocator, TransientResourcePool& transientResourcePool);
+		void reset();
 	};
 }
