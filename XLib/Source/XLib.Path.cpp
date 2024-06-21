@@ -9,32 +9,6 @@
 
 using namespace XLib;
 
-StringViewASCII Path::GetFileName(const char* pathCStr)
-{
-	const uintptr pathLength = String::GetCStrLength(pathCStr);
-
-	for (uintptr i = pathLength - 1; i < pathLength; i--)
-	{
-		if (pathCStr[i] == '\\' || pathCStr[i] == '/')
-			return StringViewASCII(pathCStr + i + 1, pathCStr + pathLength);
-	}
-
-	return StringViewASCII(pathCStr, pathLength);
-}
-
-StringViewASCII Path::RemoveFileName(const char* pathCStr)
-{
-	const uintptr pathLength = String::GetCStrLength(pathCStr);
-
-	for (uintptr i = pathLength - 1; i < pathLength; i--)
-	{
-		if (pathCStr[i] == '\\' || pathCStr[i] == '/')
-			return StringViewASCII(pathCStr, pathCStr + i + 1);
-	}
-
-	return StringViewASCII {};
-}
-
 void Path::GetCurrentPath(VirtualStringRefASCII resultPath)
 {
 	// Including null-terminator.
@@ -146,6 +120,8 @@ void Path::AddTrailingDirectorySeparator(VirtualStringRefASCII path)
 	char* pathData = path.getBuffer();
 	uint32 pathLength = path.getLength();
 
+	if (pathLength == 0)
+		return;
 	if (Path::HasTrailingDirectorySeparator(StringViewASCII(pathData, pathLength)))
 		return;
 
@@ -159,3 +135,39 @@ void Path::AddTrailingDirectorySeparator(VirtualStringRefASCII path)
 	pathData[pathLength] = '/';
 }
 
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+StringViewASCII Path::GetFileName(StringViewASCII path)
+{
+	const char* pathBegin = path.getData();
+	const char* pathEnd = path.getData() + path.getLength();
+	for (const char* pathIt = pathEnd - 1; pathBegin <= pathIt; pathIt--)
+	{
+		if (Path::IsDirectorySeparatorChar(*pathIt))
+			return StringViewASCII(pathIt + 1, pathEnd);
+	}
+	return path;
+}
+
+StringViewASCII Path::GetFileName(const char* pathCStr)
+{
+	return GetFileName(StringViewASCII::FromCStr(pathCStr));
+}
+
+StringViewASCII Path::RemoveFileName(StringViewASCII path)
+{
+	const char* pathBegin = path.getData();
+	const char* pathEnd = path.getData() + path.getLength();
+	for (const char* pathIt = pathEnd - 1; pathBegin <= pathIt; pathIt--)
+	{
+		if (Path::IsDirectorySeparatorChar(*pathIt))
+			return StringViewASCII(pathBegin, pathIt + 1);
+	}
+	return StringViewASCII();
+}
+
+StringViewASCII Path::RemoveFileName(const char* pathCStr)
+{
+	return RemoveFileName(StringViewASCII::FromCStr(pathCStr));
+}

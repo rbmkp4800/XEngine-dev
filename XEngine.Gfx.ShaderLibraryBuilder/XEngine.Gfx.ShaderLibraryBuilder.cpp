@@ -18,7 +18,101 @@ using namespace XLib;
 using namespace XEngine::Gfx;
 using namespace XEngine::Gfx::ShaderLibraryBuilder;
 
-static void StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const char* outLibraryFilePath)
+struct CmdArgs
+{
+	InplaceStringASCIIx1024 libraryDefinitionFilePath;
+	InplaceStringASCIIx1024 outLibraryFilePath;
+	InplaceStringASCIIx1024 intermediateDirPath;
+};
+
+static bool ParseCmdArgs(int argc, char* argv[], CmdArgs& cmdArgs)
+{
+	const char* libdefArg = nullptr;
+	const char* outArg = nullptr;
+	const char* imdirArg = nullptr;
+
+	for (int i = 1; i < argc; i++)
+	{
+		if (String::StartsWith(argv[i], "-libdef="))
+			libdefArg = argv[i] + 8;
+		else if (String::StartsWith(argv[i], "-out="))
+			outArg = argv[i] + 5;
+		else if (String::StartsWith(argv[i], "-imdir="))
+			imdirArg = argv[i] + 7;
+	}
+
+	Path::MakeAbsolute(libdefArg, cmdArgs.libraryDefinitionFilePath);
+	Path::Normalize(cmdArgs.libraryDefinitionFilePath);
+
+	Path::MakeAbsolute(outArg, cmdArgs.outLibraryFilePath);
+	Path::Normalize(cmdArgs.outLibraryFilePath);
+
+	Path::MakeAbsolute(imdirArg, cmdArgs.intermediateDirPath);
+	Path::Normalize(cmdArgs.intermediateDirPath);
+	Path::AddTrailingDirectorySeparator(cmdArgs.intermediateDirPath);
+
+	if (cmdArgs.libraryDefinitionFilePath.isEmpty())
+	{
+		FmtPrintStdOut("error: missing library definition file path (-libdef=XXX)\n");
+		return false;
+	}
+	if (cmdArgs.outLibraryFilePath.isEmpty())
+	{
+		FmtPrintStdOut("error: missing output library file path (-out=XXX)\n");
+		return false;
+	}
+	if (cmdArgs.outLibraryFilePath.isEmpty())
+	{
+		FmtPrintStdOut("warning: missing output file path (-out=XXX). Incremental building is not available\n");
+	}
+
+	if (!Path::HasFileName(cmdArgs.libraryDefinitionFilePath))
+	{
+		FmtPrintStdOut("error: library definition file path has no filename\n");
+		return false;
+	}
+	if (!Path::HasFileName(cmdArgs.outLibraryFilePath))
+	{
+		FmtPrintStdOut("error: output library file path has no filename\n");
+		return false;
+	}
+
+	return true;
+}
+
+static void StoreShaderIntermediateBlob(const CmdArgs& cmdArgs, const Shader& shader,
+	const HAL::ShaderCompiler::Blob& blob, const char* filenameSuffix)
+{
+	InplaceStringASCIIx1024 filePath;
+	FmtPrintStr(filePath, cmdArgs.intermediateDirPath,
+		"SH.", FmtArgHex64(shader.getNameXSH(), 16), ".", shader.getName(), filenameSuffix);
+
+	File file;
+	file.open(filePath.getCStr(), FileAccessMode::Write, FileOpenMode::Override);
+	if (!file.isOpen())
+	{
+		FmtPrintStdOut("warning: Cannot open file '", filePath, "' for writing\n");
+		return;
+	}
+
+	file.write(blob.getData(), blob.getSize());
+	file.close();
+}
+
+static void StoreShaderCompilationResultIntermediates(const CmdArgs& cmdArgs, const Shader& shader,
+	const HAL::ShaderCompiler::ShaderCompilationResult& compilationResult)
+{
+	if (cmdArgs.intermediateDirPath.isEmpty())
+		return;
+
+	if (const HAL::ShaderCompiler::Blob* bytecodeBlob = compilationResult.getBytecodeBlob())
+		StoreShaderIntermediateBlob(cmdArgs, shader, *bytecodeBlob, ".bin");
+
+	if (const HAL::ShaderCompiler::Blob* preprocBlob = compilationResult.getPreprocessedSourceBlob())
+		StoreShaderIntermediateBlob(cmdArgs, shader, *preprocBlob, ".PP.hlsl");
+}
+
+static bool StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const char* outLibraryFilePath)
 {
 	FmtPrintStdOut("Storing shader library '", outLibraryFilePath, "'\n");
 
@@ -129,7 +223,7 @@ static void StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const
 	if (!file.open(outLibraryFilePath, FileAccessMode::Write, FileOpenMode::Override))
 	{
 		FmtPrintStdOut("error: Cannot open shader library for writing '", outLibraryFilePath, "'\n");
-		return;
+		return false;
 	}
 
 	file.write(&header, sizeof(header));
@@ -146,6 +240,8 @@ static void StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const
 	XAssert(blobsDataSizeCheck == blobsDataSize);
 
 	file.close();
+
+	return true;
 }
 
 static HAL::ShaderCompiler::SourceResolutionResult ResolveSource(void* context, StringViewASCII sourceFilename)
@@ -158,53 +254,15 @@ static HAL::ShaderCompiler::SourceResolutionResult ResolveSource(void* context, 
 
 int main(int argc, char* argv[])
 {
-	// Parse cmd line arguments.
-
-	const char* libraryDefinitionFilePath = nullptr;
-	const char* outLibraryFilePath = nullptr;
-	const char* intermediateDirPath = nullptr;
-
-	for (int i = 1; i < argc; i++)
-	{
-		if (String::StartsWith(argv[i], "-libdef="))
-			libraryDefinitionFilePath = argv[i] + 8;
-		else if (String::StartsWith(argv[i], "-out="))
-			outLibraryFilePath = argv[i] + 5;
-		else if (String::StartsWith(argv[i], "-imdir="))
-			intermediateDirPath = argv[i] + 7;
-	}
-
-	if (!libraryDefinitionFilePath)
-	{
-		FmtPrintStdOut("error: missing library definition file path (-libdef=XXX)");
-		return 0;
-	}
-	if (!outLibraryFilePath)
-	{
-		FmtPrintStdOut("error: missing output file path (-out=XXX)");
-		return 0;
-	}
-	// TODO: `outLibraryFilePath` should have filename.
+	CmdArgs cmdArgs;
+	if (!ParseCmdArgs(argc, argv, cmdArgs))
+		return 1;	
 
 	// Load library definition file.
 	LibraryDefinition libraryDefinition;
-	FmtPrintStdOut("Loading shader library definition file '", libraryDefinitionFilePath, "'\n");
-	if (!LibraryDefinitionLoader::Load(libraryDefinition, libraryDefinitionFilePath))
-		return 0;
-
-	// Get library source root path.
-	InplaceStringASCIIx1024 librarySourceRootPath;
-	{
-		InplaceStringASCIIx1024 a;
-		a.append(Path::RemoveFileName(libraryDefinitionFilePath));
-		if (!a.isEmpty())
-			a.append('/');
-		a.append('.');
-		Path::MakeAbsolute(a, librarySourceRootPath);
-		Path::Normalize(librarySourceRootPath);
-		if (!Path::HasTrailingDirectorySeparator(librarySourceRootPath))
-			librarySourceRootPath.append('/');
-	}
+	FmtPrintStdOut("Loading shader library definition file '", cmdArgs.libraryDefinitionFilePath, "'\n");
+	if (!LibraryDefinitionLoader::Load(libraryDefinition, cmdArgs.libraryDefinitionFilePath.getCStr()))
+		return 1;
 
 	// Sort pipelines by actual name, so log looks nice :sparkles:
 	ArrayList<Shader*> shadersToCompile;
@@ -216,6 +274,9 @@ int main(int argc, char* argv[])
 		QuickSort<Shader*>(shadersToCompile, shadersToCompile.getSize(),
 			[](const Shader* left, const Shader* right) -> bool { return String::IsLess(left->getName(), right->getName()); });
 	}
+
+	InplaceStringASCIIx1024 librarySourceRootPath = Path::RemoveFileName(cmdArgs.libraryDefinitionFilePath);
+	XAssert(Path::HasTrailingDirectorySeparator(librarySourceRootPath));
 
 	SourceCache sourceCache;
 
@@ -246,55 +307,15 @@ int main(int argc, char* argv[])
 			FmtPrintStdOut(compilationResult->getCompilationOutput(), "\n");
 
 		if (compilationResult->getStatus() != HAL::ShaderCompiler::ShaderCompilationStatus::Success)
-			return 0;
+			return 1;
 
 		shader.setCompiledBlob(compilationResult->getBytecodeBlob());
 
-		if (intermediateDirPath)
-		{
-			const HAL::ShaderCompiler::Blob* bytecodeBlob = compilationResult->getBytecodeBlob();
-			if (bytecodeBlob)
-			{
-				InplaceStringASCIIx1024 intermObjectFilePath;
-				FmtPrintStr(intermObjectFilePath,
-					intermediateDirPath, "/sh.", FmtArgHex64(shader.getNameXSH(), 16), ".", shader.getName(), ".bin");
-
-				File intermObjectFile;
-				intermObjectFile.open(intermObjectFilePath.getCStr(), FileAccessMode::Write, FileOpenMode::Override);
-				if (intermObjectFile.isOpen())
-				{
-					intermObjectFile.write(bytecodeBlob->getData(), bytecodeBlob->getSize());
-					intermObjectFile.close();
-				}
-				else
-				{
-					FmtPrintStdOut("error: Cannot open file '", intermObjectFilePath, "' for writing\n");
-				}
-			}
-
-			const HAL::ShaderCompiler::Blob* preprocBlob = compilationResult->getPreprocessedSourceBlob();
-			if (preprocBlob)
-			{
-				InplaceStringASCIIx1024 intermPreprocFilePath;
-				FmtPrintStr(intermPreprocFilePath,
-					intermediateDirPath, "/sh.", FmtArgHex64(shader.getNameXSH(), 16), '.', shader.getName(), ".pp.hlsl");
-
-				File intermPreprocFile;
-				intermPreprocFile.open(intermPreprocFilePath.getCStr(), FileAccessMode::Write, FileOpenMode::Override);
-				if (intermPreprocFile.isOpen())
-				{
-					intermPreprocFile.write(preprocBlob->getData(), preprocBlob->getSize());
-					intermPreprocFile.close();
-				}
-				else
-				{
-					FmtPrintStdOut("error: Cannot open file '", intermPreprocFilePath, "' for writing\n");
-				}
-			}
-		}
+		StoreShaderCompilationResultIntermediates(cmdArgs, shader, *compilationResult);
 	}
 
-	StoreShaderLibrary(libraryDefinition, outLibraryFilePath);
+	if (!StoreShaderLibrary(libraryDefinition, cmdArgs.outLibraryFilePath.getCStr()))
+		return 1;
 
 	return 0;
 }
