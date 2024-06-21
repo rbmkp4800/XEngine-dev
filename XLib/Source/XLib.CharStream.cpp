@@ -43,6 +43,7 @@ void MemoryCharStreamWriter::write(const char* cstr)
 bool FileCharStreamReader::open(const char* name, uint32 bufferSize, void* externalBuffer)
 {
 	XAssert(bufferSize >= 64);
+
 	close();
 
 	const FileOpenResult fileOpenResult = File::Open(name, FileAccessMode::Read, FileOpenMode::OpenExisting);
@@ -53,7 +54,7 @@ bool FileCharStreamReader::open(const char* name, uint32 bufferSize, void* exter
 	this->fileHandleIsInternal = true;
 
 	this->bufferIsInternal = externalBuffer == nullptr;
-	this->buffer = (char*)(bufferIsInternal ? externalBuffer : SystemHeapAllocator::Allocate(bufferSize));
+	this->buffer = (char*)(bufferIsInternal ? SystemHeapAllocator::Allocate(bufferSize) : externalBuffer);
 
 	this->bufferSize = bufferSize;
 	this->bufferOffset = 0;
@@ -63,13 +64,15 @@ bool FileCharStreamReader::open(const char* name, uint32 bufferSize, void* exter
 
 void FileCharStreamReader::open(FileHandle fileHandle, uint32 bufferSize, void* externalBuffer)
 {
+	XAssert(bufferSize >= 64);
+
 	close();
 
 	this->fileHandle = fileHandle;
 	this->fileHandleIsInternal = false;
 
 	this->bufferIsInternal = externalBuffer == nullptr;
-	this->buffer = (char*)(bufferIsInternal ? externalBuffer : SystemHeapAllocator::Allocate(bufferSize));
+	this->buffer = (char*)(bufferIsInternal ? SystemHeapAllocator::Allocate(bufferSize) : externalBuffer);
 
 	this->bufferSize = bufferSize;
 	this->bufferOffset = 0;
@@ -86,15 +89,38 @@ void FileCharStreamReader::close()
 	memorySet(this, 0, sizeof(*this));
 }
 
+
+bool FileCharStreamWriter::open(const char* name, bool overrideFileContent, uint32 bufferSize, void* externalBuffer)
+{
+	XAssert(bufferSize >= 64);
+
+	close();
+
+	const FileOpenResult fileOpenResult = File::Open(name, FileAccessMode::Write, overrideFileContent ? FileOpenMode::Override : FileOpenMode::OpenExisting);
+	if (!fileOpenResult.status)
+		return false;
+
+	this->fileHandle = fileOpenResult.handle;
+	this->fileHandleIsInternal = true;
+
+	this->bufferIsInternal = externalBuffer == nullptr;
+	this->buffer = (char*)(bufferIsInternal ? SystemHeapAllocator::Allocate(bufferSize) : externalBuffer);
+
+	this->bufferSize = bufferSize;
+	this->bufferOffset = 0;
+}
+
 void FileCharStreamWriter::open(FileHandle fileHandle, uint32 bufferSize, void* externalBuffer)
 {
+	XAssert(bufferSize >= 64);
+
 	close();
 
 	this->fileHandle = fileHandle;
 	this->fileHandleIsInternal = false;
 
 	this->bufferIsInternal = externalBuffer == nullptr;
-	this->buffer = (char*)(bufferIsInternal ? externalBuffer : SystemHeapAllocator::Allocate(bufferSize));
+	this->buffer = (char*)(bufferIsInternal ? SystemHeapAllocator::Allocate(bufferSize) : externalBuffer);
 
 	this->bufferSize = bufferSize;
 	this->bufferOffset = 0;

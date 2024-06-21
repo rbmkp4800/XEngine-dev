@@ -10,6 +10,7 @@
 // TODO: Store used vertex attributes info in vertex shader blob (to validate in runtime).
 // TODO: Store color RTs info in pixel shader blob (to validate in runtime).
 // TODO: Pipeline bindings shader visibility.
+// TODO: `getSourceHash` -> `getHash`.
 
 namespace XEngine::Gfx::HAL::ShaderCompiler
 {

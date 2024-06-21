@@ -1,5 +1,6 @@
 #include <XLib.h>
 #include <XLib.Algorithm.QuickSort.h>
+#include <XLib.CharStream.h>
 #include <XLib.Containers.ArrayList.h>
 #include <XLib.CRC.h>
 #include <XLib.FileSystem.h>
@@ -13,6 +14,8 @@
 #include "XEngine.Gfx.ShaderLibraryBuilder.LibraryDefinition.h"
 #include "XEngine.Gfx.ShaderLibraryBuilder.LibraryDefinitionLoader.h"
 #include "XEngine.Gfx.ShaderLibraryBuilder.SourceCache.h"
+
+// TODO: Implement `FileSystem::CreateDirs()` and create output and intermediate dirs.
 
 using namespace XLib;
 using namespace XEngine::Gfx;
@@ -99,8 +102,8 @@ static void StoreShaderIntermediateBlob(const CmdArgs& cmdArgs, const Shader& sh
 	file.close();
 }
 
-static void StoreShaderCompilationResultIntermediates(const CmdArgs& cmdArgs, const Shader& shader,
-	const HAL::ShaderCompiler::ShaderCompilationResult& compilationResult)
+static void StoreShaderCompilationResultIntermediates(const CmdArgs& cmdArgs,
+	const Shader& shader, const HAL::ShaderCompiler::ShaderCompilationResult& compilationResult)
 {
 	if (cmdArgs.intermediateDirPath.isEmpty())
 		return;
@@ -112,9 +115,9 @@ static void StoreShaderCompilationResultIntermediates(const CmdArgs& cmdArgs, co
 		StoreShaderIntermediateBlob(cmdArgs, shader, *preprocBlob, ".PP.hlsl");
 }
 
-static bool StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const char* outLibraryFilePath)
+static bool StoreShaderLibrary(const CmdArgs& cmdArgs, const LibraryDefinition& libraryDefinition)
 {
-	FmtPrintStdOut("Storing shader library '", outLibraryFilePath, "'\n");
+	FmtPrintStdOut("Storing shader library '", cmdArgs.outLibraryFilePath, "'\n");
 
 	XTODO("Sort objects in order of XSH increase");
 
@@ -215,14 +218,16 @@ static bool StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const
 	header.blobsDataOffset = uint32(blobsDataOffset);
 	header.blobsDataSize = blobsDataSize;
 
-	StringViewASCII outputDirPath = Path::RemoveFileName(outLibraryFilePath);
 	// TODO:
-	//FileSystem::CreateDirs(outputDirPath);
+#if 0
+	FileSystem::CreateDirs(Path::RemoveFileName(cmdArgs.outLibraryFilePath));
+#endif
 
 	File file;
-	if (!file.open(outLibraryFilePath, FileAccessMode::Write, FileOpenMode::Override))
+	file.open(cmdArgs.outLibraryFilePath.getCStr(), FileAccessMode::Write, FileOpenMode::Override);
+	if (!file.isOpen())
 	{
-		FmtPrintStdOut("error: Cannot open shader library for writing '", outLibraryFilePath, "'\n");
+		FmtPrintStdOut("error: Cannot open shader library for writing '", cmdArgs.outLibraryFilePath, "'\n");
 		return false;
 	}
 
@@ -244,6 +249,58 @@ static bool StoreShaderLibrary(const LibraryDefinition& libraryDefinition, const
 	return true;
 }
 
+static void StoreIncrementalBuildCacheIndex(const CmdArgs& cmdArgs, const LibraryDefinition& libraryDefinition)
+{
+	InplaceStringASCIIx1024 filePath;
+	filePath.append(cmdArgs.intermediateDirPath);
+	filePath.append("_IncrementalBuildCacheIndex.txt");
+
+	FileCharStreamWriter fileWriter;
+	fileWriter.open(filePath.getCStr(), true);
+	if (!fileWriter.isOpen())
+	{
+		FmtPrintStdOut("warning: Cannot open file '", filePath, "' for writing\n");
+		return;
+	}
+
+	auto ShaderTypeToString = [](HAL::ShaderType type) -> const char*
+	{
+		switch (type)
+		{
+			case HAL::ShaderType::Compute:			return "CS";
+			case HAL::ShaderType::Vertex:			return "VS";
+			case HAL::ShaderType::Amplification:	return "AS";
+			case HAL::ShaderType::Mesh:				return "MS";
+			case HAL::ShaderType::Pixel:			return "PS";
+		}
+		return nullptr;
+	};
+
+	for (const ShaderRef& shader : libraryDefinition.shaders)
+	{
+		const uint64 shaderNameXSH = shader->getNameXSH();
+		const StringViewASCII shaderName = shader->getName();
+		const StringViewASCII shaderEntryPointName = shader->getCompilationArgs().entryPointName;
+		const const char* shaderTypeStr = ShaderTypeToString(shader->getCompilationArgs().shaderType);
+
+		const uint64 pipelineLayoutNameXSH = shader->getPipelineLayoutNameXSH();
+		const StringViewASCII pipelineLayoutName = StringViewASCII::FromCStr("XXX");
+		// TODO: We should retrieve pipeline layout name from XSH reverse table.
+		// Probably we might use table local to pipeline layouts just in case.
+
+		const uint64 pipelineLayoutHash = shader->getPipelineLayout().getSourceHash();
+
+		FmtPrint(fileWriter,
+			"SH:", FmtArgHex64(shaderNameXSH, 16), '(', shaderName, ')', '|',
+			"T:", shaderTypeStr, '|',
+			"EP:", shaderEntryPointName, '|',
+			"PL:", FmtArgHex64(pipelineLayoutNameXSH, 16), '(', pipelineLayoutName, ')', '|',
+			"PLHash:", FmtArgHex64(pipelineLayoutHash, 16), '\n');
+	}
+
+	fileWriter.close();
+}
+
 static HAL::ShaderCompiler::SourceResolutionResult ResolveSource(void* context, StringViewASCII sourceFilename)
 {
 	SourceCache& sourceCache = *(SourceCache*)context;
@@ -256,13 +313,18 @@ int main(int argc, char* argv[])
 {
 	CmdArgs cmdArgs;
 	if (!ParseCmdArgs(argc, argv, cmdArgs))
-		return 1;	
+		return 1;
 
 	// Load library definition file.
 	LibraryDefinition libraryDefinition;
 	FmtPrintStdOut("Loading shader library definition file '", cmdArgs.libraryDefinitionFilePath, "'\n");
 	if (!LibraryDefinitionLoader::Load(libraryDefinition, cmdArgs.libraryDefinitionFilePath.getCStr()))
 		return 1;
+
+	// TODO:
+#if 0
+	FileSystem::CreateDirs(Path::RemoveFileName(cmdArgs.intermediateDirPath));
+#endif
 
 	// Sort pipelines by actual name, so log looks nice :sparkles:
 	ArrayList<Shader*> shadersToCompile;
@@ -314,8 +376,10 @@ int main(int argc, char* argv[])
 		StoreShaderCompilationResultIntermediates(cmdArgs, shader, *compilationResult);
 	}
 
-	if (!StoreShaderLibrary(libraryDefinition, cmdArgs.outLibraryFilePath.getCStr()))
+	if (!StoreShaderLibrary(cmdArgs, libraryDefinition))
 		return 1;
+
+	StoreIncrementalBuildCacheIndex(cmdArgs, libraryDefinition);
 
 	return 0;
 }

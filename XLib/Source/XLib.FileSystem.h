@@ -10,6 +10,8 @@ namespace XLib
 		static bool RemoveFile(const char* path);
 		static bool FileExists(const char* path);
 		static TimePoint GetFileLastWriteTime(const char* path);
+
+		static void CreateDirs(const char* path);
 	};
 }
 
