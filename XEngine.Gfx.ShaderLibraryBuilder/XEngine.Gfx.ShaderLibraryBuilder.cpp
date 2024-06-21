@@ -251,6 +251,9 @@ static bool StoreShaderLibrary(const CmdArgs& cmdArgs, const LibraryDefinition& 
 
 static void StoreIncrementalBuildCacheIndex(const CmdArgs& cmdArgs, const LibraryDefinition& libraryDefinition)
 {
+	if (cmdArgs.intermediateDirPath.isEmpty())
+		return;
+
 	InplaceStringASCIIx1024 filePath;
 	filePath.append(cmdArgs.intermediateDirPath);
 	filePath.append("_IncrementalBuildCacheIndex.txt");
@@ -281,7 +284,7 @@ static void StoreIncrementalBuildCacheIndex(const CmdArgs& cmdArgs, const Librar
 		const uint64 shaderNameXSH = shader->getNameXSH();
 		const StringViewASCII shaderName = shader->getName();
 		const StringViewASCII shaderEntryPointName = shader->getCompilationArgs().entryPointName;
-		const const char* shaderTypeStr = ShaderTypeToString(shader->getCompilationArgs().shaderType);
+		const char* shaderTypeStr = ShaderTypeToString(shader->getCompilationArgs().shaderType);
 
 		const uint64 pipelineLayoutNameXSH = shader->getPipelineLayoutNameXSH();
 		const StringViewASCII pipelineLayoutName = StringViewASCII::FromCStr("XXX");

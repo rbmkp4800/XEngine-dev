@@ -501,9 +501,9 @@ bool HLSLPatcher::processVariableDefinitionForBinding(const BindingInfo& binding
 			return false;
 		}
 
-		// Write ':register(s#);' to output.
+		// Write " : register(s#);" to output.
 		InplaceStringASCIIx32 registerString;
-		FmtPrintStr(registerString, ":register(s", bindingInfo.staticSampler.shaderRegister, ");");
+		FmtPrintStr(registerString, " : register(s", bindingInfo.staticSampler.shaderRegister, ");\n");
 		composer.write(registerString);
 		composer.blankOutInputRangeUpToCurrentPosition();
 
@@ -608,7 +608,7 @@ bool HLSLPatcher::processVariableDefinitionForBinding(const BindingInfo& binding
 		return false;
 	}
 
-	// Write ':register(x#);' to output.
+	// Write " : register(x#);" to output.
 	{
 		char shaderRegisterChar = 0;
 		const ResourceType type = bindingInfo.resource.type;
@@ -622,7 +622,7 @@ bool HLSLPatcher::processVariableDefinitionForBinding(const BindingInfo& binding
 			XAssertUnreachableCode();
 
 		InplaceStringASCIIx32 registerString;
-		FmtPrintStr(registerString, ":register(", shaderRegisterChar, registerString, bindingInfo.resource.shaderRegister, ");");
+		FmtPrintStr(registerString, " : register(", shaderRegisterChar, registerString, bindingInfo.resource.shaderRegister, ");\n");
 		composer.write(registerString);
 	}
 

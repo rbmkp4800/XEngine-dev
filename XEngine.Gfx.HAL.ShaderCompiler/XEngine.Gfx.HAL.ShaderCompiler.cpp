@@ -923,6 +923,7 @@ ShaderCompilationResultRef ShaderCompiler::CompileShader(XLib::StringViewASCII m
 
 
 	// Actually compile shader via DXC /////////////////////////////////////////////////////////////
+	HRESULT compilerCallHResult = E_FAIL;
 	HRESULT compilationStatusHResult = E_FAIL;
 	Microsoft::WRL::ComPtr<IDxcBlobUtf8> dxcCompilationErrorsBlob;
 	Microsoft::WRL::ComPtr<IDxcBlob> dxcBytecodeBlob;
@@ -957,38 +958,38 @@ ShaderCompilationResultRef ShaderCompiler::CompileShader(XLib::StringViewASCII m
 		dxcSourceBuffer.Encoding = CP_UTF8;
 
 		Microsoft::WRL::ComPtr<IDxcResult> dxcResult;
-		const HRESULT compilerCallHResult = dxcCompiler->Compile(&dxcSourceBuffer,
+		compilerCallHResult = dxcCompiler->Compile(&dxcSourceBuffer,
 			dxcArgsList.getData(), dxcArgsList.getSize(), nullptr, IID_PPV_ARGS(&dxcResult));
 
-		if (FAILED(compilerCallHResult) || !dxcResult)
+		if (dxcResult)
 		{
-			ShaderCompilationResult::ComposerSource resultComposerSrc = {};
-			resultComposerSrc.status = ShaderCompilationStatus::CompilerCallFailed;
-			return ShaderCompilationResult::Compose(resultComposerSrc);
+			dxcResult->GetStatus(&compilationStatusHResult);
+			dxcResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&dxcCompilationErrorsBlob), nullptr);
+			dxcResult->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&dxcBytecodeBlob), nullptr);
 		}
-
-		dxcResult->GetStatus(&compilationStatusHResult);
-		dxcResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&dxcCompilationErrorsBlob), nullptr);
-		dxcResult->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&dxcBytecodeBlob), nullptr);
 	}
 
 
 	// Compose shader compilation result ///////////////////////////////////////////////////////////
 	ShaderCompilationResult::ComposerSource resultComposerSrc = {};
 
-	resultComposerSrc.status = FAILED(compilationStatusHResult) ?
-		ShaderCompilationStatus::CompilationError : ShaderCompilationStatus::Success;
+	if (FAILED(compilerCallHResult))
+		resultComposerSrc.status = ShaderCompilationStatus::CompilerCallFailed;
+	else if (FAILED(compilationStatusHResult))
+		resultComposerSrc.status = ShaderCompilationStatus::CompilationError;
+	else
+		resultComposerSrc.status = ShaderCompilationStatus::Success;
+
 	resultComposerSrc.preprocessingOuputStr = StringViewASCII(
 		dxcPreprocessingErrorsBlob->GetStringPointer(), dxcPreprocessingErrorsBlob->GetStringLength());
 	resultComposerSrc.compilationOutputStr = StringViewASCII(
 		dxcCompilationErrorsBlob->GetStringPointer(), dxcCompilationErrorsBlob->GetStringLength());
 
 	BlobRef preprocessedSourceBlob = nullptr;
-	if (dxcPreprocessedSourceBlob && dxcPreprocessedSourceBlob->GetStringLength() > 0)
+	if (!patchedSource.isEmpty())
 	{
-		preprocessedSourceBlob = Blob::Create(XCheckedCastU32(dxcPreprocessedSourceBlob->GetStringLength()));
-		memoryCopy((void*)preprocessedSourceBlob->getData(),
-			dxcPreprocessedSourceBlob->GetStringPointer(), dxcPreprocessedSourceBlob->GetStringLength());
+		preprocessedSourceBlob = Blob::Create(patchedSource.getLength());
+		memoryCopy((void*)preprocessedSourceBlob->getData(), patchedSource.getData(), patchedSource.getLength());
 
 		resultComposerSrc.preprocessedSourceBlob = preprocessedSourceBlob.get();
 	}
