@@ -19,14 +19,14 @@ namespace XEngine::Gfx::ShaderLibraryBuilder
 			HAL::ShaderCompiler::DescriptorSetLayoutRef ref;
 		};
 
-		struct PipelineLayout
+		struct PipelineBindingLayout
 		{
 			uint64 nameXSH;
-			HAL::ShaderCompiler::PipelineLayoutRef ref;
+			HAL::ShaderCompiler::PipelineBindingLayoutRef ref;
 		};
 
 		XLib::ArrayList<DescriptorSetLayout> descriptorSetLayouts;
-		XLib::ArrayList<PipelineLayout> pipelineLayouts;
+		XLib::ArrayList<PipelineBindingLayout> pipelineBindingLayouts;
 		XLib::ArrayList<ShaderRef> shaders;
 	};
 }

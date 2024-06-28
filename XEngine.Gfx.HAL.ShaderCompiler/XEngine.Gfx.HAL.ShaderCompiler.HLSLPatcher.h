@@ -108,25 +108,25 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 	private:
 		Lexer lexer;
 		OutputComposer composer;
-		const PipelineLayout& pipelineLayout;
+		const PipelineBindingLayout& pipelineBindingLayout;
 
 	private:
 		bool processAttribute(Attribute& attribute, Error& error);
 		bool processVariableDefinitionForBinding(const BindingInfo& bindingInfo, Error& error);
 
-		static bool ExtractBindingInfo(const PipelineLayout& pipelineLayout,
+		static bool ExtractBindingInfo(const PipelineBindingLayout& pipelineBindingLayout,
 			XLib::StringViewASCII bindingRootName, Location bindingRootNameLocation,
 			XLib::StringViewASCII bindingNestedName, Location bindingNestedNameLocation,
 			BindingInfo& resultBindingInfo, Error& error);
 
 	private:
-		HLSLPatcher(XLib::StringViewASCII sourceText, const PipelineLayout& pipelineLayout);
+		HLSLPatcher(XLib::StringViewASCII sourceText, const PipelineBindingLayout& pipelineBindingLayout);
 		~HLSLPatcher() = default;
 
 		bool patch(XLib::DynamicStringASCII& result, Error& error);
 
 	public:
-		static bool Patch(XLib::StringViewASCII sourceText, const PipelineLayout& pipelineLayout,
+		static bool Patch(XLib::StringViewASCII sourceText, const PipelineBindingLayout& pipelineBindingLayout,
 			XLib::DynamicStringASCII& result, Error& error);
 	};
 }

@@ -631,12 +631,12 @@ bool HLSLPatcher::processVariableDefinitionForBinding(const BindingInfo& binding
 	return true;
 }
 
-bool HLSLPatcher::ExtractBindingInfo(const PipelineLayout& pipelineLayout,
+bool HLSLPatcher::ExtractBindingInfo(const PipelineBindingLayout& pipelineBindingLayout,
 	StringViewASCII bindingRootName, Location bindingRootNameLocation,
 	StringViewASCII bindingNestedName, Location bindingNestedNameLocation,
 	BindingInfo& resultBindingInfo, Error& error)
 {
-	const sint16 staticSamplerIndex = pipelineLayout.findStaticSampler(bindingRootName);
+	const sint16 staticSamplerIndex = pipelineBindingLayout.findStaticSampler(bindingRootName);
 	if (staticSamplerIndex >= 0)
 	{
 		if (!bindingNestedName.isEmpty())
@@ -647,11 +647,11 @@ bool HLSLPatcher::ExtractBindingInfo(const PipelineLayout& pipelineLayout,
 		}
 
 		resultBindingInfo.type = BindingType::StaticSampler;
-		resultBindingInfo.staticSampler.shaderRegister = pipelineLayout.getStaticSamplerShaderRegister(staticSamplerIndex);
+		resultBindingInfo.staticSampler.shaderRegister = pipelineBindingLayout.getStaticSamplerShaderRegister(staticSamplerIndex);
 		return true;
 	}
 
-	const sint16 pipelineBindingIndex = pipelineLayout.findBinding(bindingRootName);
+	const sint16 pipelineBindingIndex = pipelineBindingLayout.findBinding(bindingRootName);
 	if (pipelineBindingIndex < 0)
 	{
 		FmtPrintStr(error.message, "unknown pipeline binding '", bindingRootName, "'");
@@ -659,8 +659,8 @@ bool HLSLPatcher::ExtractBindingInfo(const PipelineLayout& pipelineLayout,
 		return false;
 	}
 
-	const PipelineBindingDesc pipelineBinding = pipelineLayout.getBindingDesc(pipelineBindingIndex);
-	const uint32 pipelineBindingBaseShaderRegiser = pipelineLayout.getBindingBaseShaderRegister(pipelineBindingIndex);
+	const PipelineBindingDesc pipelineBinding = pipelineBindingLayout.getBindingDesc(pipelineBindingIndex);
+	const uint32 pipelineBindingBaseShaderRegiser = pipelineBindingLayout.getBindingBaseShaderRegister(pipelineBindingIndex);
 
 	ResourceType resourceType = ResourceType::Undefined;
 	bool allowArray = false;
@@ -754,8 +754,8 @@ bool HLSLPatcher::ExtractBindingInfo(const PipelineLayout& pipelineLayout,
 	return true;
 }
 
-HLSLPatcher::HLSLPatcher(StringViewASCII sourceText, const PipelineLayout& pipelineLayout)
-	: lexer(sourceText), composer(lexer), pipelineLayout(pipelineLayout) { }
+HLSLPatcher::HLSLPatcher(StringViewASCII sourceText, const PipelineBindingLayout& pipelineBindingLayout)
+	: lexer(sourceText), composer(lexer), pipelineBindingLayout(pipelineBindingLayout) { }
 
 bool HLSLPatcher::patch(DynamicStringASCII& result, Error& error)
 {
@@ -832,7 +832,7 @@ bool HLSLPatcher::patch(DynamicStringASCII& result, Error& error)
 		{
 			BindingInfo bindingInfo = {};
 
-			if (!ExtractBindingInfo(pipelineLayout,
+			if (!ExtractBindingInfo(pipelineBindingLayout,
 				attribute.binding.rootName, attribute.binding.rootNameLocation,
 				attribute.binding.nestedName, attribute.binding.nestedNameLocation,
 				bindingInfo, error))
@@ -851,9 +851,9 @@ bool HLSLPatcher::patch(DynamicStringASCII& result, Error& error)
 	return true;
 }
 
-bool HLSLPatcher::Patch(StringViewASCII sourceText, const PipelineLayout& pipelineLayout,
+bool HLSLPatcher::Patch(StringViewASCII sourceText, const PipelineBindingLayout& pipelineBindingLayout,
 	DynamicStringASCII& result, Error& error)
 {
-	HLSLPatcher patcher(sourceText, pipelineLayout);
+	HLSLPatcher patcher(sourceText, pipelineBindingLayout);
 	return patcher.patch(result, error);
 }

@@ -13,7 +13,7 @@
 // TODO: Probably we can state that Texture2D is equivalent to Texture2DArray[1].
 // TODO: Handle should be 18+10+4 or 17+11+4 instead of 20+8+4.
 // TODO: Implement "host visible" memory/resources via `D3D12_HEAP_TYPE_GPU_UPLOAD`.
-// TODO: Move bindings from `Device::DescriptorSetLayout` and `Device::PipelineLayout` to device internal heap (TLSF probably).
+// TODO: Move bindings from `Device::DescriptorSetLayout` and `Device::PipelineBindingLayout` to device internal heap (TLSF probably).
 // TODO: Look into `minImageTransferGranularity`. This is additional constraint on CLs we submit to copy queue.
 // TODO: Do something about optimized clear values passed on resource creation. Warning suppressed for now.
 // TODO: `TextureLayout::Commom` allows shader write access (D3D12 UAV), but D3D12 spec says that this is only allowed using a "queue-specific" common layout. We should revisit this when implementing multi-queue support (including vulkan specifics).
@@ -53,10 +53,10 @@ namespace XEngine::Gfx::HAL
 	enum class BufferHandle					: uint32 { Zero = 0 };
 	enum class TextureHandle				: uint32 { Zero = 0 };
 	enum class DescriptorSetLayoutHandle	: uint32 { Zero = 0 };
-	enum class PipelineLayoutHandle			: uint32 { Zero = 0 }; // PipelineBindingLayoutHandle?
+	enum class PipelineBindingLayoutHandle	: uint32 { Zero = 0 };
 	enum class ShaderHandle					: uint32 { Zero = 0 };
-	enum class GraphicsPipelineHandle		: uint32 { Zero = 0 };
-	//enum class RaytracingPipelineHandle		: uint32 { Zero = 0 };
+	enum class GraphicsPipelineStateHandle	: uint32 { Zero = 0 };
+	enum class RaytracingPipelineStateHandle: uint32 { Zero = 0 };
 	enum class OutputHandle					: uint32 { Zero = 0 };
 
 	enum class DescriptorSet				: uint64 { Zero = 0 };
@@ -152,12 +152,12 @@ namespace XEngine::Gfx::HAL
 		ResourceViewType type;
 	};
 
-	enum class PipelineType : uint8
+	enum class PipelineMode : uint8
 	{
 		Undefined = 0,
 		Graphics,
 		Compute,
-		//Raytracing,
+		Raytracing,
 	};
 
 	enum class CommandListType : uint8
@@ -271,7 +271,7 @@ namespace XEngine::Gfx::HAL
 		RenderTarget renderTargets[MaxColorRenderTargetCount];
 	};
 
-	struct GraphicsPipelineDesc
+	struct GraphicsPipelineStateDesc
 	{
 		const VertexAttribute* vertexAttributes;
 		uint8 vertexAttributeCount;
@@ -311,7 +311,7 @@ namespace XEngine::Gfx::HAL
 		U32,
 	};
 
-	enum class BufferBindType : uint8
+	enum class BufferBindingType : uint8
 	{
 		Undefined = 0,
 		Constant,
@@ -420,10 +420,10 @@ namespace XEngine::Gfx::HAL
 		friend Device;
 
 	private:
-		struct BindingResolveResult;
+		struct PipelineBindingResolveResult;
 
-		static inline BindingResolveResult ResolveBindingByNameXSH(
-			Device* device, PipelineLayoutHandle pipleineLayoutHandle, uint64 bindingNameXSH);
+		static inline PipelineBindingResolveResult ResolvePipelineBindingByNameXSH(
+			Device* device, PipelineBindingLayoutHandle pipleineBindingLayoutHandle, uint64 bindingNameXSH);
 
 	private:
 		Device* device = nullptr;
@@ -437,8 +437,8 @@ namespace XEngine::Gfx::HAL
 		CommandListType type = CommandListType::Undefined;
 		bool isOpen = false;
 
-		PipelineLayoutHandle currentPipelineLayoutHandle = PipelineLayoutHandle::Zero;
-		PipelineType currentPipelineType = PipelineType::Undefined;
+		PipelineBindingLayoutHandle currentPipelineBindingLayoutHandle = PipelineBindingLayoutHandle::Zero;
+		PipelineMode currentPipelineMode = PipelineMode::Undefined;
 		uint8 setColorRenderTargetCount = 0;
 		bool isDepthStencilRenderTargetSet = false;
 
@@ -449,11 +449,11 @@ namespace XEngine::Gfx::HAL
 		CommandList() = default;
 		~CommandList();
 
-		void setPipelineType(PipelineType pipelineType);
-		void setPipelineLayout(PipelineLayoutHandle pipelineLayoutHandle);
-		void setComputePipeline(ShaderHandle computeShaderHandle);
-		void setGraphicsPipeline(GraphicsPipelineHandle graphicsPipelineHandle);
-		//void setRaytracingPipeline(RaytracingPipelineHandle raytracingPipelineHandle);
+		void setPipelineMode(PipelineMode pipelineMode);
+		void setPipelineBindingLayout(PipelineBindingLayoutHandle pipelineBindingLayoutHandle);
+		void setComputePipelineState(ShaderHandle computeShaderHandle);
+		void setGraphicsPipelineState(GraphicsPipelineStateHandle graphicsPipelineStateHandle);
+		void setRaytracingPipelineState(RaytracingPipelineStateHandle raytracingPipelineStateHandle);
 
 		void setViewport(float32 left, float32 top, float32 right, float32 bottom, float32 minDepth = 0.0f, float32 maxDepth = 1.0f);
 		void setScissor(uint32 left, uint32 top, uint32 right, uint32 bottom);
@@ -465,7 +465,7 @@ namespace XEngine::Gfx::HAL
 		void bindVertexBuffer(uint8 bufferIndex, BufferPointer bufferPointer, uint16 stride, uint32 byteSize);
 
 		void bindConstants(uint64 bindingNameXSH, const void* data, uint32 size32bitValues, uint32 offset32bitValues = 0);
-		void bindBuffer(uint64 bindingNameXSH, BufferBindType bindType, BufferPointer bufferPointer);
+		void bindBuffer(uint64 bindingNameXSH, BufferBindingType bindingType, BufferPointer bufferPointer);
 		void bindDescriptorSet(uint64 bindingNameXSH, DescriptorSet descriptorSet);
 		//void bindDescriptorArray(uint64 bindingNameXSH, ...);
 
@@ -510,9 +510,9 @@ namespace XEngine::Gfx::HAL
 		uint16 maxMemoryAllocationCount;
 		uint16 maxResourceCount;
 		uint16 maxDescriptorSetLayoutCount;
-		uint16 maxPipelineLayoutCount;
+		uint16 maxPipelineBindingLayoutCount;
 		uint16 maxShaderCount;
-		uint16 maxCompositePipelineCount;
+		uint16 maxCompositePipelineStateCount;
 		uint16 maxOutputCount;
 
 		uint32 bindlessDescriptorPoolSize;
@@ -532,7 +532,7 @@ namespace XEngine::Gfx::HAL
 		friend CommandList;
 
 	private:
-		enum class CompositePipelineType : uint8;
+		enum class CompositePipelineStateType : uint8;
 
 		struct Queue
 		{
@@ -589,9 +589,9 @@ namespace XEngine::Gfx::HAL
 		struct MemoryAllocation;
 		struct Resource;
 		struct DescriptorSetLayout;
-		struct PipelineLayout;
+		struct PipelineBindingLayout;
 		struct Shader;
-		struct CompositePipeline;
+		struct CompositePipelineState;
 		struct Output;
 
 		static constexpr uint32 DescriptorAllocatorChunkSize = 1024;
@@ -620,9 +620,9 @@ namespace XEngine::Gfx::HAL
 		Pool<MemoryAllocation> memoryAllocationPool;
 		Pool<Resource> resourcePool;
 		Pool<DescriptorSetLayout> descriptorSetLayoutPool;
-		Pool<PipelineLayout> pipelineLayoutPool;
+		Pool<PipelineBindingLayout> pipelineBindingLayoutPool;
 		Pool<Shader> shaderPool;
-		Pool<CompositePipeline> compositePipelinePool;
+		Pool<CompositePipelineState> compositePipelineStatePool;
 		Pool<Output> outputPool;
 
 		uint32 bindlessDescriptorPoolSize = 0;
@@ -678,17 +678,17 @@ namespace XEngine::Gfx::HAL
 		DescriptorSetLayoutHandle createDescriptorSetLayout(const void* blobData, uint32 blobSize);
 		void destroyDescriptorSetLayout(DescriptorSetLayoutHandle descriptorSetLayoutHandle);
 
-		PipelineLayoutHandle createPipelineLayout(const void* blobData, uint32 blobSize);
-		void destroyPipelineLayout(PipelineLayoutHandle pipelineLayoutHandle);
+		PipelineBindingLayoutHandle createPipelineBindingLayout(const void* blobData, uint32 blobSize);
+		void destroyPipelineBindingLayout(PipelineBindingLayoutHandle pipelineBindingLayoutHandle);
 
-		ShaderHandle createShader(PipelineLayoutHandle pipelineLayoutHandle, const void* blobData, uint32 blobSize);
+		ShaderHandle createShader(PipelineBindingLayoutHandle pipelineBindingLayoutHandle, const void* blobData, uint32 blobSize);
 		void destroyShader(ShaderHandle shaderHandle);
 
-		GraphicsPipelineHandle createGraphicsPipeline(PipelineLayoutHandle pipelineLayoutHandle, const GraphicsPipelineDesc& desc);
-		void destroyGraphicsPipeline(GraphicsPipelineHandle graphicsPipelineHandle);
+		GraphicsPipelineStateHandle createGraphicsPipelineState(PipelineBindingLayoutHandle pipelineBindingLayoutHandle, const GraphicsPipelineStateDesc& desc);
+		void destroyGraphicsPipelineState(GraphicsPipelineStateHandle graphicsPipelineStateHandle);
 
-		// RaytracingPipelineHandle createRaytracingPipeline(...);
-		// void destroyRaytracingPipeline(RaytracingPipelineHandle raytracingPipelineHandle);
+		// RaytracingPipelineStateHandle createRaytracingPipelineState(...);
+		// void destroyRaytracingPipelineState(RaytracingPipelineStateHandle raytracingPipelineStateHandle);
 
 		OutputHandle createWindowOutput(uint16 width, uint16 height, void* platformWindowHandle);
 		// OutputHandle createDisplayOutput();

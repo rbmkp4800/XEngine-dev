@@ -18,7 +18,7 @@ namespace XEngine::Gfx::ShaderLibraryFormat
 		// TODO: Checksum
 
 		uint16 descriptorSetLayoutCount;
-		uint16 pipelineLayoutCount;
+		uint16 pipelineBindingLayoutCount;
 		uint16 shaderCount;
 		uint32 blobsDataOffset;
 		uint32 blobsDataSize;
@@ -34,7 +34,7 @@ namespace XEngine::Gfx::ShaderLibraryFormat
 	};
 	static_assert(sizeof(DescriptorSetLayoutRecord) == 20);
 
-	struct PipelineLayoutRecord // 20 bytes
+	struct PipelineBindingLayoutRecord // 20 bytes
 	{
 		uint32 nameXSH0;
 		uint32 nameXSH1;
@@ -42,7 +42,7 @@ namespace XEngine::Gfx::ShaderLibraryFormat
 		uint32 blobSize;
 		uint32 blobCRC32;
 	};
-	static_assert(sizeof(PipelineLayoutRecord) == 20);
+	static_assert(sizeof(PipelineBindingLayoutRecord) == 20);
 
 	struct ShaderRecord // 28 bytes
 	{
@@ -51,8 +51,8 @@ namespace XEngine::Gfx::ShaderLibraryFormat
 		uint32 blobOffset;
 		uint32 blobSize;
 		uint32 blobCRC32;
-		uint32 pipelineLayoutNameXSH0;
-		uint32 pipelineLayoutNameXSH1;
+		uint32 pipelineBindingLayoutNameXSH0;
+		uint32 pipelineBindingLayoutNameXSH1;
 	};
 	static_assert(sizeof(ShaderRecord) == 28);
 }

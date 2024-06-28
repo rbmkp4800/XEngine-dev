@@ -92,7 +92,7 @@ void DescriptorSetLayoutBlobWriter::finalize()
 {
 	XAssert(blobMemory);
 
-	subHeader->sourceHash = blobInfo.sourceHash;
+	subHeader->hash = blobInfo.hash;
 	subHeader->bindingCount = blobInfo.bindingCount;
 
 	FillGenericBlobHeader(blobMemory, blobSize, DescriptorSetLayoutBlobSignature, 0);
@@ -136,7 +136,7 @@ DescriptorSetLayoutBlobInfo DescriptorSetLayoutBlobReader::getBlobInfo() const
 	XAssert(subHeader);
 	DescriptorSetLayoutBlobInfo blobInfo = {};
 	blobInfo.bindingCount = subHeader->bindingCount;
-	blobInfo.sourceHash = subHeader->sourceHash;
+	blobInfo.hash = subHeader->hash;
 	return blobInfo;
 }
 
@@ -154,21 +154,21 @@ DescriptorSetBindingInfo DescriptorSetLayoutBlobReader::getBindingInfo(uint32 bi
 }
 
 
-// Pipeline layout blob ////////////////////////////////////////////////////////////////////////////
+// Pipeline binding layout blob ////////////////////////////////////////////////////////////////////
 
-void PipelineLayoutBlobWriter::setup(const PipelineLayoutBlobInfo& blobInfo)
+void PipelineBindingLayoutBlobWriter::setup(const PipelineBindingLayoutBlobInfo& blobInfo)
 {
 	XAssert(blobSize == 0);
 	this->blobInfo = blobInfo;
 
 	blobSize =
 		sizeof(GenericBlobHeader) +
-		sizeof(PipelineLayoutBlobSubHeader) +
+		sizeof(PipelineBindingLayoutBlobSubHeader) +
 		sizeof(PipelineBindingRecord) * blobInfo.bindingCount +
 		blobInfo.platformDataSize;
 }
 
-void PipelineLayoutBlobWriter::setBlobMemory(void* memory, uint32 memorySize)
+void PipelineBindingLayoutBlobWriter::setBlobMemory(void* memory, uint32 memorySize)
 {
 	XAssert(blobSize > 0 && !blobMemory);
 	XAssert(blobSize == memorySize);
@@ -181,7 +181,7 @@ void PipelineLayoutBlobWriter::setBlobMemory(void* memory, uint32 memorySize)
 		offsetAccum += sizeof(GenericBlobHeader);
 
 		const uint32 subHeaderOffset = offsetAccum;
-		offsetAccum += sizeof(PipelineLayoutBlobSubHeader);
+		offsetAccum += sizeof(PipelineBindingLayoutBlobSubHeader);
 
 		const uint32 bindingRecordsOffset = offsetAccum;
 		offsetAccum += sizeof(PipelineBindingRecord) * blobInfo.bindingCount;
@@ -191,13 +191,13 @@ void PipelineLayoutBlobWriter::setBlobMemory(void* memory, uint32 memorySize)
 
 		XAssert(offsetAccum == blobSize);
 
-		subHeader = (PipelineLayoutBlobSubHeader*)(uintptr(blobMemory) + subHeaderOffset);
+		subHeader = (PipelineBindingLayoutBlobSubHeader*)(uintptr(blobMemory) + subHeaderOffset);
 		bindingRecords = (PipelineBindingRecord*)(uintptr(blobMemory) + bindingRecordsOffset);
 		platformData = (void*)(uintptr(blobMemory) + platformDataOffset);
 	}
 }
 
-void PipelineLayoutBlobWriter::writeBindingInfo(uint16 bindingIndex, const PipelineBindingInfo& bindingInfo)
+void PipelineBindingLayoutBlobWriter::writeBindingInfo(uint16 bindingIndex, const PipelineBindingInfo& bindingInfo)
 {
 	XAssert(bindingRecords);
 	XAssert(bindingIndex < blobInfo.bindingCount);
@@ -206,35 +206,35 @@ void PipelineLayoutBlobWriter::writeBindingInfo(uint16 bindingIndex, const Pipel
 	record.nameXSH = bindingInfo.nameXSH;
 	record.d3dRootParameterIndex = bindingInfo.d3dRootParameterIndex;
 	record.type = bindingInfo.type;
-	record.descriptorSetLayoutSourceHash = bindingInfo.type == PipelineBindingType::DescriptorSet ? bindingInfo.descriptorSetLayoutSourceHash : 0;
+	record.descriptorSetLayoutHash = bindingInfo.type == PipelineBindingType::DescriptorSet ? bindingInfo.descriptorSetLayoutHash : 0;
 	record.inplaceConstantCount = bindingInfo.type == PipelineBindingType::InplaceConstants ? bindingInfo.inplaceConstantCount : 0;
 }
 
-void PipelineLayoutBlobWriter::writePlatformData(const void* data, uint32 size)
+void PipelineBindingLayoutBlobWriter::writePlatformData(const void* data, uint32 size)
 {
 	XAssert(platformData);
 	XAssert(size == blobInfo.platformDataSize);
 	memoryCopy(platformData, data, size);
 }
 
-void PipelineLayoutBlobWriter::finalize()
+void PipelineBindingLayoutBlobWriter::finalize()
 {
 	XAssert(blobMemory);
 
-	subHeader->sourceHash = blobInfo.sourceHash;
+	subHeader->hash = blobInfo.hash;
 	subHeader->bindingCount = blobInfo.bindingCount;
 	subHeader->platformDataSize = XCheckedCastU16(blobInfo.platformDataSize);
 
-	FillGenericBlobHeader(blobMemory, blobSize, PipelineLayoutBlobSignature, 0);
+	FillGenericBlobHeader(blobMemory, blobSize, PipelineBindingLayoutBlobSignature, 0);
 	memorySet(this, 0, sizeof(*this));
 }
 
 
-bool PipelineLayoutBlobReader::open(const void* data, uint32 size)
+bool PipelineBindingLayoutBlobReader::open(const void* data, uint32 size)
 {
 	XAssert(!subHeader);
 
-	if (!ValidateGenericBlobHeader(data, size, PipelineLayoutBlobSignature, 0))
+	if (!ValidateGenericBlobHeader(data, size, PipelineBindingLayoutBlobSignature, 0))
 		return false;
 
 	{
@@ -242,11 +242,11 @@ bool PipelineLayoutBlobReader::open(const void* data, uint32 size)
 		offsetAccum += sizeof(GenericBlobHeader);
 
 		const uint32 subHeaderOffset = offsetAccum;
-		offsetAccum += sizeof(PipelineLayoutBlobSubHeader);
+		offsetAccum += sizeof(PipelineBindingLayoutBlobSubHeader);
 
 		if (size < offsetAccum)
 			return false;
-		const PipelineLayoutBlobSubHeader* subHeader = (const PipelineLayoutBlobSubHeader*)(uintptr(data) + subHeaderOffset);
+		const PipelineBindingLayoutBlobSubHeader* subHeader = (const PipelineBindingLayoutBlobSubHeader*)(uintptr(data) + subHeaderOffset);
 
 		const uint32 bindingRecordsOffset = offsetAccum;
 		offsetAccum += sizeof(PipelineBindingRecord) * subHeader->bindingCount;
@@ -265,17 +265,17 @@ bool PipelineLayoutBlobReader::open(const void* data, uint32 size)
 	return true;
 }
 
-PipelineLayoutBlobInfo PipelineLayoutBlobReader::getBlobInfo() const
+PipelineBindingLayoutBlobInfo PipelineBindingLayoutBlobReader::getBlobInfo() const
 {
 	XAssert(subHeader);
-	PipelineLayoutBlobInfo blobInfo = {};
+	PipelineBindingLayoutBlobInfo blobInfo = {};
 	blobInfo.bindingCount = subHeader->bindingCount;
 	blobInfo.platformDataSize = subHeader->platformDataSize;
-	blobInfo.sourceHash = subHeader->sourceHash;
+	blobInfo.hash = subHeader->hash;
 	return blobInfo;
 }
 
-PipelineBindingInfo PipelineLayoutBlobReader::getBindingInfo(uint16 bindingIndex) const
+PipelineBindingInfo PipelineBindingLayoutBlobReader::getBindingInfo(uint16 bindingIndex) const
 {
 	XAssert(bindingRecords);
 	XAssert(bindingIndex < subHeader->bindingCount);
@@ -286,7 +286,7 @@ PipelineBindingInfo PipelineLayoutBlobReader::getBindingInfo(uint16 bindingIndex
 	bindingInfo.d3dRootParameterIndex = record.d3dRootParameterIndex;
 	bindingInfo.type = record.type;
 	if (record.type == PipelineBindingType::DescriptorSet)
-		bindingInfo.descriptorSetLayoutSourceHash = record.descriptorSetLayoutSourceHash;
+		bindingInfo.descriptorSetLayoutHash = record.descriptorSetLayoutHash;
 	else if (record.type == PipelineBindingType::InplaceConstants)
 		bindingInfo.inplaceConstantCount = record.inplaceConstantCount;
 	return bindingInfo;
@@ -342,7 +342,7 @@ void ShaderBlobWriter::finalize()
 {
 	XAssert(blobMemory);
 
-	subHeader->pipelineLayoutSourceHash = blobInfo.pipelineLayoutSourceHash;
+	subHeader->pipelineBindingLayoutHash = blobInfo.pipelineBindingLayoutHash;
 	subHeader->bytecodeSizeLo16 = uint16(blobInfo.bytecodeSize);
 	subHeader->bytecodeSizeHi8 = XCheckedCastU8(blobInfo.bytecodeSize >> 16);
 	subHeader->shaderType = blobInfo.shaderType;
@@ -389,7 +389,7 @@ ShaderBlobInfo ShaderBlobReader::getBlobInfo() const
 {
 	XAssert(subHeader);
 	ShaderBlobInfo blobInfo = {};
-	blobInfo.pipelineLayoutSourceHash = subHeader->pipelineLayoutSourceHash;
+	blobInfo.pipelineBindingLayoutHash = subHeader->pipelineBindingLayoutHash;
 	blobInfo.bytecodeSize = uint32(subHeader->bytecodeSizeLo16) | (uint32(subHeader->bytecodeSizeHi8) << 16);
 	blobInfo.shaderType = subHeader->shaderType;
 	return blobInfo;

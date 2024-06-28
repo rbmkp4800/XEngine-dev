@@ -107,7 +107,7 @@ namespace // Barriers validation
 
 // Device internal types ///////////////////////////////////////////////////////////////////////////
 
-enum class Device::CompositePipelineType : uint8
+enum class Device::CompositePipelineStateType : uint8
 {
 	Undefined = 0,
 	Graphics,
@@ -165,32 +165,32 @@ struct Device::Resource : PoolEntryBase
 struct Device::DescriptorSetLayout : PoolEntryBase
 {
 	BlobFormat::DescriptorSetBindingInfo bindings[MaxDescriptorSetBindingCount];
-	uint32 sourceHash;
+	uint32 hash;
 	uint16 bindingCount;
 };
 
-struct Device::PipelineLayout : PoolEntryBase
+struct Device::PipelineBindingLayout : PoolEntryBase
 {
 	BlobFormat::PipelineBindingInfo bindings[MaxPipelineBindingCount];
 	ID3D12RootSignature* d3dRootSignature;
-	uint32 sourceHash;
+	uint32 hash;
 	uint16 bindingCount;
 };
 
 struct Device::Shader : PoolEntryBase
 {
 	ID3D12StateObject* d3dStateObject;
-	PipelineLayoutHandle pipelineLayoutHandle;
+	PipelineBindingLayoutHandle pipelineBindingLayoutHandle;
 	ShaderType type;
 
 	D3D12_PROGRAM_IDENTIFIER d3dProgramIdentifier; // Only valid for compute shader
 };
 
-struct Device::CompositePipeline : PoolEntryBase
+struct Device::CompositePipelineState : PoolEntryBase
 {
 	ID3D12StateObject* d3dStateObject;
-	PipelineLayoutHandle pipelineLayoutHandle;
-	CompositePipelineType type;
+	PipelineBindingLayoutHandle pipelineBindingLayoutHandle;
+	CompositePipelineStateType type;
 
 	D3D12_PROGRAM_IDENTIFIER d3dProgramIdentifier;
 };
@@ -204,7 +204,7 @@ struct Device::Output : PoolEntryBase
 
 // CommandList /////////////////////////////////////////////////////////////////////////////////////
 
-struct CommandList::BindingResolveResult
+struct CommandList::PipelineBindingResolveResult
 {
 	PipelineBindingType type;
 	uint8 d3dRootParameterIndex;
@@ -212,31 +212,31 @@ struct CommandList::BindingResolveResult
 	union
 	{
 		uint8 inplaceConstantCount;
-		uint32 descriptorSetLayoutSourceHash;
+		uint32 descriptorSetLayoutHash;
 	};
 };
 
-inline CommandList::BindingResolveResult CommandList::ResolveBindingByNameXSH(
-	Device* device, PipelineLayoutHandle pipleineLayoutHandle, uint64 bindingNameXSH)
+inline CommandList::PipelineBindingResolveResult CommandList::ResolvePipelineBindingByNameXSH(
+	Device* device, PipelineBindingLayoutHandle pipelineBindingLayoutHandle, uint64 bindingNameXSH)
 {
-	Device::PipelineLayout& pipelineLayout = device->pipelineLayoutPool.resolveHandle(uint32(pipleineLayoutHandle));
-	for (uint16 i = 0; i < pipelineLayout.bindingCount; i++)
+	Device::PipelineBindingLayout& pipelineBindingLayout = device->pipelineBindingLayoutPool.resolveHandle(uint32(pipelineBindingLayoutHandle));
+	for (uint16 i = 0; i < pipelineBindingLayout.bindingCount; i++)
 	{
-		const BlobFormat::PipelineBindingInfo& binding = pipelineLayout.bindings[i];
+		const BlobFormat::PipelineBindingInfo& binding = pipelineBindingLayout.bindings[i];
 		if (binding.nameXSH == bindingNameXSH)
 		{
-			BindingResolveResult result = {};
+			PipelineBindingResolveResult result = {};
 			result.type = binding.type;
 			result.d3dRootParameterIndex = uint8(binding.d3dRootParameterIndex);
 			if (binding.type == PipelineBindingType::InplaceConstants)
 				result.inplaceConstantCount = binding.inplaceConstantCount;
 			if (binding.type == PipelineBindingType::DescriptorSet)
-				result.descriptorSetLayoutSourceHash = binding.descriptorSetLayoutSourceHash;
+				result.descriptorSetLayoutHash = binding.descriptorSetLayoutHash;
 			return result;
 		}
 	}
 	XEAssertUnreachableCode();
-	return BindingResolveResult {};
+	return PipelineBindingResolveResult {};
 }
 
 void CommandList::cleanup()
@@ -249,43 +249,43 @@ CommandList::~CommandList()
 	XEMasterAssert(!device && !d3dCommandList && !isOpen); // Command list should be submitted or discarded.
 }
 
-void CommandList::setPipelineType(PipelineType pipelineType)
+void CommandList::setPipelineMode(PipelineMode pipelineMode)
 {
 	XEAssert(isOpen);
-	if (currentPipelineType == pipelineType)
+	if (currentPipelineMode == pipelineMode)
 		return;
 
-	currentPipelineType = pipelineType;
-	currentPipelineLayoutHandle = PipelineLayoutHandle::Zero;
+	currentPipelineMode = pipelineMode;
+	currentPipelineBindingLayoutHandle = PipelineBindingLayoutHandle::Zero;
 }
 
-void CommandList::setPipelineLayout(PipelineLayoutHandle pipelineLayoutHandle)
+void CommandList::setPipelineBindingLayout(PipelineBindingLayoutHandle pipelineBindingLayoutHandle)
 {
 	XEAssert(isOpen);
-	XEAssert(pipelineLayoutHandle != PipelineLayoutHandle::Zero);
+	XEAssert(pipelineBindingLayoutHandle != PipelineBindingLayoutHandle::Zero);
 
-	if (currentPipelineLayoutHandle == pipelineLayoutHandle)
+	if (currentPipelineBindingLayoutHandle == pipelineBindingLayoutHandle)
 		return;
 
-	const Device::PipelineLayout& pipelineLayout = device->pipelineLayoutPool.resolveHandle(uint32(pipelineLayoutHandle));
+	const Device::PipelineBindingLayout& pipelineBindingLayout = device->pipelineBindingLayoutPool.resolveHandle(uint32(pipelineBindingLayoutHandle));
 
-	if (currentPipelineType == PipelineType::Graphics)
-		d3dCommandList->SetGraphicsRootSignature(pipelineLayout.d3dRootSignature);
-	else if (currentPipelineType == PipelineType::Compute)
-		d3dCommandList->SetComputeRootSignature(pipelineLayout.d3dRootSignature);
+	if (currentPipelineMode == PipelineMode::Graphics)
+		d3dCommandList->SetGraphicsRootSignature(pipelineBindingLayout.d3dRootSignature);
+	else if (currentPipelineMode == PipelineMode::Compute)
+		d3dCommandList->SetComputeRootSignature(pipelineBindingLayout.d3dRootSignature);
 	else
 		XEAssertUnreachableCode();
 
-	currentPipelineLayoutHandle = pipelineLayoutHandle;
+	currentPipelineBindingLayoutHandle = pipelineBindingLayoutHandle;
 }
 
-void CommandList::setComputePipeline(ShaderHandle computeShaderHandle)
+void CommandList::setComputePipelineState(ShaderHandle computeShaderHandle)
 {
 	XEAssert(isOpen);
 
 	const Device::Shader& shader = device->shaderPool.resolveHandle(uint32(computeShaderHandle));
 	XEAssert(shader.type == ShaderType::Compute);
-	XEAssert(shader.pipelineLayoutHandle == currentPipelineLayoutHandle);
+	XEAssert(shader.pipelineBindingLayoutHandle == currentPipelineBindingLayoutHandle);
 
 	D3D12_SET_PROGRAM_DESC d3dSetProgramDesc = {};
 	d3dSetProgramDesc.Type = D3D12_PROGRAM_TYPE_GENERIC_PIPELINE;
@@ -293,17 +293,17 @@ void CommandList::setComputePipeline(ShaderHandle computeShaderHandle)
 	d3dCommandList->SetProgram(&d3dSetProgramDesc);
 }
 
-void CommandList::setGraphicsPipeline(GraphicsPipelineHandle graphicsPipelineHandle)
+void CommandList::setGraphicsPipelineState(GraphicsPipelineStateHandle graphicsPipelineStateHandle)
 {
 	XEAssert(isOpen);
 
-	const Device::CompositePipeline& pipeline = device->compositePipelinePool.resolveHandle(uint32(graphicsPipelineHandle));
-	XEAssert(pipeline.type == Device::CompositePipelineType::Graphics);
-	XEAssert(pipeline.pipelineLayoutHandle == currentPipelineLayoutHandle);
+	const Device::CompositePipelineState& pipelineState = device->compositePipelineStatePool.resolveHandle(uint32(graphicsPipelineStateHandle));
+	XEAssert(pipelineState.type == Device::CompositePipelineStateType::Graphics);
+	XEAssert(pipelineState.pipelineBindingLayoutHandle == currentPipelineBindingLayoutHandle);
 
 	D3D12_SET_PROGRAM_DESC d3dSetProgramDesc = {};
 	d3dSetProgramDesc.Type = D3D12_PROGRAM_TYPE_GENERIC_PIPELINE;
-	d3dSetProgramDesc.GenericPipeline.ProgramIdentifier = pipeline.d3dProgramIdentifier;
+	d3dSetProgramDesc.GenericPipeline.ProgramIdentifier = pipelineState.d3dProgramIdentifier;
 	d3dCommandList->SetProgram(&d3dSetProgramDesc);
 }
 
@@ -443,29 +443,29 @@ void CommandList::bindConstants(uint64 bindingNameXSH,
 	const void* data, uint32 size32bitValues, uint32 offset32bitValues)
 {
 	XEAssert(isOpen);
-	XEAssert(currentPipelineLayoutHandle != PipelineLayoutHandle::Zero);
+	XEAssert(currentPipelineBindingLayoutHandle != PipelineBindingLayoutHandle::Zero);
 
-	const BindingResolveResult resolvedBinding = ResolveBindingByNameXSH(device, currentPipelineLayoutHandle, bindingNameXSH);
+	const PipelineBindingResolveResult resolvedBinding = ResolvePipelineBindingByNameXSH(device, currentPipelineBindingLayoutHandle, bindingNameXSH);
 	XEAssert(resolvedBinding.type == PipelineBindingType::InplaceConstants);
 
-	if (currentPipelineType == PipelineType::Graphics)
+	if (currentPipelineMode == PipelineMode::Graphics)
 		d3dCommandList->SetGraphicsRoot32BitConstants(resolvedBinding.d3dRootParameterIndex, size32bitValues, data, offset32bitValues);
-	else if (currentPipelineType == PipelineType::Compute)
+	else if (currentPipelineMode == PipelineMode::Compute)
 		d3dCommandList->SetComputeRoot32BitConstants(resolvedBinding.d3dRootParameterIndex, size32bitValues, data, offset32bitValues);
 	else
 		XEAssertUnreachableCode();
 }
 
-void CommandList::bindBuffer(uint64 bindingNameXSH, BufferBindType bindType, BufferPointer bufferPointer)
+void CommandList::bindBuffer(uint64 bindingNameXSH, BufferBindingType bindingType, BufferPointer bufferPointer)
 {
 	XEAssert(isOpen);
 
-	const BindingResolveResult resolvedBinding = ResolveBindingByNameXSH(device, currentPipelineLayoutHandle, bindingNameXSH);
-	if (bindType == BufferBindType::Constant)
+	const PipelineBindingResolveResult resolvedBinding = ResolvePipelineBindingByNameXSH(device, currentPipelineBindingLayoutHandle, bindingNameXSH);
+	if (bindingType == BufferBindingType::Constant)
 		XEAssert(resolvedBinding.type == PipelineBindingType::ConstantBuffer);
-	else if (bindType == BufferBindType::ReadOnly)
+	else if (bindingType == BufferBindingType::ReadOnly)
 		XEAssert(resolvedBinding.type == PipelineBindingType::ReadOnlyBuffer);
-	else if (bindType == BufferBindType::ReadWrite)
+	else if (bindingType == BufferBindingType::ReadWrite)
 		XEAssert(resolvedBinding.type == PipelineBindingType::ReadWriteBuffer);
 	else
 		XEAssertUnreachableCode();
@@ -475,24 +475,24 @@ void CommandList::bindBuffer(uint64 bindingNameXSH, BufferBindType bindType, Buf
 	XEAssert(resource.d3dResource);
 
 	const uint64 bufferAddress = resource.d3dResource->GetGPUVirtualAddress() + bufferPointer.offset;
-	XEAssert(imply(bindType == BufferBindType::Constant, bufferAddress % ConstantBufferBindAlignment == 0));
+	XEAssert(imply(bindingType == BufferBindingType::Constant, bufferAddress % ConstantBufferBindAlignment == 0));
 
-	if (currentPipelineType == PipelineType::Graphics)
+	if (currentPipelineMode == PipelineMode::Graphics)
 	{
-		if (bindType == BufferBindType::Constant)
+		if (bindingType == BufferBindingType::Constant)
 			d3dCommandList->SetGraphicsRootConstantBufferView(resolvedBinding.d3dRootParameterIndex, bufferAddress);
-		else if (bindType == BufferBindType::ReadOnly)
+		else if (bindingType == BufferBindingType::ReadOnly)
 			d3dCommandList->SetGraphicsRootShaderResourceView(resolvedBinding.d3dRootParameterIndex, bufferAddress);
-		else if (bindType == BufferBindType::ReadWrite)
+		else if (bindingType == BufferBindingType::ReadWrite)
 			d3dCommandList->SetGraphicsRootUnorderedAccessView(resolvedBinding.d3dRootParameterIndex, bufferAddress);
 	}
-	else if (currentPipelineType == PipelineType::Compute)
+	else if (currentPipelineMode == PipelineMode::Compute)
 	{
-		if (bindType == BufferBindType::Constant)
+		if (bindingType == BufferBindingType::Constant)
 			d3dCommandList->SetComputeRootConstantBufferView(resolvedBinding.d3dRootParameterIndex, bufferAddress);
-		else if (bindType == BufferBindType::ReadOnly)
+		else if (bindingType == BufferBindingType::ReadOnly)
 			d3dCommandList->SetComputeRootShaderResourceView(resolvedBinding.d3dRootParameterIndex, bufferAddress);
-		else if (bindType == BufferBindType::ReadWrite)
+		else if (bindingType == BufferBindingType::ReadWrite)
 			d3dCommandList->SetComputeRootUnorderedAccessView(resolvedBinding.d3dRootParameterIndex, bufferAddress);
 	}
 	else
@@ -503,19 +503,19 @@ void CommandList::bindDescriptorSet(uint64 bindingNameXSH, DescriptorSet descrip
 {
 	XEAssert(isOpen);
 
-	const BindingResolveResult resolvedBinding = ResolveBindingByNameXSH(device, currentPipelineLayoutHandle, bindingNameXSH);
+	const PipelineBindingResolveResult resolvedBinding = ResolvePipelineBindingByNameXSH(device, currentPipelineBindingLayoutHandle, bindingNameXSH);
 	XEAssert(resolvedBinding.type == PipelineBindingType::DescriptorSet);
 
 	const Device::DescriptorSetLayout* descriptorSetLayout = nullptr;
 	uint32 baseDescriptorIndex = 0;
 	device->decomposeDescriptorSetReference(descriptorSet, descriptorSetLayout, baseDescriptorIndex);
-	XEAssert(descriptorSetLayout->sourceHash == resolvedBinding.descriptorSetLayoutSourceHash);
+	XEAssert(descriptorSetLayout->hash == resolvedBinding.descriptorSetLayoutHash);
 
 	const uint64 descriptorTableGPUPtr = device->shaderVisbileSRVHeapGPUPtr + baseDescriptorIndex * device->srvDescriptorSize;
 
-	if (currentPipelineType == PipelineType::Graphics)
+	if (currentPipelineMode == PipelineMode::Graphics)
 		d3dCommandList->SetGraphicsRootDescriptorTable(resolvedBinding.d3dRootParameterIndex, D3D12Helpers::GPUDescriptorHandle(descriptorTableGPUPtr));
-	else if (currentPipelineType == PipelineType::Compute)
+	else if (currentPipelineMode == PipelineMode::Compute)
 		d3dCommandList->SetComputeRootDescriptorTable(resolvedBinding.d3dRootParameterIndex, D3D12Helpers::GPUDescriptorHandle(descriptorTableGPUPtr));
 	else
 		XEAssertUnreachableCode();
@@ -553,23 +553,23 @@ void CommandList::clearDepthStencilRenderTarget(bool clearDepth, bool clearStenc
 void CommandList::draw(uint32 vertexCount, uint32 vertexOffset)
 {
 	XEAssert(isOpen);
-	XEAssert(currentPipelineType == PipelineType::Graphics);
-	// TODO: Check that pipeline is actually bound.
+	XEAssert(currentPipelineMode == PipelineMode::Graphics);
+	// TODO: Check that pipeline state is actually set.
 	d3dCommandList->DrawInstanced(vertexCount, 1, vertexOffset, 0);
 }
 
 void CommandList::drawIndexed(uint32 indexCount, uint32 indexOffset, uint32 vertexOffset)
 {
 	XEAssert(isOpen);
-	XEAssert(currentPipelineType == PipelineType::Graphics);
-	// TODO: Check that pipeline is actually bound.
+	XEAssert(currentPipelineMode == PipelineMode::Graphics);
+	// TODO: Check that pipeline state is actually set.
 	d3dCommandList->DrawIndexedInstanced(indexCount, 1, indexOffset, vertexOffset, 0);
 }
 
 void CommandList::dispatch(uint32 groupCountX, uint32 groupCountY, uint32 groupCountZ)
 {
 	XEAssert(isOpen);
-	XEAssert(currentPipelineType == PipelineType::Compute);
+	XEAssert(currentPipelineMode == PipelineMode::Compute);
 	d3dCommandList->Dispatch(groupCountX, groupCountY, groupCountZ);
 }
 
@@ -780,9 +780,9 @@ template <> constexpr uint8 Device::Pool<Device::CommandList>				::GetHandleSign
 template <> constexpr uint8 Device::Pool<Device::MemoryAllocation>			::GetHandleSignature() { return 4; }
 template <> constexpr uint8 Device::Pool<Device::Resource>					::GetHandleSignature() { return 5; }
 template <> constexpr uint8 Device::Pool<Device::DescriptorSetLayout>		::GetHandleSignature() { return 6; }
-template <> constexpr uint8 Device::Pool<Device::PipelineLayout>			::GetHandleSignature() { return 7; }
+template <> constexpr uint8 Device::Pool<Device::PipelineBindingLayout>		::GetHandleSignature() { return 7; }
 template <> constexpr uint8 Device::Pool<Device::Shader>					::GetHandleSignature() { return 8; }
-template <> constexpr uint8 Device::Pool<Device::CompositePipeline>			::GetHandleSignature() { return 9; }
+template <> constexpr uint8 Device::Pool<Device::CompositePipelineState>	::GetHandleSignature() { return 9; }
 template <> constexpr uint8 Device::Pool<Device::Output>					::GetHandleSignature() { return 10; }
 
 template <typename EntryType>
@@ -1261,14 +1261,14 @@ void Device::initialize(/*const PhysicalDevice& physicalDevice, */const DeviceSe
 		const uintptr descriptorSetLayoutPoolMemOffset = poolsMemorySizeAccum;
 		poolsMemorySizeAccum += sizeof(DescriptorSetLayout) * settings.maxDescriptorSetLayoutCount;
 
-		const uintptr pipelineLayoutPoolMemOffset = poolsMemorySizeAccum;
-		poolsMemorySizeAccum += sizeof(PipelineLayout) * settings.maxPipelineLayoutCount;
+		const uintptr pipelineBindingLayoutPoolMemOffset = poolsMemorySizeAccum;
+		poolsMemorySizeAccum += sizeof(PipelineBindingLayout) * settings.maxPipelineBindingLayoutCount;
 
 		const uintptr shaderPoolMemOffset = poolsMemorySizeAccum;
 		poolsMemorySizeAccum += sizeof(Shader) * settings.maxShaderCount;
 
-		const uintptr compositePipelinePoolMemOffset = poolsMemorySizeAccum;
-		poolsMemorySizeAccum += sizeof(CompositePipeline) * settings.maxCompositePipelineCount;
+		const uintptr compositePipelineStatePoolMemOffset = poolsMemorySizeAccum;
+		poolsMemorySizeAccum += sizeof(CompositePipelineState) * settings.maxCompositePipelineStateCount;
 
 		const uintptr outputPoolMemOffset = poolsMemorySizeAccum;
 		poolsMemorySizeAccum += sizeof(Output) * settings.maxOutputCount;
@@ -1278,15 +1278,15 @@ void Device::initialize(/*const PhysicalDevice& physicalDevice, */const DeviceSe
 		byte* poolsMemory = (byte*)SystemHeapAllocator::Allocate(poolsTotalMemorySize);
 		memorySet(poolsMemory, 0, poolsTotalMemorySize);
 
-		commandAllocatorPool.initialize		((CommandAllocator*)	(poolsMemory + commandAllocatorPoolMemOffset),		settings.maxMemoryAllocationCount);
-		commandListPool.initialize			((CommandList*)			(poolsMemory + commandListPoolMemOffset),			settings.maxCommandAllocatorCount);
-		memoryAllocationPool.initialize		((MemoryAllocation*)	(poolsMemory + memoryAllocationPoolMemOffset),		settings.maxCommandListCount);
-		resourcePool.initialize				((Resource*)			(poolsMemory + resourcePoolMemOffset),				settings.maxResourceCount);
-		descriptorSetLayoutPool.initialize	((DescriptorSetLayout*)	(poolsMemory + descriptorSetLayoutPoolMemOffset),	settings.maxDescriptorSetLayoutCount);
-		pipelineLayoutPool.initialize		((PipelineLayout*)		(poolsMemory + pipelineLayoutPoolMemOffset),		settings.maxPipelineLayoutCount);
-		shaderPool.initialize				((Shader*)				(poolsMemory + shaderPoolMemOffset),				settings.maxShaderCount);
-		compositePipelinePool.initialize	((CompositePipeline*)	(poolsMemory + compositePipelinePoolMemOffset),		settings.maxCompositePipelineCount);
-		outputPool.initialize				((Output*)				(poolsMemory + outputPoolMemOffset),				settings.maxOutputCount);
+		commandAllocatorPool.initialize			((CommandAllocator*)		(poolsMemory + commandAllocatorPoolMemOffset),			settings.maxMemoryAllocationCount);
+		commandListPool.initialize				((CommandList*)				(poolsMemory + commandListPoolMemOffset),				settings.maxCommandAllocatorCount);
+		memoryAllocationPool.initialize			((MemoryAllocation*)		(poolsMemory + memoryAllocationPoolMemOffset),			settings.maxCommandListCount);
+		resourcePool.initialize					((Resource*)				(poolsMemory + resourcePoolMemOffset),					settings.maxResourceCount);
+		descriptorSetLayoutPool.initialize		((DescriptorSetLayout*)		(poolsMemory + descriptorSetLayoutPoolMemOffset),		settings.maxDescriptorSetLayoutCount);
+		pipelineBindingLayoutPool.initialize	((PipelineBindingLayout*)	(poolsMemory + pipelineBindingLayoutPoolMemOffset),		settings.maxPipelineBindingLayoutCount);
+		shaderPool.initialize					((Shader*)					(poolsMemory + shaderPoolMemOffset),					settings.maxShaderCount);
+		compositePipelineStatePool.initialize	((CompositePipelineState*)	(poolsMemory + compositePipelineStatePoolMemOffset),	settings.maxCompositePipelineStateCount);
+		outputPool.initialize					((Output*)					(poolsMemory + outputPoolMemOffset),					settings.maxOutputCount);
 	}
 
 	bindlessDescriptorPoolSize = settings.bindlessDescriptorPoolSize;
@@ -1533,7 +1533,7 @@ DescriptorSetLayoutHandle Device::createDescriptorSetLayout(const void* blobData
 
 	DescriptorSetLayoutHandle descriptorSetLayoutHandle = DescriptorSetLayoutHandle::Zero;
 	DescriptorSetLayout& descriptorSetLayout = descriptorSetLayoutPool.allocate((uint32&)descriptorSetLayoutHandle);
-	descriptorSetLayout.sourceHash = blobInfo.sourceHash;
+	descriptorSetLayout.hash = blobInfo.hash;
 	descriptorSetLayout.bindingCount = blobInfo.bindingCount;
 
 	for (uint16 i = 0; i < blobInfo.bindingCount; i++)
@@ -1542,49 +1542,49 @@ DescriptorSetLayoutHandle Device::createDescriptorSetLayout(const void* blobData
 	return descriptorSetLayoutHandle;
 }
 
-PipelineLayoutHandle Device::createPipelineLayout(const void* blobData, uint32 blobSize)
+PipelineBindingLayoutHandle Device::createPipelineBindingLayout(const void* blobData, uint32 blobSize)
 {
-	BlobFormat::PipelineLayoutBlobReader blobReader;
+	BlobFormat::PipelineBindingLayoutBlobReader blobReader;
 	XEMasterAssert(blobReader.open(blobData, blobSize));
 
-	const BlobFormat::PipelineLayoutBlobInfo blobInfo = blobReader.getBlobInfo();
+	const BlobFormat::PipelineBindingLayoutBlobInfo blobInfo = blobReader.getBlobInfo();
 	XEMasterAssert(blobInfo.bindingCount <= MaxPipelineBindingCount);
 
-	PipelineLayoutHandle pipelineLayoutHandle = PipelineLayoutHandle::Zero;
-	PipelineLayout& pipelineLayout = pipelineLayoutPool.allocate((uint32&)pipelineLayoutHandle);
-	pipelineLayout.sourceHash = blobInfo.sourceHash;
-	pipelineLayout.bindingCount = blobInfo.bindingCount;
+	PipelineBindingLayoutHandle pipelineBindingLayoutHandle = PipelineBindingLayoutHandle::Zero;
+	PipelineBindingLayout& pipelineBindingLayout = pipelineBindingLayoutPool.allocate((uint32&)pipelineBindingLayoutHandle);
+	pipelineBindingLayout.hash = blobInfo.hash;
+	pipelineBindingLayout.bindingCount = blobInfo.bindingCount;
 
 	for (uint16 i = 0; i < blobInfo.bindingCount; i++)
 	{
 		// TODO: Validate binding (root parameter index, binding type etc).
-		pipelineLayout.bindings[i] = blobReader.getBindingInfo(i);
+		pipelineBindingLayout.bindings[i] = blobReader.getBindingInfo(i);
 	}
 
-	XEAssert(!pipelineLayout.d3dRootSignature);
+	XEAssert(!pipelineBindingLayout.d3dRootSignature);
 	HRESULT hResult = d3dDevice->CreateRootSignature(0,
 		blobReader.getPlatformDataPtr(), blobInfo.platformDataSize,
-		IID_PPV_ARGS(&pipelineLayout.d3dRootSignature));
+		IID_PPV_ARGS(&pipelineBindingLayout.d3dRootSignature));
 	XEMasterAssert(hResult == S_OK);
 
-	return pipelineLayoutHandle;
+	return pipelineBindingLayoutHandle;
 }
 
-ShaderHandle Device::createShader(PipelineLayoutHandle pipelineLayoutHandle, const void* blobData, uint32 blobSize)
+ShaderHandle Device::createShader(PipelineBindingLayoutHandle pipelineBindingLayoutHandle, const void* blobData, uint32 blobSize)
 {
-	const PipelineLayout& pipelineLayout = pipelineLayoutPool.resolveHandle(uint32(pipelineLayoutHandle));
-	XEAssert(pipelineLayout.d3dRootSignature);
+	const PipelineBindingLayout& pipelineBindingLayout = pipelineBindingLayoutPool.resolveHandle(uint32(pipelineBindingLayoutHandle));
+	XEAssert(pipelineBindingLayout.d3dRootSignature);
 
 	BlobFormat::ShaderBlobReader blobReader;
 	XEMasterAssert(blobReader.open(blobData, blobSize));
 
 	const BlobFormat::ShaderBlobInfo blobInfo = blobReader.getBlobInfo();
-	XEMasterAssert(blobInfo.pipelineLayoutSourceHash == pipelineLayout.sourceHash);
+	XEMasterAssert(blobInfo.pipelineBindingLayoutHash == pipelineBindingLayout.hash);
 	XEMasterAssert(blobInfo.shaderType > ShaderType::Undefined && blobInfo.shaderType < ShaderType::ValueCount);
 
 	ShaderHandle shaderHandle = ShaderHandle::Zero;
 	Shader& shader = shaderPool.allocate((uint32&)shaderHandle);
-	shader.pipelineLayoutHandle = pipelineLayoutHandle;
+	shader.pipelineBindingLayoutHandle = pipelineBindingLayoutHandle;
 	shader.type = blobInfo.shaderType;
 
 	XEAssert(!shader.d3dStateObject);
@@ -1612,7 +1612,7 @@ ShaderHandle Device::createShader(PipelineLayoutHandle pipelineLayoutHandle, con
 
 		// Root signature
 		{
-			d3dRootSignatureDesc.pGlobalRootSignature = pipelineLayout.d3dRootSignature;
+			d3dRootSignatureDesc.pGlobalRootSignature = pipelineBindingLayout.d3dRootSignature;
 
 			D3D12_STATE_SUBOBJECT& d3dStateSubobjectRootSignature = d3dStateSubobjects.emplaceBack();
 			d3dStateSubobjectRootSignature.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
@@ -1671,17 +1671,17 @@ ShaderHandle Device::createShader(PipelineLayoutHandle pipelineLayoutHandle, con
 	return shaderHandle;
 }
 
-GraphicsPipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipelineLayoutHandle, const GraphicsPipelineDesc& desc)
+GraphicsPipelineStateHandle Device::createGraphicsPipelineState(PipelineBindingLayoutHandle pipelineBindingLayoutHandle, const GraphicsPipelineStateDesc& desc)
 {
-	const PipelineLayout& pipelineLayout = pipelineLayoutPool.resolveHandle(uint32(pipelineLayoutHandle));
-	XEAssert(pipelineLayout.d3dRootSignature);
+	const PipelineBindingLayout& pipelineBindingLayout = pipelineBindingLayoutPool.resolveHandle(uint32(pipelineBindingLayoutHandle));
+	XEAssert(pipelineBindingLayout.d3dRootSignature);
 
-	GraphicsPipelineHandle pipelineHandle = GraphicsPipelineHandle::Zero;
-	CompositePipeline& pipeline = compositePipelinePool.allocate((uint32&)pipelineHandle);
-	pipeline.pipelineLayoutHandle = pipelineLayoutHandle;
-	pipeline.type = CompositePipelineType::Graphics;
+	GraphicsPipelineStateHandle pipelineStateHandle = GraphicsPipelineStateHandle::Zero;
+	CompositePipelineState& pipelineState = compositePipelineStatePool.allocate((uint32&)pipelineStateHandle);
+	pipelineState.pipelineBindingLayoutHandle = pipelineBindingLayoutHandle;
+	pipelineState.type = CompositePipelineStateType::Graphics;
 
-	XEAssert(!pipeline.d3dStateObject);
+	XEAssert(!pipelineState.d3dStateObject);
 
 	// Verify enabled shader stages combination.
 	if (desc.vertexAttributeCount > 0)
@@ -1938,19 +1938,19 @@ GraphicsPipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipel
 		d3dStateObjectDesc.NumSubobjects = d3dStateSubobjects.getSize();
 		d3dStateObjectDesc.pSubobjects = d3dStateSubobjects;
 
-		HRESULT hResult = d3dDevice->CreateStateObject(&d3dStateObjectDesc, IID_PPV_ARGS(&pipeline.d3dStateObject));
+		HRESULT hResult = d3dDevice->CreateStateObject(&d3dStateObjectDesc, IID_PPV_ARGS(&pipelineState.d3dStateObject));
 		XEMasterAssert(SUCCEEDED(hResult));
 	}
 
 	// Retrieve D3D program identifier
 	{
 		ID3D12StateObjectProperties1* d3dStateObjectProps = nullptr;
-		pipeline.d3dStateObject->QueryInterface(IID_PPV_ARGS(&d3dStateObjectProps));
-		pipeline.d3dProgramIdentifier = d3dStateObjectProps->GetProgramIdentifier(L"default");
+		pipelineState.d3dStateObject->QueryInterface(IID_PPV_ARGS(&d3dStateObjectProps));
+		pipelineState.d3dProgramIdentifier = d3dStateObjectProps->GetProgramIdentifier(L"default");
 		d3dStateObjectProps->Release();
 	}
 
-	return pipelineHandle;
+	return pipelineStateHandle;
 }
 
 OutputHandle Device::createWindowOutput(uint16 width, uint16 height, void* platformWindowHandle)
@@ -2081,8 +2081,8 @@ void Device::openCommandList(HAL::CommandList& commandList, CommandAllocatorHand
 	commandList.dsvHeapOffset = deviceCommandListIndex * 1;
 	commandList.type = type;
 	commandList.isOpen = true;
-	commandList.currentPipelineLayoutHandle = PipelineLayoutHandle::Zero;
-	commandList.currentPipelineType = PipelineType::Undefined;
+	commandList.currentPipelineBindingLayoutHandle = PipelineBindingLayoutHandle::Zero;
+	commandList.currentPipelineMode = PipelineMode::Undefined;
 	commandList.setColorRenderTargetCount = 0;
 	commandList.isDepthStencilRenderTargetSet = false;
 

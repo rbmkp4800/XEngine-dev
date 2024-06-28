@@ -122,15 +122,15 @@ static bool StoreShaderLibrary(const CmdArgs& cmdArgs, const LibraryDefinition& 
 	XTODO("Sort objects in order of XSH increase");
 
 	ArrayList<ShaderLibraryFormat::DescriptorSetLayoutRecord> descriptorSetLayoutRecords;
-	ArrayList<ShaderLibraryFormat::PipelineLayoutRecord> pipelineLayoutRecords;
+	ArrayList<ShaderLibraryFormat::PipelineBindingLayoutRecord> pipelineBindingLayoutRecords;
 	ArrayList<ShaderLibraryFormat::ShaderRecord> shaderRecords;
 
 	descriptorSetLayoutRecords.resize(libraryDefinition.descriptorSetLayouts.getSize());
-	pipelineLayoutRecords.resize(libraryDefinition.pipelineLayouts.getSize());
+	pipelineBindingLayoutRecords.resize(libraryDefinition.pipelineBindingLayouts.getSize());
 	shaderRecords.resize(libraryDefinition.shaders.getSize());
 
 	memorySet(descriptorSetLayoutRecords.getData(), 0, descriptorSetLayoutRecords.getByteSize());
-	memorySet(pipelineLayoutRecords.getData(), 0, pipelineLayoutRecords.getByteSize());
+	memorySet(pipelineBindingLayoutRecords.getData(), 0, pipelineBindingLayoutRecords.getByteSize());
 	memorySet(shaderRecords.getData(), 0, shaderRecords.getByteSize());
 
 	struct BlobDataView
@@ -142,7 +142,7 @@ static bool StoreShaderLibrary(const CmdArgs& cmdArgs, const LibraryDefinition& 
 	ArrayList<BlobDataView> blobs;
 	blobs.reserve(
 		libraryDefinition.descriptorSetLayouts.getSize() +
-		libraryDefinition.pipelineLayouts.getSize() +
+		libraryDefinition.pipelineBindingLayouts.getSize() +
 		libraryDefinition.shaders.getSize());
 
 	uint32 blobsDataSizeAccum = 0;
@@ -164,21 +164,21 @@ static bool StoreShaderLibrary(const CmdArgs& cmdArgs, const LibraryDefinition& 
 		blobsDataSizeAccum += dsl.getBlobSize();
 	}
 
-	for (uint32 i = 0; i < libraryDefinition.pipelineLayouts.getSize(); i++)
+	for (uint32 i = 0; i < libraryDefinition.pipelineBindingLayouts.getSize(); i++)
 	{
-		const uint64 nameXSH = libraryDefinition.pipelineLayouts[i].nameXSH;
-		const HAL::ShaderCompiler::PipelineLayout& pipelineLayout = *libraryDefinition.pipelineLayouts[i].ref.get();
-		const uint32 blobCRC32 = CRC32::Compute(pipelineLayout.getBlobData(), pipelineLayout.getBlobSize());
+		const uint64 nameXSH = libraryDefinition.pipelineBindingLayouts[i].nameXSH;
+		const HAL::ShaderCompiler::PipelineBindingLayout& pipelineBindingLayout = *libraryDefinition.pipelineBindingLayouts[i].ref.get();
+		const uint32 blobCRC32 = CRC32::Compute(pipelineBindingLayout.getBlobData(), pipelineBindingLayout.getBlobSize());
 
-		ShaderLibraryFormat::PipelineLayoutRecord& record = pipelineLayoutRecords[i];
+		ShaderLibraryFormat::PipelineBindingLayoutRecord& record = pipelineBindingLayoutRecords[i];
 		record.nameXSH0 = uint32(nameXSH);
 		record.nameXSH1 = uint32(nameXSH >> 32);
 		record.blobOffset = blobsDataSizeAccum;
-		record.blobSize = pipelineLayout.getBlobSize();
+		record.blobSize = pipelineBindingLayout.getBlobSize();
 		record.blobCRC32 = blobCRC32;
 
-		blobs.pushBack(BlobDataView{ pipelineLayout.getBlobData(), pipelineLayout.getBlobSize() });
-		blobsDataSizeAccum += pipelineLayout.getBlobSize();
+		blobs.pushBack(BlobDataView{ pipelineBindingLayout.getBlobData(), pipelineBindingLayout.getBlobSize() });
+		blobsDataSizeAccum += pipelineBindingLayout.getBlobSize();
 	}
 
 	for (uint32 i = 0; i < libraryDefinition.shaders.getSize(); i++)
@@ -194,8 +194,8 @@ static bool StoreShaderLibrary(const CmdArgs& cmdArgs, const LibraryDefinition& 
 		record.blobOffset = blobsDataSizeAccum;
 		record.blobSize = shaderBlob.getSize();
 		record.blobCRC32 = blobCRC32;
-		record.pipelineLayoutNameXSH0 = uint32(shader.getPipelineLayoutNameXSH());
-		record.pipelineLayoutNameXSH1 = uint32(shader.getPipelineLayoutNameXSH() >> 32);
+		record.pipelineBindingLayoutNameXSH0 = uint32(shader.getPipelineBindingLayoutNameXSH());
+		record.pipelineBindingLayoutNameXSH1 = uint32(shader.getPipelineBindingLayoutNameXSH() >> 32);
 
 		blobs.pushBack(BlobDataView{ shaderBlob.getData(), shaderBlob.getSize() });
 		blobsDataSizeAccum += shaderBlob.getSize();
@@ -206,14 +206,14 @@ static bool StoreShaderLibrary(const CmdArgs& cmdArgs, const LibraryDefinition& 
 	const uintptr blobsDataOffset =
 		sizeof(ShaderLibraryFormat::LibraryHeader) +
 		descriptorSetLayoutRecords.getByteSize() +
-		pipelineLayoutRecords.getByteSize() +
+		pipelineBindingLayoutRecords.getByteSize() +
 		shaderRecords.getByteSize();
 
 	ShaderLibraryFormat::LibraryHeader header = {};
 	header.signature = ShaderLibraryFormat::LibrarySignature;
 	header.version = ShaderLibraryFormat::LibraryCurrentVersion;
 	header.descriptorSetLayoutCount = XCheckedCastU16(descriptorSetLayoutRecords.getSize());
-	header.pipelineLayoutCount = XCheckedCastU16(pipelineLayoutRecords.getSize());
+	header.pipelineBindingLayoutCount = XCheckedCastU16(pipelineBindingLayoutRecords.getSize());
 	header.shaderCount = XCheckedCastU16(shaderRecords.getSize());
 	header.blobsDataOffset = uint32(blobsDataOffset);
 	header.blobsDataSize = blobsDataSize;
@@ -233,7 +233,7 @@ static bool StoreShaderLibrary(const CmdArgs& cmdArgs, const LibraryDefinition& 
 
 	file.write(&header, sizeof(header));
 	file.write(descriptorSetLayoutRecords.getData(), descriptorSetLayoutRecords.getByteSize());
-	file.write(pipelineLayoutRecords.getData(), pipelineLayoutRecords.getByteSize());
+	file.write(pipelineBindingLayoutRecords.getData(), pipelineBindingLayoutRecords.getByteSize());
 	file.write(shaderRecords.getData(), shaderRecords.getByteSize());
 
 	uint32 blobsDataSizeCheck = 0;
@@ -286,19 +286,19 @@ static void StoreIncrementalBuildCacheIndex(const CmdArgs& cmdArgs, const Librar
 		const StringViewASCII shaderEntryPointName = shader->getCompilationArgs().entryPointName;
 		const char* shaderTypeStr = ShaderTypeToString(shader->getCompilationArgs().shaderType);
 
-		const uint64 pipelineLayoutNameXSH = shader->getPipelineLayoutNameXSH();
-		const StringViewASCII pipelineLayoutName = StringViewASCII::FromCStr("XXX");
-		// TODO: We should retrieve pipeline layout name from XSH reverse table.
-		// Probably we might use table local to pipeline layouts just in case.
+		const uint64 pipelineBindingLayoutNameXSH = shader->getPipelineBindingLayoutNameXSH();
+		const StringViewASCII pipelineBindingLayoutName = StringViewASCII::FromCStr("XXX");
+		// TODO: We should retrieve pipeline binding layout name from XSH reverse table.
+		// Probably we might use table local to pipeline binding layouts just in case.
 
-		const uint64 pipelineLayoutHash = shader->getPipelineLayout().getSourceHash();
+		const uint64 pipelineBindingLayoutHash = shader->getPipelineBindingLayout().getHash();
 
 		FmtPrint(fileWriter,
 			"SH:", FmtArgHex64(shaderNameXSH, 16), '(', shaderName, ')', '|',
 			"T:", shaderTypeStr, '|',
 			"EP:", shaderEntryPointName, '|',
-			"PL:", FmtArgHex64(pipelineLayoutNameXSH, 16), '(', pipelineLayoutName, ')', '|',
-			"PLHash:", FmtArgHex64(pipelineLayoutHash, 16), '\n');
+			"PBL:", FmtArgHex64(pipelineBindingLayoutNameXSH, 16), '(', pipelineBindingLayoutName, ')', '|',
+			"PBLHash:", FmtArgHex64(pipelineBindingLayoutHash, 16), '\n');
 	}
 
 	fileWriter.close();
@@ -363,7 +363,7 @@ int main(int argc, char* argv[])
 
 		HAL::ShaderCompiler::ShaderCompilationResultRef compilationResult =
 			HAL::ShaderCompiler::CompileShader(
-				mainSourceFilePath, shader.getCompilationArgs(), shader.getPipelineLayout(),
+				mainSourceFilePath, shader.getCompilationArgs(), shader.getPipelineBindingLayout(),
 				&ResolveSource, &sourceCache);
 
 		if (compilationResult->getPreprocessingOuput().getLength() > 0)

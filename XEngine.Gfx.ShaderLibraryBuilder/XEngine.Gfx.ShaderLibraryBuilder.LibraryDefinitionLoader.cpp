@@ -117,12 +117,12 @@ static HAL::ShaderCompiler::DescriptorSetLayout* LibFindDescriptorSetLayout(Libr
 	return nullptr;
 }
 
-static HAL::ShaderCompiler::PipelineLayout* LibFindPipelineLayout(LibraryDefinition& lib, uint64 nameXSH)
+static HAL::ShaderCompiler::PipelineBindingLayout* LibFindPipelineBindingLayout(LibraryDefinition& lib, uint64 nameXSH)
 {
-	for (const auto& pipelineLayout : lib.pipelineLayouts)
+	for (const auto& pipelineBindingLayout : lib.pipelineBindingLayouts)
 	{
-		if (pipelineLayout.nameXSH == nameXSH)
-			return pipelineLayout.ref.get();
+		if (pipelineBindingLayout.nameXSH == nameXSH)
+			return pipelineBindingLayout.ref.get();
 	}
 	return nullptr;
 }
@@ -407,12 +407,12 @@ bool LibraryDefinitionLoader::readDescriptorSetLayout(StringViewASCII descriptor
 	return true;
 }
 
-bool LibraryDefinitionLoader::readPipelineLayout(StringViewASCII pipelineLayoutName, Cursor jsonPipelineLayoutNameCursor)
+bool LibraryDefinitionLoader::readPipelineBindingLayout(StringViewASCII pipelineBindingLayoutName, Cursor jsonPipelineBindingLayoutNameCursor)
 {
 	IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithObjectValue("bindings"));
 
 	InplaceArrayList<HAL::ShaderCompiler::PipelineBindingDesc, HAL::MaxPipelineBindingCount> bindings;
-	InplaceArrayList<HAL::ShaderCompiler::StaticSamplerDesc, HAL::ShaderCompiler::MaxPipelineStaticSamplerCount> pipelineLayoutStaticSamplers;
+	InplaceArrayList<HAL::ShaderCompiler::StaticSamplerDesc, HAL::ShaderCompiler::MaxPipelineStaticSamplerCount> pipelineBindingLayoutStaticSamplers;
 
 	jsonReader.openObject();
 	IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
@@ -452,8 +452,8 @@ bool LibraryDefinitionLoader::readPipelineLayout(StringViewASCII pipelineLayoutN
 				staticSampler.bindingName = bindingName;
 				staticSampler.desc = internalStaticSampler->desc;
 
-				IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!pipelineLayoutStaticSamplers.isFull(), "pipeline layout static samplers limit exceeded", jsonBindingNameCursor);
-				pipelineLayoutStaticSamplers.pushBack(staticSampler);
+				IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!pipelineBindingLayoutStaticSamplers.isFull(), "pipeline binding layout static samplers limit exceeded", jsonBindingNameCursor);
+				pipelineBindingLayoutStaticSamplers.pushBack(staticSampler);
 			}
 			else
 			{
@@ -480,7 +480,7 @@ bool LibraryDefinitionLoader::readPipelineLayout(StringViewASCII pipelineLayoutN
 					binding.descriptorSetLayout = descriptorSetLayout;
 				}
 
-				IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!bindings.isFull(), "pipeline layout bindings limit exceeded", jsonBindingNameCursor);
+				IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!bindings.isFull(), "pipeline binding layout bindings limit exceeded", jsonBindingNameCursor);
 				bindings.pushBack(binding);
 			}
 
@@ -495,36 +495,36 @@ bool LibraryDefinitionLoader::readPipelineLayout(StringViewASCII pipelineLayoutN
 
 	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonReader.isEndOfObject(), "end of object expected", getJSONCursor());
 
-	const uint64 pipelineLayoutNameXSH = XSH::Compute(pipelineLayoutName);
-	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(pipelineLayoutNameXSH != 0,
-		"pipeline layout name XSH = 0. This is not allowed", jsonPipelineLayoutNameCursor);
+	const uint64 pipelineBindingLayoutNameXSH = XSH::Compute(pipelineBindingLayoutName);
+	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(pipelineBindingLayoutNameXSH != 0,
+		"pipeline binding layout name XSH = 0. This is not allowed", jsonPipelineBindingLayoutNameCursor);
 
-	//if (libraryDefinition.pipelineLayouts.find(pipelineLayoutNameXSH))
-	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!LibFindPipelineLayout(libraryDefinition, pipelineLayoutNameXSH),
-		"pipeline layout redefinition", jsonPipelineLayoutNameCursor);
+	//if (libraryDefinition.pipelineBindingLayouts.find(pipelineBindingLayoutNameXSH))
+	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!LibFindPipelineBindingLayout(libraryDefinition, pipelineBindingLayoutNameXSH),
+		"pipeline binding layout redefinition", jsonPipelineBindingLayoutNameCursor);
 	// TODO: We may give separate error for hash collision (that will never happen).
 
 	HAL::ShaderCompiler::GenericErrorMessage objectCreationErrorMessage;
 
-	const HAL::ShaderCompiler::PipelineLayoutRef pipelineLayout =
-		HAL::ShaderCompiler::PipelineLayout::Create(bindings, bindings.getSize(),
-			pipelineLayoutStaticSamplers, pipelineLayoutStaticSamplers.getSize(), objectCreationErrorMessage);
+	const HAL::ShaderCompiler::PipelineBindingLayoutRef pipelineBindingLayout =
+		HAL::ShaderCompiler::PipelineBindingLayout::Create(bindings, bindings.getSize(),
+			pipelineBindingLayoutStaticSamplers, pipelineBindingLayoutStaticSamplers.getSize(), objectCreationErrorMessage);
 
-	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(pipelineLayout, objectCreationErrorMessage.text.getCStr(), jsonPipelineLayoutNameCursor);
+	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(pipelineBindingLayout, objectCreationErrorMessage.text.getCStr(), jsonPipelineBindingLayoutNameCursor);
 
-	//libraryDefinition.pipelineLayouts.insert(pipelineLayoutNameXSH, pipelineLayout);
-	libraryDefinition.pipelineLayouts.pushBack(
-		LibraryDefinition::PipelineLayout { pipelineLayoutNameXSH, pipelineLayout });
+	//libraryDefinition.pipelineBindingLayouts.insert(pipelineBindingLayoutNameXSH, pipelineBindingLayout);
+	libraryDefinition.pipelineBindingLayouts.pushBack(
+		LibraryDefinition::PipelineBindingLayout { pipelineBindingLayoutNameXSH, pipelineBindingLayout });
 
 	return true;
 }
 
 bool LibraryDefinitionLoader::readShader(StringViewASCII shaderName, Cursor jsonShaderNameCursor, HAL::ShaderType shaderType)
 {
-	HAL::ShaderCompiler::PipelineLayoutRef pipelineLayout = nullptr;
-	uint64 pipelineLayoutNameXSH = 0;
+	HAL::ShaderCompiler::PipelineBindingLayoutRef pipelineBindingLayout = nullptr;
+	uint64 pipelineBindingLayoutNameXSH = 0;
 
-	IF_FALSE_RETURN_FALSE(readPipelineLayoutSetupProperty(pipelineLayout, pipelineLayoutNameXSH));
+	IF_FALSE_RETURN_FALSE(readPipelineBindingLayoutSetupProperty(pipelineBindingLayout, pipelineBindingLayoutNameXSH));
 
 	StringViewASCII mainSourceFilename;
 	HAL::ShaderCompiler::ShaderCompilationArgs args = {};
@@ -547,7 +547,7 @@ bool LibraryDefinitionLoader::readShader(StringViewASCII shaderName, Cursor json
 	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!LibFindShader(libraryDefinition, shaderNameXSH), "shader redefinition", jsonShaderNameCursor);
 	// TODO: We may give separate error for hash collision (that will never happen).
 
-	const ShaderRef shader = Shader::Create(shaderName, shaderNameXSH, pipelineLayout.get(), pipelineLayoutNameXSH, mainSourceFilename, args);
+	const ShaderRef shader = Shader::Create(shaderName, shaderNameXSH, pipelineBindingLayout.get(), pipelineBindingLayoutNameXSH, mainSourceFilename, args);
 
 	XAssert(shader);
 	libraryDefinition.shaders.pushBack(shader);
@@ -555,27 +555,27 @@ bool LibraryDefinitionLoader::readShader(StringViewASCII shaderName, Cursor json
 	return true;
 }
 
-bool LibraryDefinitionLoader::readPipelineLayoutSetupProperty(
-	HAL::ShaderCompiler::PipelineLayoutRef& resultPipelineLayout, uint64& resultPipelineLayoutNameXSH)
+bool LibraryDefinitionLoader::readPipelineBindingLayoutSetupProperty(
+	HAL::ShaderCompiler::PipelineBindingLayoutRef& resultPipelineBindingLayout, uint64& resultPipelineBindingLayoutNameXSH)
 {
-	StringViewASCII pipelineLayoutName = {};
-	const Cursor jsonPipelineLayoutNameCursor = getJSONCursor();
-	IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("layout", pipelineLayoutName));
+	StringViewASCII pipelineBindingLayoutName = {};
+	const Cursor jsonPipelineBindingLayoutNameCursor = getJSONCursor();
+	IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("pipeline_binding_layout", pipelineBindingLayoutName));
 
-	const uint64 pipelineLayoutNameXSH = XSH::Compute(pipelineLayoutName);
+	const uint64 pipelineBindingLayoutNameXSH = XSH::Compute(pipelineBindingLayoutName);
 
-	//const HAL::ShaderCompiler::PipelineLayoutRef* foundPipelineLayout =
-	//	libraryDefinition.pipelineLayouts.findValue(pipelineLayoutNameXSH);
-	HAL::ShaderCompiler::PipelineLayout* foundPipelineLayout =
-		LibFindPipelineLayout(libraryDefinition, pipelineLayoutNameXSH);
-	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(foundPipelineLayout != nullptr,
-		"undefined pipeline layout", jsonPipelineLayoutNameCursor);
+	//const HAL::ShaderCompiler::PipelineBindingLayoutRef* foundPipelineBindingLayout =
+	//	libraryDefinition.pipelineBindingLayouts.findValue(pipelineBindingLayoutNameXSH);
+	HAL::ShaderCompiler::PipelineBindingLayout* foundPipelineBindingLayout =
+		LibFindPipelineBindingLayout(libraryDefinition, pipelineBindingLayoutNameXSH);
+	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(foundPipelineBindingLayout != nullptr,
+		"undefined pipeline binding layout", jsonPipelineBindingLayoutNameCursor);
 	// TODO: Additionally compare actual names to check for hash collision (that will never happen).
 
-	//resultPipelineLayout = *foundPipelineLayout;
-	resultPipelineLayout = foundPipelineLayout;
-	resultPipelineLayoutNameXSH = pipelineLayoutNameXSH;
-	XAssert(resultPipelineLayout);
+	//resultPipelineBindingLayout = *foundPipelineBindingLayout;
+	resultPipelineBindingLayout = foundPipelineBindingLayout;
+	resultPipelineBindingLayoutNameXSH = pipelineBindingLayoutNameXSH;
+	XAssert(resultPipelineBindingLayout);
 
 	return true;
 }
@@ -636,8 +636,8 @@ bool LibraryDefinitionLoader::load(const char* jsonPath)
 				readEntryStatus = readStaticSampler(entryName, jsonEntryNameCursor);
 			else if (entryType == "descriptor_set_layout")
 				readEntryStatus = readDescriptorSetLayout(entryName, jsonEntryNameCursor);
-			else if (entryType == "pipeline_layout")
-				readEntryStatus = readPipelineLayout(entryName, jsonEntryNameCursor);
+			else if (entryType == "pipeline_binding_layout")
+				readEntryStatus = readPipelineBindingLayout(entryName, jsonEntryNameCursor);
 			else if (entryType == "vs" || entryType == "vertex_shader")
 				readEntryStatus = readShader(entryName, jsonEntryNameCursor, HAL::ShaderType::Vertex);
 			else if (entryType == "as" || entryType == "amplification_shader")

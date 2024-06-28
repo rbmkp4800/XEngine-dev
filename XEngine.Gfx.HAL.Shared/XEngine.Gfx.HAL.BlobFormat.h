@@ -11,7 +11,7 @@ namespace XEngine::Gfx::HAL::BlobFormat::Data
 {
 	constexpr uint32 GenericBlobSignature				= 0x874C2131;
 	constexpr uint16 DescriptorSetLayoutBlobSignature	= 0xF1A6;
-	constexpr uint16 PipelineLayoutBlobSignature		= 0xE1B2;
+	constexpr uint16 PipelineBindingLayoutBlobSignature	= 0xE1B2;
 	constexpr uint16 ShaderBlobSignature				= 0xE084;
 
 	struct GenericBlobHeader // 16 bytes
@@ -26,7 +26,7 @@ namespace XEngine::Gfx::HAL::BlobFormat::Data
 
 	struct DescriptorSetLayoutBlobSubHeader // 8 bytes
 	{
-		uint32 sourceHash;
+		uint32 hash;
 		uint16 bindingCount;
 		uint16 _padding0;
 	};
@@ -41,20 +41,20 @@ namespace XEngine::Gfx::HAL::BlobFormat::Data
 	};
 	static_assert(sizeof(DescriptorSetBindingRecord) == 12);
 
-	struct PipelineLayoutBlobSubHeader // 8 bytes
+	struct PipelineBindingLayoutBlobSubHeader // 8 bytes
 	{
-		uint32 sourceHash;
+		uint32 hash;
 		uint16 bindingCount;
 		uint16 platformDataSize;
 	};
-	static_assert(sizeof(PipelineLayoutBlobSubHeader) == 8);
+	static_assert(sizeof(PipelineBindingLayoutBlobSubHeader) == 8);
 
 	struct PipelineBindingRecord // 16 bytes
 	{
 		// [0..8)
 		uint64 nameXSH;
 		// [8..12)
-		uint32 descriptorSetLayoutSourceHash;
+		uint32 descriptorSetLayoutHash;
 		// [12..14)
 		uint16 d3dRootParameterIndex;
 		// [14..15)
@@ -66,7 +66,7 @@ namespace XEngine::Gfx::HAL::BlobFormat::Data
 
 	struct ShaderBlobSubHeader // 8 bytes
 	{
-		uint32 pipelineLayoutSourceHash;
+		uint32 pipelineBindingLayoutHash;
 		uint16 bytecodeSizeLo16;
 		uint8 bytecodeSizeHi8;
 		ShaderType shaderType;
@@ -81,7 +81,7 @@ namespace XEngine::Gfx::HAL::BlobFormat
 	struct DescriptorSetLayoutBlobInfo
 	{
 		uint16 bindingCount;
-		uint32 sourceHash;
+		uint32 hash;
 	};
 
 	struct DescriptorSetBindingInfo
@@ -131,13 +131,13 @@ namespace XEngine::Gfx::HAL::BlobFormat
 	};
 
 
-	// Pipeline layout blob ////////////////////////////////////////////////////////////////////////
+	// Pipeline binding layout blob ////////////////////////////////////////////////////////////////
 
-	struct PipelineLayoutBlobInfo
+	struct PipelineBindingLayoutBlobInfo
 	{
 		uint16 bindingCount;
 		uint32 platformDataSize;
-		uint32 sourceHash;
+		uint32 hash;
 	};
 
 	struct PipelineBindingInfo
@@ -149,27 +149,27 @@ namespace XEngine::Gfx::HAL::BlobFormat
 		union
 		{
 			uint8 inplaceConstantCount;
-			uint32 descriptorSetLayoutSourceHash;
+			uint32 descriptorSetLayoutHash;
 		};
 	};
 
-	class PipelineLayoutBlobWriter
+	class PipelineBindingLayoutBlobWriter
 	{
 	private:
-		PipelineLayoutBlobInfo blobInfo = {};
+		PipelineBindingLayoutBlobInfo blobInfo = {};
 		uint32 blobSize = 0;
 
 		void* blobMemory = nullptr;
 
-		Data::PipelineLayoutBlobSubHeader* subHeader = nullptr;
+		Data::PipelineBindingLayoutBlobSubHeader* subHeader = nullptr;
 		Data::PipelineBindingRecord* bindingRecords = nullptr;
 		void* platformData = nullptr;
 
 	public:
-		PipelineLayoutBlobWriter() = default;
-		~PipelineLayoutBlobWriter() = default;
+		PipelineBindingLayoutBlobWriter() = default;
+		~PipelineBindingLayoutBlobWriter() = default;
 
-		void setup(const PipelineLayoutBlobInfo& blobInfo);
+		void setup(const PipelineBindingLayoutBlobInfo& blobInfo);
 
 		uint32 getBlobSize() const { return blobSize; }
 		void setBlobMemory(void* memory, uint32 memorySize);
@@ -179,19 +179,19 @@ namespace XEngine::Gfx::HAL::BlobFormat
 		void finalize();
 	};
 
-	class PipelineLayoutBlobReader
+	class PipelineBindingLayoutBlobReader
 	{
 	private:
-		const Data::PipelineLayoutBlobSubHeader* subHeader = nullptr;
+		const Data::PipelineBindingLayoutBlobSubHeader* subHeader = nullptr;
 		const Data::PipelineBindingRecord* bindingRecords = nullptr;
 		const void* platformData = nullptr;
 
 	public:
-		PipelineLayoutBlobReader() = default;
-		~PipelineLayoutBlobReader() = default;
+		PipelineBindingLayoutBlobReader() = default;
+		~PipelineBindingLayoutBlobReader() = default;
 
 		bool open(const void* data, uint32 size);
-		PipelineLayoutBlobInfo getBlobInfo() const;
+		PipelineBindingLayoutBlobInfo getBlobInfo() const;
 		PipelineBindingInfo getBindingInfo(uint16 bindingIndex) const;
 		const void* getPlatformDataPtr() const { return platformData; }
 	};
@@ -201,7 +201,7 @@ namespace XEngine::Gfx::HAL::BlobFormat
 
 	struct ShaderBlobInfo
 	{
-		uint32 pipelineLayoutSourceHash;
+		uint32 pipelineBindingLayoutHash;
 		uint32 bytecodeSize;
 		ShaderType shaderType;
 	};

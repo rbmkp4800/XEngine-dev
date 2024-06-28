@@ -164,16 +164,16 @@ DescriptorSetLayoutRef DescriptorSetLayout::Create(const DescriptorSetBindingDes
 		}
 	}
 
-	// Calculate source hash.
-	uint32 sourceHash = 0;
+	// Calculate hash.
+	uint32 hash = 0;
 	{
-		XTODO("Calculate descriptor set layout source hash")
+		XTODO("Calculate descriptor set layout hash")
 		// ...
 	}
 
 	BlobFormat::DescriptorSetLayoutBlobInfo blobInfo = {};
 	blobInfo.bindingCount = bindingCount;
-	blobInfo.sourceHash = sourceHash;
+	blobInfo.hash = hash;
 
 	BlobFormat::DescriptorSetLayoutBlobWriter blobWriter;
 	blobWriter.setup(blobInfo);
@@ -211,7 +211,7 @@ DescriptorSetLayoutRef DescriptorSetLayout::Create(const DescriptorSetBindingDes
 		resultObject.namesBuffer = StringViewASCII(namesBuffer, namesBufferSize);
 		resultObject.blobData = blobData;
 		resultObject.blobSize = blobSize;
-		resultObject.sourceHash = sourceHash;
+		resultObject.hash = hash;
 		resultObject.descriptorCount = descriptorCount;
 		resultObject.bindingCount = bindingCount;
 	}
@@ -253,9 +253,9 @@ DescriptorSetLayoutRef DescriptorSetLayout::Create(const DescriptorSetBindingDes
 }
 
 
-// PipelineLayout //////////////////////////////////////////////////////////////////////////////////
+// PipelineBindingLayout ///////////////////////////////////////////////////////////////////////////
 
-struct PipelineLayout::InternalBindingDesc
+struct PipelineBindingLayout::InternalBindingDesc
 {
 	uint16 nameOffset;
 	uint16 nameLength;
@@ -263,14 +263,14 @@ struct PipelineLayout::InternalBindingDesc
 	PipelineBindingType type;
 };
 
-struct PipelineLayout::InternalStaticSamplerDesc
+struct PipelineBindingLayout::InternalStaticSamplerDesc
 {
 	uint16 bindingNameOffset;
 	uint16 bindingNameLength;
 	uint32 baseShaderRegister;
 };
 
-sint16 PipelineLayout::findBinding(StringViewASCII name) const
+sint16 PipelineBindingLayout::findBinding(StringViewASCII name) const
 {
 	for (uint16 i = 0; i < bindingCount; i++)
 	{
@@ -280,7 +280,7 @@ sint16 PipelineLayout::findBinding(StringViewASCII name) const
 	return -1;
 }
 
-sint16 PipelineLayout::findStaticSampler(StringViewASCII bindingName) const
+sint16 PipelineBindingLayout::findStaticSampler(StringViewASCII bindingName) const
 {
 	for (uint16 i = 0; i < staticSamplerCount; i++)
 	{
@@ -290,7 +290,7 @@ sint16 PipelineLayout::findStaticSampler(StringViewASCII bindingName) const
 	return -1;
 }
 
-PipelineBindingDesc PipelineLayout::getBindingDesc(uint16 bindingIndex) const
+PipelineBindingDesc PipelineBindingLayout::getBindingDesc(uint16 bindingIndex) const
 {
 	XAssert(bindingIndex < bindingCount);
 	const InternalBindingDesc& internalDesc = bindings[bindingIndex];
@@ -301,19 +301,19 @@ PipelineBindingDesc PipelineLayout::getBindingDesc(uint16 bindingIndex) const
 	return result;
 }
 
-uint32 PipelineLayout::getBindingBaseShaderRegister(uint16 bindingIndex) const
+uint32 PipelineBindingLayout::getBindingBaseShaderRegister(uint16 bindingIndex) const
 {
 	XAssert(bindingIndex < bindingCount);
 	return bindings[bindingIndex].baseShaderRegister;
 }
 
-uint32 PipelineLayout::getStaticSamplerShaderRegister(uint16 staticSamplerIndex) const
+uint32 PipelineBindingLayout::getStaticSamplerShaderRegister(uint16 staticSamplerIndex) const
 {
 	XAssert(staticSamplerIndex < staticSamplerCount);
 	return staticSamplers[staticSamplerIndex].baseShaderRegister;
 }
 
-PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, uint16 bindingCount,
+PipelineBindingLayoutRef PipelineBindingLayout::Create(const PipelineBindingDesc* bindings, uint16 bindingCount,
 	const StaticSamplerDesc* staticSamplers, uint16 staticSamplerCount, GenericErrorMessage& errorMessage)
 {
 	// NOTE: I am retarded, so I put all the data in a single heap allocation :autistic_face:
@@ -439,10 +439,10 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 		}
 	}
 
-	// Calculate source hash.
-	uint32 sourceHash = 0;
+	// Calculate hash.
+	uint32 hash = 0;
 	{
-		XTODO("Calculate pipeline layout source hash")
+		XTODO("Calculate pipeline binding layout hash")
 		// ...
 	}
 
@@ -590,24 +590,24 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 	const void* platformData = d3dRootSignature->GetBufferPointer();
 	const uint32 platformDataSize = XCheckedCastU32(d3dRootSignature->GetBufferSize());
 
-	BlobFormat::PipelineLayoutBlobInfo blobInfo = {};
+	BlobFormat::PipelineBindingLayoutBlobInfo blobInfo = {};
 	blobInfo.bindingCount = bindingCount;
 	blobInfo.platformDataSize = platformDataSize;
-	blobInfo.sourceHash = sourceHash;
+	blobInfo.hash = hash;
 
-	BlobFormat::PipelineLayoutBlobWriter blobWriter;
+	BlobFormat::PipelineBindingLayoutBlobWriter blobWriter;
 	blobWriter.setup(blobInfo);
 	const uint32 blobSize = blobWriter.getBlobSize();
 
 	// Calculate required memory block size.
-	uint32 memoryBlockSizeAccum = sizeof(PipelineLayout);
+	uint32 memoryBlockSizeAccum = sizeof(PipelineBindingLayout);
 	memoryBlockSizeAccum = alignUp<uint32>(memoryBlockSizeAccum, 16);
 
 	const uint32 internalBindingsRelativeOffset = memoryBlockSizeAccum;
-	memoryBlockSizeAccum += sizeof(PipelineLayout::InternalBindingDesc) * bindingCount;
+	memoryBlockSizeAccum += sizeof(PipelineBindingLayout::InternalBindingDesc) * bindingCount;
 
 	const uint32 staticSamplersRelativeOffset = memoryBlockSizeAccum;
-	memoryBlockSizeAccum += sizeof(PipelineLayout::InternalStaticSamplerDesc) * staticSamplerCount;
+	memoryBlockSizeAccum += sizeof(PipelineBindingLayout::InternalStaticSamplerDesc) * staticSamplerCount;
 
 	const uint32 namesBufferRelativeOffset = memoryBlockSizeAccum;
 	memoryBlockSizeAccum += namesBufferSize;
@@ -622,9 +622,9 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 	memorySet(memoryBlock, 0, memoryBlockSize); // Just in case.
 
 	// Populate memory block.
-	PipelineLayout& resultObject = *(PipelineLayout*)memoryBlock;
-	PipelineLayout::InternalBindingDesc* internalBindings = (PipelineLayout::InternalBindingDesc*)(uintptr(memoryBlock) + internalBindingsRelativeOffset);
-	PipelineLayout::InternalStaticSamplerDesc* internalStaticSamplers = (PipelineLayout::InternalStaticSamplerDesc*)(uintptr(memoryBlock) + staticSamplersRelativeOffset);
+	PipelineBindingLayout& resultObject = *(PipelineBindingLayout*)memoryBlock;
+	PipelineBindingLayout::InternalBindingDesc* internalBindings = (PipelineBindingLayout::InternalBindingDesc*)(uintptr(memoryBlock) + internalBindingsRelativeOffset);
+	PipelineBindingLayout::InternalStaticSamplerDesc* internalStaticSamplers = (PipelineBindingLayout::InternalStaticSamplerDesc*)(uintptr(memoryBlock) + staticSamplersRelativeOffset);
 	char* namesBuffer = (char*)(uintptr(memoryBlock) + namesBufferRelativeOffset);
 	void* blobData = (void*)(uintptr(memoryBlock) + blobDataRelativeOffset);
 
@@ -636,7 +636,7 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 		resultObject.namesBuffer = StringViewASCII(namesBuffer, namesBufferSize);
 		resultObject.blobData = blobData;
 		resultObject.blobSize = blobSize;
-		resultObject.sourceHash = sourceHash;
+		resultObject.hash = hash;
 		resultObject.bindingCount = bindingCount;
 		resultObject.staticSamplerCount = staticSamplerCount;
 	}
@@ -645,7 +645,7 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 	for (uint16 i = 0; i < bindingCount; i++)
 	{
 		const PipelineBindingDesc& src = bindings[i];
-		PipelineLayout::InternalBindingDesc& dst = internalBindings[i];
+		PipelineBindingLayout::InternalBindingDesc& dst = internalBindings[i];
 
 		dst.nameOffset = bindingsDeducedInfo[i].nameOffset;
 		dst.nameLength = XCheckedCastU16(src.name.getLength());
@@ -663,7 +663,7 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 	for (uint16 i = 0; i < staticSamplerCount; i++)
 	{
 		const StaticSamplerDesc& src = staticSamplers[i];
-		PipelineLayout::InternalStaticSamplerDesc& dst = internalStaticSamplers[i];
+		PipelineBindingLayout::InternalStaticSamplerDesc& dst = internalStaticSamplers[i];
 
 		dst.bindingNameOffset = staticSamplersDeducedInfo[i].nameOffset;
 		dst.bindingNameLength = XCheckedCastU16(src.bindingName.getLength());
@@ -685,7 +685,7 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 			blobBindingInfo.d3dRootParameterIndex = bindingsDeducedInfo[i].d3dRootParameterIndex;
 			blobBindingInfo.type = binding.type;
 			if (binding.type == PipelineBindingType::DescriptorSet)
-				blobBindingInfo.descriptorSetLayoutSourceHash = binding.descriptorSetLayout->getSourceHash();
+				blobBindingInfo.descriptorSetLayoutHash = binding.descriptorSetLayout->getHash();
 
 			blobWriter.writeBindingInfo(i, blobBindingInfo);
 		}
@@ -693,7 +693,7 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 		blobWriter.finalize();
 	}
 
-	return PipelineLayoutRef(&resultObject);
+	return PipelineBindingLayoutRef(&resultObject);
 }
 
 
@@ -795,7 +795,7 @@ bool ShaderCompiler::ValidateShaderEntryPointName(StringViewASCII name)
 }
 
 ShaderCompilationResultRef ShaderCompiler::CompileShader(XLib::StringViewASCII mainSourceFilename,
-	const ShaderCompilationArgs& args, const PipelineLayout& pipelineLayout,
+	const ShaderCompilationArgs& args, const PipelineBindingLayout& pipelineBindingLayout,
 	SourceResolverFunc sourceResolverFunc, void* sourceResolverContext)
 {
 	wchar mainSourceFilenameW[2048] = {};
@@ -905,7 +905,7 @@ ShaderCompilationResultRef ShaderCompiler::CompileShader(XLib::StringViewASCII m
 			dxcPreprocessedSourceBlob->GetStringPointer(), dxcPreprocessedSourceBlob->GetStringLength());
 
 		HLSLPatcher::Error hlslPatcherError = {};
-		if (!HLSLPatcher::Patch(preprocessedSource, pipelineLayout, patchedSource, hlslPatcherError))
+		if (!HLSLPatcher::Patch(preprocessedSource, pipelineBindingLayout, patchedSource, hlslPatcherError))
 		{
 			XTODO(__FUNCTION__": HLSL patching: cursor location is invalid due to preprocessing. Parse #line directives");
 
@@ -1001,7 +1001,7 @@ ShaderCompilationResultRef ShaderCompiler::CompileShader(XLib::StringViewASCII m
 
 		// Compose bytecode blob
 		BlobFormat::ShaderBlobInfo blobInfo = {};
-		blobInfo.pipelineLayoutSourceHash = pipelineLayout.getSourceHash();
+		blobInfo.pipelineBindingLayoutHash = pipelineBindingLayout.getHash();
 		blobInfo.bytecodeSize = bytecodeSize;
 		blobInfo.shaderType = args.shaderType;
 

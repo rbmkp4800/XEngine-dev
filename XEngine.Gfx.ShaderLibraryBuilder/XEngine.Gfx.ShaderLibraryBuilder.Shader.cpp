@@ -4,7 +4,7 @@ using namespace XLib;
 using namespace XEngine::Gfx::ShaderLibraryBuilder;
 
 ShaderRef Shader::Create(StringViewASCII name, uint64 nameXSH,
-	HAL::ShaderCompiler::PipelineLayout* pipelineLayout, uint64 pipelineLayoutNameXSH,
+	HAL::ShaderCompiler::PipelineBindingLayout* pipelineBindingLayout, uint64 pipelineBindingLayoutNameXSH,
 	XLib::StringViewASCII mainSourceFilename, const HAL::ShaderCompiler::ShaderCompilationArgs& compilationArgs)
 {
 	// I should not be allowed to code. Sorry :(
@@ -32,8 +32,8 @@ ShaderRef Shader::Create(StringViewASCII name, uint64 nameXSH,
 	construct(resultObject);
 	resultObject.name = StringViewASCII((char*)memoryBlock + nameStrOffset, name.getLength());
 	resultObject.nameXSH = nameXSH;
-	resultObject.pipelineLayout = pipelineLayout;
-	resultObject.pipelineLayoutNameXSH = pipelineLayoutNameXSH;
+	resultObject.pipelineBindingLayout = pipelineBindingLayout;
+	resultObject.pipelineBindingLayoutNameXSH = pipelineBindingLayoutNameXSH;
 	resultObject.mainSourceFilename = StringViewASCII((char*)memoryBlock + mainSourceFilenameStrOffset, mainSourceFilename.getLength());
 	resultObject.compilationArgs.entryPointName = StringViewASCII((char*)memoryBlock + entryPointNameStrOffset, compilationArgs.entryPointName.getLength());
 	resultObject.compilationArgs.shaderType = compilationArgs.shaderType;

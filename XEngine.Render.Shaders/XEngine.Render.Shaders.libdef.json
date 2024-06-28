@@ -3,7 +3,7 @@
 		"type": "static_sampler",
 		"filter": "linear",
 		"reduction": "weighted_avg",
-		"address": "wrap",
+		"address": "wrap"
 		//"lod_min": 0,
 		//"lod_max": 1,
 		//"lod_bias": 0
@@ -26,17 +26,20 @@
 	"Test.DescriptorSetLayout": {
 		"type": "descriptor_set_layout",
 		"bindings": {
-			"TEST_TEXTURE" : { "type": "read_only_texture_descriptor" }
+			"TEST_TEXTURE": { "type": "read_only_texture_descriptor" }
 		}
 	},
 
-	"Test.PipelineLayout" : {
-		"type": "pipeline_layout",
+	"Test.PipelineBindingLayout": {
+		"type": "pipeline_binding_layout",
 		"bindings": {
-			"SOME_CONSTANT_BUFFER":	{ "type": "constant_buffer" },
-			"SOME_BUFFER":			{ "type": "read_only_buffer" },
-			"SOME_RW_BUFFER" :		{ "type": "read_write_buffer" },
-			"TEST_DS" :				{ "type": "descriptor_set", "dsl": "Test.DescriptorSetLayout" },
+			"SOME_CONSTANT_BUFFER": { "type": "constant_buffer" },
+			"SOME_BUFFER": { "type": "read_only_buffer" },
+			"SOME_RW_BUFFER": { "type": "read_write_buffer" },
+			"TEST_DS": {
+				"type": "descriptor_set",
+				"dsl": "Test.DescriptorSetLayout"
+			}
 			//"TEST_SAMPLER":			{ "type": "static_sampler", "static_sampler": "Test.Sampler" }
 		}
 		// "flags" : [ "block_as", "block_ms", "block_vertex_input" ], // Or 'allow' insead of 'block'?
@@ -44,17 +47,17 @@
 
 	"TestVS": {
 		"type": "vertex_shader",
-		"layout": "Test.PipelineLayout",
+		"pipeline_binding_layout": "Test.PipelineBindingLayout",
 		"src": "TestGraphics.hlsl",
-		"entry": "MainVS",
+		"entry": "MainVS"
 		//"vertex_input_layout": "Test.VertexInputLayout",
 	},
 
 	"TestPS": {
 		"type": "pixel_shader",
-		"layout": "Test.PipelineLayout",
+		"pipeline_binding_layout": "Test.PipelineBindingLayout",
 		"src": "TestGraphics.hlsl",
-		"entry": "MainPS",
+		"entry": "MainPS"
 
 		//"color_rts": [ "R8G8B8A8_UNORM" ],
 		//"depth_stencil_rt": "D16",
@@ -64,11 +67,11 @@
 			"MYVARIATION0": "DEF_A=0;DEF_B;DEF_C=ASD",
 			"MYVARIATION1": "DEF_A=0;DEF_B;DEF_C=ASD",
 		},*/
-	},
+	}
 
 	/*"Test.GraphicsPipeline": {
 		"type": "graphics_pipeline",
-		"layout": "Test.PipelineLayout",
+		"pipeline_binding_layout": "Test.PipelineBindingLayout",
 		"vertex_input_layout": "Test.VertexInputLayout",
 		"vs": { "path": "TestGraphics.hlsl", "entry": "MainVS" },
 		"ps": { "path": "TestGraphics.hlsl", "entry": "MainPS" },
@@ -78,7 +81,7 @@
 
 	"Test.ComputePipeline": {
 		"type": "compute_pipeline",
-		"layout": "Test.PipelineLayout",
+		"pipeline_binding_layout": "Test.PipelineBindingLayout",
 		"cs": { "path": "TestCompute.hlsl", "entry" :"MainCS" }
 	}*/
-	}
+}

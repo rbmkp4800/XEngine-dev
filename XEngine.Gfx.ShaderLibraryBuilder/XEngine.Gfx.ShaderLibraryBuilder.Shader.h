@@ -15,8 +15,8 @@ namespace XEngine::Gfx::ShaderLibraryBuilder
 		XLib::StringViewASCII name;
 		uint64 nameXSH = 0;
 
-		HAL::ShaderCompiler::PipelineLayoutRef pipelineLayout = nullptr;
-		uint64 pipelineLayoutNameXSH = 0;
+		HAL::ShaderCompiler::PipelineBindingLayoutRef pipelineBindingLayout = nullptr;
+		uint64 pipelineBindingLayoutNameXSH = 0;
 
 		XLib::StringViewASCII mainSourceFilename;
 		HAL::ShaderCompiler::ShaderCompilationArgs compilationArgs = {};
@@ -30,8 +30,8 @@ namespace XEngine::Gfx::ShaderLibraryBuilder
 		inline XLib::StringViewASCII getName() const { return name; }
 		inline uint64 getNameXSH() const { return nameXSH; }
 
-		inline const HAL::ShaderCompiler::PipelineLayout& getPipelineLayout() const { return *pipelineLayout.get(); }
-		inline uint64 getPipelineLayoutNameXSH() const { return pipelineLayoutNameXSH; }
+		inline const HAL::ShaderCompiler::PipelineBindingLayout& getPipelineBindingLayout() const { return *pipelineBindingLayout.get(); }
+		inline uint64 getPipelineBindingLayoutNameXSH() const { return pipelineBindingLayoutNameXSH; }
 
 		inline XLib::StringViewASCII getMainSourceFilename() const { return mainSourceFilename; }
 		inline const HAL::ShaderCompiler::ShaderCompilationArgs& getCompilationArgs() const { return compilationArgs; }
@@ -41,7 +41,7 @@ namespace XEngine::Gfx::ShaderLibraryBuilder
 
 	public:
 		static ShaderRef Create(XLib::StringViewASCII name, uint64 nameXSH,
-			HAL::ShaderCompiler::PipelineLayout* pipelineLayout, uint64 pipelineLayoutNameXSH,
+			HAL::ShaderCompiler::PipelineBindingLayout* pipelineBindingLayout, uint64 pipelineBindingLayoutNameXSH,
 			XLib::StringViewASCII mainSourceFilename, const HAL::ShaderCompiler::ShaderCompilationArgs& compilationArgs);
 	};
 }

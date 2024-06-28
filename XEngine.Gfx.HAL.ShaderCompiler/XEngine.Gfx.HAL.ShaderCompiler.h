@@ -21,12 +21,12 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 	constexpr uint32 StartShaderRegiserIndex = 1000;
 
 	class DescriptorSetLayout;
-	class PipelineLayout;
+	class PipelineBindingLayout;
 	class Blob;
 	class ShaderCompilationResult;
 
 	using DescriptorSetLayoutRef = XLib::RefCountedPtr<DescriptorSetLayout>;
-	using PipelineLayoutRef = XLib::RefCountedPtr<PipelineLayout>;
+	using PipelineBindingLayoutRef = XLib::RefCountedPtr<PipelineBindingLayout>;
 	using BlobRef = XLib::RefCountedPtr<Blob>;
 	using ShaderCompilationResultRef = XLib::RefCountedPtr<ShaderCompilationResult>;
 
@@ -35,8 +35,6 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 		Undefined = 0,
 		D3D12,
 		Vulkan,
-		//Scarlett,
-		//Prospero,
 	};
 
 	struct GenericErrorMessage
@@ -87,7 +85,7 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 		XLib::StringViewASCII namesBuffer;
 		const void* blobData = nullptr;
 		uint32 blobSize = 0;
-		uint32 sourceHash = 0;
+		uint32 hash = 0;
 		uint32 descriptorCount = 0;
 		uint16 bindingCount = 0;
 
@@ -98,7 +96,7 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 	public:
 		inline uint16 getBindingCount() const { return bindingCount; }
 		inline uint32 getDescriptorCount() const { return descriptorCount; }
-		inline uint32 getSourceHash() const { return sourceHash; }
+		inline uint32 getHash() const { return hash; }
 
 		sint16 findBinding(XLib::StringViewASCII name) const; // Returns negative number on failure.
 		DescriptorSetBindingDesc getBindingDesc(uint16 bindingIndex) const;
@@ -112,7 +110,7 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 			GenericErrorMessage& errorMessage);
 	};
 
-	class PipelineLayout final : public XLib::RefCounted
+	class PipelineBindingLayout final : public XLib::RefCounted
 	{
 	private:
 		struct InternalBindingDesc;
@@ -127,17 +125,17 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 		XLib::StringViewASCII namesBuffer;
 		const void* blobData = nullptr;
 		uint32 blobSize = 0;
-		uint32 sourceHash = 0;
+		uint32 hash = 0;
 		uint16 bindingCount = 0;
 		uint16 staticSamplerCount = 0;
 
 	private:
-		PipelineLayout() = default;
-		virtual ~PipelineLayout() override = default;
+		PipelineBindingLayout() = default;
+		virtual ~PipelineBindingLayout() override = default;
 
 	public:
 		inline uint16 getBindingCount() const { return bindingCount; }
-		inline uint32 getSourceHash() const { return sourceHash; }
+		inline uint32 getHash() const { return hash; }
 
 		sint16 findBinding(XLib::StringViewASCII name) const; // Returns negative number on failure.
 		sint16 findStaticSampler(XLib::StringViewASCII bindingName) const; // Returns negative number on failure.
@@ -149,7 +147,7 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 		inline uint32 getBlobSize() const { return blobSize; }
 
 	public:
-		static PipelineLayoutRef Create(const PipelineBindingDesc* bindings, uint16 bindingCount,
+		static PipelineBindingLayoutRef Create(const PipelineBindingDesc* bindings, uint16 bindingCount,
 			const StaticSamplerDesc* staticSamplers, uint16 staticSamplerCount,
 			GenericErrorMessage& errorMessage);
 	};
@@ -241,6 +239,6 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 	bool ValidateShaderEntryPointName(XLib::StringViewASCII name);
 
 	ShaderCompilationResultRef CompileShader(XLib::StringViewASCII mainSourceFilename,
-		const ShaderCompilationArgs& args, const PipelineLayout& pipelineLayout,
+		const ShaderCompilationArgs& args, const PipelineBindingLayout& pipelineBindingLayout,
 		SourceResolverFunc sourceResolverFunc, void* sourceResolverContext = nullptr);
 }

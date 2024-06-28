@@ -45,10 +45,10 @@ namespace XEngine::Gfx::ShaderLibraryBuilder
 
 		bool readStaticSampler(XLib::StringViewASCII staticSamplerName, Cursor jsonStaticSamplerNameCursor);
 		bool readDescriptorSetLayout(XLib::StringViewASCII descriptorSetLayoutName, Cursor jsonDescriptorSetLayoutNameCursor);
-		bool readPipelineLayout(XLib::StringViewASCII pipelineLayoutName, Cursor jsonPipelineLayoutNameCursor);
+		bool readPipelineBindingLayout(XLib::StringViewASCII pipelineBindingLayoutName, Cursor jsonPipelineBindingLayoutNameCursor);
 		bool readShader(XLib::StringViewASCII shaderName, Cursor jsonShaderNameCursor, HAL::ShaderType shaderType);
 
-		bool readPipelineLayoutSetupProperty(HAL::ShaderCompiler::PipelineLayoutRef& resultPipelineLayout, uint64& resultPipelineLayoutNameXSH);
+		bool readPipelineBindingLayoutSetupProperty(HAL::ShaderCompiler::PipelineBindingLayoutRef& resultPipelineBindingLayout, uint64& resultPipelineBindingLayoutNameXSH);
 
 		inline Cursor getJSONCursor() const { return Cursor { jsonReader.getLineNumer(), jsonReader.getColumnNumer() }; };
 
