@@ -1,3 +1,137 @@
+
+#include <XLib.h>
+#include <XLib.Vectors.h>
+#include <XLib.Math.h>
+#include <XLib.Math.Matrix4x4.h>
+#include <XEngine.Gfx.HAL.D3D12.h>
+#include <XEngine.Gfx.ShaderLibraryLoader.h>
+#include <XEngine.Gfx.Allocation.h>
+#include <XEngine.Render.SceneRenderer.h>
+#include <XEngine.System.h>
+
+using namespace XLib;
+using namespace XEngine;
+
+class Game0 : public System::InputHandler
+{
+private:
+	System::Window window;
+
+	Gfx::HAL::Device gfxHwDevice;
+	Gfx::HAL::CommandAllocatorHandle gfxHwCommandAllocator = {};
+	Gfx::HAL::DescriptorAllocatorHandle gfxHwDescriptorAllocator = {};
+	Gfx::HAL::OutputHandle gfxHwOutput = {};
+
+	Gfx::CircularUploadMemoryAllocator gfxUploadMemoryAllocator;
+	Gfx::Scheduler::TransientResourceCache gfxSchTransientResourceCache;
+	Gfx::Scheduler::TaskGraph gfxSchTaskGraph;
+
+	Gfx::ShaderLibraryLoader gfxShaderLibraryLoader;
+	Render::SceneRenderer sceneRenderer;
+
+	float32x3 cameraPosition = {};
+	float32x2 cameraRotation = {};
+	float32 accum = 0.0f;
+
+protected:
+	virtual void onMouseMove(sint32 deltaX, sint32 deltaY) override;
+	virtual void onMouseButton(System::MouseButton button, bool state) override {}
+	virtual void onScroll(float32 delta) override {}
+	virtual void onKeyboard(System::KeyCode key, bool state) override {}
+	virtual void onCharacter(uint32 characterUTF32) override {}
+	virtual void onCloseRequest() override {}
+
+public:
+	Game0() = default;
+	~Game0() = default;
+
+	void run();
+};
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Game0::onMouseMove(sint32 deltaX, sint32 deltaY)
+{
+	cameraRotation.x += float32(deltaX) * 0.005f;
+	cameraRotation.y -= float32(deltaY) * 0.005f;
+}
+
+void Game0::run()
+{
+	window.create(1600, 900);
+
+	System::RegisterInputHandler(this);
+	//System::SetCursorEnabled(false);
+
+	{
+		Gfx::HAL::DeviceSettings gfxHwDeviceSettings = {};
+		gfxHwDeviceSettings.maxCommandAllocatorCount = 4;
+		gfxHwDeviceSettings.maxDescriptorAllocatorCount = 4;
+		gfxHwDeviceSettings.maxCommandListCount = 4;
+		gfxHwDeviceSettings.maxMemoryAllocationCount = 1024;
+		gfxHwDeviceSettings.maxResourceCount = 1024;
+		gfxHwDeviceSettings.maxDescriptorSetLayoutCount = 64;
+		gfxHwDeviceSettings.maxPipelineLayoutCount = 64;
+		gfxHwDeviceSettings.maxShaderCount = 64;
+		gfxHwDeviceSettings.maxCompositePipelineCount = 64;
+		gfxHwDeviceSettings.maxOutputCount = 4;
+		gfxHwDeviceSettings.bindlessDescriptorPoolSize = 16;
+		gfxHwDevice.initialize(gfxHwDeviceSettings);
+	}
+
+	gfxHwCommandAllocator = gfxHwDevice.createCommandAllocator();
+	gfxHwDescriptorAllocator = gfxHwDevice.createDescriptorAllocator();
+	gfxHwOutput = gfxHwDevice.createWindowOutput(1600, 900, window.getHandle());
+
+	gfxUploadMemoryAllocator.initialize(gfxHwDevice, 16);
+	gfxSchTransientResourceCache.initialize(gfxHwDevice);
+	gfxSchTaskGraph.initialize();
+
+	gfxShaderLibraryLoader.load("XEngine.Render.Shaders.xeslib", gfxHwDevice);
+	sceneRenderer.initialize(gfxHwDevice);
+
+	for (;;)
+	{
+		gfxSchTaskGraph.open(gfxHwDevice, gfxSchTransientResourceCache);
+		{
+			const Gfx::HAL::TextureHandle gfxHwCurrentBackBuffer = gfxHwDevice.getOutputCurrentBackBuffer(gfxHwOutput);
+			const Gfx::Scheduler::TextureHandle gfxSchCurrentBackBuffer =
+				gfxSchTaskGraph.importExternalTexture(gfxHwCurrentBackBuffer, Gfx::HAL::TextureLayout::Present);
+
+			sceneRenderer.render(gfxSchTaskGraph, gfxSchCurrentBackBuffer);
+		}
+		gfxSchTaskGraph.closeAndCompile();
+		gfxSchTaskGraph.execute(gfxHwCommandAllocator, gfxHwDescriptorAllocator, gfxUploadMemoryAllocator);
+
+		const Gfx::HAL::DeviceQueueSyncPoint gfxHwFrameEndSyncPoint =
+			gfxHwDevice.getEndOfQueueSyncPoint(Gfx::HAL::DeviceQueue::Graphics);
+		while (!gfxHwDevice.isQueueSyncPointReached(gfxHwFrameEndSyncPoint))
+			{ }
+
+		gfxHwDevice.resetCommandAllocator(gfxHwCommandAllocator);
+		gfxHwDevice.resetDescriptorAllocator(gfxHwDescriptorAllocator);
+	}
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int __stdcall WinMain(void*, void*, char*, int)
+{
+	Game0 game0;
+	game0.run();
+	return 0;
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#if 0
+
 #include <XLib.h>
 #include <XLib.Vectors.h>
 #include <XLib.Math.h>
@@ -310,3 +444,5 @@ int __stdcall WinMain(void*, void*, char*, int)
 	game0.run();
 	return 0;
 }
+
+#endif

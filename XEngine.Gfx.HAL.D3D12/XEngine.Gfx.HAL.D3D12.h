@@ -49,7 +49,7 @@ namespace XEngine::Gfx::HAL
 
 	enum class CommandAllocatorHandle		: uint32 { Zero = 0 };
 	enum class DescriptorAllocatorHandle	: uint32 { Zero = 0 };
-	enum class DeviceMemoryAllocationHandle	: uint32 { Zero = 0 };
+	enum class DeviceMemoryHandle			: uint32 { Zero = 0 };
 	enum class BufferHandle					: uint32 { Zero = 0 };
 	enum class TextureHandle				: uint32 { Zero = 0 };
 	enum class DescriptorSetLayoutHandle	: uint32 { Zero = 0 };
@@ -73,17 +73,18 @@ namespace XEngine::Gfx::HAL
 
 	static constexpr uint8 DeviceQueueCount = uint8(DeviceQueue::ValueCount);
 
-	struct ResourceAllocationInfo
-	{
-		uint64 size;
-		uint64 alignment; // TODO: Remove this. It should be well known constant (inc user provided tiling).
-	};
-
-	enum class ResourceType
+	enum class ResourceType : uint8
 	{
 		Undefined = 0,
 		Buffer,
 		Texture,
+	};
+
+	enum class ResourceAlignmentRequirement : uint8
+	{
+		Undefined = 0,
+		_4kib,
+		_64kib,
 	};
 
 	enum class StagingBufferAccessMode : uint8
@@ -99,6 +100,12 @@ namespace XEngine::Gfx::HAL
 		Texture1D,
 		Texture2D,
 		Texture3D,
+	};
+
+	struct ResourceMemoryRequirements
+	{
+		uint64 size;
+		ResourceAlignmentRequirement alignment;
 	};
 
 	struct TextureDesc
@@ -415,6 +422,7 @@ namespace XEngine::Gfx::HAL
 		uint16x3 size;
 	};
 
+
 	class CommandList : public XLib::NonCopyable
 	{
 		friend Device;
@@ -429,7 +437,7 @@ namespace XEngine::Gfx::HAL
 		Device* device = nullptr;
 		ID3D12GraphicsCommandList10* d3dCommandList = nullptr;
 		uint32 deviceCommandListHandle = 0;
-		CommandAllocatorHandle commandAllocatorHandle = CommandAllocatorHandle::Zero;
+		CommandAllocatorHandle commandAllocatorHandle = {};
 
 		uint16 rtvHeapOffset = 0;
 		uint16 dsvHeapOffset = 0;
@@ -437,7 +445,7 @@ namespace XEngine::Gfx::HAL
 		CommandListType type = CommandListType::Undefined;
 		bool isOpen = false;
 
-		PipelineLayoutHandle currentPipelineLayoutHandle = PipelineLayoutHandle::Zero;
+		PipelineLayoutHandle currentPipelineLayoutHandle = {};
 		PipelineType currentPipelineType = PipelineType::Undefined;
 		uint8 setColorRenderTargetCount = 0;
 		bool isDepthStencilRenderTargetSet = false;
@@ -477,9 +485,9 @@ namespace XEngine::Gfx::HAL
 		void dispatchMesh();
 		void dispatch(uint32 groupCountX, uint32 groupCountY = 1, uint32 groupCountZ = 1);
 
-		//void globalMemoryBarrier(
-		//	BarrierSync syncBefore, BarrierSync syncAfter,
-		//	BarrierAccess accessBefore, BarrierAccess accessAfter);
+		void globalMemoryBarrier(
+			BarrierSync syncBefore, BarrierSync syncAfter,
+			BarrierAccess accessBefore, BarrierAccess accessAfter);
 		void bufferMemoryBarrier(BufferHandle bufferHandle,
 			BarrierSync syncBefore, BarrierSync syncAfter,
 			BarrierAccess accessBefore, BarrierAccess accessAfter);
@@ -501,6 +509,7 @@ namespace XEngine::Gfx::HAL
 		//void pushDebugMarker(const char* name);
 		//void popDebugMarker();
 	};
+
 
 	struct DeviceSettings
 	{
@@ -657,15 +666,15 @@ namespace XEngine::Gfx::HAL
 		DescriptorAllocatorHandle createDescriptorAllocator();
 		void destroyDescriptorAllocator(DescriptorAllocatorHandle descriptorAllocatorHandle);
 
-		DeviceMemoryAllocationHandle allocateDeviceMemory(uint64 size, bool hostVisible);
-		void releaseDeviceMemory(DeviceMemoryAllocationHandle deviceMemoryHandle);
+		DeviceMemoryHandle allocateDeviceMemory(uint64 size, bool hostVisible = false);
+		void releaseDeviceMemory(DeviceMemoryHandle memoryHandle);
 
-		ResourceAllocationInfo getTextureAllocationInfo(const TextureDesc& textureDesc) const;
+		ResourceMemoryRequirements getTextureMemoryRequirements(const TextureDesc& textureDesc) const;
 
 		BufferHandle createBuffer(uint64 size,
-			DeviceMemoryAllocationHandle memoryHandle = DeviceMemoryAllocationHandle::Zero, uint64 memoryOffset = 0);
+			DeviceMemoryHandle memoryHandle = {}, uint64 memoryOffset = 0);
 		TextureHandle createTexture(const TextureDesc& desc, TextureLayout initialLayout,
-			DeviceMemoryAllocationHandle memoryHandle = DeviceMemoryAllocationHandle::Zero, uint64 memoryOffset = 0);
+			DeviceMemoryHandle memoryHandle = {}, uint64 memoryOffset = 0);
 
 		BufferHandle createVirtualBuffer(uint64 size);
 		TextureHandle createVirtualTexture(const TextureDesc& textureDesc);
@@ -713,7 +722,7 @@ namespace XEngine::Gfx::HAL
 		void submitSyncPointWait(DeviceQueue deviceQueue, DeviceQueueSyncPoint syncPoint);
 		HostSignalToken submitHostSignalWait(DeviceQueue deviceQueue);
 
-		DeviceQueueSyncPoint getEndOfQueueSyncPoint(DeviceQueue deviceQueue) const;
+		DeviceQueueSyncPoint getEOPSyncPoint(DeviceQueue deviceQueue) const;
 		bool isQueueSyncPointReached(DeviceQueueSyncPoint syncPoint) const;
 		void emitHostSignal(HostSignalToken signalToken);
 
@@ -722,6 +731,7 @@ namespace XEngine::Gfx::HAL
 		uint16 getDescriptorSetLayoutDescriptorCount(DescriptorSetLayoutHandle descriptorSetLayoutHandle) const;
 
 		TextureHandle getOutputBackBuffer(OutputHandle outputHandle, uint32 backBufferIndex) const;
+		TextureHandle getOutputCurrentBackBuffer(OutputHandle outputHandle) const;
 		uint32 getOutputCurrentBackBufferIndex(OutputHandle outputHandle) const;
 
 		//void setObjectDebugName(uint32 objectHandle, const char* name);
@@ -736,9 +746,19 @@ namespace XEngine::Gfx::HAL
 
 	uint16x3 CalculateMipLevelSize(uint16x3 srcSize, uint8 mipLevel);
 
+	class BarrierSyncUtils abstract final
+	{
+	public:
+		static inline bool IsBufferCompatible(BarrierSync sync);
+		static inline bool IsTextureCompatible(BarrierSync sync);
+	};
+
 	class BarrierAccessUtils abstract final
 	{
 	public:
-		static inline bool IsReadOnly(BarrierAccess barrierAccess);
+		static inline bool IsReadOnly(BarrierAccess access);
+		static inline bool IsBufferCompatible(BarrierAccess access);
+		static inline bool IsTextureCompatible(BarrierAccess access);
+		static inline bool IsCompatibleWithTextureLayout(BarrierAccess access, TextureLayout layout);
 	};
 }

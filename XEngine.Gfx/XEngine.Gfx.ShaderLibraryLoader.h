@@ -2,12 +2,11 @@
 
 #include <XLib.h>
 #include <XLib.NonCopyable.h>
-
 #include <XEngine.Gfx.HAL.D3D12.h>
 
 namespace XEngine::Gfx
 {
-	class ShaderLibrary : public XLib::NonCopyable
+	class ShaderLibraryLoader : public XLib::NonCopyable
 	{
 	private:
 		struct DescriptorSetLayout;
@@ -25,14 +24,13 @@ namespace XEngine::Gfx
 		uint32 shaderCount = 0;
 
 	public:
-		ShaderLibrary() = default;
-		~ShaderLibrary();
+		ShaderLibraryLoader() = default;
+		~ShaderLibraryLoader();
 
-		void load(const char* libraryFilePath, HAL::Device& halDevice);
-		void reload(const char* libraryFilePath, HAL::Device& halDevice);
+		void load(const char* libraryFilePath, HAL::Device& hwDevice);
 
-		HAL::DescriptorSetLayoutHandle getDescriptorSetLayout(uint64 nameXSH) const;
-		HAL::PipelineLayoutHandle getPipelineLayout(uint64 nameXSH) const;
-		HAL::ShaderHandle getShader(uint64 nameXSH) const;
+		static HAL::DescriptorSetLayoutHandle GetDescriptorSetLayout(uint64 nameXSH) const;
+		static HAL::PipelineLayoutHandle GetPipelineLayout(uint64 nameXSH) const;
+		static HAL::ShaderHandle GetShader(uint64 nameXSH) const;
 	};
 }

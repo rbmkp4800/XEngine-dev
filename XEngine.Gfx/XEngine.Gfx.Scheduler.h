@@ -2,21 +2,30 @@
 
 #include <XLib.h>
 #include <XLib.NonCopyable.h>
+
 #include <XEngine.Gfx.HAL.D3D12.h>
 
 #include "XEngine.Gfx.Allocation.h"
 
-// TODO: Split barriers?
+// TODO: Use hashmap or something in `TransientResourceCache` instead of retarded linear search through all entries.
+// TODO: Optimal resource aliasing.
+// TODO: Proper `TransientMemoryPool` implementation with multiple allocations and ability to grow.
+// TODO: Check that there is one and only one dependency between task and resource(subresource).
+// TODO: Check that we do not have duplacete imported resources during `TaskGraph::closeAndCompile` (as a separate validation step).
+// TODO: Implement proper `canOverlapPrecedingShaderWrite` handling.
+// TODO: Implement proper handles.
+
+// TODO: Do something about this `union { textureDesc; bufferSize; };` everywhere. Probably we can drop buffer size and always save resource size.
 
 namespace XEngine::Gfx::Scheduler
 {
-	class Graph;
-	class GraphExecutionContext;
+	class TaskGraph;
+	class TaskExecutionContext;
 
-	enum class BufferHandle : uint32 {};
-	enum class TextureHandle : uint32 {};
+	enum class BufferHandle : uint32 { Zero = 0, };
+	enum class TextureHandle : uint32 { Zero = 0, };
 
-	enum class PassType : uint8
+	enum class TaskType : uint8
 	{
 		None = 0,
 		Graphics,
@@ -24,7 +33,7 @@ namespace XEngine::Gfx::Scheduler
 		Copy,
 	};
 
-	enum class ShaderStage : uint8
+	enum class ResourceShaderAccessStage : uint8
 	{
 		Any = 0,
 		Compute,
@@ -33,192 +42,247 @@ namespace XEngine::Gfx::Scheduler
 		Pixel,
 	};
 
-	using PassExecutorFunc = void(*)(GraphExecutionContext& executionBroker,
-		HAL::Device& device, HAL::CommandList& commandList, const void* userData);
+	using TaskExecutorFunc = void(*)(TaskExecutionContext& executionContext,
+		HAL::Device& hwDevice, HAL::CommandList& hwCommandList, void* userData);
+
+
+	/*class TransientMemoryPool : public XLib::NonCopyable
+	{
+
+	};*/
+
 
 	class TransientResourceCache : public XLib::NonCopyable
 	{
-		friend Graph;
-		friend GraphExecutionContext;
+		friend TaskGraph;
 
 	private:
-		enum class EntryType : uint8;
+		static constexpr uint64 AllocationAlignment = 0x10000;
 
 		struct Entry;
 
-		static constexpr uint32 AllocationAlignment = 0x10000;
-
 	private:
-		HAL::Device* device = nullptr;
-		HAL::DeviceMemoryAllocationHandle deviceMemoryPool = HAL::DeviceMemoryAllocationHandle::Zero;
-		uint64 deviceMemoryPoolSize = 0;
+		HAL::Device* hwDevice = nullptr;
+		HAL::DeviceMemoryHandle hwDeviceMemory = {};
+		uint64 deviceMemorySize = 0;
 
 		Entry* entries = nullptr;
+		uint16 entryPoolSize = 0;
 		uint16 entryCount = 0;
+
+	private:
+		void openUsageCycle();
+		void closeUsageCycle();
+		void setPrevUsageCycleEOPSyncPoint(HAL::DeviceQueueSyncPoint hwSyncPoint);
+
+		HAL::BufferHandle queryBuffer(uint64 nameXSH, uint32 bufferSize, uint16 memoryOffset);
+		HAL::TextureHandle queryTexture(uint64 nameXSH, HAL::TextureDesc hwTextureDesc, uint16 memoryOffset);
 
 	public:
 		TransientResourceCache() = default;
-		~TransientResourceCache() = default;
+		~TransientResourceCache();
 
-		void initialize(HAL::Device& device, HAL::DeviceMemoryAllocationHandle deviceMemoryPool, uint64 deviceMemoryPoolSize);
-
-		//inline HAL::DeviceMemoryAllocationHandle getMemoryPool() const { return deviceMemoryPool; }
+		void initialize(HAL::Device& hwDevice, uint16 maxEntryCount);
 	};
 
-	class GraphExecutionContext final : public XLib::NonCopyable
+
+	class TaskExecutionContext final : public XLib::NonCopyable
 	{
-		friend Graph;
+		friend TaskGraph;
 
 	private:
-		HAL::Device& device;
-		const Graph& graph;
-		HAL::DescriptorAllocatorHandle transientDescriptorAllocator;
-		TransientUploadMemoryAllocator& transientUploadMemoryAllocator;
+		HAL::Device& hwDevice;
+		const TaskGraph& taskGraph;
+		HAL::DescriptorAllocatorHandle hwTransientDescriptorAllocator;
+		CircularUploadMemoryAllocator& transientUploadMemoryAllocator;
 
 	private:
-		GraphExecutionContext(HAL::Device& device, const Graph& graph,
-			HAL::DescriptorAllocatorHandle transientDescriptorAllocator,
-			TransientUploadMemoryAllocator& transientUploadMemoryAllocator);
-		~GraphExecutionContext() = default;
+		TaskExecutionContext(HAL::Device& hwDevice, const TaskGraph& taskGraph,
+			HAL::DescriptorAllocatorHandle hwTransientDescriptorAllocator,
+			CircularUploadMemoryAllocator& transientUploadMemoryAllocator);
+		~TaskExecutionContext() = default;
 
 	public:
-		HAL::DescriptorSet allocateDescriptorSet(HAL::DescriptorSetLayoutHandle descriptorSetLayout);
-		UploadBufferPointer allocateUploadMemory(uint32 size);
+		HAL::DescriptorSet allocateTransientDescriptorSet(HAL::DescriptorSetLayoutHandle hwDescriptorSetLayout);
+		UploadBufferPointer allocateTransientUploadMemory(uint32 size);
 
-		HAL::BufferHandle resolveBuffer(BufferHandle bufferHandle);
-		HAL::TextureHandle resolveTexture(TextureHandle textureHandle);
+		HAL::BufferHandle resolveBuffer(BufferHandle hwBufferHandle);
+		HAL::TextureHandle resolveTexture(TextureHandle hwTextureHandle);
 	};
 
-	class PassDependencyCollector final : public XLib::NonCopyable
+
+	class TaskDependencyCollector final : public XLib::NonCopyable
 	{
-		friend Graph;
+		friend TaskGraph;
 
 	private:
-		Graph* graph = nullptr;
-		//uint16 magic = 0;
+		TaskGraph* parent = nullptr;
 
-	//private:
-	//	void addDependeny(HAL::ResourceType resourceType, uint32 resourceHandle, HAL::BarrierAccess access, HAL::BarrierSync sync);
+	private:
+		inline explicit TaskDependencyCollector(TaskGraph& parent);
 
 	public:
-		PassDependencyCollector() = default;
-		~PassDependencyCollector();
+		TaskDependencyCollector() = delete;
+		inline ~TaskDependencyCollector();
 
-		void addBufferAcces(BufferHandle bufferHandle,
-			HAL::BarrierAccess access, HAL::BarrierSync sync);
-		void addTextureAccess(TextureHandle textureHandle,
-			HAL::BarrierAccess access, HAL::BarrierSync sync,
-			HAL::TextureSubresourceRange* subresourceRange);
+		inline TaskDependencyCollector(TaskDependencyCollector&& that);
+		inline void operator = (TaskDependencyCollector&& that);
 
-		//void addManualBufferAccess(BufferHandle bufferHandle);
-		//void addManualTextureAccess(TextureHandle textureHandle);
+		// Temporary
+		inline TaskDependencyCollector& addBufferAcces(BufferHandle hwBufferHandle,
+			HAL::BarrierSync hwSync, HAL::BarrierAccess hwAccess);
+		inline TaskDependencyCollector& addTextureAccess(TextureHandle hwTextureHandle,
+			HAL::BarrierSync hwSync, HAL::BarrierAccess hwAccess, HAL::TextureLayout hwTextureLayout,
+			HAL::TextureSubresourceRange* hwSubresourceRange);
 
-		void addBufferShaderRead(BufferHandle bufferHandle,
-			ShaderStage shaderStage = ShaderStage::Any);
-		void addBufferShaderWrite(BufferHandle bufferHandle,
-			ShaderStage shaderStage = ShaderStage::Any,
+		//void addManualBufferAccess(BufferHandle hwBufferHandle);
+		//void addManualTextureAccess(TextureHandle hwTextureHandle);
+
+		inline TaskDependencyCollector& addBufferShaderRead(BufferHandle hwBufferHandle,
+			ResourceShaderAccessStage shaderStage = ResourceShaderAccessStage::Any);
+		inline TaskDependencyCollector& addBufferShaderWrite(BufferHandle hwBufferHandle,
+			ResourceShaderAccessStage shaderStage = ResourceShaderAccessStage::Any,
 			bool dependsOnPrecedingShaderWrite = true);
 
-		void addTextureShaderRead(TextureHandle textureHandle,
-			const HAL::TextureSubresourceRange* subresourceRange = nullptr,
-			ShaderStage shaderStage = ShaderStage::Any);
-		void addTextureShaderWrite(TextureHandle textureHandle,
-			const HAL::TextureSubresourceRange* subresourceRange = nullptr,
-			ShaderStage shaderStage = ShaderStage::Any,
+		inline TaskDependencyCollector& addTextureShaderRead(TextureHandle hwTextureHandle,
+			const HAL::TextureSubresourceRange* hwSubresourceRange = nullptr,
+			ResourceShaderAccessStage shaderStage = ResourceShaderAccessStage::Any);
+		inline TaskDependencyCollector& addTextureShaderWrite(TextureHandle hwTextureHandle,
+			const HAL::TextureSubresourceRange* hwSubresourceRange = nullptr,
+			ResourceShaderAccessStage shaderStage = ResourceShaderAccessStage::Any,
 			bool dependsOnPrecedingShaderWrite = true);
 
-		void addColorRenderTarget(TextureHandle textureHandle,
+		inline TaskDependencyCollector& addColorRenderTarget(TextureHandle hwTextureHandle,
 			uint8 mipLevel = 0, uint16 arrayIndex = 0);
-		void addDepthStencilRenderTarget(TextureHandle textureHandle,
+		inline TaskDependencyCollector& addDepthStencilRenderTarget(TextureHandle hwTextureHandle,
 			uint8 mipLevel = 0, uint16 arrayIndex = 0);
-		void addDepthStencilRenderTargetReadOnly(TextureHandle textureHandle,
+		inline TaskDependencyCollector& addDepthStencilRenderTargetReadOnly(TextureHandle hwTextureHandle,
 			uint8 mipLevel = 0, uint16 arrayIndex = 0);
-
-		void close();
 	};
 
-	struct GraphSettings
-	{
-		uint16 resourcePoolSize;
-		uint16 passPoolSize;
-		uint16 dependencyPoolSize;
-		uint16 barrierPoolSize;
-		uint32 userDataPoolSize;
-	};
 
-	class Graph final : public XLib::NonCopyable
+	class TaskGraph final : public XLib::NonCopyable
 	{
-		friend GraphExecutionContext;
-		friend PassDependencyCollector;
+		friend TaskExecutionContext;
+		friend TaskDependencyCollector;
 
 	private:
-		static constexpr uint16 MaxResourceCountLog2 = 10;
-		static constexpr uint16 MaxPassCountLog2 = 10;
+		enum class State : uint8;
+
+		static constexpr uint16 MaxResourceCountLog2 = 9;
+		static constexpr uint16 MaxTaskCountLog2 = 9;
 		static constexpr uint16 MaxDenendencyCountLog2 = 12;
 
 		static constexpr uint16 MaxResourceCount = 1 << MaxResourceCountLog2;
-		static constexpr uint16 MaxPassCount = 1 << MaxPassCountLog2;
+		static constexpr uint16 MaxTaskCount = 1 << MaxTaskCountLog2;
 		static constexpr uint16 MaxDenendencyCount = 1 << MaxDenendencyCountLog2;
 
 		struct Resource;
-		struct Pass;
+		struct Task;
 		struct Dependency;
 		struct Barrier;
 
 	private:
-		HAL::Device* device = nullptr;
-		TransientResourceCache* transientResourceCache = nullptr;
-
-		byte* poolsMemory = nullptr;
+		byte* internalMemoryBlock = nullptr;
 		Resource* resources = nullptr;
-		Pass* passes = nullptr;
+		Task* tasks = nullptr;
 		Dependency* dependencies = nullptr;
 		Barrier* barriers = nullptr;
 		byte* userDataPool = nullptr;
 
+		HAL::Device* hwDevice = nullptr;
+		TransientResourceCache* transientResourceCache = nullptr;
+
 		uint16 resourcePoolSize = 0;
-		uint16 passPoolSize = 0;
+		uint16 taskPoolSize = 0;
 		uint16 dependencyPoolSize = 0;
 		uint16 barrierPoolSize = 0;
 
 		uint16 resourceCount = 0;
-		uint16 passCount = 0;
+		uint16 taskCount = 0;
 		uint16 dependencyCount = 0;
 		uint16 barrierCount = 0;
 
 		uint32 userDataPoolSize = 0;
 		uint32 userDataAllocatedSize = 0;
 
-		PassDependencyCollector* issuedPassDependencyCollector = nullptr;
-		//uint16 issuedPassDependencyCollectorMagic = 0;
-		bool isCompiled = false;
+		TaskDependencyCollector* issuedTaskDependencyCollector = nullptr;
+		uint16 postExecutionLocalBarrierChainHeadIdx = 0;
+		State state = State(0);
+
+	private:
+		void registerIssuedTaskDependenciesCollector(TaskDependencyCollector& registree);
+		void relocateIssuedTaskDependenciesCollector(TaskDependencyCollector& from, TaskDependencyCollector& to);
+		void revokeIssuedTaskDependenciesCollector();
+
+		void addTaskDependency(TaskDependencyCollector& sourceTaskDependenlyCollector,
+			HAL::ResourceType hwResourceType, uint32 hwResourceHandle, HAL::BarrierSync hwSync, HAL::BarrierAccess hwAccess);
 
 	public:
-		Graph() = default;
-		inline ~Graph() { destroy(); }
+		TaskGraph() = default;
+		inline ~TaskGraph() { destroy(); }
 
-		void initialize(HAL::Device& device,
-			TransientResourceCache& transientResourceCache,
-			const GraphSettings& settings);
+		void initialize();
 		void destroy();
 
+		void open(HAL::Device& hwDevice, TransientResourceCache& transientResourceCache);
+
 		BufferHandle createTransientBuffer(uint32 size, uint64 nameXSH);
-		TextureHandle createTransientTexture(HAL::TextureDesc textureDesc, uint64 nameXSH);
-		BufferHandle importExternalBuffer(HAL::BufferHandle bufferHandle);
-		TextureHandle importExternalTexture(HAL::TextureHandle textureHandle, HAL::TextureLayout defaultLayout);
-		//void createVirtualCPUResource();
+		TextureHandle createTransientTexture(HAL::TextureDesc hwTextureDesc, uint64 nameXSH);
+		BufferHandle importExternalBuffer(HAL::BufferHandle hwBufferHandle);
+		TextureHandle importExternalTexture(HAL::TextureHandle hwTextureHandle,
+			HAL::TextureLayout hwPreExecutionLayout, HAL::TextureLayout hwPostExecutionLayout);
 
 		void* allocateUserData(uint32 size);
 
-		void addPass(PassType type, PassDependencyCollector& dependencyCollector,
-			PassExecutorFunc executorFunc, const void* userData);
+		TaskDependencyCollector addTask(TaskType type, TaskExecutorFunc executorFunc, void* userData);
 
-		void compile();
+		void closeAndCompile();
 
-		void execute(HAL::CommandAllocatorHandle commandAllocator,
-			HAL::DescriptorAllocatorHandle transientDescriptorAllocator,
-			TransientUploadMemoryAllocator& transientUploadMemoryAllocator) const;
-
-		void reset();
+		void execute(HAL::CommandAllocatorHandle hwCommandAllocator,
+			HAL::DescriptorAllocatorHandle hwTransientDescriptorAllocator,
+			CircularUploadMemoryAllocator& transientUploadMemoryAllocator);
 	};
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// INLINE DEFINITIONS //////////////////////////////////////////////////////////////////////////////
+
+inline XEngine::Gfx::Scheduler::TaskDependencyCollector::TaskDependencyCollector(TaskGraph& parent)
+{
+	parent.registerIssuedTaskDependenciesCollector(*this);
+}
+
+inline XEngine::Gfx::Scheduler::TaskDependencyCollector::~TaskDependencyCollector()
+{
+	if (parent)
+		parent->revokeIssuedTaskDependenciesCollector();
+}
+
+inline XEngine::Gfx::Scheduler::TaskDependencyCollector::TaskDependencyCollector(TaskDependencyCollector&& that)
+{
+	if (that.parent)
+		that.parent->relocateIssuedTaskDependenciesCollector(that, *this);
+}
+
+inline void XEngine::Gfx::Scheduler::TaskDependencyCollector::operator = (TaskDependencyCollector&& that)
+{
+	if (that.parent)
+		that.parent->relocateIssuedTaskDependenciesCollector(that, *this);
+}
+
+inline auto XEngine::Gfx::Scheduler::TaskDependencyCollector::addBufferAcces(
+	BufferHandle hwBufferHandle, HAL::BarrierSync hwSync, HAL::BarrierAccess hwAccess) -> TaskDependencyCollector&
+{
+	parent->addTaskDependency(*this, HAL::ResourceType::Buffer, uint32(hwBufferHandle), hwSync, hwAccess);
+	return *this;
+}
+
+inline auto XEngine::Gfx::Scheduler::addTextureAccess(TextureHandle hwTextureHandle,
+	HAL::BarrierSync hwSync, HAL::BarrierAccess hwAccess, HAL::TextureLayout hwTextureLayout,
+	HAL::TextureSubresourceRange* hwSubresourceRange)  -> TaskDependencyCollector&
+{
+	...;
+	return *this;
 }

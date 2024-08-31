@@ -33,17 +33,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ClInclude Include="XEngine.Render.Bloom.h" />
-    <ClInclude Include="XEngine.Render.h" />
-    <ClInclude Include="XEngine.Render.PostComposition.h" />
     <ClInclude Include="XEngine.Render.Scene.h" />
+    <ClInclude Include="XEngine.Render.SceneRenderer.h" />
   </ItemGroup>
 
   <ItemGroup>
-    <ClCompile Include="XEngine.Render.Bloom.cpp" />
-    <ClCompile Include="XEngine.Render.cpp" />
-    <ClCompile Include="XEngine.Render.PostComposition.cpp" />
     <ClCompile Include="XEngine.Render.Scene.cpp" />
+    <ClCompile Include="XEngine.Render.SceneRenderer.cpp" />
   </ItemGroup>
 
   <ItemGroup>
@@ -53,8 +49,8 @@
     <ProjectReference Include="..\XEngine.XStringHash\XEngine.XStringHash.vcxproj" >
       <Project>{ca640875-7c04-42ba-b081-8dac82c9f48d}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\XEngine.Gfx.HAL.D3D12\XEngine.Gfx.HAL.D3D12.vcxproj">
-      <Project>{1ed495b0-b69b-4409-83fc-587f590eab29}</Project>
+    <ProjectReference Include="..\XEngine.Gfx\XEngine.Gfx.vcxproj">
+      <Project>{b22f5870-0471-414e-bbdf-7a7ab5e46b83}</Project>
     </ProjectReference>
     <ProjectReference Include="..\XEngine.Render.Shaders\XEngine.Render.Shaders.vcxproj">
       <Project>{e6af7fdc-1839-4501-96b6-389ab9cafddb}</Project>

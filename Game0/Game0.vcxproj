@@ -57,6 +57,9 @@
     <ProjectReference Include="..\XEngine.System\XEngine.System.vcxproj">
       <Project>{107c587b-0d5f-4de1-a06b-5fc8c7b1051b}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\XEngine.Render\XEngine.Render.vcxproj">
+      <Project>{25b57cc9-0f71-4901-ba27-3ea9952fa23c}</Project>
+    </ProjectReference>
     <!-- TODO: Remove -->
     <ProjectReference Include="..\XEngine.Render.Shaders\XEngine.Render.Shaders.vcxproj">
       <Project>{e6af7fdc-1839-4501-96b6-389ab9cafddb}</Project>

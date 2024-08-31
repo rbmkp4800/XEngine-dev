@@ -1,9 +1,8 @@
+#include "XEngine.Gfx.ShaderLibraryLoader.h"
+
 #include <XLib.Allocation.h>
 #include <XLib.System.File.h>
-
 #include <XEngine.Gfx.ShaderLibraryFormat.h>
-
-#include "XEngine.Gfx.ShaderLibrary.h"
 
 using namespace XLib;
 using namespace XEngine::Gfx;
@@ -12,25 +11,25 @@ XTODO("Use hash maps instead of linear search");
 
 static inline uint64 U64From2xU32(uint32 lo, uint32 hi) { return uint64(lo) | (uint64(hi) << 32); }
 
-struct ShaderLibrary::DescriptorSetLayout
+struct ShaderLibraryLoader::DescriptorSetLayout
 {
 	uint64 nameXSH;
 	HAL::DescriptorSetLayoutHandle halDescriptorSetLayout;
 };
 
-struct ShaderLibrary::PipelineLayout
+struct ShaderLibraryLoader::PipelineLayout
 {
 	uint64 nameXSH;
 	HAL::PipelineLayoutHandle halPipelineLayout;
 };
 
-struct ShaderLibrary::Shader
+struct ShaderLibraryLoader::Shader
 {
 	uint64 nameXSH;
 	HAL::ShaderHandle halShader;
 };
 
-ShaderLibrary::~ShaderLibrary()
+ShaderLibraryLoader::~ShaderLibraryLoader()
 {
 	if (memoryBlock)
 	{
@@ -40,7 +39,7 @@ ShaderLibrary::~ShaderLibrary()
 	}
 }
 
-void ShaderLibrary::load(const char* libraryFilePath, HAL::Device& halDevice)
+void ShaderLibraryLoader::load(const char* libraryFilePath, HAL::Device& halDevice)
 {
 	// TODO: Refactor this method.
 
@@ -188,7 +187,7 @@ void ShaderLibrary::load(const char* libraryFilePath, HAL::Device& halDevice)
 	SystemHeapAllocator::Release(libraryData);
 }
 
-HAL::DescriptorSetLayoutHandle ShaderLibrary::getDescriptorSetLayout(uint64 nameXSH) const
+HAL::DescriptorSetLayoutHandle ShaderLibraryLoader::getDescriptorSetLayout(uint64 nameXSH) const
 {
 	for (uint32 i = 0; i < descriptorSetLayoutCount; i++)
 	{
@@ -200,7 +199,7 @@ HAL::DescriptorSetLayoutHandle ShaderLibrary::getDescriptorSetLayout(uint64 name
 	return HAL::DescriptorSetLayoutHandle::Zero;
 }
 
-HAL::PipelineLayoutHandle ShaderLibrary::getPipelineLayout(uint64 nameXSH) const
+HAL::PipelineLayoutHandle ShaderLibraryLoader::getPipelineLayout(uint64 nameXSH) const
 {
 	for (uint32 i = 0; i < pipelineLayoutCount; i++)
 	{
@@ -212,7 +211,7 @@ HAL::PipelineLayoutHandle ShaderLibrary::getPipelineLayout(uint64 nameXSH) const
 	return HAL::PipelineLayoutHandle::Zero;
 }
 
-HAL::ShaderHandle ShaderLibrary::getShader(uint64 nameXSH) const
+HAL::ShaderHandle ShaderLibraryLoader::getShader(uint64 nameXSH) const
 {
 	for (uint32 i = 0; i < shaderCount; i++)
 	{

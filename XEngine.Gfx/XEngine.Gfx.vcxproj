@@ -34,17 +34,15 @@
 
   <ItemGroup>
     <ClInclude Include="XEngine.Gfx.Allocation.h" />
-    <ClInclude Include="XEngine.Gfx.PipelineRegistry.h" />
     <ClInclude Include="XEngine.Gfx.Scheduler.h" />
-    <ClInclude Include="XEngine.Gfx.ShaderLibrary.h" />
+    <ClInclude Include="XEngine.Gfx.ShaderLibraryLoader.h" />
     <ClInclude Include="XEngine.Gfx.Uploader.h" />
   </ItemGroup>
 
   <ItemGroup>
     <ClCompile Include="XEngine.Gfx.Allocation.cpp" />
-    <ClCompile Include="XEngine.Gfx.PipelineRegistry.cpp" />
     <ClCompile Include="XEngine.Gfx.Scheduler.cpp" />
-    <ClCompile Include="XEngine.Gfx.ShaderLibrary.cpp" />
+    <ClCompile Include="XEngine.Gfx.ShaderLibraryLoader.cpp" />
     <ClCompile Include="XEngine.Gfx.Uploader.cpp" />
   </ItemGroup>
 

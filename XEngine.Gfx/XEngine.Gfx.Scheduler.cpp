@@ -1,274 +1,344 @@
+#include "XEngine.Gfx.Scheduler.h"
+
 #include <XLib.Algorithm.QuickSort.h>
 #include <XLib.Allocation.h>
 #include <XLib.Containers.ArrayList.h>
 
-#include "XEngine.Gfx.Scheduler.h"
+#include "XEngine.Gfx.Allocation.h"
 
 using namespace XEngine::Gfx;
 using namespace XEngine::Gfx::Scheduler;
 
-XTODO("Implement proper handles");
 
-
-static inline HAL::BarrierSync TranslateSchedulerShaderStageToHALBarrierSync(Scheduler::ShaderStage shaderStage)
+static inline HAL::BarrierSync TranslateSchResourceShaderAccessStageToHwBarrierSync(Scheduler::ResourceShaderAccessStage shaderStage)
 {
 	switch (shaderStage)
 	{
-		case ShaderStage::Any:		return HAL::BarrierSync::AllShaders;
-		case ShaderStage::Compute:	return HAL::BarrierSync::ComputeShader;
-		case ShaderStage::Graphics:	return HAL::BarrierSync::AllGraphicsShaders;
-		case ShaderStage::PrePixel:	return HAL::BarrierSync::PrePixelShaders;
-		case ShaderStage::Pixel:	return HAL::BarrierSync::PixelShader;
+		case ResourceShaderAccessStage::Any:		return HAL::BarrierSync::AllShaders;
+		case ResourceShaderAccessStage::Compute:	return HAL::BarrierSync::ComputeShader;
+		case ResourceShaderAccessStage::Graphics:	return HAL::BarrierSync::AllGraphicsShaders;
+		case ResourceShaderAccessStage::PrePixel:	return HAL::BarrierSync::PrePixelShaders;
+		case ResourceShaderAccessStage::Pixel:		return HAL::BarrierSync::PixelShader;
 	}
-	XEAssertUnreachableCode();
+	XEMasterAssertUnreachableCode();
 	return HAL::BarrierSync::None;
 }
 
 
 // TransientResourceCache ///////////////////////////////////////////////////////////////////////////
 
-enum class TransientResourceCache::EntryType : uint8
-{
-	Undefined = 0,
-	Buffer,
-	Texture,
-};
-
 struct TransientResourceCache::Entry
 {
+	uint64 nameXSH;
+	HAL::DeviceQueueSyncPoint hwLastUsageCycleEOPSyncPoint;
+
 	union
 	{
-		struct
-		{
-			HAL::BufferHandle handle;
-			uint32 size;
-		} buffer;
+		uint32 bufferSize;
+		HAL::TextureDesc hwTextureDesc;
+	} desc;
 
-		struct
-		{
-			HAL::TextureHandle handle;
-			HAL::TextureDesc desc;
-		} texture;
+	union
+	{
+		HAL::BufferHandle hwBufferHandle;
+		HAL::TextureHandle hwTextureHandle;
 	};
 
-	EntryType type;
+	uint16 memoryOffset;
+
+	HAL::ResourceType type;
 };
 
-void TransientResourceCache::initialize(HAL::Device& device,
-	HAL::DeviceMemoryAllocationHandle deviceMemoryPool, uint64 deviceMemoryPoolSize)
-{
-	// TODO: State asserts
 
-	this->device = &device;
-	this->deviceMemoryPool = deviceMemoryPool;
-	this->deviceMemoryPoolSize = deviceMemoryPoolSize;
+void TransientResourceCache::openUsageCycle()
+{
+
 }
 
-GraphExecutionContext::GraphExecutionContext(
-	HAL::Device& device,
-	const Graph& graph,
-	HAL::DescriptorAllocatorHandle transientDescriptorAllocator,
-	TransientUploadMemoryAllocator& transientUploadMemoryAllocator) :
-	device(device),
-	graph(graph),
-	transientDescriptorAllocator(transientDescriptorAllocator),
+void TransientResourceCache::closeUsageCycle()
+{
+
+}
+
+void TransientResourceCache::setPrevUsageCycleEOPSyncPoint(HAL::DeviceQueueSyncPoint hwSyncPoint)
+{
+
+}
+
+HAL::BufferHandle TransientResourceCache::queryBuffer(uint64 nameXSH, uint32 bufferSize, uint16 memoryOffset)
+{
+	bufferSize = alignUp<uint32>(bufferSize, AllocationAlignment);
+
+	for (uint16 i = 0; i < entryCount; i++)
+	{
+		const Entry& entry = entries[i];
+		if (entry.type == HAL::ResourceType::Buffer &&
+			entry.nameXSH == nameXSH &&
+			entry.desc.bufferSize == bufferSize &&
+			entry.memoryOffset == memoryOffset)
+		{
+			return entry.hwBufferHandle;
+		}
+	}
+
+	const HAL::BufferHandle hwBuffer = hwDevice->createBuffer(bufferSize, hwDeviceMemory, memoryOffset);
+
+	XEMasterAssert(entryCount < entryPoolSize);
+	const uint16 newEntryIndex = entryCount;
+	entryCount++;
+
+	Entry& entry = entries[newEntryIndex];
+	entry = {};
+	entry.nameXSH = nameXSH;
+	entry.hwLastUsageCycleEOPSyncPoint = {};
+	entry.desc.bufferSize = bufferSize;
+	entry.hwBufferHandle = hwBuffer;
+	entry.memoryOffset = memoryOffset;
+	entry.type = HAL::ResourceType::Buffer;
+}
+
+HAL::TextureHandle TransientResourceCache::queryTexture(uint64 nameXSH, HAL::TextureDesc hwTextureDesc, uint16 memoryOffset)
+{
+
+}
+
+TransientResourceCache::~TransientResourceCache()
+{
+	if (hwDevice)
+	{
+		hwDevice->releaseDeviceMemory(hwDeviceMemory);
+		hwDevice = nullptr;
+		hwDeviceMemory = {};
+		deviceMemorySize = 0;
+	}
+
+	if (entries)
+	{
+		XLib::SystemHeapAllocator::Release(entries);
+		entries = nullptr;
+		entryPoolSize = 0;
+		entryCount = 0;
+	}
+}
+
+void TransientResourceCache::initialize(HAL::Device& hwDevice, uint16 maxEntryCount)
+{
+	this->hwDevice = &hwDevice;
+	deviceMemorySize = 1024 * 1024 * 128;
+	hwDeviceMemory = hwDevice.allocateDeviceMemory(deviceMemorySize);
+}
+
+
+// TaskExecutionContext ////////////////////////////////////////////////////////////////////////////
+
+TaskExecutionContext::TaskExecutionContext(HAL::Device& hwDevice, const TaskGraph& graph,
+	HAL::DescriptorAllocatorHandle hwTransientDescriptorAllocator,
+	CircularUploadMemoryAllocator& transientUploadMemoryAllocator)
+	:
+	hwDevice(hwDevice), taskGraph(taskGraph),
+	hwTransientDescriptorAllocator(hwTransientDescriptorAllocator),
 	transientUploadMemoryAllocator(transientUploadMemoryAllocator)
 { }
 
-HAL::DescriptorSet GraphExecutionContext::allocateDescriptorSet(HAL::DescriptorSetLayoutHandle descriptorSetLayout)
+HAL::DescriptorSet TaskExecutionContext::allocateTransientDescriptorSet(HAL::DescriptorSetLayoutHandle descriptorSetLayout)
 {
-	return device.allocateDescriptorSet(transientDescriptorAllocator, descriptorSetLayout);
+	return hwDevice.allocateDescriptorSet(hwTransientDescriptorAllocator, descriptorSetLayout);
 }
 
-UploadBufferPointer GraphExecutionContext::allocateUploadMemory(uint32 size)
+UploadBufferPointer TaskExecutionContext::allocateTransientUploadMemory(uint32 size)
 {
 	return transientUploadMemoryAllocator.allocate(size);
 }
 
-HAL::BufferHandle GraphExecutionContext::resolveBuffer(BufferHandle bufferHandle)
+HAL::BufferHandle TaskExecutionContext::resolveBuffer(BufferHandle bufferHandle)
 {
 	const uint16 resourceIndex = uint16(bufferHandle);
-	XEAssert(resourceIndex < graph.resourceCount);
-	const Graph::Resource& resource = graph.resources[resourceIndex];
+	XEAssert(resourceIndex < taskGraph.resourceCount);
+	const TaskGraph::Resource& resource = taskGraph.resources[resourceIndex];
 	XEAssert(resource.type == HAL::ResourceType::Buffer);
-	return HAL::BufferHandle(resource.halResourceHandle);
+	return resource.hwBufferHandle;
 }
 
-HAL::TextureHandle GraphExecutionContext::resolveTexture(TextureHandle textureHandle)
+HAL::TextureHandle TaskExecutionContext::resolveTexture(TextureHandle textureHandle)
 {
 	const uint16 resourceIndex = uint16(textureHandle);
-	XEAssert(resourceIndex < graph.resourceCount);
-	const Graph::Resource& resource = graph.resources[resourceIndex];
+	XEAssert(resourceIndex < taskGraph.resourceCount);
+	const TaskGraph::Resource& resource = taskGraph.resources[resourceIndex];
 	XEAssert(resource.type == HAL::ResourceType::Texture);
-	return HAL::TextureHandle(resource.halResourceHandle);
+	return resource.hwTextureHandle;
 }
 
 
-// PassDependencyCollector /////////////////////////////////////////////////////////////////////////
+// TaskGraph ///////////////////////////////////////////////////////////////////////////////////////////
 
-PassDependencyCollector::~PassDependencyCollector()
+enum class TaskGraph::State : uint8
 {
-	XEMasterAssert(!graph);
-}
+	Undefined = 0,
+	Empty,
+	Recording,
+	ReadyForExecution,
+};
 
-void PassDependencyCollector::addBufferAcces(BufferHandle bufferHandle,
-	HAL::BarrierAccess access, HAL::BarrierSync sync)
+struct TaskGraph::Resource
 {
-	// TODO: Should we check something like no write bits set when read is set?
-	XEAssert(access != HAL::BarrierAccess::None);
-	XEAssert(sync != HAL::BarrierSync::None);
+	uint64 transientNameXSH;
 
-	XEAssert(graph);
-	XEAssert(graph->issuedPassDependencyCollector == this);
-	XEAssert(graph->passCount > 0);
-
-	const uint16 resourceIndex = uint16(bufferHandle);
-	Graph::Resource& resource = graph->resources[resourceIndex];
-	XEAssert(resource.type == HAL::ResourceType::Buffer);
-
-	//XEAssert(resource.dependencyCollectorMagic != magic);
-	//resource.dependencyCollectorMagic = magic;
-
-	const uint16 passIndex = graph->passCount - 1;
-	Graph::Pass& pass = graph->passes[passIndex];
-	XEAssert(pass.dependenciesBaseOffset + pass.dependencyCount == graph->dependencyCount);
-
-	const uint16 dependencyIndex = graph->dependencyCount;
-	XEMasterAssert(dependencyIndex < graph->dependencyPoolSize);
-	graph->dependencyCount++;
-	pass.dependencyCount++;
-
-	Graph::Dependency& dependency = graph->dependencies[dependencyIndex];
-	dependency = {};
-	dependency.resourceIndex = resourceIndex;
-	dependency.passIndex = passIndex;
-	dependency.access = access;
-	dependency.sync = sync;
-	dependency.dependsOnPrecedingShaderWrite = true; // ????
-	dependency.resourceDependencyChainNextIdx = uint16(-1);
-
-	if (resource.dependencyChainHeadIdx == uint16(-1))
-		resource.dependencyChainHeadIdx = dependencyIndex;
-	else
-		graph->dependencies[resource.dependencyChainTailIdx].resourceDependencyChainNextIdx = dependencyIndex;
-
-	resource.dependencyChainTailIdx = dependencyIndex;
-}
-
-void PassDependencyCollector::addTextureAccess(TextureHandle textureHandle,
-	HAL::BarrierAccess access, HAL::BarrierSync sync,
-	HAL::TextureSubresourceRange* subresourceRange)
-{
-	XEAssert(graph);
-}
-
-void PassDependencyCollector::addBufferShaderRead(BufferHandle bufferHandle, ShaderStage shaderStage)
-{
-	addBufferAcces(bufferHandle, HAL::BarrierAccess::ShaderReadOnly, TranslateSchedulerShaderStageToHALBarrierSync(shaderStage));
-}
-
-void PassDependencyCollector::addBufferShaderWrite(BufferHandle bufferHandle, ShaderStage shaderStage,
-	bool dependsOnPrecedingShaderWrite)
-{
-	XTODO(__FUNCTION__ ": `dependsOnPrecedingShaderWrite` is dropped here");
-	addBufferAcces(bufferHandle, HAL::BarrierAccess::ShaderReadWrite, TranslateSchedulerShaderStageToHALBarrierSync(shaderStage));
-}
-
-void PassDependencyCollector::close()
-{
-	XEAssert(graph);
-	XEAssert(graph->issuedPassDependencyCollector == this);
-
-	graph->issuedPassDependencyCollector = nullptr;
-	graph = nullptr;
-}
-
-
-// Graph ///////////////////////////////////////////////////////////////////////////////////////////
-
-struct Graph::Resource
-{
 	union
 	{
 		uint32 bufferSize;
-		HAL::TextureDesc textureDesc;
+		HAL::TextureDesc hwTextureDesc;
+	} desc;
+
+	union
+	{
+		HAL::BufferHandle hwBufferHandle;
+		HAL::TextureHandle hwTextureHandle;
 	};
-	uint64 transientResourceNameXSH;
-	uint32 halResourceHandle;
 
 	HAL::ResourceType type;
 	bool isImported;
 	//uint8 handleGeneration;
 
-	//uint16 dependencyCollectorMagic;
+	HAL::TextureLayout hwPreExecutionImportedTextureLayout;
+	HAL::TextureLayout hwPostExecutionImportedTextureLayout;
+
 	uint16 dependencyChainHeadIdx;
 	uint16 dependencyChainTailIdx;
 
-	uint16 firstUsagePassIndex;
-	uint16 lastUsagePassIndex;
-
-	//uint16 refCount;
+	//uint16 firstUsagePassIndex;
+	//uint16 lastUsagePassIndex;
 };
 
-struct Graph::Pass
+struct TaskGraph::Task
 {
-	PassExecutorFunc executporFunc;
-	const void* userData;
+	TaskExecutorFunc executporFunc;
+	void* userData;
 
-	uint16 dependenciesBaseOffset;
+	uint16 dependenciesOffset;
 	uint16 dependencyCount;
 
-	uint16 preExecutionBarrierChainHeadIdx;
-	uint16 postExecutionBarrierChainHeadIdx;
+	struct
+	{
+		HAL::BarrierSync hwSyncBefore;
+		HAL::BarrierSync hwSyncAfter;
+		HAL::BarrierAccess hwAccessBefore;
+		HAL::BarrierAccess hwAccessAfter;
+	} preExecutionGlobalBarrier;
 
-	//uint16 refCount;
+	uint16 preExecutionLocalBarrierChainHeadIdx;
 };
 
-struct Graph::Dependency
+struct TaskGraph::Dependency
 {
 	uint16 resourceIndex;
-	uint16 passIndex;
+	uint16 taskIndex;
 
-	HAL::BarrierAccess access;
-	HAL::BarrierSync sync;
-	bool dependsOnPrecedingShaderWrite;
+	HAL::BarrierSync hwSync;
+	HAL::BarrierAccess hwAccess;
+	HAL::TextureLayout hwTextureLayout;
+	bool canOverlapPrecedingShaderWrite;
 
-	HAL::TextureSubresourceRange textureSubresourceRange;
+	HAL::TextureSubresourceRange hwTextureSubresourceRange;
 	bool usesTextureSubresourceRange;
 
 	uint16 resourceDependencyChainNextIdx;
 };
 
-struct Graph::Barrier
+struct TaskGraph::Barrier
 {
-	HAL::BarrierAccess accessBefore;
-	HAL::BarrierAccess accessAfter;
-	HAL::BarrierSync syncBefore;
-	HAL::BarrierSync syncAfter;
+	HAL::BarrierSync hwSyncBefore;
+	HAL::BarrierSync hwSyncAfter;
+	HAL::BarrierAccess hwAccessBefore;
+	HAL::BarrierAccess hwAccessAfter;
 
-	HAL::TextureSubresourceRange textureSubresourceRange;
-	HAL::TextureLayout layoutBefore;
-	HAL::TextureLayout layoutAfter;
+	HAL::TextureSubresourceRange hwTextureSubresourceRange;
+	HAL::TextureLayout hwTextureLayoutBefore;
+	HAL::TextureLayout hwTextureLayoutAfter;
 
 	uint16 resourceIndex;
 
 	uint16 chainNextIdx;
 };
 
-void Graph::initialize(HAL::Device& device,
-	TransientResourceCache& transientResourceCache,
-	const GraphSettings& settings)
-{
-	XEMasterAssert(!this->device);
-	memorySet(this, 0, sizeof(Graph));
 
-	this->device = &device;
-	this->transientResourceCache = &transientResourceCache;
-	this->resourcePoolSize = settings.resourcePoolSize;
-	this->passPoolSize = settings.passPoolSize;
-	this->dependencyPoolSize = settings.dependencyPoolSize;
-	this->barrierPoolSize = settings.barrierPoolSize;
-	this->userDataPoolSize = settings.userDataPoolSize;
+void TaskGraph::registerIssuedTaskDependenciesCollector(TaskDependencyCollector& registree)
+{
+	XEAssert(!issuedTaskDependencyCollector);
+	issuedTaskDependencyCollector = &registree;
+	issuedTaskDependencyCollector->parent = this;
+}
+
+void TaskGraph::relocateIssuedTaskDependenciesCollector(TaskDependencyCollector& from, TaskDependencyCollector& to)
+{
+	XEAssert(issuedTaskDependencyCollector == &from);
+	XEAssert(issuedTaskDependencyCollector->parent == this);
+	issuedTaskDependencyCollector->parent = nullptr;
+	issuedTaskDependencyCollector = &to;
+	issuedTaskDependencyCollector->parent = this;
+}
+
+void TaskGraph::revokeIssuedTaskDependenciesCollector()
+{
+	if (!issuedTaskDependencyCollector)
+		return;
+
+	XEAssert(issuedTaskDependencyCollector->parent == this);
+	issuedTaskDependencyCollector->parent = nullptr;
+	issuedTaskDependencyCollector = nullptr;
+}
+
+void TaskGraph::addTaskDependency(TaskDependencyCollector& sourceTaskDependenlyCollector,
+	HAL::ResourceType hwResourceType, uint32 hwResourceHandle, HAL::BarrierSync hwSync, HAL::BarrierAccess hwAccess)
+{
+	XEAssert(issuedTaskDependencyCollector);
+	XEAssert(&sourceTaskDependenlyCollector == issuedTaskDependencyCollector);
+
+	// TODO: Do actual validation for sync/access values.
+	XEAssert(hwSync != HAL::BarrierSync::None);
+	XEAssert(hwAccess != HAL::BarrierAccess::None);
+
+	const uint16 resourceIndex = uint16(hwResourceHandle);
+	Resource& resource = resources[resourceIndex];
+	XEAssert(resource.type == hwResourceType);
+
+	XEAssert(taskCount > 0);
+	const uint16 taskIndex = taskCount - 1;
+	Task& task = tasks[taskIndex];
+	XEAssert(task.dependenciesOffset + task.dependencyCount == dependencyCount);
+
+	const uint16 dependencyIndex = dependencyCount;
+	XEMasterAssert(dependencyIndex < dependencyPoolSize);
+	dependencyCount++;
+	task.dependencyCount++;
+
+	Dependency& dependency = dependencies[dependencyIndex];
+	dependency = {};
+	dependency.resourceIndex = resourceIndex;
+	dependency.taskIndex = taskIndex;
+	dependency.hwSync = hwSync;
+	dependency.hwAccess = hwAccess;
+	dependency.canOverlapPrecedingShaderWrite = false; // TODO: Implement proper support for this.
+	dependency.resourceDependencyChainNextIdx = uint16(-1);
+
+	if (resource.dependencyChainHeadIdx == uint16(-1))
+		resource.dependencyChainHeadIdx = dependencyIndex;
+	else
+		dependencies[resource.dependencyChainTailIdx].resourceDependencyChainNextIdx = dependencyIndex;
+
+	resource.dependencyChainTailIdx = dependencyIndex;
+}
+
+void TaskGraph::initialize()
+{
+	XEMasterAssert(!this->internalMemoryBlock);
+	memorySet(this, 0, sizeof(TaskGraph));
+
+
+	this->resourcePoolSize = MaxResourceCount;
+	this->taskPoolSize = MaxTaskCount;
+	this->dependencyPoolSize = MaxDenendencyCount;
+	this->barrierPoolSize = MaxDenendencyCount * 2;
+	this->userDataPoolSize = 16 * 1024; // TODO: ????
 
 	{
 		uintptr poolsMemorySizeAccum = 0;
@@ -277,7 +347,7 @@ void Graph::initialize(HAL::Device& device,
 		poolsMemorySizeAccum += sizeof(Resource) * resourcePoolSize;
 
 		const uintptr passPoolMemOffset = poolsMemorySizeAccum;
-		poolsMemorySizeAccum += sizeof(Pass) * passPoolSize;
+		poolsMemorySizeAccum += sizeof(Task) * taskPoolSize;
 
 		const uintptr dependencyPoolMemOffset = poolsMemorySizeAccum;
 		poolsMemorySizeAccum += sizeof(Dependency) * dependencyPoolSize;
@@ -289,31 +359,42 @@ void Graph::initialize(HAL::Device& device,
 		poolsMemorySizeAccum += userDataPoolSize;
 
 		const uintptr poolsTotalMemorySize = poolsMemorySizeAccum;
-		poolsMemory = (byte*)XLib::SystemHeapAllocator::Allocate(poolsTotalMemorySize);
+		byte* poolsMemory = (byte*)XLib::SystemHeapAllocator::Allocate(poolsTotalMemorySize);
 		memorySet(poolsMemory, 0, poolsTotalMemorySize);
 
 		resources = (Resource*)(poolsMemory + resourcePoolMemOffset);
-		passes = (Pass*)(poolsMemory + passPoolMemOffset);
+		tasks = (Task*)(poolsMemory + passPoolMemOffset);
 		dependencies = (Dependency*)(poolsMemory + dependencyPoolMemOffset);
 		barriers = (Barrier*)(poolsMemory + barrierPoolMemoryOffset);
 		userDataPool = poolsMemory + userDataPoolMemOffset;
 	}
 }
 
-void Graph::destroy()
+void TaskGraph::destroy()
 {
-	if (!device)
-		return;
+	if (internalMemoryBlock)
+		XLib::SystemHeapAllocator::Release(internalMemoryBlock);
 
-	// TODO: Revisit this.
-	XLib::SystemHeapAllocator::Release(poolsMemory);
-	memorySet(this, 0, sizeof(Graph));
+	memorySet(this, 0, sizeof(TaskGraph));
 }
 
-BufferHandle Graph::createTransientBuffer(uint32 size, uint64 nameXSH)
+void TaskGraph::open(HAL::Device& hwDevice, TransientResourceCache& transientResourceCache)
 {
-	XEAssert(device);
-	XEAssert(!isCompiled);
+	XEAssert(state == State::Empty);
+
+	this->hwDevice = &hwDevice;
+	this->transientResourceCache = &transientResourceCache;
+
+	...;
+	XEAssertUnreachableCode();
+
+	postExecutionLocalBarrierChainHeadIdx = uint16(-1);
+	state = State::Recording;
+}
+
+BufferHandle TaskGraph::createTransientBuffer(uint32 size, uint64 nameXSH)
+{
+	XEAssert(state == State::Recording);
 
 	XEMasterAssert(resourceCount < resourcePoolSize);
 	const uint16 resourceIndex = resourceCount;
@@ -331,10 +412,9 @@ BufferHandle Graph::createTransientBuffer(uint32 size, uint64 nameXSH)
 	return BufferHandle(resourceIndex);
 }
 
-TextureHandle Graph::createTransientTexture(HAL::TextureDesc textureDesc, uint64 nameXSH)
+TextureHandle TaskGraph::createTransientTexture(HAL::TextureDesc hwTextureDesc, uint64 nameXSH)
 {
-	XEAssert(device);
-	XEAssert(!isCompiled);
+	XEAssert(state == State::Recording);
 
 	XEMasterAssert(resourceCount < resourcePoolSize);
 	const uint16 resourceIndex = resourceCount;
@@ -342,7 +422,7 @@ TextureHandle Graph::createTransientTexture(HAL::TextureDesc textureDesc, uint64
 
 	Resource& resource = resources[resourceIndex];
 	resource = {};
-	resource.textureDesc = textureDesc;
+	resource.hwTextureDesc = hwTextureDesc;
 	resource.transientResourceNameXSH = nameXSH;
 	resource.type = HAL::ResourceType::Texture;
 	resource.isImported = false;
@@ -352,10 +432,9 @@ TextureHandle Graph::createTransientTexture(HAL::TextureDesc textureDesc, uint64
 	return TextureHandle(resourceIndex);
 }
 
-BufferHandle Graph::importExternalBuffer(HAL::BufferHandle bufferHandle)
+BufferHandle TaskGraph::importExternalBuffer(HAL::BufferHandle hwBufferHandle)
 {
-	XEAssert(device);
-	XEAssert(!isCompiled);
+	XEAssert(state == State::Recording);
 
 	XEMasterAssert(resourceCount < resourcePoolSize);
 	const uint16 resourceIndex = resourceCount;
@@ -364,7 +443,7 @@ BufferHandle Graph::importExternalBuffer(HAL::BufferHandle bufferHandle)
 	Resource& resource = resources[resourceIndex];
 	resource = {};
 	// TODO: Fill `resource.bufferSize` just in case.
-	resource.halResourceHandle = uint32(bufferHandle);
+	resource.hwBufferHandle = hwBufferHandle;
 	resource.type = HAL::ResourceType::Buffer;
 	resource.isImported = true;
 	resource.dependencyChainHeadIdx = uint16(-1);
@@ -373,10 +452,10 @@ BufferHandle Graph::importExternalBuffer(HAL::BufferHandle bufferHandle)
 	return BufferHandle(resourceIndex);
 }
 
-TextureHandle Graph::importExternalTexture(HAL::TextureHandle textureHandle, HAL::TextureLayout defaultLayout)
+TextureHandle TaskGraph::importExternalTexture(HAL::TextureHandle hwTextureHandle,
+	HAL::TextureLayout hwPreExecutionLayout, HAL::TextureLayout hwPostExecutionLayout)
 {
-	XEAssert(device);
-	XEAssert(!isCompiled);
+	XEAssert(state == State::Recording);
 
 	XEMasterAssert(resourceCount < resourcePoolSize);
 	const uint16 resourceIndex = resourceCount;
@@ -385,203 +464,335 @@ TextureHandle Graph::importExternalTexture(HAL::TextureHandle textureHandle, HAL
 	Resource& resource = resources[resourceIndex];
 	resource = {};
 	// TODO: Fill `resource.textureDesc` just in case.
-	resource.halResourceHandle = uint32(textureHandle);
+	resource.hwTextureHandle = hwTextureHandle;
 	resource.type = HAL::ResourceType::Texture;
 	resource.isImported = true;
+	resource.hwPreExecutionImportedTextureLayout = hwPreExecutionLayout;
+	resource.hwPostExecutionImportedTextureLayout = hwPostExecutionLayout;
 	resource.dependencyChainHeadIdx = uint16(-1);
 	resource.dependencyChainTailIdx = uint16(-1);
-
-	XEAssert(defaultLayout == HAL::TextureLayout::Common);
 
 	return TextureHandle(resourceIndex);
 }
 
-void Graph::addPass(PassType type, PassDependencyCollector& dependencyCollector,
-	PassExecutorFunc executorFunc, const void* userData)
+TaskDependencyCollector TaskGraph::addTask(TaskType type, TaskExecutorFunc executorFunc, void* userData)
 {
-	XEAssert(device);
-	XEAssert(!isCompiled);
-	XEAssert(!issuedPassDependencyCollector);
+	XEAssert(state == State::Recording);
+	revokeIssuedTaskDependenciesCollector();
 
-	XEMasterAssert(passCount < passPoolSize);
-	const uint16 passIndex = passCount;
-	passCount++;
+	XEMasterAssert(taskCount < taskPoolSize);
+	const uint16 taskIndex = taskCount;
+	taskCount++;
 
-	Pass& pass = passes[passIndex];
-	pass.executporFunc = executorFunc;
-	pass.userData = userData;
-	pass.dependenciesBaseOffset = dependencyCount;
-	pass.dependencyCount = 0;
-	//pass.refCount = 0;
+	Task& task = tasks[taskIndex];
+	task.executporFunc = executorFunc;
+	task.userData = userData;
+	task.dependenciesOffset = dependencyCount;
+	task.dependencyCount = 0;
+	task.preExecutionGlobalBarrier = {};
+	task.preExecutionLocalBarrierChainHeadIdx = uint16(-1);
 
-	XEAssert(!dependencyCollector.graph);
-	dependencyCollector.graph = this;
-	issuedPassDependencyCollector = &dependencyCollector;
+	return TaskDependencyCollector(*this);
 }
 
-void Graph::compile()
+void TaskGraph::closeAndCompile()
 {
-	XEAssert(device);
-	XEAssert(!isCompiled);
-	XEAssert(!issuedPassDependencyCollector);
-	XEAssert(passCount > 0);
-
-#if 0
-	// Compute refcount for resources and passes.
-	// Simple graph flood-fill from unreferenced resources.
-	// "FrameGraph: Extensible Rendering Architecture in Frostbite" by Yuriy O'Donnell
-	{
-		for (uint16 i = 0; i < dependencyCount; i++)
-		{
-			const Dependency& dependency = dependencies[i];
-
-			if (HAL::BarrierAccessUtils::IsReadOnly(dependency.access))
-				resources[dependency.resourceIndex].refCount++;
-			else
-				passes[dependency.passIndex].refCount++;
-		}
-
-		XLib::InplaceArrayList<uint16, MaxResourceCount> unreferencedResourcesStack;
-		for (uint16 i = 0; i < resourceCount; i++)
-		{
-			if (resources[i].refCount == 0)
-				unreferencedResourcesStack.pushBack(i);
-		}
-
-		while (!unreferencedResourcesStack.isEmpty())
-		{
-			const uint16 unrefResIndex = unreferencedResourcesStack.popBack();
-
-			for (uint16 unrefResDepChainIter = resources[unrefResIndex].dependencyChainHeadIdx;
-				unrefResDepChainIter != uint16(-1);
-				unrefResDepChainIter = dependencies[unrefResDepChainIter].resourceDependencyChainNextIdx)
-			{
-				//if (!IsModifyingAccess(dependencies[unrefResDepChainIter].resourceAccessType))
-				if (HAL::BarrierAccessUtils::IsReadOnly(dependencies[unrefResDepChainIter].access))
-					continue;
-
-				Pass& unrefPass = passes[dependencies[unrefResDepChainIter].passIndex];
-				XEAssert(unrefPass.refCount > 0);
-				unrefPass.refCount--;
-				if (unrefPass.refCount > 0)
-					continue;
-
-				for (uint16 i = 0; i < unrefPass.dependencyCount; i++)
-				{
-					const Dependency& unrefDep = dependencies[unrefPass.dependenciesBaseOffset + i];
-					//if (!IsModifyingAccess(unrefDep.resourceAccessType))
-					if (HAL::BarrierAccessUtils::IsReadOnly(unrefDep.access))
-					{
-						Resource& newUnrefRes = resources[unrefDep.resourceIndex];
-						XEAssert(newUnrefRes.refCount > 0);
-						newUnrefRes.refCount--;
-
-						if (newUnrefRes.refCount == 0)
-							unreferencedResourcesStack.pushBack(unrefDep.resourceIndex);
-					}
-				}
-			}
-		}
-	}
-#endif
-
+	XEAssert(state == State::Recording);
+	revokeIssuedTaskDependenciesCollector();
 
 	// Generate resource barriers.
-	for (uint16 resourceIndex = 0; resourceIndex < resourceCount; resourceIndex++)
 	{
-		const Resource& resource = resources[resourceIndex];
-		//if (resource.refCount == 0)
-		//	continue;
-		//XEAssert(resource.dependencyChainHeadIdx != uint16(-1));
-
-		//if (resource.type == HAL::ResourceType::Buffer)
+		struct ResourceState
 		{
-			Barrier* prevBarrier = nullptr;
-			HAL::BarrierAccess prevBarrierAccess = HAL::BarrierAccess::None;
-			HAL::BarrierSync prevBarrierSync = HAL::BarrierSync::None;
-
-			// (T_T)
-			HAL::TextureLayout prevTextureLayout = HAL::TextureLayout::Common;
-
-			for (uint16 depChainIter = resource.dependencyChainHeadIdx;
-				depChainIter != uint16(-1);
-				depChainIter = dependencies[depChainIter].resourceDependencyChainNextIdx)
+			union
 			{
-				const Dependency& dependency = dependencies[depChainIter];
-				Pass& pass = passes[dependency.passIndex];
-
-				//if (pass.refCount == 0)
-				//	continue;
-
-				const bool readToReadTransition =
-					prevBarrierAccess != HAL::BarrierAccess::None &&
-					HAL::BarrierAccessUtils::IsReadOnly(prevBarrierAccess) &&
-					HAL::BarrierAccessUtils::IsReadOnly(dependency.access);
-
-				const bool shaderWriteToShaderWriteWithoutSync =
-					!dependency.dependsOnPrecedingShaderWrite &&
-					prevBarrierAccess == HAL::BarrierAccess::ShaderReadWrite &&
-					dependency.access == HAL::BarrierAccess::ShaderReadWrite;
-
-				if (readToReadTransition || shaderWriteToShaderWriteWithoutSync)
+				struct
 				{
-					// Extend already emitted barrier.
-					prevBarrierAccess |= dependency.access;
-					prevBarrierSync |= dependency.sync;
+					uint16 prevGlobalBarrierEmittingTaskIndex;
+				} buffer;
 
-					XEAssert(prevBarrier);
-					prevBarrier->accessAfter |= dependency.access;
-					prevBarrier->syncAfter |= dependency.sync;
+				struct
+				{
+					uint16 prevBarrierIndex;
+				} texture;
+			};
+
+			HAL::BarrierSync hwSync;
+			HAL::BarrierAccess hwAccess;
+			HAL::TextureLayout hwTextureLayout;
+		};
+
+		ResourceState resourceStates[MaxResourceCount];
+		XEAssert(resourceCount < MaxResourceCount);
+		memorySet(resourceStates, 0, sizeof(ResourceState) * resourceCount);
+
+		for (uint16 taskIndex = 0; taskIndex < taskCount; taskIndex++)
+		{
+			Task& task = tasks[taskIndex];
+			for (uint16 taskDependencyIndex = 0; taskDependencyIndex < task.dependencyCount; taskDependencyIndex++)
+			{
+				const Dependency& dependency = dependencies[task.dependenciesOffset + taskDependencyIndex];
+
+				const uint16 resourceIndex = dependency.resourceIndex;
+				XEAssert(resourceIndex < resourceCount);
+				const Resource& resource = resources[resourceIndex];
+				ResourceState& resourceState = resourceStates[resourceIndex];
+
+				if (resource.type == HAL::ResourceType::Buffer)
+				{
+					XEAssert(HAL::BarrierSyncUtils::IsBufferCompatible(dependency.hwSync));
+					XEAssert(HAL::BarrierAccessUtils::IsBufferCompatible(dependency.hwAccess));
+
+					if (resourceState.hwAccess == HAL::BarrierAccess::None)
+					{
+						XEAssert(resourceState.hwSync == HAL::BarrierSync::None);
+
+						// This is first access to buffer. No barrier required.
+
+						resourceState.buffer.prevGlobalBarrierEmittingTaskIndex = uint16(-1);
+						resourceState.hwSync = dependency.hwSync;
+						resourceState.hwAccess = dependency.hwAccess;
+					}
+					else
+					{
+						XEAssert(resourceState.hwSync != HAL::BarrierSync::None);
+
+						// Buffer was already accessed.
+						// Extend previously generated barrier if this is read->read situation. Generate new barrier otherwise.
+
+						const bool prevAccessIsReadOnly = HAL::BarrierAccessUtils::IsReadOnly(resourceState.hwAccess);
+						const bool currAccessIsReadOnly = HAL::BarrierAccessUtils::IsReadOnly(dependency.hwAccess);
+						if (prevAccessIsReadOnly && currAccessIsReadOnly)
+						{
+							// This is read->read situation. No new barrier required. Just extend previous access.
+
+							const uint16 prevGlobalBarrierEmittingTaskIndex = resourceState.buffer.prevGlobalBarrierEmittingTaskIndex;
+							if (prevGlobalBarrierEmittingTaskIndex == uint16(-1))
+							{
+								// We are extending first access to resource that does not require barrier.
+								// Nothing to do here.
+							}
+							else
+							{
+								// Extend previous barrer.
+								XEAssert(prevGlobalBarrierEmittingTaskIndex < taskCount);
+								Task& prevGlobalBarrierEmittingTask = tasks[prevGlobalBarrierEmittingTaskIndex];
+								prevGlobalBarrierEmittingTask.preExecutionGlobalBarrier.hwSyncAfter |= dependency.hwSync;
+								prevGlobalBarrierEmittingTask.preExecutionGlobalBarrier.hwAccessAfter |= dependency.hwAccess;
+							}
+
+							resourceState.hwSync |= dependency.hwSync;
+							resourceState.hwAccess |= dependency.hwAccess;
+						}
+						else
+						{
+							// Generate new barrier.
+
+							// TODO: Handle `canOverlapPrecedingShaderWrite`.
+
+							task.preExecutionGlobalBarrier.hwSyncBefore |= resourceState.hwSync;
+							task.preExecutionGlobalBarrier.hwSyncAfter |= dependency.hwSync;
+							task.preExecutionGlobalBarrier.hwAccessBefore |= resourceState.hwAccess;
+							task.preExecutionGlobalBarrier.hwAccessAfter |= dependency.hwAccess;
+
+							resourceState.buffer.prevGlobalBarrierEmittingTaskIndex = taskIndex;
+							resourceState.hwSync = dependency.hwSync;
+							resourceState.hwAccess = dependency.hwAccess;
+						}
+					}
+				}
+				else if (resource.type == HAL::ResourceType::Texture)
+				{
+					XEAssert(HAL::BarrierSyncUtils::IsTextureCompatible(dependency.hwSync));
+					XEAssert(HAL::BarrierAccessUtils::IsCompatibleWithTextureLayout(dependency.hwAccess, dependency.hwTextureLayout));
+					XEAssert(dependency.hwTextureLayout != HAL::TextureLayout::Undefined);
+
+					XEAssert(!dependency.usesTextureSubresourceRange); // Not implemented.
+
+					if (resourceState.hwAccess == HAL::BarrierAccess::None)
+					{
+						XEAssert(resourceState.hwSync == HAL::BarrierSync::None);
+						XEAssert(resourceState.hwTextureLayout == HAL::TextureLayout::Undefined);
+
+						// This is first access to texture.
+						// For imported texture: generate layout transition barrier if pre-execution layout does not match dependency layout.
+						// For transient texture: communicate initial texture layout to driver via "fake" barrier.
+
+						bool shouldGenerateBarrier = false;
+
+						if (resource.isImported)
+						{
+							if (resource.hwPreExecutionImportedTextureLayout != dependency.hwTextureLayout)
+							{
+								// Real layout transition.
+								shouldGenerateBarrier = true;
+								resourceState.hwTextureLayout = resource.hwPreExecutionImportedTextureLayout;
+							}
+							else
+							{
+								// Access does not require barrier.
+								shouldGenerateBarrier = false;
+							}
+						}
+						else
+						{
+							// Fake transition to notify driver about initial layout.
+							shouldGenerateBarrier = true;
+						}
+
+						uint16 generatedBarrierIndex = uint16(-1);
+						if (shouldGenerateBarrier)
+						{
+							XEMasterAssert(barrierCount < barrierPoolSize);
+							const uint16 barrierIndex = barrierCount;
+							barrierCount++;
+
+							Barrier& barrier = barriers[barrierIndex];
+							barrier = {};
+							barrier.hwSyncBefore = HAL::BarrierSync::None;
+							barrier.hwAccessBefore = HAL::BarrierAccess::None;
+							barrier.hwSyncAfter = dependency.hwSync;
+							barrier.hwAccessAfter = dependency.hwAccess;
+							//barrier.hwTextureSubresourceRange = ...;
+							barrier.hwTextureLayoutBefore = resourceState.hwTextureLayout;
+							barrier.hwTextureLayoutAfter = dependency.hwTextureLayout;
+							barrier.resourceIndex = resourceIndex;
+							barrier.chainNextIdx = task.preExecutionLocalBarrierChainHeadIdx;
+							task.preExecutionLocalBarrierChainHeadIdx = barrierIndex;
+
+							generatedBarrierIndex = barrierIndex;
+						}
+
+						resourceState.texture.prevBarrierIndex = generatedBarrierIndex;
+						resourceState.hwSync = dependency.hwSync;
+						resourceState.hwAccess = dependency.hwAccess;
+						resourceState.hwTextureLayout = dependency.hwTextureLayout;
+					}
+					else
+					{
+						XEAssert(resourceState.hwSync != HAL::BarrierSync::None);
+						XEAssert(resourceState.hwTextureLayout != HAL::TextureLayout::Undefined);
+
+						// Texture was already accessed.
+						// Extend previous barrier if layout matches. Generate new barrier otherwise.
+
+						if (resourceState.hwTextureLayout == dependency.hwTextureLayout)
+						{
+							const bool prevAccessIsReadOnly = HAL::BarrierAccessUtils::IsReadOnly(resourceState.hwAccess);
+							const bool currAccessIsReadOnly = HAL::BarrierAccessUtils::IsReadOnly(dependency.hwAccess);
+
+							if (prevAccessIsReadOnly && currAccessIsReadOnly)
+							{
+								// This is read->read situation. No new barrier required. Just extend previous access.
+
+								const uint16 prevBarrierIndex = resourceState.texture.prevBarrierIndex;
+								if (prevBarrierIndex == uint16(-1))
+								{
+									// We are extending first access to resource that does not require barrier.
+									// Nothing to do here.
+								}
+								else
+								{
+									// Extend previous barrer.
+									XEAssert(prevBarrierIndex < barrierCount);
+									Barrier& prevBarrier = barriers[prevBarrierIndex];
+									prevBarrier.hwSyncAfter |= dependency.hwSync;
+									prevBarrier.hwAccessAfter |= dependency.hwAccess;
+								}
+
+								resourceState.hwSync |= dependency.hwSync;
+								resourceState.hwAccess |= dependency.hwAccess;
+							}
+							else
+							{
+								// Generate new barrier.
+
+								// TODO: Handle `canOverlapPrecedingShaderWrite`.
+
+								XEMasterAssert(barrierCount < barrierPoolSize);
+								const uint16 barrierIndex = barrierCount;
+								barrierCount++;
+
+								Barrier& barrier = barriers[barrierIndex];
+								barrier = {};
+								barrier.hwSyncBefore = resourceState.hwSync;
+								barrier.hwAccessBefore = resourceState.hwAccess;
+								barrier.hwSyncAfter = dependency.hwSync;
+								barrier.hwAccessAfter = dependency.hwAccess;
+								//barrier.hwTextureSubresourceRange = ...;
+								barrier.hwTextureLayoutBefore = resourceState.hwTextureLayout;
+								barrier.hwTextureLayoutAfter = resourceState.hwTextureLayout;
+								barrier.resourceIndex = resourceIndex;
+								barrier.chainNextIdx = task.preExecutionLocalBarrierChainHeadIdx;
+								task.preExecutionLocalBarrierChainHeadIdx = barrierIndex;
+
+								resourceState.texture.prevBarrierIndex = barrierIndex;
+								resourceState.hwSync = dependency.hwSync;
+								resourceState.hwAccess = dependency.hwAccess;
+							}
+						}
+						else
+						{
+							XEMasterAssert(barrierCount < barrierPoolSize);
+							const uint16 barrierIndex = barrierCount;
+							barrierCount++;
+
+							Barrier& barrier = barriers[barrierIndex];
+							barrier = {};
+							barrier.hwSyncBefore = resourceState.hwSync;
+							barrier.hwAccessBefore = resourceState.hwAccess;
+							barrier.hwSyncAfter = dependency.hwSync;
+							barrier.hwAccessAfter = dependency.hwAccess;
+							//barrier.hwTextureSubresourceRange = ...;
+							barrier.hwTextureLayoutBefore = resourceState.hwTextureLayout;
+							barrier.hwTextureLayoutAfter = dependency.hwTextureLayout;
+							barrier.resourceIndex = resourceIndex;
+							barrier.chainNextIdx = task.preExecutionLocalBarrierChainHeadIdx;
+							task.preExecutionLocalBarrierChainHeadIdx = barrierIndex;
+
+							resourceState.texture.prevBarrierIndex = barrierIndex;
+							resourceState.hwSync = dependency.hwSync;
+							resourceState.hwAccess = dependency.hwAccess;
+							resourceState.hwTextureLayout = dependency.hwTextureLayout;
+						}
+					}
 				}
 				else
-				{
-					// Generate new barrier.
-					XEMasterAssert(barrierCount < barrierPoolSize);
-					const uint16 newBarrierIndex = barrierCount;
-					barrierCount++;
-
-					Barrier& newBarrier = barriers[newBarrierIndex];
-					newBarrier = {};
-					newBarrier.resourceIndex = resourceIndex;
-					newBarrier.accessBefore = prevBarrierAccess;
-					newBarrier.accessAfter = dependency.access;
-					newBarrier.syncBefore = prevBarrierSync;
-					newBarrier.syncAfter = dependency.sync;
-					newBarrier.chainNextIdx = uint16(-1);
-
-					if (resource.type == HAL::ResourceType::Texture)
-					{
-						newBarrier.layoutBefore = prevTextureLayout;
-						newBarrier.layoutAfter = ...;
-						...;
-					}
-
-					if (prevBarrier)
-						prevBarrier->chainNextIdx = newBarrierIndex;
-					else
-						pass.preExecutionBarrierChainHeadIdx = newBarrierIndex;
-
-					prevBarrier = &newBarrier;
-					prevBarrierAccess = dependency.access;
-					prevBarrierSync = dependency.sync;
-				}
+					XEAssertUnreachableCode();
 			}
-
-			// TODO: Generate last barrier to NONE state (will need this for aliasing to work properly
-
-			XTODO(__FUNCTION__ ": ");
 		}
-		/*else if (resource.type == HAL::ResourceType::Texture)
+
+
+		// Generate barriers to transition imported textures to post-execution layout.
+		XEAssert(postExecutionLocalBarrierChainHeadIdx == uint16(-1));
+		for (uint16 resourceIndex = 0; resourceIndex < resourceCount; resourceIndex++)
 		{
+			const Resource& resource = resources[resourceIndex];
+			const ResourceState& resourceState = resourceStates[resourceIndex];
 
+			if (resource.isImported &&
+				resource.type == HAL::ResourceType::Texture &&
+				resource.hwPostExecutionImportedTextureLayout != resourceState.hwTextureLayout)
+			{
+				XEMasterAssert(barrierCount < barrierPoolSize);
+				const uint16 barrierIndex = barrierCount;
+				barrierCount++;
+
+				Barrier& barrier = barriers[barrierIndex];
+				barrier = {};
+				barrier.hwSyncBefore = resourceState.hwSync;
+				barrier.hwAccessBefore = resourceState.hwAccess;
+				barrier.hwSyncAfter = HAL::BarrierSync::None;
+				barrier.hwAccessAfter = HAL::BarrierAccess::None;
+				//barrier.hwTextureSubresourceRange = ...;
+				barrier.hwTextureLayoutBefore = resourceState.hwTextureLayout;
+				barrier.hwTextureLayoutAfter = resource.hwPostExecutionImportedTextureLayout;
+				barrier.resourceIndex = resourceIndex;
+				barrier.chainNextIdx = postExecutionLocalBarrierChainHeadIdx;
+				postExecutionLocalBarrierChainHeadIdx = barrierIndex;
+			}
 		}
-		else
-			XEAssertUnreachableCode();*/
 	}
-
-
-	// Compute transient resource lifetime conflict matrix (if we ever need one).
-	// ...
 
 
 	// Compute transient resources locations.
@@ -648,8 +859,8 @@ void Graph::compile()
 					const Resource& alreadyPlacedResource = resources[alreadyPlacedResourceIndex];
 
 				const bool lifetimesOverlap =
-					resource.firstUsagePassIndex <= alreadyPlacedResource.lastUsagePassIndex &&
-					resource.lastUsagePassIndex  >= alreadyPlacedResource.firstUsagePassIndex;
+					resource.firstUsageTaskIndex <= alreadyPlacedResource.lastUsageTaskIndex &&
+					resource.lastUsageTaskIndex  >= alreadyPlacedResource.firstUsageTaskIndex;
 
 				if (lifetimesOverlap)
 				{
@@ -712,10 +923,10 @@ void Graph::compile()
 
 #else
 
-	uint32 transientResourceHeapOffsetAccum = 0;
+	uint32 transientResourceMemoryOffsetAccum = 0;
 	for (uint16 resourceIndex = 0; resourceIndex < resourceCount; resourceIndex++)
 	{
-		const Resource resource = resources[resourceIndex];
+		const Resource& resource = resources[resourceIndex];
 		if (resource.isImported)
 			continue;
 
@@ -723,86 +934,111 @@ void Graph::compile()
 
 		if (resource.type == HAL::ResourceType::Buffer)
 		{
-			resourceLocation.offset = transientResourceHeapOffsetAccum;
+			resourceLocation.offset = transientResourceMemoryOffsetAccum;
 			resourceLocation.size = XCheckedCastU16(
-				divRoundUp<uint64>(resource.bufferSize, TransientResourceCache::AllocationAlignment));
+				divRoundUp<uint64>(resource.desc.bufferSize, TransientResourceCache::AllocationAlignment));
 		}
 		else if (resource.type == HAL::ResourceType::Texture)
 		{
-			const HAL::ResourceAllocationInfo textureAllocationInfo =
-				device->getTextureAllocationInfo(resource.textureDesc);
-			XEAssert(textureAllocationInfo.alignment <= TransientResourceCache::AllocationAlignment);
+			const HAL::ResourceMemoryRequirements hwMemoryRequirements =
+				hwDevice->getTextureMemoryRequirements(resource.desc.hwTextureDesc);
+			XEAssert(hwMemoryRequirements.alignment <= HAL::ResourceAlignmentRequirement::_64kib);
 
-			resourceLocation.offset = transientResourceHeapOffsetAccum;
+			resourceLocation.offset = transientResourceMemoryOffsetAccum;
 			resourceLocation.size = XCheckedCastU16(
-				divRoundUp<uint64>(textureAllocationInfo.size, TransientResourceCache::AllocationAlignment));
+				divRoundUp<uint64>(hwMemoryRequirements.size, TransientResourceCache::AllocationAlignment));
 		}
 
-		transientResourceHeapOffsetAccum += resourceLocation.size;
+		transientResourceMemoryOffsetAccum += resourceLocation.size;
 	}
 
 #endif
 
 
-	// Allocate transient resources.
-
-	// NOTE: This is a placeholder code.
-	uint32 transientResourceHeapOffsetAccum = 0;
-	for (uint16 resourceIndex = 0; resourceIndex < resourceCount; resourceIndex++)
+	// Query transient resources from cache.
 	{
-		Resource resource = resources[resourceIndex];
-		if (resource.isImported)
-			continue;
+		transientResourceCache->openUsageCycle();
 
-		if (resource.type == HAL::ResourceType::Buffer)
+		for (uint16 resourceIndex = 0; resourceIndex < resourceCount; resourceIndex++)
 		{
-			const HAL::BufferHandle bufferHandle = device->createBuffer(resource.bufferSize);
-			resource.halResourceHandle = uint32(bufferHandle);
+			Resource& resource = resources[resourceIndex];
+			if (resource.isImported)
+				continue;
+
+			const TransientResourceLocation& resourceLocation = transientResourceLocations[resourceIndex];
+
+			if (resource.type == HAL::ResourceType::Buffer)
+			{
+				resource.hwBufferHandle = transientResourceCache->queryBuffer(
+					resource.transientNameXSH, resource.desc.bufferSize, resourceLocation.offset);
+			}
+			else if (resource.type == HAL::ResourceType::Texture)
+			{
+				resource.hwTextureHandle = transientResourceCache->queryTexture(
+					resource.transientNameXSH, resource.desc.hwTextureDesc, resourceLocation.offset);
+			}
 		}
-		else if (resource.type == HAL::ResourceType::Texture)
-		{
-			const HAL::TextureHandle textureHandle = device->createTexture(resource.textureDesc, HAL::TextureLayout::Common);
-			resource.halResourceHandle = uint32(textureHandle);
-		}
+
+		transientResourceCache->closeUsageCycle();
 	}
 
-	isCompiled = true;
+	state = State::ReadyForExecution;
 }
 
-void Graph::execute(HAL::CommandAllocatorHandle commandAllocator,
-	HAL::DescriptorAllocatorHandle transientDescriptorAllocator,
-	TransientUploadMemoryAllocator& transientUploadMemoryAllocator) const
+void TaskGraph::execute(HAL::CommandAllocatorHandle hwCommandAllocator,
+	HAL::DescriptorAllocatorHandle hwTransientDescriptorAllocator,
+	CircularUploadMemoryAllocator& transientUploadMemoryAllocator)
 {
-	XEAssert(device);
-	XEAssert(isCompiled);
+	XEAssert(state == State::ReadyForExecution);
 
-	GraphExecutionContext context(*device, *this,
-		transientDescriptorAllocator, transientUploadMemoryAllocator);
+	if (!taskCount)
+		return;
 
-	HAL::CommandList commandList;
-	device->openCommandList(commandList, commandAllocator);
+	TaskExecutionContext context(*hwDevice, *this,
+		hwTransientDescriptorAllocator, transientUploadMemoryAllocator);
 
-	for (uint16 passIndex = 0; passIndex < passCount; passIndex++)
+	HAL::CommandList hwCommandList;
+	hwDevice->openCommandList(hwCommandList, hwCommandAllocator);
+
+	for (uint16 taskIndex = 0; taskIndex < taskCount; taskIndex++)
 	{
-		const Pass& pass = passes[passIndex];
-		pass.executporFunc(context, *device, commandList, pass.userData);
+		const Task& task = tasks[taskIndex];
 
 		// Emit barriers.
-		...;
+		{
+			if (task.preExecutionGlobalBarrier.hwSyncBefore != HAL::BarrierSync::None &&
+				task.preExecutionGlobalBarrier.hwSyncAfter != HAL::BarrierSync::None)
+			{
+				hwCommandList.globalMemoryBarrier(
+					task.preExecutionGlobalBarrier.hwSyncBefore, task.preExecutionGlobalBarrier.hwSyncAfter,
+					task.preExecutionGlobalBarrier.hwAccessBefore, task.preExecutionGlobalBarrier.hwAccessAfter);
+			}
+
+			uint16 barrierChainIt = task.preExecutionLocalBarrierChainHeadIdx;
+			while (barrierChainIt != uint16(-1))
+			{
+				XAssert(barrierChainIt < barrierCount);
+				const Barrier& barrier = barriers[barrierChainIt];
+				XAssert(barrier.resourceIndex < resourceCount);
+				const Resource& resource = resources[barrier.resourceIndex];
+				XEAssert(resource.type == HAL::ResourceType::Texture);
+
+				hwCommandList.textureMemoryBarrier(resource.hwTextureHandle,
+					barrier.hwSyncBefore, barrier.hwSyncAfter,
+					barrier.hwAccessBefore, barrier.hwAccessAfter,
+					barrier.hwTextureLayoutBefore, barrier.hwTextureLayoutAfter);
+
+				barrierChainIt = barrier.chainNextIdx;
+			}
+		}
+
+		task.executporFunc(context, *hwDevice, hwCommandList, task.userData);
 	}
 
-	device->closeCommandList(commandList);
-	device->submitCommandList(HAL::DeviceQueue::Graphics, commandList);
+	hwDevice->closeCommandList(hwCommandList);
+	hwDevice->submitCommandList(HAL::DeviceQueue::Graphics, hwCommandList);
 
-	const HAL::DeviceQueueSyncPoint sp = device->getEndOfQueueSyncPoint(HAL::DeviceQueue::Graphics);
-	transientUploadMemoryAllocator.enqueueRelease(sp);
-	while (!device->isQueueSyncPointReached(sp))
-		{ }
-}
-
-void Graph::reset()
-{
-	XEAssert(device);
-	// Graph re-recoding and transient resource reuse is not implemented for now.
-	XEAssertUnreachableCode();
+	const HAL::DeviceQueueSyncPoint hwEOPSyncPoint = hwDevice->getEOPSyncPoint(HAL::DeviceQueue::Graphics);
+	transientUploadMemoryAllocator.enqueueRelease(hwEOPSyncPoint);
+	transientResourceCache->setPrevUsageCycleEOPSyncPoint(hwEOPSyncPoint);
 }

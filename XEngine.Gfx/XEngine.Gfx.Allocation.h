@@ -56,7 +56,7 @@ namespace XEngine::Gfx
 		void* cpuPointer;
 	};
 
-	class TransientUploadMemoryAllocator : public XLib::NonCopyable
+	class CircularUploadMemoryAllocator : public XLib::NonCopyable
 	{
 	public:
 		static constexpr uint32 AllocationAlignment = HAL::ConstantBufferBindAlignment;
@@ -68,8 +68,8 @@ namespace XEngine::Gfx
 		byte* mappedUploadMemoryPoolBuffer = nullptr;
 
 	public:
-		TransientUploadMemoryAllocator() = default;
-		~TransientUploadMemoryAllocator();
+		CircularUploadMemoryAllocator() = default;
+		~CircularUploadMemoryAllocator();
 
 		void initialize(HAL::Device& device, uint8 poolSizeLog2);
 
