@@ -15,11 +15,14 @@ void SceneRenderer::testPassExecutor(Gfx::Scheduler::TaskExecutionContext& gfxSc
 	gfxHwRT.format = Gfx::HAL::TexelViewFormat::R8G8B8A8_UNORM;
 
 	gfxHwCommandList.bindRenderTargets(1, &gfxHwRT);
-	gfxHwCommandList.clearColorRenderTarget(0, nullptr);
+
+	float32 clearColor[4] = {};
+	gfxHwCommandList.clearColorRenderTarget(0, clearColor);
 
 	gfxHwCommandList.setViewport(0.0f, 0.0f, 1280.0f, 720.0f);
 	gfxHwCommandList.setScissor(0, 0, 1280, 720);
 
+	gfxHwCommandList.setPipelineType(Gfx::HAL::PipelineType::Graphics);
 	gfxHwCommandList.setPipelineLayout(gfxHwTestPipelineLayout);
 	gfxHwCommandList.setGraphicsPipeline(gfxHwTestPipeline);
 	gfxHwCommandList.draw(3);
@@ -27,12 +30,12 @@ void SceneRenderer::testPassExecutor(Gfx::Scheduler::TaskExecutionContext& gfxSc
 
 void SceneRenderer::initialize(Gfx::HAL::Device& gfxHwDevice)
 {
-	gfxHwTestPipelineLayout = Gfx::ShaderLibraryLoader::GetPipelineLayout("TestPL"_xsh);
+	gfxHwTestPipelineLayout = Gfx::GlobalShaderLibraryLoader.getPipelineLayout("Test.PipelineLayout"_xsh);
 
 	{
 		Gfx::HAL::GraphicsPipelineDesc gfxHwTestPipelineDesc = {};
-		gfxHwTestPipelineDesc.vsHandle = Gfx::ShaderLibraryLoader::GetShader("TestVS"_xsh);
-		gfxHwTestPipelineDesc.psHandle = Gfx::ShaderLibraryLoader::GetShader("TestPS"_xsh);
+		gfxHwTestPipelineDesc.vsHandle = Gfx::GlobalShaderLibraryLoader.getShader("TestTriangleVS"_xsh);
+		gfxHwTestPipelineDesc.psHandle = Gfx::GlobalShaderLibraryLoader.getShader("TestTrianglePS"_xsh);
 		gfxHwTestPipelineDesc.colorRenderTargetFormats[0] = Gfx::HAL::TexelViewFormat::R8G8B8A8_UNORM;
 		gfxHwTestPipeline = gfxHwDevice.createGraphicsPipeline(gfxHwTestPipelineLayout, gfxHwTestPipelineDesc);
 	}
@@ -43,7 +46,7 @@ void SceneRenderer::render(
 	Gfx::Scheduler::TextureHandle gfxSchTargetTexture)
 {
 	TestPassUserData* testPassUserData = (TestPassUserData*)gfxSchTaskGraph.allocateUserData(sizeof(TestPassUserData));
-	testPassUserData = {};
+	*testPassUserData = {};
 	testPassUserData->sceneRenderer = this;
 
 	auto TestPassExecutor = [](Gfx::Scheduler::TaskExecutionContext& gfxSchExecutionContext,

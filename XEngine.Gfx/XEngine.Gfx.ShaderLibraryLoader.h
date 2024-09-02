@@ -4,6 +4,8 @@
 #include <XLib.NonCopyable.h>
 #include <XEngine.Gfx.HAL.D3D12.h>
 
+// TODO: Remove `GlobalShaderLibraryLoader` bullshit.
+
 namespace XEngine::Gfx
 {
 	class ShaderLibraryLoader : public XLib::NonCopyable
@@ -29,8 +31,10 @@ namespace XEngine::Gfx
 
 		void load(const char* libraryFilePath, HAL::Device& hwDevice);
 
-		static HAL::DescriptorSetLayoutHandle GetDescriptorSetLayout(uint64 nameXSH) const;
-		static HAL::PipelineLayoutHandle GetPipelineLayout(uint64 nameXSH) const;
-		static HAL::ShaderHandle GetShader(uint64 nameXSH) const;
+		HAL::DescriptorSetLayoutHandle getDescriptorSetLayout(uint64 nameXSH) const;
+		HAL::PipelineLayoutHandle getPipelineLayout(uint64 nameXSH) const;
+		HAL::ShaderHandle getShader(uint64 nameXSH) const;
 	};
+
+	extern ShaderLibraryLoader GlobalShaderLibraryLoader;
 }

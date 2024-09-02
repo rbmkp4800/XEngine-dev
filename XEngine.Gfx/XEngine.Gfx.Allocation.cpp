@@ -50,10 +50,10 @@ bool CircularAllocatorWithGPUReleaseQueue::tryAdvanceReleaseQueue()
 	{
 		if (releaseQueueHeadCounter == releaseQueueTailCounter)
 			break;
-		if (!device->isQueueSyncPointReached(releaseQueueSyncPoints[releaseQueueHeadCounter]))
+		if (!hwDevice->isQueueSyncPointReached(hwReleaseQueueSyncPoints[releaseQueueHeadCounter]))
 			break;
 
-		allocatedRangeHeadCounter = releaseQueueRangeCounters[releaseQueueHeadCounter];
+		allocatedRangeHeadCounter = releaseQueueAllocatedRangeCounters[releaseQueueHeadCounter];
 		releaseQueueHeadCounter++;
 		releaseQueueHeadCounter &= ReleaseQueueCounterMask;
 		releaseQueueAdvanced = true;
@@ -84,16 +84,16 @@ inline bool CircularAllocatorWithGPUReleaseQueue::isPendingReleaseRangeEmpty() c
 		return allocatedRangeHeadCounter == allocatedRangeTailCounter;
 
 	const uint16 releaseQueueBackCounter = (releaseQueueTailCounter - 1) & ReleaseQueueCounterMask;
-	const uint16 pendingReleaseRangeHeadCounter = releaseQueueRangeCounters[releaseQueueBackCounter];
+	const uint16 pendingReleaseRangeHeadCounter = releaseQueueAllocatedRangeCounters[releaseQueueBackCounter];
 	return pendingReleaseRangeHeadCounter == allocatedRangeTailCounter;
 }
 
-void CircularAllocatorWithGPUReleaseQueue::initialize(HAL::Device& device, uint8 poolSizeLog2)
+void CircularAllocatorWithGPUReleaseQueue::initialize(HAL::Device& hwDevice, uint8 poolSizeLog2)
 {
-	XEAssert(!this->device);
+	XEAssert(!this->hwDevice);
 	XEAssert(poolSizeLog2 <= 16); // As we use uint16 for counters everywhere
 
-	this->device = &device;
+	this->hwDevice = &hwDevice;
 	this->poolSizeLog2 = poolSizeLog2;
 
 	allocatedRangeHeadCounter = 0;
@@ -104,7 +104,7 @@ void CircularAllocatorWithGPUReleaseQueue::initialize(HAL::Device& device, uint8
 
 uint16 CircularAllocatorWithGPUReleaseQueue::allocate(uint16 size)
 {
-	XEAssert(device);
+	XEAssert(hwDevice);
 
 	uint16 resultAllocationHeadCounter = 0;
 	for (;;)
@@ -128,7 +128,7 @@ uint16 CircularAllocatorWithGPUReleaseQueue::allocate(uint16 size)
 
 void CircularAllocatorWithGPUReleaseQueue::enqueueRelease(HAL::DeviceQueueSyncPoint syncPoint)
 {
-	XEAssert(device);
+	XEAssert(hwDevice);
 
 	if (isPendingReleaseRangeEmpty())
 		return;
@@ -141,14 +141,13 @@ void CircularAllocatorWithGPUReleaseQueue::enqueueRelease(HAL::DeviceQueueSyncPo
 		{
 			// Release queue is still full after we tried to advance it.
 			// This means that it is too small and something should be done to it.
-			// We crash in Dev to report this issue, but in Master we fallback to busy wait for GPU.
-			XEAssertUnreachableCode();
+			XEShitHitTheFan();
 		}
 		else
 		{
 			// Push new range to release queue.
-			releaseQueueSyncPoints[releaseQueueTailCounter] = syncPoint;
-			releaseQueueRangeCounters[releaseQueueTailCounter] = allocatedRangeTailCounter;
+			hwReleaseQueueSyncPoints[releaseQueueTailCounter] = syncPoint;
+			releaseQueueAllocatedRangeCounters[releaseQueueTailCounter] = allocatedRangeTailCounter;
 			releaseQueueTailCounter++;
 			releaseQueueTailCounter &= ReleaseQueueCounterMask;
 			break;
@@ -156,38 +155,38 @@ void CircularAllocatorWithGPUReleaseQueue::enqueueRelease(HAL::DeviceQueueSyncPo
 	}
 }
 
-TransientUploadMemoryAllocator::~TransientUploadMemoryAllocator()
+CircularUploadMemoryAllocator::~CircularUploadMemoryAllocator()
 {
-	if (uploadMemoryPoolBuffer != HAL::BufferHandle::Zero)
+	if (hwUploadMemoryPoolBuffer != HAL::BufferHandle(0))
 	{
-		baseAllocator.getDevice()->destroyBuffer(uploadMemoryPoolBuffer);
+		baseAllocator.getDevice()->destroyBuffer(hwUploadMemoryPoolBuffer);
 
-		uploadMemoryPoolBuffer = HAL::BufferHandle::Zero;
+		hwUploadMemoryPoolBuffer = {};
 		mappedUploadMemoryPoolBuffer = nullptr;
 	}
 }
 
-void TransientUploadMemoryAllocator::initialize(HAL::Device& device, uint8 poolSizeLog2)
+void CircularUploadMemoryAllocator::initialize(HAL::Device& hwDevice, uint8 poolSizeLog2)
 {
 	// TODO: State asserts
 
 	XEAssert(poolSizeLog2 > HAL::ConstantBufferBindAlignmentLog2);
 
-	baseAllocator.initialize(device, poolSizeLog2 - HAL::ConstantBufferBindAlignmentLog2);
+	baseAllocator.initialize(hwDevice, poolSizeLog2 - HAL::ConstantBufferBindAlignmentLog2);
 
 	const uint32 poolSize = uint32(1) << poolSizeLog2;
-	uploadMemoryPoolBuffer = device.createStagingBuffer(poolSize, HAL::StagingBufferAccessMode::DeviceReadHostWrite);
-	mappedUploadMemoryPoolBuffer = (byte*)device.getMappedBufferPtr(uploadMemoryPoolBuffer);
+	hwUploadMemoryPoolBuffer = hwDevice.createStagingBuffer(poolSize, HAL::StagingBufferAccessMode::DeviceReadHostWrite);
+	mappedUploadMemoryPoolBuffer = (byte*)hwDevice.getMappedBufferPtr(hwUploadMemoryPoolBuffer);
 }
 
-UploadBufferPointer TransientUploadMemoryAllocator::allocate(uint32 size)
+UploadBufferPointer CircularUploadMemoryAllocator::allocate(uint32 size)
 {
 	const uint32 baseAllocationSize = divRoundUp(size, AllocationAlignment);
 	const uint32 allocationOffset = uint32(baseAllocator.allocate(uint16(baseAllocationSize))) * AllocationAlignment;
 
 	UploadBufferPointer result = {};
-	result.gpuPointer.buffer = uploadMemoryPoolBuffer;
-	result.gpuPointer.offset = allocationOffset;
-	result.cpuPointer = mappedUploadMemoryPoolBuffer + allocationOffset;
+	result.hwDevicePointer.buffer = hwUploadMemoryPoolBuffer;
+	result.hwDevicePointer.offset = allocationOffset;
+	result.hostPointer = mappedUploadMemoryPoolBuffer + allocationOffset;
 	return result;
 }

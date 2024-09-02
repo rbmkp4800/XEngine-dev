@@ -1,5 +1,9 @@
 #pragma once
 
+// TODO: Remove this
+
+#if 0
+
 #include "XLib.h"
 
 namespace XLib
@@ -118,3 +122,5 @@ namespace XLib
 		inline Type& back() { return buffer[(backIdx - 1) % bufferSize]; }
 	};
 }
+
+#endif

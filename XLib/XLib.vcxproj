@@ -58,6 +58,7 @@
     <ClInclude Include="Source\XLib.Containers.BinaryHeap.h" />
     <ClInclude Include="Source\XLib.Containers.BinaryTree.h" />
     <ClInclude Include="Source\XLib.Containers.BitArray.h" />
+    <ClInclude Include="Source\XLib.Containers.CircularQueue.h" />
     <ClInclude Include="Source\XLib.Containers.CyclicQueue.h" />
     <ClInclude Include="Source\XLib.Containers.DoublyLinkedList.h" />
     <ClInclude Include="Source\XLib.Containers.HashMap.h" />

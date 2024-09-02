@@ -1,11 +1,11 @@
-#include "XEngine.Gfx.HAL.D3D12.h"
-
 #include <d3d12.h>
 #include <dxgi1_6.h>
 
 #include <XLib.Allocation.h>
 #include <XLib.Containers.ArrayList.h>
 #include <XEngine.Gfx.HAL.BlobFormat.h>
+
+#include "XEngine.Gfx.HAL.D3D12.h"
 
 #include "D3D12Helpers.h"
 #include "XEngine.Gfx.HAL.D3D12.Translation.h"
@@ -1162,8 +1162,8 @@ void Device::initialize(/*const PhysicalDevice& physicalDevice, */const DeviceSe
 	if (!d3dDebug)
 		D3D12GetDebugInterface(IID_PPV_ARGS(&d3dDebug));
 
-	//d3dDebug->EnableDebugLayer();
-	//d3dDebug->SetEnableGPUBasedValidation(TRUE);
+	d3dDebug->EnableDebugLayer();
+	d3dDebug->SetEnableGPUBasedValidation(TRUE);
 	//d3dDebug->SetEnableAutoName(TRUE);
 
 	{
@@ -1256,6 +1256,9 @@ void Device::initialize(/*const PhysicalDevice& physicalDevice, */const DeviceSe
 		const uintptr commandAllocatorPoolMemOffset = poolsMemorySizeAccum;
 		poolsMemorySizeAccum += sizeof(CommandAllocator) * settings.maxCommandAllocatorCount;
 
+		const uintptr descriptorAllocatorPoolMemOffset = poolsMemorySizeAccum;
+		poolsMemorySizeAccum += sizeof(DescriptorAllocator*) * settings.maxDescriptorAllocatorCount;
+
 		const uintptr commandListPoolMemOffset = poolsMemorySizeAccum;
 		poolsMemorySizeAccum += sizeof(CommandList) * settings.maxCommandListCount;
 
@@ -1285,9 +1288,10 @@ void Device::initialize(/*const PhysicalDevice& physicalDevice, */const DeviceSe
 		byte* poolsMemory = (byte*)SystemHeapAllocator::Allocate(poolsTotalMemorySize);
 		memorySet(poolsMemory, 0, poolsTotalMemorySize);
 
-		commandAllocatorPool.initialize		((CommandAllocator*)	(poolsMemory + commandAllocatorPoolMemOffset),		settings.maxMemoryAllocationCount);
-		commandListPool.initialize			((CommandList*)			(poolsMemory + commandListPoolMemOffset),			settings.maxCommandAllocatorCount);
-		memoryAllocationPool.initialize		((MemoryAllocation*)	(poolsMemory + memoryAllocationPoolMemOffset),		settings.maxCommandListCount);
+		commandAllocatorPool.initialize		((CommandAllocator*)	(poolsMemory + commandAllocatorPoolMemOffset),		settings.maxCommandAllocatorCount);
+		descriptorAllocatorPool.initialize	((DescriptorAllocator*)	(poolsMemory + descriptorAllocatorPoolMemOffset),	settings.maxDescriptorAllocatorCount);
+		commandListPool.initialize			((CommandList*)			(poolsMemory + commandListPoolMemOffset),			settings.maxCommandListCount);
+		memoryAllocationPool.initialize		((MemoryAllocation*)	(poolsMemory + memoryAllocationPoolMemOffset),		settings.maxMemoryAllocationCount);
 		resourcePool.initialize				((Resource*)			(poolsMemory + resourcePoolMemOffset),				settings.maxResourceCount);
 		descriptorSetLayoutPool.initialize	((DescriptorSetLayout*)	(poolsMemory + descriptorSetLayoutPoolMemOffset),	settings.maxDescriptorSetLayoutCount);
 		pipelineLayoutPool.initialize		((PipelineLayout*)		(poolsMemory + pipelineLayoutPoolMemOffset),		settings.maxPipelineLayoutCount);
@@ -1375,9 +1379,14 @@ DeviceMemoryHandle Device::allocateDeviceMemory(uint64 size, bool hostVisible)
 	return memoryHandle;
 }
 
+void Device::releaseDeviceMemory(DeviceMemoryHandle memoryHandle)
+{
+	XEMasterAssertUnreachableCode(); // Not implemented.
+}
+
 ResourceMemoryRequirements Device::getTextureMemoryRequirements(const TextureDesc& textureDesc) const
 {
-	XEMasterAssertUnreachableCode();
+	XEMasterAssertUnreachableCode(); // Not implemented.
 	return ResourceMemoryRequirements{};
 }
 
@@ -2231,6 +2240,14 @@ uint16 Device::getDescriptorSetLayoutDescriptorCount(DescriptorSetLayoutHandle d
 TextureHandle Device::getOutputBackBuffer(OutputHandle outputHandle, uint32 backBufferIndex) const
 {
 	const Output& output = outputPool.resolveHandle(uint32(outputHandle));
+	XEAssert(backBufferIndex < countof(output.backBuffers));
+	return output.backBuffers[backBufferIndex];
+}
+
+TextureHandle Device::getOutputCurrentBackBuffer(OutputHandle outputHandle) const
+{
+	const Output& output = outputPool.resolveHandle(uint32(outputHandle));
+	const uint32 backBufferIndex = output.dxgiSwapChain->GetCurrentBackBufferIndex();
 	XEAssert(backBufferIndex < countof(output.backBuffers));
 	return output.backBuffers[backBufferIndex];
 }

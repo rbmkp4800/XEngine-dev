@@ -8,6 +8,9 @@
 // TODO: All this code should probably be thread safe or assert single-thread usage.
 // TODO: We removed `TransientDescriptorAllocator` so there is no need to have abstract `CircularAllocatorWithGPUReleaseQueue`.
 
+// TODO: I do not like 'counter' (headCounter/tailCounter). Sounds more like index.
+// TODO: Use `XLib::InplaceCircularQueue` for sync points and hack SOA on top of it.
+
 namespace XEngine::Gfx
 {
 	class CircularAllocatorWithGPUReleaseQueue : public XLib::NonCopyable
@@ -19,10 +22,10 @@ namespace XEngine::Gfx
 		static_assert(ReleaseQueueBufferSizeLog2 < 16);
 
 	private:
-		HAL::DeviceQueueSyncPoint releaseQueueSyncPoints[ReleaseQueueBufferSize];
-		uint16 releaseQueueRangeCounters[ReleaseQueueBufferSize];
+		HAL::DeviceQueueSyncPoint hwReleaseQueueSyncPoints[ReleaseQueueBufferSize];
+		uint16 releaseQueueAllocatedRangeCounters[ReleaseQueueBufferSize];
 
-		HAL::Device* device = nullptr;
+		HAL::Device* hwDevice = nullptr;
 		uint8 poolSizeLog2 = 0;
 
 		uint16 allocatedRangeHeadCounter = 0;
@@ -42,18 +45,18 @@ namespace XEngine::Gfx
 		CircularAllocatorWithGPUReleaseQueue() = default;
 		~CircularAllocatorWithGPUReleaseQueue() = default;
 
-		void initialize(HAL::Device& device, uint8 poolSizeLog2);
+		void initialize(HAL::Device& hwDevice, uint8 poolSizeLog2);
 
 		uint16 allocate(uint16 size);
 		void enqueueRelease(HAL::DeviceQueueSyncPoint syncPoint);
 
-		inline HAL::Device* getDevice() { return device; }
+		inline HAL::Device* getDevice() { return hwDevice; }
 	};
 
 	struct UploadBufferPointer
 	{
-		HAL::BufferPointer gpuPointer;
-		void* cpuPointer;
+		HAL::BufferPointer hwDevicePointer;
+		void* hostPointer;
 	};
 
 	class CircularUploadMemoryAllocator : public XLib::NonCopyable
@@ -64,7 +67,7 @@ namespace XEngine::Gfx
 	private:
 		CircularAllocatorWithGPUReleaseQueue baseAllocator;
 
-		HAL::BufferHandle uploadMemoryPoolBuffer = HAL::BufferHandle::Zero;
+		HAL::BufferHandle hwUploadMemoryPoolBuffer = {};
 		byte* mappedUploadMemoryPoolBuffer = nullptr;
 
 	public:

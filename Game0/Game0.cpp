@@ -26,7 +26,6 @@ private:
 	Gfx::Scheduler::TransientResourceCache gfxSchTransientResourceCache;
 	Gfx::Scheduler::TaskGraph gfxSchTaskGraph;
 
-	Gfx::ShaderLibraryLoader gfxShaderLibraryLoader;
 	Render::SceneRenderer sceneRenderer;
 
 	float32x3 cameraPosition = {};
@@ -64,22 +63,7 @@ void Game0::run()
 	System::RegisterInputHandler(this);
 	//System::SetCursorEnabled(false);
 
-	{
-		Gfx::HAL::DeviceSettings gfxHwDeviceSettings = {};
-		gfxHwDeviceSettings.maxCommandAllocatorCount = 4;
-		gfxHwDeviceSettings.maxDescriptorAllocatorCount = 4;
-		gfxHwDeviceSettings.maxCommandListCount = 4;
-		gfxHwDeviceSettings.maxMemoryAllocationCount = 1024;
-		gfxHwDeviceSettings.maxResourceCount = 1024;
-		gfxHwDeviceSettings.maxDescriptorSetLayoutCount = 64;
-		gfxHwDeviceSettings.maxPipelineLayoutCount = 64;
-		gfxHwDeviceSettings.maxShaderCount = 64;
-		gfxHwDeviceSettings.maxCompositePipelineCount = 64;
-		gfxHwDeviceSettings.maxOutputCount = 4;
-		gfxHwDeviceSettings.bindlessDescriptorPoolSize = 16;
-		gfxHwDevice.initialize(gfxHwDeviceSettings);
-	}
-
+	gfxHwDevice.initialize();
 	gfxHwCommandAllocator = gfxHwDevice.createCommandAllocator();
 	gfxHwDescriptorAllocator = gfxHwDevice.createDescriptorAllocator();
 	gfxHwOutput = gfxHwDevice.createWindowOutput(1600, 900, window.getHandle());
@@ -88,24 +72,29 @@ void Game0::run()
 	gfxSchTransientResourceCache.initialize(gfxHwDevice);
 	gfxSchTaskGraph.initialize();
 
-	gfxShaderLibraryLoader.load("XEngine.Render.Shaders.xeslib", gfxHwDevice);
+	Gfx::GlobalShaderLibraryLoader.load("XEngine.Render.Shaders.xeslib", gfxHwDevice);
 	sceneRenderer.initialize(gfxHwDevice);
 
 	for (;;)
 	{
-		gfxSchTaskGraph.open(gfxHwDevice, gfxSchTransientResourceCache);
+		System::DispatchEvents();
+
+		gfxSchTaskGraph.open(gfxHwDevice);
 		{
 			const Gfx::HAL::TextureHandle gfxHwCurrentBackBuffer = gfxHwDevice.getOutputCurrentBackBuffer(gfxHwOutput);
 			const Gfx::Scheduler::TextureHandle gfxSchCurrentBackBuffer =
-				gfxSchTaskGraph.importExternalTexture(gfxHwCurrentBackBuffer, Gfx::HAL::TextureLayout::Present);
+				gfxSchTaskGraph.importExternalTexture(gfxHwCurrentBackBuffer,
+					Gfx::HAL::TextureLayout::Present, Gfx::HAL::TextureLayout::Present);
 
 			sceneRenderer.render(gfxSchTaskGraph, gfxSchCurrentBackBuffer);
 		}
-		gfxSchTaskGraph.closeAndCompile();
-		gfxSchTaskGraph.execute(gfxHwCommandAllocator, gfxHwDescriptorAllocator, gfxUploadMemoryAllocator);
+		gfxSchTaskGraph.execute(gfxSchTransientResourceCache, gfxHwCommandAllocator, gfxHwDescriptorAllocator, gfxUploadMemoryAllocator);
 
 		const Gfx::HAL::DeviceQueueSyncPoint gfxHwFrameEndSyncPoint =
-			gfxHwDevice.getEndOfQueueSyncPoint(Gfx::HAL::DeviceQueue::Graphics);
+			gfxHwDevice.getEOPSyncPoint(Gfx::HAL::DeviceQueue::Graphics);
+
+		gfxHwDevice.submitOutputFlip(Gfx::HAL::DeviceQueue::Graphics, gfxHwOutput);
+
 		while (!gfxHwDevice.isQueueSyncPointReached(gfxHwFrameEndSyncPoint))
 			{ }
 

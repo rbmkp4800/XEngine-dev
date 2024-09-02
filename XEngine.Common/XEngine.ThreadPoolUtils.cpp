@@ -21,7 +21,7 @@ void XEngine::AsyncMemoryCopy(void* destination, const void* source, uintptr siz
 void AsyncMemoryCopyContext::TaskRoutine(AsyncMemoryCopyContext::Task& task)
 {
 	AsyncMemoryCopyContext& context =
-		*(AsyncMemoryCopyContext*)(uintptr(&task) - offsetof(AsyncMemoryCopyContext, task));
+		*(AsyncMemoryCopyContext*)(uintptr(&task) - offsetOf(AsyncMemoryCopyContext, task));
 
 	// ASSERT(context.destination);
 	// ASSERT(context.source);

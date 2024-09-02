@@ -109,8 +109,7 @@ constexpr auto countof(T(&)[size])
 		return size;
 }
 
-#undef offsetof
-#define offsetof(type, field) uintptr(&((type*)nullptr)->field)
+#define offsetOf(type, field) uintptr(&((type*)nullptr)->field)
 
 template <typename T>
 inline void swap(T& a, T& b)

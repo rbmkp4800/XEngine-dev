@@ -1,10 +1,6 @@
 #include "XEngine.Gfx.Scheduler.h"
 
-#include <XLib.Algorithm.QuickSort.h>
 #include <XLib.Allocation.h>
-#include <XLib.Containers.ArrayList.h>
-
-#include "XEngine.Gfx.Allocation.h"
 
 using namespace XEngine::Gfx;
 using namespace XEngine::Gfx::Scheduler;
@@ -30,7 +26,6 @@ static inline HAL::BarrierSync TranslateSchResourceShaderAccessStageToHwBarrierS
 struct TransientResourceCache::Entry
 {
 	uint64 nameXSH;
-	HAL::DeviceQueueSyncPoint hwLastUsageCycleEOPSyncPoint;
 
 	union
 	{
@@ -45,65 +40,75 @@ struct TransientResourceCache::Entry
 	};
 
 	uint16 memoryOffset;
+	uint16 lastUsageSessionIndex;
 
 	HAL::ResourceType type;
+
+	// TODO: This should look like this:
+#if 0
+	uint64 nameXSH;
+	HAL::ResourceDesc hwDesc; // Still U64. Includes `HAL::ResourceType`.
+	HAL::ResourceHandle hwHandle;
+	uint16 memoryOffset;
+	uint16 sessionIndex;
+#endif
 };
 
 
-void TransientResourceCache::openUsageCycle()
+void TransientResourceCache::pruneSessionReleaseQueue()
 {
-
+	while (!sessionReleaseQueue.isEmpty() && hwDevice->isQueueSyncPointReached(sessionReleaseQueue.peek().hwSyncPoint))
+		sessionReleaseQueue.pop();
 }
 
-void TransientResourceCache::closeUsageCycle()
+void TransientResourceCache::prune()
 {
+	pruneSessionReleaseQueue();
 
-}
-
-void TransientResourceCache::setPrevUsageCycleEOPSyncPoint(HAL::DeviceQueueSyncPoint hwSyncPoint)
-{
-
-}
-
-HAL::BufferHandle TransientResourceCache::queryBuffer(uint64 nameXSH, uint32 bufferSize, uint16 memoryOffset)
-{
-	bufferSize = alignUp<uint32>(bufferSize, AllocationAlignment);
-
-	for (uint16 i = 0; i < entryCount; i++)
+	for (uint16 entryIndex = 0; entryIndex < entryCount; entryIndex++)
 	{
-		const Entry& entry = entries[i];
-		if (entry.type == HAL::ResourceType::Buffer &&
-			entry.nameXSH == nameXSH &&
-			entry.desc.bufferSize == bufferSize &&
-			entry.memoryOffset == memoryOffset)
+		Entry& entry = entries[entryIndex];
+
+		const uint16 lastUsageSessionAge = currentSessionIndex - entry.lastUsageSessionIndex;
+		if (lastUsageSessionAge >= SessionForceEvictAge)
 		{
-			return entry.hwBufferHandle;
+			if (entry.type == HAL::ResourceType::Buffer)
+				hwDevice->destroyBuffer(entry.hwBufferHandle);
+			else if (entry.type == HAL::ResourceType::Texture)
+				hwDevice->destroyTexture(entry.hwTextureHandle);
+
+			// TODO: Remove element
+			// ...
+			XEAssertUnreachableCode();
 		}
 	}
 
-	const HAL::BufferHandle hwBuffer = hwDevice->createBuffer(bufferSize, hwDeviceMemory, memoryOffset);
-
-	XEMasterAssert(entryCount < entryPoolSize);
-	const uint16 newEntryIndex = entryCount;
-	entryCount++;
-
-	Entry& entry = entries[newEntryIndex];
-	entry = {};
-	entry.nameXSH = nameXSH;
-	entry.hwLastUsageCycleEOPSyncPoint = {};
-	entry.desc.bufferSize = bufferSize;
-	entry.hwBufferHandle = hwBuffer;
-	entry.memoryOffset = memoryOffset;
-	entry.type = HAL::ResourceType::Buffer;
+	// If we are over treshold cache load value (e. g. 75% of total capacity).
+	// Iterate over all entries.
+	// Construct LRU-ordered list of released entries.
+	// Remove top entries until we reach treshold cache load.
 }
 
-HAL::TextureHandle TransientResourceCache::queryTexture(uint64 nameXSH, HAL::TextureDesc hwTextureDesc, uint16 memoryOffset)
+void TransientResourceCache::initialize(HAL::Device& hwDevice, uint16 maxEntryCount)
 {
+	this->hwDevice = &hwDevice;
+	deviceMemorySize = 1024 * 1024 * 128;
+	hwDeviceMemory = hwDevice.allocateDeviceMemory(deviceMemorySize);
 
+	entries = (Entry*)XLib::SystemHeapAllocator::Allocate(sizeof(Entry) * maxEntryCount);
+	memorySet(entries, 0, sizeof(Entry) * maxEntryCount);
+
+	entryPoolSize = maxEntryCount;
+	entryCount = 0;
 }
 
-TransientResourceCache::~TransientResourceCache()
+void TransientResourceCache::destroy()
 {
+	XEAssert(!sessionIsOpen);
+
+	// TODO: Proper resources release.
+	XEAssertUnreachableCode();
+
 	if (hwDevice)
 	{
 		hwDevice->releaseDeviceMemory(hwDeviceMemory);
@@ -121,63 +126,138 @@ TransientResourceCache::~TransientResourceCache()
 	}
 }
 
-void TransientResourceCache::initialize(HAL::Device& hwDevice, uint16 maxEntryCount)
+
+// TransientResourceCacheAccessSession /////////////////////////////////////////////////////////////
+
+TransientResourceCacheAccessSession::~TransientResourceCacheAccessSession()
 {
-	this->hwDevice = &hwDevice;
-	deviceMemorySize = 1024 * 1024 * 128;
-	hwDeviceMemory = hwDevice.allocateDeviceMemory(deviceMemorySize);
+	XEAssert(!cache);
 }
 
-
-// TaskExecutionContext ////////////////////////////////////////////////////////////////////////////
-
-TaskExecutionContext::TaskExecutionContext(HAL::Device& hwDevice, const TaskGraph& graph,
-	HAL::DescriptorAllocatorHandle hwTransientDescriptorAllocator,
-	CircularUploadMemoryAllocator& transientUploadMemoryAllocator)
-	:
-	hwDevice(hwDevice), taskGraph(taskGraph),
-	hwTransientDescriptorAllocator(hwTransientDescriptorAllocator),
-	transientUploadMemoryAllocator(transientUploadMemoryAllocator)
-{ }
-
-HAL::DescriptorSet TaskExecutionContext::allocateTransientDescriptorSet(HAL::DescriptorSetLayoutHandle descriptorSetLayout)
+void TransientResourceCacheAccessSession::openAndPruneCache(TransientResourceCache& cache)
 {
-	return hwDevice.allocateDescriptorSet(hwTransientDescriptorAllocator, descriptorSetLayout);
+	XEAssert(!this->cache && !cache.sessionIsOpen);
+	this->cache = &cache;
+	cache.sessionIsOpen = true;
+	cache.prune();
 }
 
-UploadBufferPointer TaskExecutionContext::allocateTransientUploadMemory(uint32 size)
+void TransientResourceCacheAccessSession::closeAndSetupSessionRelease(HAL::DeviceQueueSyncPoint hwSessionReleaseSyncPoint)
 {
-	return transientUploadMemoryAllocator.allocate(size);
+	XEAssert(cache && cache->sessionIsOpen);
+
+	while (cache->sessionReleaseQueue.isFull())
+	{
+		XEShitHitTheFan();
+		cache->pruneSessionReleaseQueue();
+	}
+
+	cache->sessionReleaseQueue.push(TransientResourceCache::SessionReleaseQueueElement { hwSessionReleaseSyncPoint });
+	cache->currentSessionIndex++;
+	XEAssert(cache->currentSessionIndex == cache->sessionReleaseQueue.getTailCounter());
+	cache->sessionIsOpen = false;
+	cache = nullptr;
 }
 
-HAL::BufferHandle TaskExecutionContext::resolveBuffer(BufferHandle bufferHandle)
+HAL::BufferHandle TransientResourceCacheAccessSession::queryBuffer(uint64 nameXSH, uint32 bufferSize, uint16 memoryOffset)
 {
-	const uint16 resourceIndex = uint16(bufferHandle);
-	XEAssert(resourceIndex < taskGraph.resourceCount);
-	const TaskGraph::Resource& resource = taskGraph.resources[resourceIndex];
-	XEAssert(resource.type == HAL::ResourceType::Buffer);
-	return resource.hwBufferHandle;
+	XEAssert(cache);
+	XEAssert(memoryOffset % TransientResourceAllocationAlignment == 0);
+	bufferSize = alignUp<uint32>(bufferSize, TransientResourceAllocationAlignment);
+
+	for (uint16 i = 0; i < cache->entryCount; i++)
+	{
+		const TransientResourceCache::Entry& entry = cache->entries[i];
+		if (entry.type == HAL::ResourceType::Buffer &&
+			entry.nameXSH == nameXSH &&
+			entry.desc.bufferSize == bufferSize &&
+			entry.memoryOffset == memoryOffset)
+		{
+			return entry.hwBufferHandle;
+		}
+	}
+
+	while (cache->entryCount == cache->entryPoolSize)
+	{
+		XEShitHitTheFan();
+		cache->prune();
+	}
+
+	XEAssert(cache->entryCount < cache->entryPoolSize);
+	const uint16 newEntryIndex = cache->entryCount;
+	cache->entryCount++;
+
+	const HAL::BufferHandle hwBuffer = cache->hwDevice->createBuffer(bufferSize, cache->hwDeviceMemory, memoryOffset);
+
+	TransientResourceCache::Entry& entry = cache->entries[newEntryIndex];
+	entry = {};
+	entry.nameXSH = nameXSH;
+	entry.desc.bufferSize = bufferSize;
+	entry.hwBufferHandle = hwBuffer;
+	entry.memoryOffset = memoryOffset;
+	entry.lastUsageSessionIndex = cache->currentSessionIndex;
+	entry.type = HAL::ResourceType::Buffer;
+
+	return hwBuffer;
 }
 
-HAL::TextureHandle TaskExecutionContext::resolveTexture(TextureHandle textureHandle)
+HAL::TextureHandle TransientResourceCacheAccessSession::queryTexture(uint64 nameXSH, HAL::TextureDesc hwTextureDesc, uint16 memoryOffset)
 {
-	const uint16 resourceIndex = uint16(textureHandle);
-	XEAssert(resourceIndex < taskGraph.resourceCount);
-	const TaskGraph::Resource& resource = taskGraph.resources[resourceIndex];
-	XEAssert(resource.type == HAL::ResourceType::Texture);
-	return resource.hwTextureHandle;
+	XEAssert(cache);
+	XEAssert(memoryOffset % TransientResourceAllocationAlignment == 0);
+
+	// TODO: (O_O)
+	auto hwTextureDescCompare = [](const HAL::TextureDesc& a, const HAL::TextureDesc& b)
+	{
+		return
+			a.size == b.size &&
+			a.dimension == b.dimension &&
+			a.format == b.format &&
+			a.mipLevelCount == b.mipLevelCount &&
+			a.enableRenderTargetUsage == b.enableRenderTargetUsage;
+	};
+
+	for (uint16 i = 0; i < cache->entryCount; i++)
+	{
+		const TransientResourceCache::Entry& entry = cache->entries[i];
+		if (entry.type == HAL::ResourceType::Buffer &&
+			entry.nameXSH == nameXSH &&
+			hwTextureDescCompare(entry.desc.hwTextureDesc, hwTextureDesc) &&
+			entry.memoryOffset == memoryOffset)
+		{
+			return entry.hwTextureHandle;
+		}
+	}
+
+	while (cache->entryCount == cache->entryPoolSize)
+	{
+		XEShitHitTheFan();
+		cache->prune();
+	}
+
+	XEAssert(cache->entryCount < cache->entryPoolSize);
+	const uint16 newEntryIndex = cache->entryCount;
+	cache->entryCount++;
+
+	// TODO: Initial layout???
+	HAL::TextureLayout hwInitialTextureLayout = HAL::TextureLayout::Common;
+	const HAL::TextureHandle hwTexture = cache->hwDevice->createTexture(
+		hwTextureDesc, hwInitialTextureLayout, cache->hwDeviceMemory, memoryOffset);
+
+	TransientResourceCache::Entry& entry = cache->entries[newEntryIndex];
+	entry = {};
+	entry.nameXSH = nameXSH;
+	entry.desc.hwTextureDesc = hwTextureDesc;
+	entry.hwTextureHandle = hwTexture;
+	entry.memoryOffset = memoryOffset;
+	entry.lastUsageSessionIndex = cache->currentSessionIndex;
+	entry.type = HAL::ResourceType::Buffer;
+
+	return hwTexture;
 }
 
 
 // TaskGraph ///////////////////////////////////////////////////////////////////////////////////////////
-
-enum class TaskGraph::State : uint8
-{
-	Undefined = 0,
-	Empty,
-	Recording,
-	ReadyForExecution,
-};
 
 struct TaskGraph::Resource
 {
@@ -194,6 +274,12 @@ struct TaskGraph::Resource
 		HAL::BufferHandle hwBufferHandle;
 		HAL::TextureHandle hwTextureHandle;
 	};
+
+	// TODO: This should look like this:
+#if 0
+	HAL::ResourceDesc hwDesc; // Still U64. Includes `HAL::ResourceType`.
+	HAL::ResourceHandle hwHandle;
+#endif
 
 	HAL::ResourceType type;
 	bool isImported;
@@ -288,7 +374,8 @@ void TaskGraph::revokeIssuedTaskDependenciesCollector()
 }
 
 void TaskGraph::addTaskDependency(TaskDependencyCollector& sourceTaskDependenlyCollector,
-	HAL::ResourceType hwResourceType, uint32 hwResourceHandle, HAL::BarrierSync hwSync, HAL::BarrierAccess hwAccess)
+	HAL::ResourceType hwResourceType, uint32 hwResourceHandle,
+	HAL::BarrierSync hwSync, HAL::BarrierAccess hwAccess, HAL::TextureLayout hwTextureLayout)
 {
 	XEAssert(issuedTaskDependencyCollector);
 	XEAssert(&sourceTaskDependenlyCollector == issuedTaskDependencyCollector);
@@ -317,6 +404,7 @@ void TaskGraph::addTaskDependency(TaskDependencyCollector& sourceTaskDependenlyC
 	dependency.taskIndex = taskIndex;
 	dependency.hwSync = hwSync;
 	dependency.hwAccess = hwAccess;
+	dependency.hwTextureLayout = hwTextureLayout;
 	dependency.canOverlapPrecedingShaderWrite = false; // TODO: Implement proper support for this.
 	dependency.resourceDependencyChainNextIdx = uint16(-1);
 
@@ -330,9 +418,8 @@ void TaskGraph::addTaskDependency(TaskDependencyCollector& sourceTaskDependenlyC
 
 void TaskGraph::initialize()
 {
-	XEMasterAssert(!this->internalMemoryBlock);
+	XEMasterAssert(!internalMemoryBlock);
 	memorySet(this, 0, sizeof(TaskGraph));
-
 
 	this->resourcePoolSize = MaxResourceCount;
 	this->taskPoolSize = MaxTaskCount;
@@ -362,6 +449,7 @@ void TaskGraph::initialize()
 		byte* poolsMemory = (byte*)XLib::SystemHeapAllocator::Allocate(poolsTotalMemorySize);
 		memorySet(poolsMemory, 0, poolsTotalMemorySize);
 
+		internalMemoryBlock = poolsMemory;
 		resources = (Resource*)(poolsMemory + resourcePoolMemOffset);
 		tasks = (Task*)(poolsMemory + passPoolMemOffset);
 		dependencies = (Dependency*)(poolsMemory + dependencyPoolMemOffset);
@@ -378,23 +466,18 @@ void TaskGraph::destroy()
 	memorySet(this, 0, sizeof(TaskGraph));
 }
 
-void TaskGraph::open(HAL::Device& hwDevice, TransientResourceCache& transientResourceCache)
+void TaskGraph::open(HAL::Device& hwDevice)
 {
-	XEAssert(state == State::Empty);
-
+	XEAssert(internalMemoryBlock);
+	XEAssert(!this->hwDevice);
 	this->hwDevice = &hwDevice;
-	this->transientResourceCache = &transientResourceCache;
-
-	...;
-	XEAssertUnreachableCode();
 
 	postExecutionLocalBarrierChainHeadIdx = uint16(-1);
-	state = State::Recording;
 }
 
 BufferHandle TaskGraph::createTransientBuffer(uint32 size, uint64 nameXSH)
 {
-	XEAssert(state == State::Recording);
+	XEAssert(hwDevice);
 
 	XEMasterAssert(resourceCount < resourcePoolSize);
 	const uint16 resourceIndex = resourceCount;
@@ -402,8 +485,8 @@ BufferHandle TaskGraph::createTransientBuffer(uint32 size, uint64 nameXSH)
 
 	Resource& resource = resources[resourceIndex];
 	resource = {};
-	resource.bufferSize = size;
-	resource.transientResourceNameXSH = nameXSH;
+	resource.desc.bufferSize = size;
+	resource.transientNameXSH = nameXSH;
 	resource.type = HAL::ResourceType::Buffer;
 	resource.isImported = false;
 	resource.dependencyChainHeadIdx = uint16(-1);
@@ -414,7 +497,7 @@ BufferHandle TaskGraph::createTransientBuffer(uint32 size, uint64 nameXSH)
 
 TextureHandle TaskGraph::createTransientTexture(HAL::TextureDesc hwTextureDesc, uint64 nameXSH)
 {
-	XEAssert(state == State::Recording);
+	XEAssert(hwDevice);
 
 	XEMasterAssert(resourceCount < resourcePoolSize);
 	const uint16 resourceIndex = resourceCount;
@@ -422,8 +505,8 @@ TextureHandle TaskGraph::createTransientTexture(HAL::TextureDesc hwTextureDesc, 
 
 	Resource& resource = resources[resourceIndex];
 	resource = {};
-	resource.hwTextureDesc = hwTextureDesc;
-	resource.transientResourceNameXSH = nameXSH;
+	resource.desc.hwTextureDesc = hwTextureDesc;
+	resource.transientNameXSH = nameXSH;
 	resource.type = HAL::ResourceType::Texture;
 	resource.isImported = false;
 	resource.dependencyChainHeadIdx = uint16(-1);
@@ -434,7 +517,7 @@ TextureHandle TaskGraph::createTransientTexture(HAL::TextureDesc hwTextureDesc, 
 
 BufferHandle TaskGraph::importExternalBuffer(HAL::BufferHandle hwBufferHandle)
 {
-	XEAssert(state == State::Recording);
+	XEAssert(hwDevice);
 
 	XEMasterAssert(resourceCount < resourcePoolSize);
 	const uint16 resourceIndex = resourceCount;
@@ -455,7 +538,7 @@ BufferHandle TaskGraph::importExternalBuffer(HAL::BufferHandle hwBufferHandle)
 TextureHandle TaskGraph::importExternalTexture(HAL::TextureHandle hwTextureHandle,
 	HAL::TextureLayout hwPreExecutionLayout, HAL::TextureLayout hwPostExecutionLayout)
 {
-	XEAssert(state == State::Recording);
+	XEAssert(hwDevice);
 
 	XEMasterAssert(resourceCount < resourcePoolSize);
 	const uint16 resourceIndex = resourceCount;
@@ -475,9 +558,21 @@ TextureHandle TaskGraph::importExternalTexture(HAL::TextureHandle hwTextureHandl
 	return TextureHandle(resourceIndex);
 }
 
+void* TaskGraph::allocateUserData(uint32 size)
+{
+	XEAssert(hwDevice);
+
+	userDataAllocatedSize = alignUp<uint32>(userDataAllocatedSize, 16);
+	const uint32 userDataOffset = userDataAllocatedSize;
+	userDataAllocatedSize += size;
+	XEMasterAssert(userDataAllocatedSize <= userDataPoolSize);
+
+	return (void*)(uintptr(userDataPool) + userDataOffset);
+}
+
 TaskDependencyCollector TaskGraph::addTask(TaskType type, TaskExecutorFunc executorFunc, void* userData)
 {
-	XEAssert(state == State::Recording);
+	XEAssert(hwDevice);
 	revokeIssuedTaskDependenciesCollector();
 
 	XEMasterAssert(taskCount < taskPoolSize);
@@ -495,10 +590,15 @@ TaskDependencyCollector TaskGraph::addTask(TaskType type, TaskExecutorFunc execu
 	return TaskDependencyCollector(*this);
 }
 
-void TaskGraph::closeAndCompile()
+void TaskGraph::execute(TransientResourceCache& transientResourceCache,
+	HAL::CommandAllocatorHandle hwCommandAllocator,
+	HAL::DescriptorAllocatorHandle hwTransientDescriptorAllocator,
+	CircularUploadMemoryAllocator& transientUploadMemoryAllocator)
 {
-	XEAssert(state == State::Recording);
+	XEAssert(hwDevice);
 	revokeIssuedTaskDependenciesCollector();
+
+	XEAssert(taskCount);
 
 	// Generate resource barriers.
 	{
@@ -540,8 +640,8 @@ void TaskGraph::closeAndCompile()
 
 				if (resource.type == HAL::ResourceType::Buffer)
 				{
-					XEAssert(HAL::BarrierSyncUtils::IsBufferCompatible(dependency.hwSync));
-					XEAssert(HAL::BarrierAccessUtils::IsBufferCompatible(dependency.hwAccess));
+					// TODO: Move these checks out of here.
+					//XEAssert(HAL::BarrierAccessUtils::IsBufferCompatible(dependency.hwAccess));
 
 					if (resourceState.hwAccess == HAL::BarrierAccess::None)
 					{
@@ -603,9 +703,9 @@ void TaskGraph::closeAndCompile()
 				}
 				else if (resource.type == HAL::ResourceType::Texture)
 				{
-					XEAssert(HAL::BarrierSyncUtils::IsTextureCompatible(dependency.hwSync));
-					XEAssert(HAL::BarrierAccessUtils::IsCompatibleWithTextureLayout(dependency.hwAccess, dependency.hwTextureLayout));
-					XEAssert(dependency.hwTextureLayout != HAL::TextureLayout::Undefined);
+					// TODO: Move these checks out of here.
+					//XEAssert(HAL::BarrierAccessUtils::IsCompatibleWithTextureLayout(dependency.hwAccess, dependency.hwTextureLayout));
+					//XEAssert(dependency.hwTextureLayout != HAL::TextureLayout::Undefined);
 
 					XEAssert(!dependency.usesTextureSubresourceRange); // Not implemented.
 
@@ -934,9 +1034,9 @@ void TaskGraph::closeAndCompile()
 
 		if (resource.type == HAL::ResourceType::Buffer)
 		{
-			resourceLocation.offset = transientResourceMemoryOffsetAccum;
+			resourceLocation.offset = XCheckedCastU16(transientResourceMemoryOffsetAccum);
 			resourceLocation.size = XCheckedCastU16(
-				divRoundUp<uint64>(resource.desc.bufferSize, TransientResourceCache::AllocationAlignment));
+				divRoundUp<uint64>(resource.desc.bufferSize, TransientResourceAllocationAlignment));
 		}
 		else if (resource.type == HAL::ResourceType::Texture)
 		{
@@ -944,9 +1044,9 @@ void TaskGraph::closeAndCompile()
 				hwDevice->getTextureMemoryRequirements(resource.desc.hwTextureDesc);
 			XEAssert(hwMemoryRequirements.alignment <= HAL::ResourceAlignmentRequirement::_64kib);
 
-			resourceLocation.offset = transientResourceMemoryOffsetAccum;
+			resourceLocation.offset = XCheckedCastU16(transientResourceMemoryOffsetAccum);
 			resourceLocation.size = XCheckedCastU16(
-				divRoundUp<uint64>(hwMemoryRequirements.size, TransientResourceCache::AllocationAlignment));
+				divRoundUp<uint64>(hwMemoryRequirements.size, TransientResourceAllocationAlignment));
 		}
 
 		transientResourceMemoryOffsetAccum += resourceLocation.size;
@@ -957,7 +1057,7 @@ void TaskGraph::closeAndCompile()
 
 	// Query transient resources from cache.
 	{
-		transientResourceCache->openUsageCycle();
+		transientResourceCacheAccessSession.openAndPruneCache(transientResourceCache);
 
 		for (uint16 resourceIndex = 0; resourceIndex < resourceCount; resourceIndex++)
 		{
@@ -969,30 +1069,24 @@ void TaskGraph::closeAndCompile()
 
 			if (resource.type == HAL::ResourceType::Buffer)
 			{
-				resource.hwBufferHandle = transientResourceCache->queryBuffer(
+				resource.hwBufferHandle = transientResourceCacheAccessSession.queryBuffer(
 					resource.transientNameXSH, resource.desc.bufferSize, resourceLocation.offset);
 			}
 			else if (resource.type == HAL::ResourceType::Texture)
 			{
-				resource.hwTextureHandle = transientResourceCache->queryTexture(
+				resource.hwTextureHandle = transientResourceCacheAccessSession.queryTexture(
 					resource.transientNameXSH, resource.desc.hwTextureDesc, resourceLocation.offset);
 			}
-		}
 
-		transientResourceCache->closeUsageCycle();
+#if 0
+			resource.hwHandle = transientResourceCacheAccessSession.queryResource(
+				resource.transientNameXSH, resource.hwDesc, resourceLocation.offset);
+#endif
+		}
 	}
 
-	state = State::ReadyForExecution;
-}
 
-void TaskGraph::execute(HAL::CommandAllocatorHandle hwCommandAllocator,
-	HAL::DescriptorAllocatorHandle hwTransientDescriptorAllocator,
-	CircularUploadMemoryAllocator& transientUploadMemoryAllocator)
-{
-	XEAssert(state == State::ReadyForExecution);
-
-	if (!taskCount)
-		return;
+	// Execute.
 
 	TaskExecutionContext context(*hwDevice, *this,
 		hwTransientDescriptorAllocator, transientUploadMemoryAllocator);
@@ -1035,10 +1129,91 @@ void TaskGraph::execute(HAL::CommandAllocatorHandle hwCommandAllocator,
 		task.executporFunc(context, *hwDevice, hwCommandList, task.userData);
 	}
 
+	// Emit post-execution barriers.
+	{
+		uint16 barrierChainIt = postExecutionLocalBarrierChainHeadIdx;
+		while (barrierChainIt != uint16(-1))
+		{
+			XAssert(barrierChainIt < barrierCount);
+			const Barrier& barrier = barriers[barrierChainIt];
+			XAssert(barrier.resourceIndex < resourceCount);
+			const Resource& resource = resources[barrier.resourceIndex];
+			XEAssert(resource.type == HAL::ResourceType::Texture);
+
+			hwCommandList.textureMemoryBarrier(resource.hwTextureHandle,
+				barrier.hwSyncBefore, barrier.hwSyncAfter,
+				barrier.hwAccessBefore, barrier.hwAccessAfter,
+				barrier.hwTextureLayoutBefore, barrier.hwTextureLayoutAfter);
+
+			barrierChainIt = barrier.chainNextIdx;
+		}
+	}
+
 	hwDevice->closeCommandList(hwCommandList);
 	hwDevice->submitCommandList(HAL::DeviceQueue::Graphics, hwCommandList);
 
 	const HAL::DeviceQueueSyncPoint hwEOPSyncPoint = hwDevice->getEOPSyncPoint(HAL::DeviceQueue::Graphics);
 	transientUploadMemoryAllocator.enqueueRelease(hwEOPSyncPoint);
-	transientResourceCache->setPrevUsageCycleEOPSyncPoint(hwEOPSyncPoint);
+	transientResourceCacheAccessSession.closeAndSetupSessionRelease(hwEOPSyncPoint);
+
+
+	// Reset.
+	{
+		hwDevice = nullptr;
+
+		// TODO: Remove.
+		memorySet(resources, 0, sizeof(Resource) * resourceCount);
+		memorySet(tasks, 0, sizeof(Resource) * taskCount);
+		memorySet(dependencies, 0, sizeof(Resource) * dependencyCount);
+		memorySet(barriers, 0, sizeof(Resource) * barrierCount);
+		memorySet(userDataPool, 0, userDataAllocatedSize);
+
+		resourceCount = 0;
+		taskCount = 0;
+		dependencyCount = 0;
+		barrierCount = 0;
+		userDataAllocatedSize = 0;
+
+		XEAssert(!issuedTaskDependencyCollector);
+		postExecutionLocalBarrierChainHeadIdx = 0;
+	}
+}
+
+
+// TaskExecutionContext ////////////////////////////////////////////////////////////////////////////
+
+TaskExecutionContext::TaskExecutionContext(HAL::Device& hwDevice, const TaskGraph& taskGraph,
+	HAL::DescriptorAllocatorHandle hwTransientDescriptorAllocator,
+	CircularUploadMemoryAllocator& transientUploadMemoryAllocator)
+	: hwDevice(hwDevice), taskGraph(taskGraph),
+	hwTransientDescriptorAllocator(hwTransientDescriptorAllocator),
+	transientUploadMemoryAllocator(transientUploadMemoryAllocator)
+{ }
+
+HAL::DescriptorSet TaskExecutionContext::allocateTransientDescriptorSet(HAL::DescriptorSetLayoutHandle descriptorSetLayout)
+{
+	return hwDevice.allocateDescriptorSet(hwTransientDescriptorAllocator, descriptorSetLayout);
+}
+
+UploadBufferPointer TaskExecutionContext::allocateTransientUploadMemory(uint32 size)
+{
+	return transientUploadMemoryAllocator.allocate(size);
+}
+
+HAL::BufferHandle TaskExecutionContext::resolveBuffer(BufferHandle bufferHandle)
+{
+	const uint16 resourceIndex = uint16(bufferHandle);
+	XEAssert(resourceIndex < taskGraph.resourceCount);
+	const TaskGraph::Resource& resource = taskGraph.resources[resourceIndex];
+	XEAssert(resource.type == HAL::ResourceType::Buffer);
+	return resource.hwBufferHandle;
+}
+
+HAL::TextureHandle TaskExecutionContext::resolveTexture(TextureHandle textureHandle)
+{
+	const uint16 resourceIndex = uint16(textureHandle);
+	XEAssert(resourceIndex < taskGraph.resourceCount);
+	const TaskGraph::Resource& resource = taskGraph.resources[resourceIndex];
+	XEAssert(resource.type == HAL::ResourceType::Texture);
+	return resource.hwTextureHandle;
 }

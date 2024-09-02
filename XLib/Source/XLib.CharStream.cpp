@@ -108,6 +108,8 @@ bool FileCharStreamWriter::open(const char* name, bool overrideFileContent, uint
 
 	this->bufferSize = bufferSize;
 	this->bufferOffset = 0;
+
+	return true;
 }
 
 void FileCharStreamWriter::open(FileHandle fileHandle, uint32 bufferSize, void* externalBuffer)

@@ -22,14 +22,18 @@
 // TODO: "Non-owning" handles? (handles that can't be used to destroy object).
 // TODO: Introduce safe "owning"/"strong" versions of handles that assert zero value on destruction.
 // TODO: In Vulkan to create dtor you need to provide image layout explicitly. In our case for example texture access in `TextureLayout::Common` and `TextureLayout::ShaderReadOnly` will need different dtors.
+// TODO: We may try to introduce `HAL::ResourceDesc` (U64, that also encodes resource type), `HAL::Device::createResource`, `HAL::ResourceHandle`. These can be parallel to previous system with separate buffer/texture. This will help to cleanup mess in Gfx.Scheduler.
+// TODO: Encode `TextureDesc` into single U64 by hand.
+// TODO: Try using "CompositeHeapAllocation" concept.
 
 
 // NOTE: Virtual textures do not support compression (CMASK/DCC) on some architectures.
 
 #define XEAssert(cond) XAssert(cond)
-#define XEAssertUnreachableCode() XAssertUnreachableCode()
+#define XEAssertUnreachableCode XAssertUnreachableCode
 #define XEMasterAssert(cond) XAssert(cond)
-#define XEMasterAssertUnreachableCode() XAssertUnreachableCode()
+#define XEMasterAssertUnreachableCode XAssertUnreachableCode
+#define XEShitHitTheFan XAssertUnreachableCode
 
 struct ID3D12Device10;
 struct ID3D12CommandQueue;
@@ -110,6 +114,17 @@ namespace XEngine::Gfx::HAL
 
 	struct TextureDesc
 	{
+		// U64 encoding
+		// NOTE: We may consider 0 dim as if it has leading 1. This way we can store 16384 in 14 bits instead of 15.
+		// width : 14 (max value 16384)
+		// height : 14 (max value 16384)
+		// depth : 12 (max value 2048)
+		// dimension : 4
+		// format : 6
+		// mipLevelCount : 4
+		// -----------------
+		// 54 bits total
+
 		uint16x3 size;
 		TextureDimension dimension : 2; // TODO: Calculate these bits properly.
 		TextureFormat format : 6;
@@ -442,11 +457,11 @@ namespace XEngine::Gfx::HAL
 		uint16 rtvHeapOffset = 0;
 		uint16 dsvHeapOffset = 0;
 
-		CommandListType type = CommandListType::Undefined;
+		CommandListType type = {};
 		bool isOpen = false;
 
 		PipelineLayoutHandle currentPipelineLayoutHandle = {};
-		PipelineType currentPipelineType = PipelineType::Undefined;
+		PipelineType currentPipelineType = {};
 		uint8 setColorRenderTargetCount = 0;
 		bool isDepthStencilRenderTargetSet = false;
 
@@ -525,6 +540,21 @@ namespace XEngine::Gfx::HAL
 		uint16 maxOutputCount;
 
 		uint32 bindlessDescriptorPoolSize;
+	};
+
+	static constexpr DeviceSettings DefautlDeviceSettings =
+	{
+		.maxCommandAllocatorCount = 16,
+		.maxDescriptorAllocatorCount = 16,
+		.maxCommandListCount = 16,
+		.maxMemoryAllocationCount = 1024,
+		.maxResourceCount = 1024 * 4,
+		.maxDescriptorSetLayoutCount = 256,
+		.maxPipelineLayoutCount = 256,
+		.maxShaderCount = 1024 * 4,
+		.maxCompositePipelineCount = 1024 * 4,
+		.maxOutputCount = 8,
+		.bindlessDescriptorPoolSize = 1024 * 64,
 	};
 
 	/*class PhysicalDevice
@@ -658,7 +688,7 @@ namespace XEngine::Gfx::HAL
 		Device() = default;
 		~Device() = default;
 
-		void initialize(/*const PhysicalDevice& physicalDevice, */const DeviceSettings& settings);
+		void initialize(/*const PhysicalDevice& physicalDevice, */const DeviceSettings& settings = DefautlDeviceSettings);
 
 		CommandAllocatorHandle createCommandAllocator();
 		void destroyCommandAllocator(CommandAllocatorHandle commandAllocatorHandle);
@@ -746,17 +776,19 @@ namespace XEngine::Gfx::HAL
 
 	uint16x3 CalculateMipLevelSize(uint16x3 srcSize, uint8 mipLevel);
 
-	class BarrierSyncUtils abstract final
-	{
-	public:
-		static inline bool IsBufferCompatible(BarrierSync sync);
-		static inline bool IsTextureCompatible(BarrierSync sync);
-	};
-
 	class BarrierAccessUtils abstract final
 	{
+	private:
+		static constexpr BarrierAccess ReadOnlyAccessMask =
+			BarrierAccess::CopySource |
+			BarrierAccess::VertexOrIndexBuffer |
+			BarrierAccess::ConstantBuffer |
+			BarrierAccess::ShaderReadOnly |
+			BarrierAccess::DepthStencilRenderTargetReadOnly |
+			BarrierAccess::RaytracingAccelerationStructureRead;
+
 	public:
-		static inline bool IsReadOnly(BarrierAccess access);
+		static inline bool IsReadOnly(BarrierAccess access) { return (access & ~ReadOnlyAccessMask) == BarrierAccess(0); }
 		static inline bool IsBufferCompatible(BarrierAccess access);
 		static inline bool IsTextureCompatible(BarrierAccess access);
 		static inline bool IsCompatibleWithTextureLayout(BarrierAccess access, TextureLayout layout);

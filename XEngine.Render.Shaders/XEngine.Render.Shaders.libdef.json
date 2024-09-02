@@ -42,11 +42,27 @@
 		// "flags" : [ "block_as", "block_ms", "block_vertex_input" ], // Or 'allow' insead of 'block'?
 	},
 
+	"TestTriangleVS": {
+		"type": "vertex_shader",
+		"layout": "Test.PipelineLayout",
+		"src": "TestGraphics.hlsl",
+		"entry_point": "TestTriangleVS",
+	},
+
+	"TestTrianglePS": {
+		"type": "pixel_shader",
+		"layout": "Test.PipelineLayout",
+		"src": "TestGraphics.hlsl",
+		"entry_point": "TestTrianglePS",
+	},
+
+	/////////////////////////////////////////////////////////////////////////
+
 	"TestVS": {
 		"type": "vertex_shader",
 		"layout": "Test.PipelineLayout",
 		"src": "TestGraphics.hlsl",
-		"entry": "MainVS",
+		"entry_point": "MainVS",
 		//"vertex_input_layout": "Test.VertexInputLayout",
 	},
 
@@ -54,7 +70,7 @@
 		"type": "pixel_shader",
 		"layout": "Test.PipelineLayout",
 		"src": "TestGraphics.hlsl",
-		"entry": "MainPS",
+		"entry_point": "MainPS",
 
 		//"color_rts": [ "R8G8B8A8_UNORM" ],
 		//"depth_stencil_rt": "D16",
@@ -70,8 +86,8 @@
 		"type": "graphics_pipeline",
 		"layout": "Test.PipelineLayout",
 		"vertex_input_layout": "Test.VertexInputLayout",
-		"vs": { "path": "TestGraphics.hlsl", "entry": "MainVS" },
-		"ps": { "path": "TestGraphics.hlsl", "entry": "MainPS" },
+		"vs": { "path": "TestGraphics.hlsl", "entry_point": "MainVS" },
+		"ps": { "path": "TestGraphics.hlsl", "entry_point": "MainPS" },
 		"color_rts": [ "R8G8B8A8_UNORM" ],
 		"depth_stencil_rt" : "D16",
 	},
@@ -79,6 +95,6 @@
 	"Test.ComputePipeline": {
 		"type": "compute_pipeline",
 		"layout": "Test.PipelineLayout",
-		"cs": { "path": "TestCompute.hlsl", "entry" :"MainCS" }
+		"cs": { "path": "TestCompute.hlsl", "entry_point" :"MainCS" }
 	}*/
-	}
+}

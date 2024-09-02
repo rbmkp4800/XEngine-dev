@@ -12,6 +12,7 @@
 // TODO: Asserts everywhere.
 // TODO: Remove CounterType from DynamicArrayList and just use uint32.
 // TODO: Do for `DynamicArrayList` same thing I did for `DynamicString`: `growBuffer`, `growBufferExponentially` etc.
+// TODO: `InplaceArrayList` destructor currently automatically calls element desctructors for entire buffer in addition to existing manual destruction.
 
 #include "XLib.h"
 #include "XLib.Allocation.h"
@@ -425,6 +426,7 @@ namespace XLib
 	inline auto InplaceArrayList<Type, Capacity, CounterType, IsSafe>::
 		emplaceBack(ConstructorArgsTypes&& ... constructorArgs) -> Type&
 	{
+		XAssert(!isFull());
 		Type& result = buffer[size];
 		construct(result, forwardRValue<ConstructorArgsTypes>(constructorArgs) ...);
 		size++;
@@ -436,6 +438,7 @@ namespace XLib
 	inline auto InplaceArrayList<Type, Capacity, CounterType, IsSafe>::
 		pushBack(const Type& value) -> Type&
 	{
+		XAssert(!isFull());
 		Type& result = buffer[size];
 		construct(result, value);
 		size++;
@@ -447,6 +450,7 @@ namespace XLib
 	inline auto InplaceArrayList<Type, Capacity, CounterType, IsSafe>::
 		pushBack(Type&& value) -> Type&
 	{
+		XAssert(!isFull());
 		Type& result = buffer[size];
 		construct(result, AsRValue(value));
 		size++;
