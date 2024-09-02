@@ -28,6 +28,8 @@ private:
 
 	Render::SceneRenderer sceneRenderer;
 
+	uint16 outputWidth = 0;
+	uint16 outputHeight = 0;
 	float32x3 cameraPosition = {};
 	float32x2 cameraRotation = {};
 	float32 accum = 0.0f;
@@ -58,6 +60,9 @@ void Game0::onMouseMove(sint32 deltaX, sint32 deltaY)
 
 void Game0::run()
 {
+	outputWidth = 1600;
+	outputHeight = 900;
+
 	window.create(1600, 900);
 
 	System::RegisterInputHandler(this);
@@ -66,7 +71,7 @@ void Game0::run()
 	gfxHwDevice.initialize();
 	gfxHwCommandAllocator = gfxHwDevice.createCommandAllocator();
 	gfxHwDescriptorAllocator = gfxHwDevice.createDescriptorAllocator();
-	gfxHwOutput = gfxHwDevice.createWindowOutput(1600, 900, window.getHandle());
+	gfxHwOutput = gfxHwDevice.createWindowOutput(outputWidth, outputHeight, window.getHandle());
 
 	gfxUploadMemoryAllocator.initialize(gfxHwDevice, 16);
 	gfxSchTransientResourceCache.initialize(gfxHwDevice);
@@ -86,7 +91,7 @@ void Game0::run()
 				gfxSchTaskGraph.importExternalTexture(gfxHwCurrentBackBuffer,
 					Gfx::HAL::TextureLayout::Present, Gfx::HAL::TextureLayout::Present);
 
-			sceneRenderer.render(gfxSchTaskGraph, gfxSchCurrentBackBuffer);
+			sceneRenderer.render(gfxSchTaskGraph, gfxSchCurrentBackBuffer, outputWidth, outputHeight);
 		}
 		gfxSchTaskGraph.execute(gfxSchTransientResourceCache, gfxHwCommandAllocator, gfxHwDescriptorAllocator, gfxUploadMemoryAllocator);
 

@@ -30,8 +30,8 @@ namespace XEngine::Gfx::Scheduler
 
 	static constexpr uint64 TransientResourceAllocationAlignment = 0x10000;
 
-	enum class BufferHandle : uint32 { Zero = 0, };
-	enum class TextureHandle : uint32 { Zero = 0, };
+	enum class BufferHandle : uint32 {};
+	enum class TextureHandle : uint32 {};
 
 	enum class TaskType : uint8
 	{
@@ -169,10 +169,10 @@ namespace XEngine::Gfx::Scheduler
 
 		inline TaskDependencyCollector& addColorRenderTarget(TextureHandle hwTextureHandle/*,
 			uint8 mipLevel = 0, uint16 arrayIndex = 0*/);
-		inline TaskDependencyCollector& addDepthStencilRenderTarget(TextureHandle hwTextureHandle,
-			uint8 mipLevel = 0, uint16 arrayIndex = 0);
-		inline TaskDependencyCollector& addDepthStencilRenderTargetReadOnly(TextureHandle hwTextureHandle,
-			uint8 mipLevel = 0, uint16 arrayIndex = 0);
+		inline TaskDependencyCollector& addDepthStencilRenderTarget(TextureHandle hwTextureHandle/*,
+			uint8 mipLevel = 0, uint16 arrayIndex = 0*/);
+		inline TaskDependencyCollector& addDepthStencilRenderTargetReadOnly(TextureHandle hwTextureHandle/*,
+			uint8 mipLevel = 0, uint16 arrayIndex = 0*/);
 	};
 
 
@@ -231,6 +231,11 @@ namespace XEngine::Gfx::Scheduler
 			HAL::ResourceType hwResourceType, uint32 hwResourceHandle,
 			HAL::BarrierSync hwSync, HAL::BarrierAccess hwAccess, HAL::TextureLayout hwTextureLayout);
 
+		inline BufferHandle composeBufferHandle(uint16 resourceIndex) const;
+		inline TextureHandle composeTextureHandle(uint16 resourceIndex) const;
+		inline Resource& resolveBufferHandle(BufferHandle bufferHandle) const;
+		inline Resource& resolveTextureHandle(TextureHandle textureHandle) const;
+
 	public:
 		TaskGraph() = default;
 		inline ~TaskGraph() { destroy(); }
@@ -286,49 +291,60 @@ namespace XEngine::Gfx::Scheduler
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // INLINE DEFINITIONS //////////////////////////////////////////////////////////////////////////////
 
-inline XEngine::Gfx::Scheduler::TaskDependencyCollector::TaskDependencyCollector(TaskGraph& parent)
+namespace XEngine::Gfx::Scheduler
 {
-	parent.registerIssuedTaskDependenciesCollector(*this);
-}
+	inline TaskDependencyCollector::TaskDependencyCollector(TaskGraph& parent)
+	{
+		parent.registerIssuedTaskDependenciesCollector(*this);
+	}
 
-inline XEngine::Gfx::Scheduler::TaskDependencyCollector::~TaskDependencyCollector()
-{
-	if (parent)
-		parent->revokeIssuedTaskDependenciesCollector();
-}
+	inline TaskDependencyCollector::~TaskDependencyCollector()
+	{
+		if (parent)
+			parent->revokeIssuedTaskDependenciesCollector();
+	}
 
-inline XEngine::Gfx::Scheduler::TaskDependencyCollector::TaskDependencyCollector(TaskDependencyCollector&& that)
-{
-	if (that.parent)
-		that.parent->relocateIssuedTaskDependenciesCollector(that, *this);
-}
+	inline TaskDependencyCollector::TaskDependencyCollector(TaskDependencyCollector&& that)
+	{
+		if (that.parent)
+			that.parent->relocateIssuedTaskDependenciesCollector(that, *this);
+	}
 
-inline void XEngine::Gfx::Scheduler::TaskDependencyCollector::operator = (TaskDependencyCollector&& that)
-{
-	if (that.parent)
-		that.parent->relocateIssuedTaskDependenciesCollector(that, *this);
-}
+	inline void TaskDependencyCollector::operator = (TaskDependencyCollector&& that)
+	{
+		if (that.parent)
+			that.parent->relocateIssuedTaskDependenciesCollector(that, *this);
+	}
 
-inline auto XEngine::Gfx::Scheduler::TaskDependencyCollector::addBufferAcces(
-	BufferHandle hwBufferHandle, HAL::BarrierSync hwSync, HAL::BarrierAccess hwAccess) -> TaskDependencyCollector&
-{
-	parent->addTaskDependency(*this, HAL::ResourceType::Buffer, uint32(hwBufferHandle), hwSync, hwAccess, HAL::TextureLayout::Undefined);
-	return *this;
-}
+	inline auto TaskDependencyCollector::addBufferAcces(
+		BufferHandle hwBufferHandle, HAL::BarrierSync hwSync, HAL::BarrierAccess hwAccess) -> TaskDependencyCollector&
+	{
+		parent->addTaskDependency(*this, HAL::ResourceType::Buffer, uint32(hwBufferHandle), hwSync, hwAccess, HAL::TextureLayout::Undefined);
+		return *this;
+	}
 
-inline auto XEngine::Gfx::Scheduler::TaskDependencyCollector::addTextureAccess(
-	TextureHandle hwTextureHandle, HAL::BarrierSync hwSync, HAL::BarrierAccess hwAccess,
-	HAL::TextureLayout hwTextureLayout, const HAL::TextureSubresourceRange* hwSubresourceRange) -> TaskDependencyCollector&
-{
-	XEAssert(!hwSubresourceRange);
-	parent->addTaskDependency(*this, HAL::ResourceType::Texture, uint32(hwTextureHandle), hwSync, hwAccess, hwTextureLayout);
-	return *this;
-}
+	inline auto TaskDependencyCollector::addTextureAccess(
+		TextureHandle hwTextureHandle, HAL::BarrierSync hwSync, HAL::BarrierAccess hwAccess,
+		HAL::TextureLayout hwTextureLayout, const HAL::TextureSubresourceRange* hwSubresourceRange) -> TaskDependencyCollector&
+	{
+		XEAssert(!hwSubresourceRange);
+		parent->addTaskDependency(*this, HAL::ResourceType::Texture, uint32(hwTextureHandle), hwSync, hwAccess, hwTextureLayout);
+		return *this;
+	}
 
-inline auto XEngine::Gfx::Scheduler::TaskDependencyCollector::addColorRenderTarget(
-	TextureHandle hwTextureHandle/*, uint8 mipLevel, uint16 arrayIndex*/) -> TaskDependencyCollector&
-{
-	parent->addTaskDependency(*this, HAL::ResourceType::Texture, uint32(hwTextureHandle),
-		HAL::BarrierSync::ColorRenderTarget, HAL::BarrierAccess::ColorRenderTarget, HAL::TextureLayout::ColorRenderTarget);
-	return *this;
+	inline TaskDependencyCollector& TaskDependencyCollector::addColorRenderTarget(
+		TextureHandle hwTextureHandle/*, uint8 mipLevel, uint16 arrayIndex*/)
+	{
+		parent->addTaskDependency(*this, HAL::ResourceType::Texture, uint32(hwTextureHandle),
+			HAL::BarrierSync::ColorRenderTarget, HAL::BarrierAccess::ColorRenderTarget, HAL::TextureLayout::ColorRenderTarget);
+		return *this;
+	}
+
+	inline TaskDependencyCollector& TaskDependencyCollector::addDepthStencilRenderTarget(
+		TextureHandle hwTextureHandle/*, uint8 mipLevel = 0, uint16 arrayIndex = 0*/)
+	{
+		parent->addTaskDependency(*this, HAL::ResourceType::Texture, uint32(hwTextureHandle),
+			HAL::BarrierSync::DepthStencilRenderTarget, HAL::BarrierAccess::DepthStencilRenderTarget, HAL::TextureLayout::DepthStencilRenderTarget);
+		return *this;
+	}
 }

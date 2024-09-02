@@ -235,13 +235,45 @@ namespace XEngine::Gfx::HAL
 
 	inline D3D12_BOX D3D12BoxFromOffsetAndSize(uint16x3 offset, uint16x3 size)
 	{
-		D3D12_BOX result = {};
-		result.left = offset.x;
-		result.top = offset.y;
-		result.front = offset.z;
-		result.right = offset.x + size.x;
-		result.bottom = offset.y + size.y;
-		result.back = offset.z + size.z;
-		return result;
+		D3D12_BOX d3dBox = {};
+		d3dBox.left = offset.x;
+		d3dBox.top = offset.y;
+		d3dBox.front = offset.z;
+		d3dBox.right = offset.x + size.x;
+		d3dBox.bottom = offset.y + size.y;
+		d3dBox.back = offset.z + size.z;
+		return d3dBox;
+	}
+
+	inline D3D12_RESOURCE_DESC1 TranslateTextureDescToD3D12ResourceDesc1(TextureDesc textureDesc)
+	{
+		XEAssert(textureDesc.dimension == TextureDimension::Texture2D);
+
+		D3D12_RESOURCE_DESC1 d3dResourceDesc = {};
+		d3dResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		d3dResourceDesc.Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+		d3dResourceDesc.Width = textureDesc.size.x;
+		d3dResourceDesc.Height = textureDesc.size.y;
+		d3dResourceDesc.DepthOrArraySize = 1;
+		d3dResourceDesc.MipLevels = textureDesc.mipLevelCount;
+		d3dResourceDesc.Format = TranslateTextureFormatToDXGIFormat(textureDesc.format);
+		d3dResourceDesc.SampleDesc.Count = 1;
+		d3dResourceDesc.SampleDesc.Quality = 0;
+		d3dResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+		d3dResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+		if (TextureFormatUtils::SupportsDepthStencilRTUsage(textureDesc.format))
+			d3dResourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+		else
+		{
+			d3dResourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+			if (textureDesc.enableRenderTargetUsage)
+			{
+				XEAssert(TextureFormatUtils::SupportsColorRTUsage(textureDesc.format));
+				d3dResourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+			}
+		}
+
+		return d3dResourceDesc;
 	}
 }

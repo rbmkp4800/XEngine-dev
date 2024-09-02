@@ -199,7 +199,7 @@ HAL::DescriptorSetLayoutHandle ShaderLibraryLoader::getDescriptorSetLayout(uint6
 	}
 
 	XEMasterAssertUnreachableCode();
-	return HAL::DescriptorSetLayoutHandle::Zero;
+	return HAL::DescriptorSetLayoutHandle(0);
 }
 
 HAL::PipelineLayoutHandle ShaderLibraryLoader::getPipelineLayout(uint64 nameXSH) const
@@ -211,7 +211,7 @@ HAL::PipelineLayoutHandle ShaderLibraryLoader::getPipelineLayout(uint64 nameXSH)
 	}
 
 	XEMasterAssertUnreachableCode();
-	return HAL::PipelineLayoutHandle::Zero;
+	return HAL::PipelineLayoutHandle(0);
 }
 
 HAL::ShaderHandle ShaderLibraryLoader::getShader(uint64 nameXSH) const
@@ -223,5 +223,5 @@ HAL::ShaderHandle ShaderLibraryLoader::getShader(uint64 nameXSH) const
 	}
 
 	XEMasterAssertUnreachableCode();
-	return HAL::ShaderHandle::Zero;
+	return HAL::ShaderHandle(0);
 }

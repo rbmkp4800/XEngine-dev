@@ -167,12 +167,13 @@ HAL::BufferHandle TransientResourceCacheAccessSession::queryBuffer(uint64 nameXS
 
 	for (uint16 i = 0; i < cache->entryCount; i++)
 	{
-		const TransientResourceCache::Entry& entry = cache->entries[i];
+		TransientResourceCache::Entry& entry = cache->entries[i];
 		if (entry.type == HAL::ResourceType::Buffer &&
 			entry.nameXSH == nameXSH &&
 			entry.desc.bufferSize == bufferSize &&
 			entry.memoryOffset == memoryOffset)
 		{
+			entry.lastUsageSessionIndex = cache->currentSessionIndex;
 			return entry.hwBufferHandle;
 		}
 	}
@@ -219,12 +220,13 @@ HAL::TextureHandle TransientResourceCacheAccessSession::queryTexture(uint64 name
 
 	for (uint16 i = 0; i < cache->entryCount; i++)
 	{
-		const TransientResourceCache::Entry& entry = cache->entries[i];
-		if (entry.type == HAL::ResourceType::Buffer &&
+		TransientResourceCache::Entry& entry = cache->entries[i];
+		if (entry.type == HAL::ResourceType::Texture &&
 			entry.nameXSH == nameXSH &&
 			hwTextureDescCompare(entry.desc.hwTextureDesc, hwTextureDesc) &&
 			entry.memoryOffset == memoryOffset)
 		{
+			entry.lastUsageSessionIndex = cache->currentSessionIndex;
 			return entry.hwTextureHandle;
 		}
 	}
@@ -251,7 +253,7 @@ HAL::TextureHandle TransientResourceCacheAccessSession::queryTexture(uint64 name
 	entry.hwTextureHandle = hwTexture;
 	entry.memoryOffset = memoryOffset;
 	entry.lastUsageSessionIndex = cache->currentSessionIndex;
-	entry.type = HAL::ResourceType::Buffer;
+	entry.type = HAL::ResourceType::Texture;
 
 	return hwTexture;
 }
@@ -416,6 +418,34 @@ void TaskGraph::addTaskDependency(TaskDependencyCollector& sourceTaskDependenlyC
 	resource.dependencyChainTailIdx = dependencyIndex;
 }
 
+inline BufferHandle TaskGraph::composeBufferHandle(uint16 resourceIndex) const
+{
+	return BufferHandle(0xB1000000 | resourceIndex);
+}
+
+inline TextureHandle TaskGraph::composeTextureHandle(uint16 resourceIndex) const
+{
+	return TextureHandle(0xB2000000 | resourceIndex);
+}
+
+inline TaskGraph::Resource& TaskGraph::resolveBufferHandle(BufferHandle bufferHandle) const
+{
+	const uint32 value = uint32(bufferHandle);
+	XEAssert((value & 0xFFFF'0000) == 0xB100'0000);
+	const uint16 resourceIndex = uint16(value);
+	XEAssert(resourceIndex < resourceCount);
+	return resources[resourceIndex];
+}
+
+inline TaskGraph::Resource& TaskGraph::resolveTextureHandle(TextureHandle textureHandle) const
+{
+	const uint32 value = uint32(textureHandle);
+	XEAssert((value & 0xFFFF'0000) == 0xB200'0000);
+	const uint16 resourceIndex = uint16(value);
+	XEAssert(resourceIndex < resourceCount);
+	return resources[resourceIndex];
+}
+
 void TaskGraph::initialize()
 {
 	XEMasterAssert(!internalMemoryBlock);
@@ -492,7 +522,7 @@ BufferHandle TaskGraph::createTransientBuffer(uint32 size, uint64 nameXSH)
 	resource.dependencyChainHeadIdx = uint16(-1);
 	resource.dependencyChainTailIdx = uint16(-1);
 
-	return BufferHandle(resourceIndex);
+	return composeBufferHandle(resourceIndex);
 }
 
 TextureHandle TaskGraph::createTransientTexture(HAL::TextureDesc hwTextureDesc, uint64 nameXSH)
@@ -512,7 +542,7 @@ TextureHandle TaskGraph::createTransientTexture(HAL::TextureDesc hwTextureDesc, 
 	resource.dependencyChainHeadIdx = uint16(-1);
 	resource.dependencyChainTailIdx = uint16(-1);
 
-	return TextureHandle(resourceIndex);
+	return composeTextureHandle(resourceIndex);
 }
 
 BufferHandle TaskGraph::importExternalBuffer(HAL::BufferHandle hwBufferHandle)
@@ -532,7 +562,7 @@ BufferHandle TaskGraph::importExternalBuffer(HAL::BufferHandle hwBufferHandle)
 	resource.dependencyChainHeadIdx = uint16(-1);
 	resource.dependencyChainTailIdx = uint16(-1);
 
-	return BufferHandle(resourceIndex);
+	return composeBufferHandle(resourceIndex);
 }
 
 TextureHandle TaskGraph::importExternalTexture(HAL::TextureHandle hwTextureHandle,
@@ -555,7 +585,7 @@ TextureHandle TaskGraph::importExternalTexture(HAL::TextureHandle hwTextureHandl
 	resource.dependencyChainHeadIdx = uint16(-1);
 	resource.dependencyChainTailIdx = uint16(-1);
 
-	return TextureHandle(resourceIndex);
+	return composeTextureHandle(resourceIndex);
 }
 
 void* TaskGraph::allocateUserData(uint32 size)
@@ -1202,18 +1232,14 @@ UploadBufferPointer TaskExecutionContext::allocateTransientUploadMemory(uint32 s
 
 HAL::BufferHandle TaskExecutionContext::resolveBuffer(BufferHandle bufferHandle)
 {
-	const uint16 resourceIndex = uint16(bufferHandle);
-	XEAssert(resourceIndex < taskGraph.resourceCount);
-	const TaskGraph::Resource& resource = taskGraph.resources[resourceIndex];
+	const TaskGraph::Resource& resource = taskGraph.resolveBufferHandle(bufferHandle);
 	XEAssert(resource.type == HAL::ResourceType::Buffer);
 	return resource.hwBufferHandle;
 }
 
 HAL::TextureHandle TaskExecutionContext::resolveTexture(TextureHandle textureHandle)
 {
-	const uint16 resourceIndex = uint16(textureHandle);
-	XEAssert(resourceIndex < taskGraph.resourceCount);
-	const TaskGraph::Resource& resource = taskGraph.resources[resourceIndex];
+	const TaskGraph::Resource& resource = taskGraph.resolveTextureHandle(textureHandle);
 	XEAssert(resource.type == HAL::ResourceType::Texture);
 	return resource.hwTextureHandle;
 }

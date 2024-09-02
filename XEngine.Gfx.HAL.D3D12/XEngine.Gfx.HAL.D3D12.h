@@ -25,6 +25,7 @@
 // TODO: We may try to introduce `HAL::ResourceDesc` (U64, that also encodes resource type), `HAL::Device::createResource`, `HAL::ResourceHandle`. These can be parallel to previous system with separate buffer/texture. This will help to cleanup mess in Gfx.Scheduler.
 // TODO: Encode `TextureDesc` into single U64 by hand.
 // TODO: Try using "CompositeHeapAllocation" concept.
+// TODO: Fast clear value handling. For now we just suppressed `D3D12_MESSAGE_ID_CLEARRENDERTARGETVIEW_MISMATCHINGCLEARVALUE` and `D3D12_MESSAGE_ID_CLEARDEPTHSTENCILVIEW_MISMATCHINGCLEARVALUE`.
 
 
 // NOTE: Virtual textures do not support compression (CMASK/DCC) on some architectures.
@@ -51,21 +52,21 @@ namespace XEngine::Gfx::HAL
 
 	class Device;
 
-	enum class CommandAllocatorHandle		: uint32 { Zero = 0 };
-	enum class DescriptorAllocatorHandle	: uint32 { Zero = 0 };
-	enum class DeviceMemoryHandle			: uint32 { Zero = 0 };
-	enum class BufferHandle					: uint32 { Zero = 0 };
-	enum class TextureHandle				: uint32 { Zero = 0 };
-	enum class DescriptorSetLayoutHandle	: uint32 { Zero = 0 };
-	enum class PipelineLayoutHandle			: uint32 { Zero = 0 }; // PipelineBindingLayoutHandle?
-	enum class ShaderHandle					: uint32 { Zero = 0 };
-	enum class GraphicsPipelineHandle		: uint32 { Zero = 0 };
-	//enum class RaytracingPipelineHandle		: uint32 { Zero = 0 };
-	enum class OutputHandle					: uint32 { Zero = 0 };
+	enum class CommandAllocatorHandle		: uint32 {};
+	enum class DescriptorAllocatorHandle	: uint32 {};
+	enum class DeviceMemoryHandle			: uint32 {};
+	enum class BufferHandle					: uint32 {};
+	enum class TextureHandle				: uint32 {};
+	enum class DescriptorSetLayoutHandle	: uint32 {};
+	enum class PipelineLayoutHandle			: uint32 {}; // PipelineBindingLayoutHandle?
+	enum class ShaderHandle					: uint32 {};
+	enum class GraphicsPipelineHandle		: uint32 {};
+	//enum class RaytracingPipelineHandle		: uint32 {};
+	enum class OutputHandle					: uint32 {};
 
-	enum class DescriptorSet				: uint64 { Zero = 0 };
-	enum class DeviceQueueSyncPoint			: uint64 { Zero = 0 };
-	enum class HostSignalToken				: uint64 { Zero = 0 };
+	enum class DescriptorSet				: uint64 {};
+	enum class DeviceQueueSyncPoint			: uint64 {};
+	enum class HostSignalToken				: uint64 {};
 
 	enum class DeviceQueue : uint8 // Also used as queue index, so should start from 0.
 	{
@@ -130,6 +131,9 @@ namespace XEngine::Gfx::HAL
 		TextureFormat format : 6;
 		uint8 mipLevelCount : 4;
 		bool enableRenderTargetUsage : 1;
+
+		static inline TextureDesc Create2D(uint16 width, uint16 height, TextureFormat format, uint8 mipLevelCount);
+		static inline TextureDesc Create2DRT(uint16 width, uint16 height, TextureFormat format, uint8 mipLevelCount);
 	};
 	static_assert(sizeof(TextureDesc) == 8);
 
@@ -317,6 +321,8 @@ namespace XEngine::Gfx::HAL
 		TexelViewFormat format;
 		uint8 mipLevel;
 		uint16 arrayIndex;
+
+		static inline ColorRenderTarget Create(TextureHandle texture, TexelViewFormat format, uint8 mipLevel = 0, uint16 arrayIndex = 0);
 	};
 
 	struct DepthStencilRenderTarget
@@ -324,6 +330,8 @@ namespace XEngine::Gfx::HAL
 		TextureHandle texture;
 		uint8 mipLevel;
 		uint16 arrayIndex;
+
+		static inline DepthStencilRenderTarget Create(TextureHandle texture, uint8 mipLevel = 0, uint16 arrayIndex = 0);
 	};
 
 	enum class IndexBufferFormat : uint8
@@ -483,6 +491,10 @@ namespace XEngine::Gfx::HAL
 
 		void bindRenderTargets(uint8 colorRenderTargetCount, const ColorRenderTarget* colorRenderTargets,
 			const DepthStencilRenderTarget* depthStencilRenderTarget = nullptr, bool readOnlyDepth = false, bool readOnlyStencil = false);
+
+		inline void bindRenderTargets(const ColorRenderTarget& colorRenderTarget);
+		inline void bindRenderTargets(const ColorRenderTarget& colorRenderTarget,
+			const DepthStencilRenderTarget& depthStencilRenderTarget, bool readOnlyDepth = false, bool readOnlyStencil = false);
 
 		void bindIndexBuffer(BufferPointer bufferPointer, IndexBufferFormat format, uint32 byteSize);
 		void bindVertexBuffer(uint8 bufferIndex, BufferPointer bufferPointer, uint16 stride, uint32 byteSize);
@@ -699,7 +711,7 @@ namespace XEngine::Gfx::HAL
 		DeviceMemoryHandle allocateDeviceMemory(uint64 size, bool hostVisible = false);
 		void releaseDeviceMemory(DeviceMemoryHandle memoryHandle);
 
-		ResourceMemoryRequirements getTextureMemoryRequirements(const TextureDesc& textureDesc) const;
+		ResourceMemoryRequirements getTextureMemoryRequirements(const TextureDesc& desc) const;
 
 		BufferHandle createBuffer(uint64 size,
 			DeviceMemoryHandle memoryHandle = {}, uint64 memoryOffset = 0);
@@ -793,4 +805,63 @@ namespace XEngine::Gfx::HAL
 		static inline bool IsTextureCompatible(BarrierAccess access);
 		static inline bool IsCompatibleWithTextureLayout(BarrierAccess access, TextureLayout layout);
 	};
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// INLINE DEFINITIONS //////////////////////////////////////////////////////////////////////////////
+
+namespace XEngine::Gfx::HAL
+{
+	inline TextureDesc TextureDesc::Create2D(uint16 width, uint16 height, TextureFormat format, uint8 mipLevelCount)
+	{
+		TextureDesc desc = {};
+		desc.size = uint16x3(width, height, 1);
+		desc.dimension = TextureDimension::Texture2D;
+		desc.format = format;
+		desc.mipLevelCount = mipLevelCount;
+		desc.enableRenderTargetUsage = false;
+		return desc;
+	}
+
+	inline TextureDesc TextureDesc::Create2DRT(uint16 width, uint16 height, TextureFormat format, uint8 mipLevelCount)
+	{
+		TextureDesc desc = {};
+		desc.size = uint16x3(width, height, 1);
+		desc.dimension = TextureDimension::Texture2D;
+		desc.format = format;
+		desc.mipLevelCount = mipLevelCount;
+		desc.enableRenderTargetUsage = true;
+		return desc;
+	}
+
+	inline ColorRenderTarget ColorRenderTarget::Create(TextureHandle texture, TexelViewFormat format, uint8 mipLevel, uint16 arrayIndex)
+	{
+		ColorRenderTarget rt = {};
+		rt.texture = texture;
+		rt.format = format;
+		rt.mipLevel = mipLevel;
+		rt.arrayIndex = arrayIndex;
+		return rt;
+	}
+
+	inline DepthStencilRenderTarget DepthStencilRenderTarget::Create(TextureHandle texture, uint8 mipLevel, uint16 arrayIndex)
+	{
+		DepthStencilRenderTarget rt = {};
+		rt.texture = texture;
+		rt.mipLevel = mipLevel;
+		rt.arrayIndex = arrayIndex;
+		return rt;
+	}
+
+	inline void CommandList::bindRenderTargets(const ColorRenderTarget& colorRenderTarget)
+	{
+		bindRenderTargets(1, &colorRenderTarget);
+	}
+
+	inline void CommandList::bindRenderTargets(const ColorRenderTarget& colorRenderTarget,
+		const DepthStencilRenderTarget& depthStencilRenderTarget, bool readOnlyDepth, bool readOnlyStencil)
+	{
+		bindRenderTargets(1, &colorRenderTarget, &depthStencilRenderTarget, readOnlyDepth, readOnlyStencil);
+	}
 }

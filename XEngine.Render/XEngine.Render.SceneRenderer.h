@@ -11,19 +11,15 @@ namespace XEngine::Render
 	class SceneRenderer : public XLib::NonCopyable
 	{
 	private:
+		struct TestPassParams;
+
+	private:
 		Gfx::HAL::PipelineLayoutHandle gfxHwTestPipelineLayout = {};
 		Gfx::HAL::GraphicsPipelineHandle gfxHwTestPipeline = {};
 
 	private:
-		struct TestPassUserData
-		{
-			SceneRenderer* sceneRenderer;
-			Gfx::Scheduler::TextureHandle gfxSchTargetTexture;
-		};
-
-	private:
 		void testPassExecutor(Gfx::Scheduler::TaskExecutionContext& gfxSchExecutionContext,
-			Gfx::HAL::Device& gfxHwDevice, Gfx::HAL::CommandList& gfxHwCommandList, TestPassUserData& userData);
+			Gfx::HAL::Device& gfxHwDevice, Gfx::HAL::CommandList& gfxHwCommandList, TestPassParams& params);
 
 	public:
 		SceneRenderer() = default;
@@ -33,6 +29,7 @@ namespace XEngine::Render
 
 		void render(
 			Gfx::Scheduler::TaskGraph& gfxSchTaskGraph,
-			Gfx::Scheduler::TextureHandle gfxSchTargetTexture);
+			Gfx::Scheduler::TextureHandle gfxSchTargetTexture,
+			uint16 targetWidth, uint16 targetHeight);
 	};
 }
