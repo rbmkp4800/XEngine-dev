@@ -6,6 +6,7 @@ struct /*[[xe::export_cb_layout(XEngine::Render::Shaders::TestCB)]]*/ TestCB
 };
 
 [[xe::binding(SOME_CONSTANT_BUFFER)]] ConstantBuffer<TestCB> testCB;
+[[xe::binding(TEST_SAMPLER)]] SamplerState testSampler;
 
 struct VSInput
 {
@@ -36,8 +37,13 @@ VSOutput MainVS(VSInput input)
 
 float4 MainPS(VSOutput input) : SV_Target0
 {
+	Texture2D<float4> myTexture = ResourceDescriptorHeap[0];
+	float4 texSample = myTexture.Sample(testSampler, input.texcoord);
+	//float4 texSample = float4(input.texcoord, 0.0f, 1.0f);
+
 	float a = saturate(dot(input.normal, normalize(float3(-1, 1, 1))));
-	return float4(a.xxx, 1.0f);
+	return float4(texSample.xyz * a.xxx, 1.0f);
+	//return float4(texSample.xyz, 1.0f);
 }
 
 /////////////////////////////////////////////////////////////////////////

@@ -4,8 +4,9 @@
 #include <XLib.Math.h>
 #include <XLib.Math.Matrix4x4.h>
 #include <XEngine.Gfx.HAL.D3D12.h>
-#include <XEngine.Gfx.ShaderLibraryLoader.h>
 #include <XEngine.Gfx.Allocation.h>
+#include <XEngine.Gfx.ShaderLibraryLoader.h>
+#include <XEngine.Gfx.Uploader.h>
 #include <XEngine.Render.SceneRenderer.h>
 #include <XEngine.System.h>
 
@@ -78,6 +79,7 @@ void Game0::run()
 	gfxSchTransientResourceCache.initialize(gfxHwDevice);
 	gfxSchTaskGraph.initialize();
 
+	Gfx::GlobalUploader.initialize(gfxHwDevice);
 	Gfx::GlobalShaderLibraryLoader.load("XEngine.Render.Shaders.xeslib", gfxHwDevice);
 
 	scene.initialize(gfxHwDevice);

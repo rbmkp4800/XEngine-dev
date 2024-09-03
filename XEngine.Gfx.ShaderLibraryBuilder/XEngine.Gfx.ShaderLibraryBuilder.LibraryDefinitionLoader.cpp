@@ -31,7 +31,7 @@ static HAL::SamplerFilterMode ParseSamplerFilterModeString(StringViewASCII strin
 	if (string == "min_lin_mag_lin_mip_pnt") return HAL::SamplerFilterMode::MinLin_MagLin_MipPnt;
 	if (string == "min_lin_mag_lin_mip_lin") return HAL::SamplerFilterMode::MinLin_MagLin_MipLin;
 	if (string == "point")	return HAL::SamplerFilterMode::MinPnt_MagPnt_MipPnt;
-	if (string == "linear")	return HAL::SamplerFilterMode::MinPnt_MagPnt_MipPnt;
+	if (string == "linear")	return HAL::SamplerFilterMode::MinLin_MagLin_MipLin;
 	if (string == "aniso")	return HAL::SamplerFilterMode::Anisotropic;
 	return HAL::SamplerFilterMode::Anisotropic;
 }
@@ -294,7 +294,7 @@ bool LibraryDefinitionLoader::readStaticSampler(StringViewASCII staticSamplerNam
 			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(samplerDesc.desc.maxAnisotropy == 0, "max anisotropy already set", jsonKeyCursor);
 			IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(jsonValue.type == JSONValueType::Number, "integer 1..16 expected", jsonValueCursor);
 
-			XAssertNotImplemented();
+			reportError("NOT IMPLEMENTED", jsonKeyCursor);
 		}
 		else if (jsonKey.string == "address")
 		{
@@ -306,15 +306,16 @@ bool LibraryDefinitionLoader::readStaticSampler(StringViewASCII staticSamplerNam
 		}
 		else if (jsonKey.string == "lod_bias")
 		{
-			XAssertNotImplemented();
+			reportError("NOT IMPLEMENTED", jsonKeyCursor);
 		}
 		else if (jsonKey.string == "lod_min")
 		{
-			XAssertNotImplemented();
+			reportError("NOT IMPLEMENTED", jsonKeyCursor);
 		}
 		else if (jsonKey.string == "lod_max")
 		{
-			XAssertNotImplemented();
+			reportError("NOT IMPLEMENTED", jsonKeyCursor);
+			return false;
 		}
 		else
 		{

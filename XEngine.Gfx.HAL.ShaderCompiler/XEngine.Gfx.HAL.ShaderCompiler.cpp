@@ -35,10 +35,115 @@ static inline D3D12_DESCRIPTOR_RANGE_TYPE TranslateDescriptorTypeToD3D12Descript
 	return D3D12_DESCRIPTOR_RANGE_TYPE(-1);
 }
 
-static inline bool TranslateSamplerDescToD3D12StaticSamplerDesc(const SamplerDesc& srcSamplerDesc, D3D12_STATIC_SAMPLER_DESC& d3dResultSamplerDesc)
+static inline bool TranslateSamplerFilterModeAndReductionModeToD3D12Filter(SamplerFilterMode filterMode, SamplerReductionMode reductionMode, D3D12_FILTER& d3dResultFilter)
 {
-	XAssertNotImplemented();
+	if (reductionMode == SamplerReductionMode::WeightedAverage)
+	{
+		switch (filterMode)
+		{
+			case SamplerFilterMode::MinPnt_MagPnt_MipPnt:	d3dResultFilter = D3D12_FILTER_MIN_MAG_MIP_POINT;				break;
+			case SamplerFilterMode::MinPnt_MagPnt_MipLin:	d3dResultFilter = D3D12_FILTER_MIN_MAG_POINT_MIP_LINEAR;		break;
+			case SamplerFilterMode::MinPnt_MagLin_MipPnt:	d3dResultFilter = D3D12_FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT;	break;
+			case SamplerFilterMode::MinPnt_MagLin_MipLin:	d3dResultFilter = D3D12_FILTER_MIN_POINT_MAG_MIP_LINEAR;		break;
+			case SamplerFilterMode::MinLin_MagPnt_MipPnt:	d3dResultFilter = D3D12_FILTER_MIN_LINEAR_MAG_MIP_POINT;		break;
+			case SamplerFilterMode::MinLin_MagPnt_MipLin:	d3dResultFilter = D3D12_FILTER_MIN_LINEAR_MAG_POINT_MIP_LINEAR;	break;
+			case SamplerFilterMode::MinLin_MagLin_MipPnt:	d3dResultFilter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;		break;
+			case SamplerFilterMode::MinLin_MagLin_MipLin:	d3dResultFilter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;				break;
+			case SamplerFilterMode::Anisotropic:			d3dResultFilter = D3D12_FILTER_ANISOTROPIC;						break;
+			default:
+				return false;
+		}
+	}
+	/*else if (reductionMode == SamplerReductionMode::WeightedAverageOfComparisonResult)
+	{
+		switch (filterMode)
+		{
+			case SamplerFilterMode::MinPnt_MagPnt_MipPnt:	d3dResultFilter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_POINT;				break;
+			case SamplerFilterMode::MinPnt_MagPnt_MipLin:	d3dResultFilter = D3D12_FILTER_COMPARISON_MIN_MAG_POINT_MIP_LINEAR;			break;
+			case SamplerFilterMode::MinPnt_MagLin_MipPnt:	d3dResultFilter = D3D12_FILTER_COMPARISON_MIN_POINT_MAG_LINEAR_MIP_POINT;	break;
+			case SamplerFilterMode::MinPnt_MagLin_MipLin:	d3dResultFilter = D3D12_FILTER_COMPARISON_MIN_POINT_MAG_MIP_LINEAR;			break;
+			case SamplerFilterMode::MinLin_MagPnt_MipPnt:	d3dResultFilter = D3D12_FILTER_COMPARISON_MIN_LINEAR_MAG_MIP_POINT;			break;
+			case SamplerFilterMode::MinLin_MagPnt_MipLin:	d3dResultFilter = D3D12_FILTER_COMPARISON_MIN_LINEAR_MAG_POINT_MIP_LINEAR;	break;
+			case SamplerFilterMode::MinLin_MagLin_MipPnt:	d3dResultFilter = D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;			break;
+			case SamplerFilterMode::MinLin_MagLin_MipLin:	d3dResultFilter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR;				break;
+			case SamplerFilterMode::Anisotropic:			d3dResultFilter = D3D12_FILTER_COMPARISON_ANISOTROPIC;						break;
+			default:
+				return false;
+		}
+	}*/
+	else if (reductionMode == SamplerReductionMode::WeightedAverageOfComparisonResult)
+	{
+		switch (filterMode)
+		{
+			case SamplerFilterMode::MinPnt_MagPnt_MipPnt:	d3dResultFilter = D3D12_FILTER_MINIMUM_MIN_MAG_MIP_POINT;				break;
+			case SamplerFilterMode::MinPnt_MagPnt_MipLin:	d3dResultFilter = D3D12_FILTER_MINIMUM_MIN_MAG_POINT_MIP_LINEAR;		break;
+			case SamplerFilterMode::MinPnt_MagLin_MipPnt:	d3dResultFilter = D3D12_FILTER_MINIMUM_MIN_POINT_MAG_LINEAR_MIP_POINT;	break;
+			case SamplerFilterMode::MinPnt_MagLin_MipLin:	d3dResultFilter = D3D12_FILTER_MINIMUM_MIN_POINT_MAG_MIP_LINEAR;		break;
+			case SamplerFilterMode::MinLin_MagPnt_MipPnt:	d3dResultFilter = D3D12_FILTER_MINIMUM_MIN_LINEAR_MAG_MIP_POINT;		break;
+			case SamplerFilterMode::MinLin_MagPnt_MipLin:	d3dResultFilter = D3D12_FILTER_MINIMUM_MIN_LINEAR_MAG_POINT_MIP_LINEAR;	break;
+			case SamplerFilterMode::MinLin_MagLin_MipPnt:	d3dResultFilter = D3D12_FILTER_MINIMUM_MIN_MAG_LINEAR_MIP_POINT;		break;
+			case SamplerFilterMode::MinLin_MagLin_MipLin:	d3dResultFilter = D3D12_FILTER_MINIMUM_MIN_MAG_MIP_LINEAR;				break;
+			case SamplerFilterMode::Anisotropic:			d3dResultFilter = D3D12_FILTER_MINIMUM_ANISOTROPIC;						break;
+			default:
+				return false;
+		}
+	}
+	else if (reductionMode == SamplerReductionMode::WeightedAverageOfComparisonResult)
+	{
+		switch (filterMode)
+		{
+			case SamplerFilterMode::MinPnt_MagPnt_MipPnt:	d3dResultFilter = D3D12_FILTER_MAXIMUM_MIN_MAG_MIP_POINT;				break;
+			case SamplerFilterMode::MinPnt_MagPnt_MipLin:	d3dResultFilter = D3D12_FILTER_MAXIMUM_MIN_MAG_POINT_MIP_LINEAR;		break;
+			case SamplerFilterMode::MinPnt_MagLin_MipPnt:	d3dResultFilter = D3D12_FILTER_MAXIMUM_MIN_POINT_MAG_LINEAR_MIP_POINT;	break;
+			case SamplerFilterMode::MinPnt_MagLin_MipLin:	d3dResultFilter = D3D12_FILTER_MAXIMUM_MIN_POINT_MAG_MIP_LINEAR;		break;
+			case SamplerFilterMode::MinLin_MagPnt_MipPnt:	d3dResultFilter = D3D12_FILTER_MAXIMUM_MIN_LINEAR_MAG_MIP_POINT;		break;
+			case SamplerFilterMode::MinLin_MagPnt_MipLin:	d3dResultFilter = D3D12_FILTER_MAXIMUM_MIN_LINEAR_MAG_POINT_MIP_LINEAR;	break;
+			case SamplerFilterMode::MinLin_MagLin_MipPnt:	d3dResultFilter = D3D12_FILTER_MAXIMUM_MIN_MAG_LINEAR_MIP_POINT;		break;
+			case SamplerFilterMode::MinLin_MagLin_MipLin:	d3dResultFilter = D3D12_FILTER_MAXIMUM_MIN_MAG_MIP_LINEAR;				break;
+			case SamplerFilterMode::Anisotropic:			d3dResultFilter = D3D12_FILTER_MAXIMUM_ANISOTROPIC;						break;
+			default:
+				return false;
+		}
+	}
+	else
+		return false;
+
+	return true;
+}
+
+static inline bool TranslateSamplerAddressModeToD3D12TextureAddressMode(SamplerAddressMode addressMode, D3D12_TEXTURE_ADDRESS_MODE& d3dResultAddressMode)
+{
+	switch (addressMode)
+	{
+		case SamplerAddressMode::Wrap:			d3dResultAddressMode = D3D12_TEXTURE_ADDRESS_MODE_WRAP;		return true;
+		case SamplerAddressMode::Mirror:		d3dResultAddressMode = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;	return true;
+		case SamplerAddressMode::Clamp:			d3dResultAddressMode = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;	return true;
+		case SamplerAddressMode::BorderZero:	d3dResultAddressMode = D3D12_TEXTURE_ADDRESS_MODE_BORDER;	return true;
+	}
 	return false;
+}
+
+static inline bool TranslateSamplerDescToD3D12StaticSamplerDesc(const SamplerDesc& samplerDesc, D3D12_STATIC_SAMPLER_DESC& d3dResultSamplerDesc)
+{
+	d3dResultSamplerDesc = {};
+	
+	if (!TranslateSamplerFilterModeAndReductionModeToD3D12Filter(samplerDesc.filterMode, samplerDesc.reductionMode, d3dResultSamplerDesc.Filter))
+		return false;
+	if (!TranslateSamplerAddressModeToD3D12TextureAddressMode(samplerDesc.addressModeU, d3dResultSamplerDesc.AddressU))
+		return false;
+	if (!TranslateSamplerAddressModeToD3D12TextureAddressMode(samplerDesc.addressModeV, d3dResultSamplerDesc.AddressV))
+		return false;
+	if (!TranslateSamplerAddressModeToD3D12TextureAddressMode(samplerDesc.addressModeW, d3dResultSamplerDesc.AddressW))
+		return false;
+
+	d3dResultSamplerDesc.MipLODBias = samplerDesc.lodBias;
+	d3dResultSamplerDesc.MaxAnisotropy = samplerDesc.maxAnisotropy;
+	//d3dResultSamplerDesc.ComparisonFunc = ...; // TODO: ...
+	d3dResultSamplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+	d3dResultSamplerDesc.MinLOD = samplerDesc.lodMin;
+	d3dResultSamplerDesc.MaxLOD = samplerDesc.lodMax;
+
+	return true;
 }
 
 
@@ -562,7 +667,7 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 	for (uint16 i = 0; i < staticSamplerCount; i++)
 	{
 		d3dStaticSamplers[i].ShaderRegister = shaderRegisterCounter;
-		d3dStaticSamplers[i].RegisterSpace = shaderRegisterCounter;
+		d3dStaticSamplers[i].RegisterSpace = 0;
 		d3dStaticSamplers[i].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 		shaderRegisterCounter++;
 	}
@@ -574,17 +679,23 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 	d3dRootSignatureDesc.Desc_1_1.pParameters = d3dRootParams.getData();
 	d3dRootSignatureDesc.Desc_1_1.NumStaticSamplers = staticSamplerCount;
 	d3dRootSignatureDesc.Desc_1_1.pStaticSamplers = staticSamplerCount ? d3dStaticSamplers : nullptr;
-	d3dRootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+	d3dRootSignatureDesc.Desc_1_1.Flags =
+		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+		D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED;
 
-	// TODO: D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED, D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED
 	// TODO: D3D12_ROOT_SIGNATURE_FLAG_DENY_*_SHADER_ROOT_ACCESS
-	// TODO: D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
 
 	const HRESULT hResult = D3D12SerializeVersionedRootSignature(&d3dRootSignatureDesc, &d3dRootSignature, &d3dError);
 	if (FAILED(hResult))
 	{
-		errorMessage.text = "'D3D12SerializeVersionedRootSignature' failed";
+		errorMessage.text = "D3D12SerializeVersionedRootSignature failed";
 		return nullptr;
+	}
+
+	if (d3dError && d3dError->GetBufferSize() > 0)
+	{
+		// TODO: We might want to forward warnings.
+		FmtPrintStdOut("#### `D3D12SerializeVersionedRootSignature` wants to say something!!!\n");
 	}
 
 	const void* platformData = d3dRootSignature->GetBufferPointer();

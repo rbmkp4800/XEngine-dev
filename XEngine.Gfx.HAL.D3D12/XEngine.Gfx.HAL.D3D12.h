@@ -47,6 +47,8 @@ namespace XEngine::Gfx::HAL
 	constexpr uint32 ConstantBufferSizeLimit = 64 * 1024;
 	constexpr uint16 ConstantBufferBindAlignmentLog2 = 8;
 	constexpr uint16 ConstantBufferBindAlignment = 1 << ConstantBufferBindAlignmentLog2;
+	constexpr uint16 BufferPlacedTextureDataAlignment = 512;
+	constexpr uint16 BufferPlacedTextureRowPitchAlignment = 256;
 	constexpr uint16 TextureArraySizeLimit = 2048;
 	constexpr uint32 OutputBackBufferCount = 2; // TODO: I do not like this name. Replace "back buffer" with something...
 
@@ -770,8 +772,8 @@ namespace XEngine::Gfx::HAL
 		bool isQueueSyncPointReached(DeviceQueueSyncPoint syncPoint) const;
 		void emitHostSignal(HostSignalToken signalToken);
 
+		TextureDesc getTextureDesc(TextureHandle textureHandle) const;
 		void* getMappedBufferPtr(BufferHandle bufferHandle) const;
-
 		uint16 getDescriptorSetLayoutDescriptorCount(DescriptorSetLayoutHandle descriptorSetLayoutHandle) const;
 
 		TextureHandle getOutputBackBuffer(OutputHandle outputHandle, uint32 backBufferIndex) const;

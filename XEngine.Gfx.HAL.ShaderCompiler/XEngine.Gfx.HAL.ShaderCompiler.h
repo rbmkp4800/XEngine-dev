@@ -11,6 +11,7 @@
 // TODO: Store color RTs info in pixel shader blob (to validate in runtime).
 // TODO: Pipeline bindings shader visibility.
 // TODO: `getSourceHash` -> `getHash`.
+// TODO: `D3D12SerializeVersionedRootSignature` might throw warnings. We want display those.
 
 namespace XEngine::Gfx::HAL::ShaderCompiler
 {

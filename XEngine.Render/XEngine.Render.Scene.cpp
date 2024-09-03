@@ -1,3 +1,7 @@
+#include <XLib.Allocation.h>
+#include <XLib.System.File.h>
+#include <XEngine.Gfx.Uploader.h>
+
 #include "XEngine.Render.Scene.h"
 
 using namespace XEngine::Gfx;
@@ -14,35 +18,35 @@ namespace
 
 	const TestVertex CubeVertices[] =
 	{
-		{ { -1.0f, -1.0f, -1.0f }, { 0.0f, 0.0f, -1.0f } },
-		{ {  1.0f,  1.0f, -1.0f }, { 0.0f, 0.0f, -1.0f } },
-		{ {  1.0f, -1.0f, -1.0f }, { 0.0f, 0.0f, -1.0f } },
-		{ { -1.0f,  1.0f, -1.0f }, { 0.0f, 0.0f, -1.0f } },
+		{ { -1.0f, -1.0f, -1.0f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f} },
+		{ {  1.0f,  1.0f, -1.0f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f} },
+		{ {  1.0f, -1.0f, -1.0f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f} },
+		{ { -1.0f,  1.0f, -1.0f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f} },
 
-		{ { -1.0f, -1.0f,  1.0f }, { 0.0f, 0.0f, 1.0f } },
-		{ {  1.0f,  1.0f,  1.0f }, { 0.0f, 0.0f, 1.0f } },
-		{ {  1.0f, -1.0f,  1.0f }, { 0.0f, 0.0f, 1.0f } },
-		{ { -1.0f,  1.0f,  1.0f }, { 0.0f, 0.0f, 1.0f } },
+		{ { -1.0f, -1.0f,  1.0f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f} },
+		{ {  1.0f,  1.0f,  1.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f} },
+		{ {  1.0f, -1.0f,  1.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 0.0f} },
+		{ { -1.0f,  1.0f,  1.0f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f} },
 
-		{ { -1.0f,  1.0f, -1.0f }, { 0.0f, 1.0f, 0.0f } },
-		{ {  1.0f,  1.0f,  1.0f }, { 0.0f, 1.0f, 0.0f } },
-		{ { -1.0f,  1.0f,  1.0f }, { 0.0f, 1.0f, 0.0f } },
-		{ {  1.0f,  1.0f, -1.0f }, { 0.0f, 1.0f, 0.0f } },
+		{ { -1.0f,  1.0f, -1.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f} },
+		{ {  1.0f,  1.0f,  1.0f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 1.0f} },
+		{ { -1.0f,  1.0f,  1.0f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 0.0f} },
+		{ {  1.0f,  1.0f, -1.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f} },
 
-		{ { -1.0f, -1.0f, -1.0f }, { 0.0f, -1.0f, 0.0f } },
-		{ {  1.0f, -1.0f,  1.0f }, { 0.0f, -1.0f, 0.0f } },
-		{ {  1.0f, -1.0f, -1.0f }, { 0.0f, -1.0f, 0.0f } },
-		{ { -1.0f, -1.0f,  1.0f }, { 0.0f, -1.0f, 0.0f } },
+		{ { -1.0f, -1.0f, -1.0f }, { 0.0f, -1.0f, 0.0f }, { 0.0f, 0.0f} },
+		{ {  1.0f, -1.0f,  1.0f }, { 0.0f, -1.0f, 0.0f }, { 1.0f, 1.0f} },
+		{ {  1.0f, -1.0f, -1.0f }, { 0.0f, -1.0f, 0.0f }, { 1.0f, 0.0f} },
+		{ { -1.0f, -1.0f,  1.0f }, { 0.0f, -1.0f, 0.0f }, { 0.0f, 1.0f} },
 
-		{ { -1.0f, -1.0f, -1.0f }, { -1.0f, 0.0f, 0.0f } },
-		{ { -1.0f,  1.0f,  1.0f }, { -1.0f, 0.0f, 0.0f } },
-		{ { -1.0f, -1.0f,  1.0f }, { -1.0f, 0.0f, 0.0f } },
-		{ { -1.0f,  1.0f, -1.0f }, { -1.0f, 0.0f, 0.0f } },
+		{ { -1.0f, -1.0f, -1.0f }, { -1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f} },
+		{ { -1.0f,  1.0f,  1.0f }, { -1.0f, 0.0f, 0.0f }, { 1.0f, 1.0f} },
+		{ { -1.0f, -1.0f,  1.0f }, { -1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f} },
+		{ { -1.0f,  1.0f, -1.0f }, { -1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f} },
 
-		{ {  1.0f, -1.0f, -1.0f }, { 1.0f, 0.0f, 0.0f } },
-		{ {  1.0f,  1.0f,  1.0f }, { 1.0f, 0.0f, 0.0f } },
-		{ {  1.0f,  1.0f, -1.0f }, { 1.0f, 0.0f, 0.0f } },
-		{ {  1.0f, -1.0f,  1.0f }, { 1.0f, 0.0f, 0.0f } },
+		{ {  1.0f, -1.0f, -1.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f} },
+		{ {  1.0f,  1.0f,  1.0f }, { 1.0f, 0.0f, 0.0f }, { 1.0f, 1.0f} },
+		{ {  1.0f,  1.0f, -1.0f }, { 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f} },
+		{ {  1.0f, -1.0f,  1.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f} },
 	};
 
 	const uint16 CubeIndices[] =
@@ -81,4 +85,44 @@ void Scene::initialize(HAL::Device& gfxHwDevice)
 
 	memoryCopy(vertexBuffer, CubeVertices, sizeof(CubeVertices));
 	memoryCopy(indexBuffer, CubeIndices, sizeof(CubeIndices));
+
+	{
+		XLib::File file;
+		file.open("../Content/wood-0.albedo.xerawtex", XLib::FileAccessMode::Read, XLib::FileOpenMode::OpenExisting);
+		XEAssert(file.isOpen());
+
+		uint16x2 textureSize ={};
+
+		file.read(&textureSize, sizeof(textureSize));
+
+		void* textureData = XLib::SystemHeapAllocator::Allocate(textureSize.x * textureSize.y * 4);
+		file.read(textureData, textureSize.x * textureSize.y * 4);
+
+		const HAL::TextureDesc gfxHwTestTextureDesc =
+			HAL::TextureDesc::Create2D(textureSize.x, textureSize.y, HAL::TextureFormat::R8G8B8A8, 1);
+
+		gfxHwTestTexture = gfxHwDevice.createTexture(gfxHwTestTextureDesc, HAL::TextureLayout::Common);
+
+		HAL::TextureRegion gfxHwTextureRegion =
+		{
+			.offset = uint16x3(0, 0, 0),
+			.size = uint16x3(textureSize.x, textureSize.y, 1),
+		};
+
+		GlobalUploader.uploadTexture(gfxHwTestTexture, HAL::TextureSubresource {}, gfxHwTextureRegion, textureData, textureSize.x * 4);
+
+		XLib::SystemHeapAllocator::Release(textureData);
+	}
+
+	{
+		HAL::ResourceView gfxHwTestTextureView = {};
+		gfxHwTestTextureView.textureHandle = gfxHwTestTexture;
+		gfxHwTestTextureView.texture.format = HAL::TexelViewFormat::R8G8B8A8_UNORM;
+		gfxHwTestTextureView.texture.writable = false;
+		gfxHwTestTextureView.texture.baseMipLevel = 0;
+		gfxHwTestTextureView.texture.mipLevelCount = 1;
+		gfxHwTestTextureView.type = HAL::ResourceViewType::Texture;
+
+		gfxHwDevice.writeBindlessDescriptor(0, gfxHwTestTextureView);
+	}
 }

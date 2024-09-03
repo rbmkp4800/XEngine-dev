@@ -27,6 +27,13 @@ void Debug::DefaultFailureHandler(const char* messageCStr)
 	{
 		if (::IsDebuggerPresent())
 			::OutputDebugStringA(messageCStr);
+
+		{
+			HANDLE hStdOut = ::GetStdHandle(STD_OUTPUT_HANDLE);
+			UINT messageLength = ::strlen(messageCStr);
+			DWORD dummy = 0;
+			::WriteFile(hStdOut, messageCStr, messageLength, &dummy, nullptr);
+		}
 	}
 	::DebugBreak();
 }

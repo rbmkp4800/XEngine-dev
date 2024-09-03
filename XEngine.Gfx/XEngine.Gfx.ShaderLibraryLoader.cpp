@@ -10,7 +10,7 @@ using namespace XEngine::Gfx;
 XTODO("Use hash maps instead of linear search");
 XTODO("Remove `GlobalShaderLibraryLoader` bullshit")
 
-XEngine::Gfx::ShaderLibraryLoader XEngine::Gfx::GlobalShaderLibraryLoader;
+ShaderLibraryLoader XEngine::Gfx::GlobalShaderLibraryLoader;
 
 static inline uint64 U64From2xU32(uint32 lo, uint32 hi) { return uint64(lo) | (uint64(hi) << 32); }
 

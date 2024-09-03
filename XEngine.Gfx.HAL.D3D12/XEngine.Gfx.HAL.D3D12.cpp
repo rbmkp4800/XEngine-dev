@@ -17,6 +17,8 @@ using namespace XLib;
 using namespace XEngine::Gfx::HAL;
 
 static_assert(ConstantBufferBindAlignment >= D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+static_assert(BufferPlacedTextureDataAlignment >= D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
+static_assert(BufferPlacedTextureRowPitchAlignment >= D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
 
 static IDXGIFactory7* dxgiFactory = nullptr;
 static ID3D12Debug6* d3dDebug = nullptr;
@@ -1116,25 +1118,31 @@ void Device::writeDescriptor(uint32 descriptorIndex, const ResourceView& resourc
 		// TODO: Check compatibility with TextureFormat.
 		const DXGI_FORMAT dxgiFormat = TranslateTexelViewFormatToDXGIFormat(resourceView.texture.format);
 
-		XEMasterAssertUnreachableCode();
-#if 0
 		if (resourceView.texture.writable)
 		{
+			XEMasterAssertUnreachableCode();
+
+#if 0
 			D3D12_UNORDERED_ACCESS_VIEW_DESC d3dUAVDesc = {};
 			d3dUAVDesc.Format = dxgiFormat;
 			// ...
 
 			d3dDevice->CreateUnorderedAccessView(resource.d3dResource, nullptr, &d3dUAVDesc, descriptorHandle);
+#endif
 		}
 		else
 		{
 			D3D12_SHADER_RESOURCE_VIEW_DESC d3dSRVDesc = {};
 			d3dSRVDesc.Format = dxgiFormat;
-			// ...
+			d3dSRVDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+			d3dSRVDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			d3dSRVDesc.Texture2D.MostDetailedMip = resourceView.texture.baseMipLevel;
+			d3dSRVDesc.Texture2D.MipLevels = resourceView.texture.mipLevelCount;
+			d3dSRVDesc.Texture2D.PlaneSlice = 0;
+			d3dSRVDesc.Texture2D.ResourceMinLODClamp = 0.0f;
 
 			d3dDevice->CreateShaderResourceView(resource.d3dResource, &d3dSRVDesc, descriptorHandle);
 		}
-#endif
 	}
 	else
 		XEAssertUnreachableCode();
@@ -2194,6 +2202,13 @@ bool Device::isQueueSyncPointReached(DeviceQueueSyncPoint syncPoint) const
 	const Queue& queue = queues[queueIndex];
 
 	return isDeviceSignalValueReached(queue, signalValue, GetDeviceQueueSyncPointSignalValueBitCount());
+}
+
+TextureDesc Device::getTextureDesc(TextureHandle textureHandle) const
+{
+	const Resource& texture = resourcePool.resolveHandle(uint32(textureHandle));
+	XEAssert(texture.type == ResourceType::Texture && texture.d3dResource);
+	return texture.textureDesc;
 }
 
 void* Device::getMappedBufferPtr(BufferHandle bufferHandle) const

@@ -244,9 +244,14 @@ namespace XLib
 	};
 }
 
-#define XAssert(expression) do { if (!(expression)) { XLib::Debug::Fail("Assertion failed: `" #expression "`\n"); } } while (false)
-#define XAssertUnreachableCode() { XLib::Debug::Fail("Assertion failed: Unreachable code reached\n"); }
-#define XAssertNotImplemented() { XLib::Debug::Fail("Assertion failed: Not implemented\n"); }
+#define XMacroToStrHelper(x) #x
+#define XMacroToStr(x) XMacroToStrHelper(x)
+
+#define XFailureMessagePrefix __FILE__ "(" XMacroToStr(__LINE__) "): "
+
+#define XAssert(expression) do { if (!(expression)) { XLib::Debug::Fail(XFailureMessagePrefix "Assertion failed: `" #expression "`\n"); } } while (false)
+#define XAssertUnreachableCode() { XLib::Debug::Fail(XFailureMessagePrefix "Assertion failed: Unreachable code reached\n"); }
+#define XAssertNotImplemented() { XLib::Debug::Fail(XFailureMessagePrefix "Assertion failed: Not implemented\n"); }
 
 
 inline uint8	XCheckedCastU8	(uint64 a) { XAssert(a <= uint8(-1)); return uint8(a); }

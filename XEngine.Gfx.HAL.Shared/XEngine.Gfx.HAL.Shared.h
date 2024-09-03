@@ -151,7 +151,7 @@ namespace XEngine::Gfx::HAL
 	{
 		Undefined = 0,
 		WeightedAverage,
-		WeightedAverageOfComparisonResult,
+		WeightedAverageOfComparisonResult, // TODO: This is not implemented yet.
 		Min,
 		Max,
 	};
@@ -185,6 +185,10 @@ namespace XEngine::Gfx::HAL
 		static bool SupportsColorRTUsage(TextureFormat format);
 		static bool SupportsDepthStencilRTUsage(TextureFormat format);
 		static DepthStencilFormat TranslateToDepthStencilFormat(TextureFormat format);
+
+		static bool IsBlockFormat(TextureFormat format);
+		static uint8 GetTexelByteSize(TextureFormat format);
+		static uint8 GetBlockByteSize(TextureFormat format);
 	};
 
 	class TexelViewFormatUtils abstract final
@@ -193,6 +197,6 @@ namespace XEngine::Gfx::HAL
 		static inline bool IsValid(TexelViewFormat format) { return format < TexelViewFormat::ValueCount && format != TexelViewFormat::Undefined; }
 		static bool SupportsColorRTUsage(TexelViewFormat format);
 		static bool SupportsVertexInputUsage(TexelViewFormat format);
-		static uint8 GetByteSize(TexelViewFormat format); // Provided formats should support linear storage.
+		//static uint8 GetTexelByteSize(TexelViewFormat format); // Provided formats should support linear storage.
 	};
 }

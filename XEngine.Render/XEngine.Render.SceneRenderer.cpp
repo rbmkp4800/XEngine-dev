@@ -50,13 +50,15 @@ void SceneRenderer::testPassExecutor(Scheduler::TaskExecutionContext& gfxSchExec
 	gfxHwCommandList.bindIndexBuffer(Gfx::HAL::BufferPointer { params.scene->gfxHwTestModel, 4096 }, Gfx::HAL::IndexBufferFormat::U16, 4096);
 	gfxHwCommandList.bindVertexBuffer(0, Gfx::HAL::BufferPointer { params.scene->gfxHwTestModel, 0 }, 32, 4096);
 
+	static float aaa = 0.0f;
+
 	{
 		const XLib::Matrix4x4 cameraViewMatrix = XLib::Matrix4x4::LookAtCentered(params.cameraDesc.position, params.cameraDesc.direction, params.cameraDesc.up);
 		const XLib::Matrix4x4 cameraProjectionMatrix = XLib::Matrix4x4::Perspective(params.cameraDesc.fov, float32(params.targetWidth) / float32(params.targetHeight), params.cameraDesc.zNear, params.cameraDesc.zFar);
 
 		const UploadBufferPointer gfxCBPointer = gfxSchExecutionContext.allocateTransientUploadMemory(sizeof(TestCB));
 		TestCB* testCB = (TestCB*)gfxCBPointer.ptr;
-		testCB->transform = XLib::Matrix4x4::Identity();
+		testCB->transform = XLib::Matrix4x4::RotationZ(aaa); aaa += 0.01f;
 		testCB->view = cameraViewMatrix;
 		testCB->viewProjection = cameraViewMatrix * cameraProjectionMatrix;
 
@@ -101,6 +103,16 @@ void SceneRenderer::render(const Scene& scene, const CameraDesc& cameraDesc,
 		HAL::TextureDesc::Create2DRT(targetWidth, targetHeight, HAL::TextureFormat::D32, 1);
 	const Scheduler::TextureHandle gfxSchDepthTexture =
 		gfxSchTaskGraph.createTransientTexture(gfxHwDepthTextureDesc, "Depth"_xsh);
+
+	/*const HAL::TextureDesc gfxHwGBufferATextureDesc =
+		HAL::TextureDesc::Create2DRT(targetWidth, targetHeight, HAL::TextureFormat::R8G8B8A8, 1);
+	const HAL::TextureDesc gfxHwGBufferBTextureDesc =
+		HAL::TextureDesc::Create2DRT(targetWidth, targetHeight, HAL::TextureFormat::R16G16, 1);
+
+	const Scheduler::TextureHandle gfxSchGBufferATexture =
+		gfxSchTaskGraph.createTransientTexture(gfxHwGBufferATextureDesc, "GBufferA"_xsh);
+	const Scheduler::TextureHandle gfxSchGBufferBTexture =
+		gfxSchTaskGraph.createTransientTexture(gfxHwGBufferBTextureDesc, "GBufferB"_xsh);*/
 
 	TestPassParams* testPassParams = (TestPassParams*)gfxSchTaskGraph.allocateUserData(sizeof(TestPassParams));
 	*testPassParams = {};
