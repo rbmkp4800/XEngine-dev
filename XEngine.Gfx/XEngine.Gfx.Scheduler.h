@@ -17,8 +17,6 @@
 // TODO: Implement proper handles.
 // TODO: Try using "CompositeHeapAllocation" concept.
 
-// TODO: Do something about this `union { textureDesc; bufferSize; };` everywhere. Probably we can drop buffer size and always save resource size.
-
 // TODO: Cleanup `TransientResourceCacheAccessSession::*` `queryBuffer` and `queryTexture`. A lot of code duplication there.
 // We may try to introduce `HAL::ResourceDesc` (U64, that also encodes resource type), `HAL::Device::createResource`, `HAL::ResourceHandle`.
 

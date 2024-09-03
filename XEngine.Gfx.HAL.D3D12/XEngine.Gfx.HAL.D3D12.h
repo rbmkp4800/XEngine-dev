@@ -504,6 +504,8 @@ namespace XEngine::Gfx::HAL
 		void bindDescriptorSet(uint64 bindingNameXSH, DescriptorSet descriptorSet);
 		//void bindDescriptorArray(uint64 bindingNameXSH, ...);
 
+		inline void bindConstantBuffer(uint64 bindingNameXSH, BufferPointer bufferPointer);
+
 		void clearColorRenderTarget(uint8 colorRenderTargetIndex, const float32* color);
 		void clearDepthStencilRenderTarget(bool clearDepth, bool clearStencil, float32 depth, uint8 stencil);
 
@@ -863,5 +865,10 @@ namespace XEngine::Gfx::HAL
 		const DepthStencilRenderTarget& depthStencilRenderTarget, bool readOnlyDepth, bool readOnlyStencil)
 	{
 		bindRenderTargets(1, &colorRenderTarget, &depthStencilRenderTarget, readOnlyDepth, readOnlyStencil);
+	}
+
+	inline void CommandList::bindConstantBuffer(uint64 bindingNameXSH, BufferPointer bufferPointer)
+	{
+		bindBuffer(bindingNameXSH, BufferBindType::Constant, bufferPointer);
 	}
 }

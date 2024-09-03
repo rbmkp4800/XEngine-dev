@@ -55,8 +55,8 @@ namespace XEngine::Gfx
 
 	struct UploadBufferPointer
 	{
-		HAL::BufferPointer hwDevicePointer;
-		void* hostPointer;
+		HAL::BufferPointer hwPtr;
+		void* ptr;
 	};
 
 	class CircularUploadMemoryAllocator : public XLib::NonCopyable

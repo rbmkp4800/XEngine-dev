@@ -1,6 +1,6 @@
-#include "XEngine.Gfx.Scheduler.h"
-
 #include <XLib.Allocation.h>
+
+#include "XEngine.Gfx.Scheduler.h"
 
 using namespace XEngine::Gfx;
 using namespace XEngine::Gfx::Scheduler;

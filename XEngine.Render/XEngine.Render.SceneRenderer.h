@@ -6,8 +6,20 @@
 #include <XEngine.Gfx.HAL.D3D12.h>
 #include <XEngine.Gfx.Scheduler.h>
 
+#include "XEngine.Render.Scene.h"
+
 namespace XEngine::Render
 {
+	struct CameraDesc
+	{
+		float32x3 position;
+		float32x3 direction;
+		float32x3 up;
+		float32 fov;
+		float32 zNear;
+		float32 zFar;
+	};
+
 	class SceneRenderer : public XLib::NonCopyable
 	{
 	private:
@@ -19,7 +31,7 @@ namespace XEngine::Render
 
 	private:
 		void testPassExecutor(Gfx::Scheduler::TaskExecutionContext& gfxSchExecutionContext,
-			Gfx::HAL::Device& gfxHwDevice, Gfx::HAL::CommandList& gfxHwCommandList, TestPassParams& params);
+			Gfx::HAL::Device& gfxHwDevice, Gfx::HAL::CommandList& gfxHwCommandList, TestPassParams& params) const;
 
 	public:
 		SceneRenderer() = default;
@@ -27,9 +39,8 @@ namespace XEngine::Render
 
 		void initialize(Gfx::HAL::Device& gfxHwDevice);
 
-		void render(
-			Gfx::Scheduler::TaskGraph& gfxSchTaskGraph,
-			Gfx::Scheduler::TextureHandle gfxSchTargetTexture,
+		void render(const Scene& scene, const CameraDesc& cameraDesc,
+			Gfx::Scheduler::TaskGraph& gfxSchTaskGraph, Gfx::Scheduler::TextureHandle gfxSchTargetTexture,
 			uint16 targetWidth, uint16 targetHeight);
 	};
 }

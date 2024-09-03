@@ -185,8 +185,8 @@ UploadBufferPointer CircularUploadMemoryAllocator::allocate(uint32 size)
 	const uint32 allocationOffset = uint32(baseAllocator.allocate(uint16(baseAllocationSize))) * AllocationAlignment;
 
 	UploadBufferPointer result = {};
-	result.hwDevicePointer.buffer = hwUploadMemoryPoolBuffer;
-	result.hwDevicePointer.offset = allocationOffset;
-	result.hostPointer = mappedUploadMemoryPoolBuffer + allocationOffset;
+	result.hwPtr.buffer = hwUploadMemoryPoolBuffer;
+	result.hwPtr.offset = allocationOffset;
+	result.ptr = mappedUploadMemoryPoolBuffer + allocationOffset;
 	return result;
 }
