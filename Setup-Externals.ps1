@@ -6,13 +6,13 @@ $myTempFolder = "$($ENV:Temp)/rbmkp4800.XEngine-Externals-temp"
 
 Function Get-RedirectedUrl($url) {
     $response = [System.Net.HttpWebRequest]::Create($url).GetResponse()
-    $response.ResponseUri.AbsoluteUri
+    $response.ResponseUri
     $response.Close()
 }
 
 Function DownloadFile($url, $destFolder) {
     $redirectedUrl = Get-RedirectedUrl $url
-    $filename = Split-Path -Leaf $redirectedUrl
+    $filename = Split-Path -Leaf $redirectedUrl.LocalPath
     $output = Join-Path $destFolder $filename
     Write-Host "Downloading $($filename)"
     [void](New-Item -ItemType Directory -Force -Path $destFolder)
@@ -44,4 +44,4 @@ Copy-Item (Join-Path $pathUnzipDXC "build/native/include")  -Destination "Extern
 Remove-Item $myTempFolder -Force -Recurse
 
 Write-Host "Press any key to continue..."
-$Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+[void]($Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown"))
