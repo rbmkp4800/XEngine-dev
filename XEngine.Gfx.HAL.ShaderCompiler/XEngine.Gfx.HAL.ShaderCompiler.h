@@ -16,8 +16,8 @@
 namespace XEngine::Gfx::HAL::ShaderCompiler
 {
 	constexpr uint16 MaxPipelineStaticSamplerCount = 8;
-	constexpr uint16 MaxPipelineBindingNameLength = 254;
-	constexpr uint16 MaxDescriptorSetBindingNameLength = 254;
+	constexpr uint16 MaxPipelineBindingNameLength = 125;
+	constexpr uint16 MaxDescriptorSetBindingNameLength = 125;
 
 	constexpr uint32 StartShaderRegiserIndex = 1000;
 

@@ -66,7 +66,7 @@ namespace XEngine::Gfx::HAL
 	//enum class RaytracingPipelineHandle		: uint32 {};
 	enum class OutputHandle					: uint32 {};
 
-	enum class DescriptorSet				: uint64 {};
+	enum class DescriptorSet				: uint64 {}; // TODO: This should be `DescriptorSetRef`
 	enum class DeviceQueueSyncPoint			: uint64 {};
 	enum class HostSignalToken				: uint64 {};
 

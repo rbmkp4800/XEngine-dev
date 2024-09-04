@@ -23,15 +23,22 @@ namespace XEngine::Render
 	class SceneRenderer : public XLib::NonCopyable
 	{
 	private:
-		struct SceneGeometryPassParams;
+		struct CommonParams;
 
 	private:
+		Gfx::HAL::DescriptorSetLayoutHandle gfxHwGBufferTexturesDSL = {};
+
 		Gfx::HAL::PipelineLayoutHandle gfxHwSceneGeometryPipelineLayout = {};
+		Gfx::HAL::PipelineLayoutHandle gfxHwDeferredLightingPipelineLayout = {};
+
 		Gfx::HAL::GraphicsPipelineHandle gfxHwSceneGeometryPipeline = {};
+		Gfx::HAL::GraphicsPipelineHandle gfxHwDeferredLightingPipeline = {};
 
 	private:
 		void sceneGeometryPassExecutor(Gfx::Scheduler::TaskExecutionContext& gfxSchExecutionContext,
-			Gfx::HAL::Device& gfxHwDevice, Gfx::HAL::CommandList& gfxHwCommandList, SceneGeometryPassParams& params) const;
+			Gfx::HAL::Device& gfxHwDevice, Gfx::HAL::CommandList& gfxHwCommandList, CommonParams& params) const;
+		void deferredLightingPassExecutor(Gfx::Scheduler::TaskExecutionContext& gfxSchExecutionContext,
+			Gfx::HAL::Device& gfxHwDevice, Gfx::HAL::CommandList& gfxHwCommandList, CommonParams& params) const;
 
 	public:
 		SceneRenderer() = default;

@@ -97,7 +97,7 @@ inline void operator delete (void* block, XLib::Internal::PlacementNewToken, voi
 // Data utils //////////////////////////////////////////////////////////////////////////////////
 
 template <typename T, uintptr size>
-constexpr auto countof(T(&)[size])
+constexpr auto countOf(T(&)[size])
 {
 	if constexpr (size <= uint8(-1))
 		return uint8(size);

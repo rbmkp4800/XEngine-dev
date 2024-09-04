@@ -1,5 +1,7 @@
 {
-	"SceneGeometry.DefaultSampler": {
+	// Scene geometry //////////////////////////////////////////////////////////////////////////////
+
+	"SceneGeometry.DefaultSampler" : {
 		"type": "static_sampler",
 		"filter": "linear",
 		"reduction": "weighted_avg",
@@ -30,6 +32,41 @@
 		"src" : "SceneGeometry.hlsl",
 		"entry_point" : "MainPS",
 	},
+
+
+	// Deferred lighting ///////////////////////////////////////////////////////////////////////////
+
+	"GBufferTexturesDSL" : {
+		"type": "descriptor_set_layout",
+		"bindings": {
+			"gbuffer_a" : { "type": "read_only_texture_descriptor" },
+			"gbuffer_b" : { "type": "read_only_texture_descriptor" },
+			"gbuffer_c" : { "type": "read_only_texture_descriptor" },
+		}
+	},
+
+	"DeferredLighting.PipelineLayout" : {
+		"type": "pipeline_layout",
+		"bindings" : {
+			"view_constant_buffer": { "type": "constant_buffer" },
+			"gbuffer_descriptors": { "type": "descriptor_set", "dsl": "GBufferTexturesDSL" },
+		},
+	},
+
+	"DeferredLighting.VS" : {
+		"type" : "vs",
+		"layout" : "DeferredLighting.PipelineLayout",
+		"src" : "FullScreenQuad.hlsl",
+		"entry_point" : "MainVS",
+	},
+
+	"DeferredLighting.PS" : {
+		"type" : "ps",
+		"layout" : "DeferredLighting.PipelineLayout",
+		"src" : "DeferredLighting.hlsl",
+		"entry_point" : "MainPS",
+	},
+
 
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////////////////////////////////////

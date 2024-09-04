@@ -135,6 +135,8 @@ bool HLSLPatcher::Lexer::advance(Error& error)
 				}
 			}
 		}
+		else
+			break;
 	}
 
 	// Process lexeme.
@@ -381,7 +383,7 @@ bool HLSLPatcher::processAttribute(Attribute& attribute, Error& error)
 		}
 
 		Lexeme bindingNestedNameLexeme = {};
-		if (lexer.peekLexeme().type == LexemeType::Dot)
+		if (lexer.peekLexeme().type == LexemeType::DoubleColon)
 		{
 			if (!lexer.advance(error))
 				return false;
@@ -462,8 +464,10 @@ bool HLSLPatcher::processAttribute(Attribute& attribute, Error& error)
 	return true;
 }
 
-bool HLSLPatcher::processVariableDefinitionForBinding(const BindingInfo& bindingInfo, Error& error)
+bool HLSLPatcher::processVariableDefinitionForBinding(const BindingInfo& bindingInfo, StringViewASCII displayBindingName, Error& error)
 {
+	error.message.clear();
+
 	if (bindingInfo.type == BindingType::StaticSampler)
 	{
 		const Lexeme samplerStateLexeme = lexer.peekLexeme();
@@ -541,9 +545,7 @@ bool HLSLPatcher::processVariableDefinitionForBinding(const BindingInfo& binding
 
 	if (actualResourceType != bindingInfo.resource.type)
 	{
-		// TODO: Proper error message
-		//TextWriteFmt(error.message, "'", resourceTypeLexeme.string, "': invalid type to use with pipeline binding '", bindingName, "'");
-		error.message = "invalid type to use with previously definied binding";
+		FmtPrintStr(error.message, "'", resourceTypeLexeme.string, "': invalid type to use with pipeline binding '", displayBindingName, "'");
 		error.location = resourceTypeLexeme.location;
 		return false;
 	}
@@ -589,7 +591,7 @@ bool HLSLPatcher::processVariableDefinitionForBinding(const BindingInfo& binding
 
 	if (lexer.peekLexeme().type == LexemeType::LeftSquareBracket)
 	{
-		error.message = "arrays not supported for now :(";
+		error.message = "arrays are not yet supported :(";
 		error.location = lexer.peekLexeme().location;
 		XAssertUnreachableCode();
 		return false;
@@ -713,7 +715,6 @@ bool HLSLPatcher::ExtractBindingInfo(const PipelineLayout& pipelineLayout,
 		const DescriptorSetBindingDesc descriptorSetBindingDesc =
 			pipelineBinding.descriptorSetLayout->getBindingDesc(descriptorSetBindingIndex);
 
-		ResourceType resourceType = ResourceType::Undefined;
 		switch (descriptorSetBindingDesc.descriptorType)
 		{
 			case DescriptorType::ReadOnlyBuffer:	resourceType = ResourceType::Buffer;	break;
@@ -724,7 +725,6 @@ bool HLSLPatcher::ExtractBindingInfo(const PipelineLayout& pipelineLayout,
 			default: XAssertUnreachableCode();
 		}
 
-		resourceType = resourceType;
 		allowArray = true;
 		shaderRegister = pipelineBindingBaseShaderRegiser +
 			pipelineBinding.descriptorSetLayout->getBindingDescriptorOffset(descriptorSetBindingIndex);
@@ -840,7 +840,15 @@ bool HLSLPatcher::patch(DynamicStringASCII& result, Error& error)
 				return false;
 			}
 
-			if (!processVariableDefinitionForBinding(bindingInfo, error))
+			InplaceStringASCIIx256 displayBindingName;
+			displayBindingName.append(attribute.binding.rootName);
+			if (!attribute.binding.nestedName.isEmpty())
+			{
+				displayBindingName.append("::");
+				displayBindingName.append(attribute.binding.nestedName);
+			}
+
+			if (!processVariableDefinitionForBinding(bindingInfo, displayBindingName, error))
 				return false;
 		}
 	}

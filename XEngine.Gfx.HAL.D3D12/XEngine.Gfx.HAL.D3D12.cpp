@@ -342,7 +342,7 @@ void CommandList::bindRenderTargets(uint8 colorRenderTargetCount, const ColorRen
 			XEAssert(resource.type == ResourceType::Texture && resource.d3dResource);
 			XEAssert(resource.textureDesc.dimension == TextureDimension::Texture2D);
 			XEAssert(resource.textureDesc.enableRenderTargetUsage);
-			// TODO: Assert compatible texture format / texel view format.
+			XTODO("Validate compatible texture format / texel view format");
 
 			D3D12_RENDER_TARGET_VIEW_DESC d3dRTVDesc = {};
 			d3dRTVDesc.Format = TranslateTexelViewFormatToDXGIFormat(rt.format);
@@ -1195,7 +1195,7 @@ void Device::initialize(/*const PhysicalDevice& physicalDevice, */const DeviceSe
 		XTODO("Fast clear value handing");
 
 		D3D12_INFO_QUEUE_FILTER d3dInfoQueueFilter = {};
-		d3dInfoQueueFilter.DenyList.NumIDs = countof(d3dMessagesToHide);
+		d3dInfoQueueFilter.DenyList.NumIDs = countOf(d3dMessagesToHide);
 		d3dInfoQueueFilter.DenyList.pIDList = d3dMessagesToHide;
 		d3dInfoQueue->AddStorageFilterEntries(&d3dInfoQueueFilter);
 
@@ -1762,7 +1762,7 @@ GraphicsPipelineHandle Device::createGraphicsPipeline(PipelineLayoutHandle pipel
 		
 		// Render target formats
 		{
-			static_assert(MaxColorRenderTargetCount <= countof(d3dRTFormatArray.RTFormats));
+			static_assert(MaxColorRenderTargetCount <= countOf(d3dRTFormatArray.RTFormats));
 			for (uint8 i = 0; i < MaxColorRenderTargetCount; i++)
 			{
 				const TexelViewFormat format = desc.colorRenderTargetFormats[i];
@@ -2144,7 +2144,7 @@ void Device::submitCommandList(DeviceQueue deviceQueue, HAL::CommandList& comman
 	XEMasterAssert(!commandList.isOpen);
 
 	const uint8 queueIndex = uint8(deviceQueue);
-	XEMasterAssert(queueIndex < countof(queues));
+	XEMasterAssert(queueIndex < countOf(queues));
 	Queue& queue = queues[queueIndex];
 
 	ID3D12CommandList* d3dCommandListsToExecute[] = { commandList.d3dCommandList };
@@ -2186,7 +2186,7 @@ DeviceQueueSyncPoint Device::getEOPSyncPoint(DeviceQueue deviceQueue) const
 	XEAssert(deviceQueue == DeviceQueue::Graphics); // Not implemented.
 
 	const uint8 queueIndex = uint8(deviceQueue);
-	XEMasterAssert(queueIndex < countof(queues));
+	XEMasterAssert(queueIndex < countOf(queues));
 	const Queue& queue = queues[queueIndex];
 
 	return ComposeDeviceQueueSyncPoint(queueIndex, queue.deviceSignalEmittedValue);
@@ -2198,7 +2198,7 @@ bool Device::isQueueSyncPointReached(DeviceQueueSyncPoint syncPoint) const
 	uint64 signalValue = 0;
 	DecomposeDeviceQueueSyncPoint(syncPoint, queueIndex, signalValue);
 
-	XEMasterAssert(queueIndex < countof(queues));
+	XEMasterAssert(queueIndex < countOf(queues));
 	const Queue& queue = queues[queueIndex];
 
 	return isDeviceSignalValueReached(queue, signalValue, GetDeviceQueueSyncPointSignalValueBitCount());
@@ -2229,7 +2229,7 @@ uint16 Device::getDescriptorSetLayoutDescriptorCount(DescriptorSetLayoutHandle d
 TextureHandle Device::getOutputBackBuffer(OutputHandle outputHandle, uint32 backBufferIndex) const
 {
 	const Output& output = outputPool.resolveHandle(uint32(outputHandle));
-	XEAssert(backBufferIndex < countof(output.backBuffers));
+	XEAssert(backBufferIndex < countOf(output.backBuffers));
 	return output.backBuffers[backBufferIndex];
 }
 
@@ -2237,7 +2237,7 @@ TextureHandle Device::getOutputCurrentBackBuffer(OutputHandle outputHandle) cons
 {
 	const Output& output = outputPool.resolveHandle(uint32(outputHandle));
 	const uint32 backBufferIndex = output.dxgiSwapChain->GetCurrentBackBufferIndex();
-	XEAssert(backBufferIndex < countof(output.backBuffers));
+	XEAssert(backBufferIndex < countOf(output.backBuffers));
 	return output.backBuffers[backBufferIndex];
 }
 
@@ -2246,7 +2246,7 @@ uint32 Device::getOutputCurrentBackBufferIndex(OutputHandle outputHandle) const
 	const Output& output = outputPool.resolveHandle(uint32(outputHandle));
 	XEAssert(output.dxgiSwapChain);
 	const uint32 backBufferIndex = output.dxgiSwapChain->GetCurrentBackBufferIndex();
-	XEAssert(backBufferIndex < countof(output.backBuffers));
+	XEAssert(backBufferIndex < countOf(output.backBuffers));
 	return backBufferIndex;
 }
 

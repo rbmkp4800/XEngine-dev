@@ -1,6 +1,5 @@
 struct ViewConstantBuffer
 {
-	float4x4 localToWorldSpaceTransform;
 	float4x4 worldToViewTransform;
 	float4x4 worldToClipTransform;
 };
@@ -27,13 +26,17 @@ struct VSOutput
 struct PSOutput
 {
 	float4 albedo : SV_Target0;
+	float4 normal : SV_Target1;
+	float2 roughtnessMetalness : SV_Target2;
 };
 
 VSOutput MainVS(VSInput input)
 {
-	const float4x4 localToWorldSpaceTransform = bnd_ViewConstantBuffer.localToWorldSpaceTransform;
-	const float3 worldSpacePosition = mul(float4(input.position, 1.0f), localToWorldSpaceTransform).xyz;
-	const float3 worldSpaceNormal = mul(input.normal, (float3x3) localToWorldSpaceTransform);
+	//const float4x4 localToWorldSpaceTransform = bnd_ViewConstantBuffer.localToWorldSpaceTransform;
+	//const float3 worldSpacePosition = mul(float4(input.position, 1.0f), localToWorldSpaceTransform).xyz;
+	//const float3 worldSpaceNormal = mul(input.normal, (float3x3) localToWorldSpaceTransform);
+	const float3 worldSpacePosition = input.position;
+	const float3 worldSpaceNormal = input.normal;
 
 	VSOutput output;
 	output.position = mul(float4(worldSpacePosition, 1.0f), bnd_ViewConstantBuffer.worldToClipTransform);
@@ -49,5 +52,7 @@ PSOutput MainPS(VSOutput input)
 	
 	PSOutput output;
 	output.albedo = float4(texSample.xyz, 1.0f);
+	output.normal = float4(input.normal, 0.0f);
+	output.roughtnessMetalness = float2(1.0f, 0.0f);
 	return output;
 }

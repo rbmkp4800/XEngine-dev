@@ -35,7 +35,8 @@
   <ItemGroup>
     <None Include="XEngine.Render.Shaders.libdef.json" />
 
-    <None Include="FullScreenQuadVS.hlsl" />
+    <None Include="DeferredLighting.hlsl" />
+    <None Include="FullScreenQuad.hlsl" />
     <None Include="SceneGeometry.hlsl" />
     <None Include="TestGraphics.hlsl" />
   </ItemGroup>

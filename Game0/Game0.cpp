@@ -126,16 +126,19 @@ void Game0::run()
 			cameraDesc.zFar = 100.0f;
 		}
 
-		gfxSchTaskGraph.open(gfxHwDevice);
 		{
+			gfxSchTaskGraph.open(gfxHwDevice, gfxHwCommandAllocator, gfxHwDescriptorAllocator,
+				gfxUploadMemoryAllocator, gfxSchTransientResourceCache);
+
 			const Gfx::HAL::TextureHandle gfxHwCurrentBackBuffer = gfxHwDevice.getOutputCurrentBackBuffer(gfxHwOutput);
 			const Gfx::Scheduler::TextureHandle gfxSchCurrentBackBuffer =
 				gfxSchTaskGraph.importExternalTexture(gfxHwCurrentBackBuffer,
 					Gfx::HAL::TextureLayout::Present, Gfx::HAL::TextureLayout::Present);
 
 			sceneRenderer.render(scene, cameraDesc, gfxSchTaskGraph, gfxSchCurrentBackBuffer, outputWidth, outputHeight);
+
+			gfxSchTaskGraph.execute();
 		}
-		gfxSchTaskGraph.execute(gfxSchTransientResourceCache, gfxHwCommandAllocator, gfxHwDescriptorAllocator, gfxUploadMemoryAllocator);
 
 		const Gfx::HAL::DeviceQueueSyncPoint gfxHwFrameEndSyncPoint =
 			gfxHwDevice.getEOPSyncPoint(Gfx::HAL::DeviceQueue::Graphics);

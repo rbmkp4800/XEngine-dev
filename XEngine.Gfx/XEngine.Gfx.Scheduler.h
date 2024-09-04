@@ -8,7 +8,9 @@
 
 #include "XEngine.Gfx.Allocation.h"
 
+// TODO: Consider adding deferred `TaskGraph::writeDescriptor` call that accepts transient resource handles. We need this to be able to allocate and populate descriptor sets before execution.
 // TODO: Use hashmap or something in `TransientResourceCache` instead of retarded linear search through all entries.
+// TODO: Do not allocate transient resources that are not accessed.
 // TODO: Optimal resource aliasing.
 // TODO: Proper `TransientMemoryPool` implementation with multiple allocations and ability to grow.
 // TODO: Check that there is one and only one dependency between task and resource(subresource).
@@ -132,6 +134,9 @@ namespace XEngine::Gfx::Scheduler
 		TaskGraph* parent = nullptr;
 
 	private:
+		static inline HAL::BarrierSync TranslateSchResourceShaderAccessStageToHwBarrierSync(ResourceShaderAccessStage shaderStage);
+
+	private:
 		inline explicit TaskDependencyCollector(TaskGraph& parent);
 
 	public:
@@ -158,11 +163,11 @@ namespace XEngine::Gfx::Scheduler
 			bool dependsOnPrecedingShaderWrite = true);
 
 		inline TaskDependencyCollector& addTextureShaderRead(TextureHandle hwTextureHandle,
-			const HAL::TextureSubresourceRange* hwSubresourceRange = nullptr,
-			ResourceShaderAccessStage shaderStage = ResourceShaderAccessStage::Any);
-		inline TaskDependencyCollector& addTextureShaderWrite(TextureHandle hwTextureHandle,
-			const HAL::TextureSubresourceRange* hwSubresourceRange = nullptr,
 			ResourceShaderAccessStage shaderStage = ResourceShaderAccessStage::Any,
+			const HAL::TextureSubresourceRange* hwSubresourceRange = nullptr);
+		inline TaskDependencyCollector& addTextureShaderWrite(TextureHandle hwTextureHandle,
+			ResourceShaderAccessStage shaderStage = ResourceShaderAccessStage::Any,
+			const HAL::TextureSubresourceRange* hwSubresourceRange = nullptr,
 			bool dependsOnPrecedingShaderWrite = true);
 
 		inline TaskDependencyCollector& addColorRenderTarget(TextureHandle hwTextureHandle/*,
@@ -202,7 +207,10 @@ namespace XEngine::Gfx::Scheduler
 		void* userDataPool = nullptr;
 
 		HAL::Device* hwDevice = nullptr;
-		TransientResourceCacheAccessSession transientResourceCacheAccessSession;
+		HAL::CommandAllocatorHandle hwCommandAllocator = {};
+		HAL::DescriptorAllocatorHandle hwTransientDescriptorAllocator = {};
+		CircularUploadMemoryAllocator* transientUploadMemoryAllocator = nullptr;
+		TransientResourceCache* transientResourceCache = nullptr;
 
 		uint16 resourcePoolSize = 0;
 		uint16 taskPoolSize = 0;
@@ -241,7 +249,11 @@ namespace XEngine::Gfx::Scheduler
 		void initialize();
 		void destroy();
 
-		void open(HAL::Device& hwDevice);
+		void open(HAL::Device& hwDevice,
+			HAL::CommandAllocatorHandle hwCommandAllocator,
+			HAL::DescriptorAllocatorHandle hwTransientDescriptorAllocator,
+			CircularUploadMemoryAllocator& transientUploadMemoryAllocator,
+			TransientResourceCache& transientResourceCache);
 
 		BufferHandle createTransientBuffer(uint32 size, uint64 nameXSH);
 		TextureHandle createTransientTexture(HAL::TextureDesc hwTextureDesc, uint64 nameXSH);
@@ -250,13 +262,14 @@ namespace XEngine::Gfx::Scheduler
 			HAL::TextureLayout hwPreExecutionLayout, HAL::TextureLayout hwPostExecutionLayout);
 
 		void* allocateUserData(uint32 size);
+		HAL::DescriptorSet allocateTransientDescriptorSet(HAL::DescriptorSetLayoutHandle hwDescriptorSetLayout);
+		UploadBufferPointer allocateTransientUploadMemory(uint32 size);
+
+		// void writeDescriptorDeferred();
 
 		TaskDependencyCollector addTask(TaskType type, TaskExecutorFunc executorFunc, void* userData);
 
-		void execute(TransientResourceCache& transientResourceCache,
-			HAL::CommandAllocatorHandle hwCommandAllocator,
-			HAL::DescriptorAllocatorHandle hwTransientDescriptorAllocator,
-			CircularUploadMemoryAllocator& transientUploadMemoryAllocator);
+		void execute();
 	};
 
 
@@ -291,6 +304,20 @@ namespace XEngine::Gfx::Scheduler
 
 namespace XEngine::Gfx::Scheduler
 {
+	inline HAL::BarrierSync TaskDependencyCollector::TranslateSchResourceShaderAccessStageToHwBarrierSync(ResourceShaderAccessStage shaderStage)
+	{
+		switch (shaderStage)
+		{
+			case ResourceShaderAccessStage::Any:		return HAL::BarrierSync::AllShaders;
+			case ResourceShaderAccessStage::Compute:	return HAL::BarrierSync::ComputeShader;
+			case ResourceShaderAccessStage::Graphics:	return HAL::BarrierSync::AllGraphicsShaders;
+			case ResourceShaderAccessStage::PrePixel:	return HAL::BarrierSync::PrePixelShaders;
+			case ResourceShaderAccessStage::Pixel:		return HAL::BarrierSync::PixelShader;
+		}
+		XEMasterAssertUnreachableCode();
+		return HAL::BarrierSync::None;
+	}
+
 	inline TaskDependencyCollector::TaskDependencyCollector(TaskGraph& parent)
 	{
 		parent.registerIssuedTaskDependenciesCollector(*this);
@@ -327,6 +354,15 @@ namespace XEngine::Gfx::Scheduler
 	{
 		XEAssert(!hwSubresourceRange);
 		parent->addTaskDependency(*this, HAL::ResourceType::Texture, uint32(hwTextureHandle), hwSync, hwAccess, hwTextureLayout);
+		return *this;
+	}
+
+	inline TaskDependencyCollector& TaskDependencyCollector::addTextureShaderRead(TextureHandle hwTextureHandle,
+		ResourceShaderAccessStage shaderStage, const HAL::TextureSubresourceRange* hwSubresourceRange)
+	{
+		parent->addTaskDependency(*this, HAL::ResourceType::Texture, uint32(hwTextureHandle),
+			TranslateSchResourceShaderAccessStageToHwBarrierSync(shaderStage),
+			HAL::BarrierAccess::ShaderReadOnly, HAL::TextureLayout::ShaderReadOnly);
 		return *this;
 	}
 

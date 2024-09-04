@@ -30,7 +30,7 @@ void Debug::DefaultFailureHandler(const char* messageCStr)
 
 		{
 			HANDLE hStdOut = ::GetStdHandle(STD_OUTPUT_HANDLE);
-			UINT messageLength = ::strlen(messageCStr);
+			DWORD messageLength = DWORD(::strlen(messageCStr));
 			DWORD dummy = 0;
 			::WriteFile(hStdOut, messageCStr, messageLength, &dummy, nullptr);
 		}

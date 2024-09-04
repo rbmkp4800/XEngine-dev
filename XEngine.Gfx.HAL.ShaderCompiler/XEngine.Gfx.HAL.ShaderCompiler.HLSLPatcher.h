@@ -112,7 +112,7 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 
 	private:
 		bool processAttribute(Attribute& attribute, Error& error);
-		bool processVariableDefinitionForBinding(const BindingInfo& bindingInfo, Error& error);
+		bool processVariableDefinitionForBinding(const BindingInfo& bindingInfo, XLib::StringViewASCII displayBindingName, Error& error);
 
 		static bool ExtractBindingInfo(const PipelineLayout& pipelineLayout,
 			XLib::StringViewASCII bindingRootName, Location bindingRootNameLocation,

@@ -21,8 +21,8 @@ void Path::GetCurrentPath(VirtualStringRefASCII resultPath)
 		// Explicitly clip output.
 
 		char internalBuffer[4096];
-		XAssert(resultPathRequiredBufferSize <= countof(internalBuffer));
-		const DWORD lengthCheck = GetCurrentDirectoryA(countof(internalBuffer), internalBuffer);
+		XAssert(resultPathRequiredBufferSize <= countOf(internalBuffer));
+		const DWORD lengthCheck = GetCurrentDirectoryA(countOf(internalBuffer), internalBuffer);
 		XAssert(lengthCheck == resultPathSrcLength);
 
 		resultPath.growBufferToFitLength(resultPathMaxLength);

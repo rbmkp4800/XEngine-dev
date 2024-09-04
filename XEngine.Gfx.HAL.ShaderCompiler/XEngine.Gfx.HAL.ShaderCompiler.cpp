@@ -403,6 +403,9 @@ PipelineBindingDesc PipelineLayout::getBindingDesc(uint16 bindingIndex) const
 	PipelineBindingDesc result = {};
 	result.name = namesBuffer.getSubString(internalDesc.nameOffset, internalDesc.nameLength);
 	result.type = internalDesc.type;
+	if (internalDesc.type == PipelineBindingType::DescriptorSet)
+		result.descriptorSetLayout = descriptorSetLayoutTable[bindingIndex].get();
+
 	return result;
 }
 
@@ -915,8 +918,8 @@ ShaderCompilationResultRef ShaderCompiler::CompileShader(XLib::StringViewASCII m
 {
 	wchar mainSourceFilenameW[2048] = {};
 	wchar entryPointNameW[128] = {};
-	MultiByteToWideChar(CP_ACP, 0, mainSourceFilename.getData(), uint32(mainSourceFilename.getLength()), mainSourceFilenameW, countof(mainSourceFilenameW));
-	MultiByteToWideChar(CP_ACP, 0, args.entryPointName.getData(), uint32(args.entryPointName.getLength()), entryPointNameW, countof(entryPointNameW));
+	MultiByteToWideChar(CP_ACP, 0, mainSourceFilename.getData(), uint32(mainSourceFilename.getLength()), mainSourceFilenameW, countOf(mainSourceFilenameW));
+	MultiByteToWideChar(CP_ACP, 0, args.entryPointName.getData(), uint32(args.entryPointName.getLength()), entryPointNameW, countOf(entryPointNameW));
 
 	static Microsoft::WRL::ComPtr<IDxcUtils> dxcUtils;
 	if (!dxcUtils)
@@ -939,9 +942,13 @@ ShaderCompilationResultRef ShaderCompiler::CompileShader(XLib::StringViewASCII m
 			SourceResolutionResult mainSourceResolutionResult = sourceResolverFunc(sourceResolverContext, mainSourceFilename);
 			if (!mainSourceResolutionResult.resolved)
 			{
-				XTODO(__FUNCTION__ ": Handle case when main source file is not resolved");
-				XAssertUnreachableCode();
-				return nullptr;
+				InplaceStringASCIIx1024 errorMessage;
+				FmtPrintStr(errorMessage, "error: cannot open main file: ", mainSourceFilename, "'");
+
+				ShaderCompilationResult::ComposerSource resultComposerSrc = {};
+				resultComposerSrc.status = ShaderCompilationStatus::PreprocessingError;
+				resultComposerSrc.preprocessingOuputStr = errorMessage.getView();
+				return ShaderCompilationResult::Compose(resultComposerSrc);
 			}
 			dxcMainSourceBuffer.Ptr = mainSourceResolutionResult.text.getData();
 			dxcMainSourceBuffer.Size = mainSourceResolutionResult.text.getLength();
@@ -1051,11 +1058,11 @@ ShaderCompilationResultRef ShaderCompiler::CompileShader(XLib::StringViewASCII m
 			LPCWSTR dxcProfile = nullptr;
 			switch (args.shaderType)
 			{
-			case ShaderType::Compute:		dxcProfile = L"-Tcs_6_6"; break;
-			case ShaderType::Vertex:		dxcProfile = L"-Tvs_6_6"; break;
-			case ShaderType::Amplification: dxcProfile = L"-Tas_6_6"; break;
-			case ShaderType::Mesh:			dxcProfile = L"-Tms_6_6"; break;
-			case ShaderType::Pixel:			dxcProfile = L"-Tps_6_6"; break;
+				case ShaderType::Compute:		dxcProfile = L"-Tcs_6_6"; break;
+				case ShaderType::Vertex:		dxcProfile = L"-Tvs_6_6"; break;
+				case ShaderType::Amplification: dxcProfile = L"-Tas_6_6"; break;
+				case ShaderType::Mesh:			dxcProfile = L"-Tms_6_6"; break;
+				case ShaderType::Pixel:			dxcProfile = L"-Tps_6_6"; break;
 			}
 			XAssert(dxcProfile);
 			dxcArgsList.pushBack(dxcProfile);

@@ -60,6 +60,8 @@ bool JSONReader::skipWhitespaceAndComments()
 				}
 			}
 		}
+		else
+			break;
 	}
 
 	return true;

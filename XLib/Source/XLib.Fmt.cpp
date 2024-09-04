@@ -8,7 +8,7 @@ template <typename UIntT>
 static inline FmtFormatResult FmtFormatDecUXX(UIntT value, char* buffer, uint8 bufferSize, uint8 lzWidth)
 {
 	char internalBuffer[24];
-	lzWidth = min<uint8>(lzWidth, countof(internalBuffer));
+	lzWidth = min<uint8>(lzWidth, countOf(internalBuffer));
 
 	uint8 digitCount = 0;
 	do
@@ -67,7 +67,7 @@ template <typename UIntT>
 static inline FmtFormatResult FmtFormatHexXX(UIntT value, char* buffer, uint8 bufferSize, uint8 lzWidth)
 {
 	char internalBuffer[16];
-	lzWidth = min<uint8>(lzWidth, countof(internalBuffer));
+	lzWidth = min<uint8>(lzWidth, countOf(internalBuffer));
 
 	uint8 digitCount = 0;
 	do

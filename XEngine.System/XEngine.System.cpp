@@ -110,7 +110,7 @@ static void HandleRawInput(WPARAM wParam, LPARAM lParam)
 
 		const bool keyState = data.Flags == RI_KEY_MAKE;
 
-		if (data.VKey < countof(KeyboardState))
+		if (data.VKey < countOf(KeyboardState))
 			KeyboardState[data.VKey] = keyState;
 
 		GlobalInputHandlersList.onKeyboard(KeyCode(data.VKey), keyState);
@@ -216,7 +216,7 @@ void XEngine::System::UnregisterInputHandler(InputHandler* inputHandler)
 
 bool XEngine::System::IsKeyDown(KeyCode key)
 {
-	return uint32(key) < countof(KeyboardState) ? KeyboardState[uint32(key)] : false;
+	return uint32(key) < countOf(KeyboardState) ? KeyboardState[uint32(key)] : false;
 }
 
 void XEngine::System::DispatchEvents()
