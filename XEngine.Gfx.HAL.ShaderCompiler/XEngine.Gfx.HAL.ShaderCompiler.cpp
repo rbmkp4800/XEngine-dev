@@ -1,4 +1,4 @@
-#include <d3d12.h>
+#include <d3d12.h> // TODO: This should be removed (including reference to Microsoft.Direct3D.D3D12 include folder)
 #include <d3d12shader.h>
 #include <dxcapi.h>
 #include <wrl/client.h>
@@ -689,6 +689,10 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 	if (FAILED(hResult))
 	{
 		errorMessage.text = "D3D12SerializeVersionedRootSignature failed";
+
+		if (d3dError && d3dError->GetBufferSize() > 0)
+			FmtPrintStdOut("D3D12SerializeVersionedRootSignature error: ", (char*)d3dError->GetBufferPointer(), "\n");
+
 		return nullptr;
 	}
 
@@ -867,13 +871,13 @@ static bool ValidateGenericBindingName(StringViewASCII name)
 {
 	if (name.isEmpty())
 		return false;
-	if (!Char::IsUpper(name[0]) && name[0] != '_')
+	if (!Char::IsLetter(name[0]) && name[0] != '_')
 		return false;
 
 	for (uintptr i = 1; i < name.getLength(); i++)
 	{
 		const char c = name[i];
-		if (!Char::IsUpper(c) && !Char::IsDigit(c) && c != '_')
+		if (!Char::IsLetterOrDigit(c) && c != '_')
 			return false;
 	}
 	return true;

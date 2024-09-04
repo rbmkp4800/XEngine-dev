@@ -436,7 +436,7 @@ bool LibraryDefinitionLoader::readPipelineLayout(StringViewASCII pipelineLayoutN
 			{
 				StringViewASCII staticSamplerName = {};
 				const Cursor jsonStaticSamplerNameCursor = getJSONCursor();
-				IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("static_sampler", staticSamplerName));
+				IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("sampler", staticSamplerName));
 
 				const StaticSamplerDesc* internalStaticSampler = nullptr;
 				for (StaticSamplerDesc& i : staticSamplers)

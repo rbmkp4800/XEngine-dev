@@ -668,7 +668,7 @@ bool HLSLPatcher::ExtractBindingInfo(const PipelineLayout& pipelineLayout,
 
 	if (pipelineBinding.type == PipelineBindingType::InplaceConstants)
 	{
-		FmtPrintStr(error.message, "pipeline binding '", bindingRootName, "': inplace constants bindings are not supported for now");
+		FmtPrintStr(error.message, "pipeline binding '", bindingRootName, "': inplace constants bindings are not yet supported");
 		error.location = bindingRootNameLocation;
 		return false;
 	}
