@@ -14,8 +14,8 @@
 	"SceneGeometry.PipelineLayout" : {
 		"type": "pipeline_layout",
 		"bindings" : {
-			"view_constant_buffer":  { "type":  "constant_buffer" },
-			"default_sampler": { "type": "static_sampler", "sampler": "SceneGeometry.DefaultSampler" },
+			"view_constant_buffer":	{ "type":  "constant_buffer" },
+			"default_sampler":		{ "type": "static_sampler", "sampler": "SceneGeometry.DefaultSampler" },
 		},
 	},
 
@@ -48,8 +48,9 @@
 	"DeferredLighting.PipelineLayout" : {
 		"type": "pipeline_layout",
 		"bindings": {
-			"view_constant_buffer": { "type": "constant_buffer" },
-			"gbuffer_descriptors": { "type": "descriptor_set", "dsl": "GBufferTexturesDSL" },
+			"view_constant_buffer":					{ "type": "constant_buffer" },
+			"deferrred_lighting_constant_buffer":	{ "type": "constant_buffer" },
+			"gbuffer_descriptors":					{ "type": "descriptor_set", "dsl": "GBufferTexturesDSL" },
 		},
 	},
 
@@ -80,8 +81,8 @@
 	"Tonemapping.PipelineLayout": {
 		"type": "pipeline_layout",
 		"bindings": {
-			"tonemapping_constant_buffer": { "type": "constant_buffer" },
-			"tonemapping_input_descriptors": { "type": "descriptor_set", "dsl": "Tonemapping.InputDSL" },
+			"tonemapping_constant_buffer":		{ "type": "constant_buffer" },
+			"tonemapping_input_descriptors":	{ "type": "descriptor_set", "dsl": "Tonemapping.InputDSL" },
 		},
 	},
 

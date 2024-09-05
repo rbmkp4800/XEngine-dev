@@ -85,8 +85,8 @@ void Game0::run()
 	scene.initialize(gfxHwDevice);
 	sceneRenderer.initialize(gfxHwDevice);
 
-	cameraPosition = { -13.0f, -7.0f, 10.0f };
-	cameraRotation = { 0.0f, -0.7f };
+	cameraPosition = { -4.0f, -4.0f, 3.0f };
+	cameraRotation = { 0.785f, -0.4f };
 
 	for (;;)
 	{

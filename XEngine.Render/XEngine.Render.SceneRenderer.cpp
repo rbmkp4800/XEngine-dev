@@ -13,6 +13,11 @@ struct ViewConstantBuffer
 	XLib::Matrix4x4 worldToClipTransform;
 };
 
+struct DeferredLightingConstantBuffer
+{
+	float32x3 lightDirection;
+};
+
 struct TonemappingConstantBuffer
 {
 	float32 exposureScaler;
@@ -27,6 +32,7 @@ struct SceneRenderer::CommonParams
 	uint16 targetHeight;
 
 	HAL::BufferPointer gfxHwViewConstantBufferPtr;
+	HAL::BufferPointer gfxHwDeferredLightingConstantBufferPtr;
 	HAL::BufferPointer gfxHwTonemappingConstantBufferPtr;
 	Scheduler::TextureHandle gfxSchDepthTexture;
 	Scheduler::TextureHandle gfxSchGBufferATexture;
@@ -70,7 +76,7 @@ void SceneRenderer::sceneGeometryPassExecutor(Scheduler::TaskExecutionContext& g
 	gfxHwCommandList.setGraphicsPipeline(gfxHwSceneGeometryPipeline);
 
 	gfxHwCommandList.bindIndexBuffer(Gfx::HAL::BufferPointer { params.scene->gfxHwTestModel, 4096 }, Gfx::HAL::IndexBufferFormat::U16, 4096);
-	gfxHwCommandList.bindVertexBuffer(0, Gfx::HAL::BufferPointer { params.scene->gfxHwTestModel, 0 }, 32, 4096);
+	gfxHwCommandList.bindVertexBuffer(0, Gfx::HAL::BufferPointer { params.scene->gfxHwTestModel, 0 }, 44, 4096);
 	gfxHwCommandList.bindConstantBuffer("view_constant_buffer"_xsh, params.gfxHwViewConstantBufferPtr);
 
 	gfxHwCommandList.drawIndexed(36);
@@ -102,6 +108,7 @@ void SceneRenderer::deferredLightingPassExecutor(Gfx::Scheduler::TaskExecutionCo
 	gfxHwCommandList.setGraphicsPipeline(gfxHwDeferredLightingPipeline);
 
 	gfxHwCommandList.bindConstantBuffer("view_constant_buffer"_xsh, params.gfxHwViewConstantBufferPtr);
+	gfxHwCommandList.bindConstantBuffer("deferrred_lighting_constant_buffer"_xsh, params.gfxHwDeferredLightingConstantBufferPtr);
 	gfxHwCommandList.bindDescriptorSet("gbuffer_descriptors"_xsh, gfxHwGBufferTexturesDS);
 
 	gfxHwCommandList.draw(3);
@@ -146,7 +153,8 @@ void SceneRenderer::initialize(HAL::Device& gfxHwDevice)
 		{
 			{ "POSITION",	0,	Gfx::HAL::TexelViewFormat::R32G32B32_FLOAT,	},
 			{ "NORMAL",		12,	Gfx::HAL::TexelViewFormat::R32G32B32_FLOAT,	},
-			{ "UV",			24,	Gfx::HAL::TexelViewFormat::R32G32_FLOAT,	},
+			{ "TANGENT",	24,	Gfx::HAL::TexelViewFormat::R32G32B32_FLOAT,	},
+			{ "UV",			36,	Gfx::HAL::TexelViewFormat::R32G32_FLOAT,	},
 		};
 
 		Gfx::HAL::GraphicsPipelineDesc gfxHwPipelineDesc = {};
@@ -212,30 +220,38 @@ void SceneRenderer::render(const Scene& scene, const CameraDesc& cameraDesc,
 	const Scheduler::TextureHandle gfxSchLuminanceTexture =
 		gfxSchTaskGraph.createTransientTexture(gfxHwLuminanceTextureDesc, "Luminance"_xsh);
 
-	const UploadBufferPointer gfxViewConstantBufferPointer = gfxSchTaskGraph.allocateTransientUploadMemory(sizeof(ViewConstantBuffer));
+	const UploadBufferPointer gfxViewConstantBufferPtr = gfxSchTaskGraph.allocateTransientUploadMemory(sizeof(ViewConstantBuffer));
 	{
 		const XLib::Matrix4x4 cameraViewMatrix = XLib::Matrix4x4::LookAtCentered(cameraDesc.position, cameraDesc.direction, cameraDesc.up);
 		const XLib::Matrix4x4 cameraProjectionMatrix = XLib::Matrix4x4::Perspective(cameraDesc.fov, float32(targetWidth) / float32(targetHeight), cameraDesc.zNear, cameraDesc.zFar);
 
-		ViewConstantBuffer* viewConstantBuffer = (ViewConstantBuffer*)gfxViewConstantBufferPointer.ptr;
-		*viewConstantBuffer =
+		ViewConstantBuffer& viewConstantBuffer = *(ViewConstantBuffer*)gfxViewConstantBufferPtr.ptr;
+		viewConstantBuffer =
 		{
 			.worldToViewTransform = cameraViewMatrix,
 			.worldToClipTransform = cameraViewMatrix * cameraProjectionMatrix,
 		};
 	}
 
-	const UploadBufferPointer gfxTonemappingConstantBufferPointer = gfxSchTaskGraph.allocateTransientUploadMemory(sizeof(TonemappingConstantBuffer));
+	const UploadBufferPointer gfxDeferredLightingConstantBufferPtr = gfxSchTaskGraph.allocateTransientUploadMemory(sizeof(DeferredLightingConstantBuffer));
 	{
 		static float a = 0.0f;
-		a += 0.01f;
-		if (a > 1.0f)
-			a = 0.0f;
+		a += 0.03f;
+		const float32x3 lightDirection = XLib::VectorMath::Normalize(float32x3(XLib::Math::Sin(a), XLib::Math::Cos(a), 0.3f));
 
-		TonemappingConstantBuffer* viewConstantBuffer = (TonemappingConstantBuffer*)gfxTonemappingConstantBufferPointer.ptr;
-		*viewConstantBuffer =
+		DeferredLightingConstantBuffer& deferredLightingConstantBuffer = *(DeferredLightingConstantBuffer*)gfxDeferredLightingConstantBufferPtr.ptr;
+		deferredLightingConstantBuffer =
 		{
-			.exposureScaler = a,
+			.lightDirection = lightDirection,
+		};
+	}
+
+	const UploadBufferPointer gfxTonemappingConstantBufferPtr = gfxSchTaskGraph.allocateTransientUploadMemory(sizeof(TonemappingConstantBuffer));
+	{
+		TonemappingConstantBuffer& tonemappingConstantBuffer = *(TonemappingConstantBuffer*)gfxTonemappingConstantBufferPtr.ptr;
+		tonemappingConstantBuffer =
+		{
+			.exposureScaler = 1.0f,
 		};
 	}
 
@@ -246,8 +262,9 @@ void SceneRenderer::render(const Scene& scene, const CameraDesc& cameraDesc,
 		.scene = &scene,
 		.targetWidth = targetWidth,
 		.targetHeight = targetHeight,
-		.gfxHwViewConstantBufferPtr = gfxViewConstantBufferPointer.hwPtr,
-		.gfxHwTonemappingConstantBufferPtr = gfxTonemappingConstantBufferPointer.hwPtr,
+		.gfxHwViewConstantBufferPtr = gfxViewConstantBufferPtr.hwPtr,
+		.gfxHwDeferredLightingConstantBufferPtr = gfxDeferredLightingConstantBufferPtr.hwPtr,
+		.gfxHwTonemappingConstantBufferPtr = gfxTonemappingConstantBufferPtr.hwPtr,
 		.gfxSchDepthTexture = gfxSchDepthTexture,
 		.gfxSchGBufferATexture = gfxSchGBufferATexture,
 		.gfxSchGBufferBTexture = gfxSchGBufferBTexture,
