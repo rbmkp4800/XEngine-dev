@@ -722,7 +722,7 @@ namespace XEngine::Gfx::HAL
 
 		BufferHandle createBuffer(uint64 size,
 			DeviceMemoryHandle memoryHandle = {}, uint64 memoryOffset = 0);
-		TextureHandle createTexture(const TextureDesc& desc, TextureLayout initialLayout,
+		TextureHandle createTexture(const TextureDesc& desc, TextureLayout initialLayout = TextureLayout::Common,
 			DeviceMemoryHandle memoryHandle = {}, uint64 memoryOffset = 0);
 
 		BufferHandle createVirtualBuffer(uint64 size);

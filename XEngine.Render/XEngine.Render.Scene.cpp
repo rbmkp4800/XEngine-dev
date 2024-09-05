@@ -72,6 +72,36 @@ namespace
 }
 
 
+HAL::TextureHandle Scene::LoadTexture(HAL::Device& gfxHwDevice, const char* path)
+{
+	XLib::File file;
+	file.open(path, XLib::FileAccessMode::Read, XLib::FileOpenMode::OpenExisting);
+	XEAssert(file.isOpen());
+
+	uint16x2 textureSize = {};
+
+	file.read(&textureSize, sizeof(textureSize));
+	XEAssert(textureSize.x > 0 && textureSize.x <= 8192);
+	XEAssert(textureSize.y > 0 && textureSize.y <= 8192);
+
+	void* textureData = XLib::SystemHeapAllocator::Allocate(textureSize.x * textureSize.y * 4);
+	file.read(textureData, textureSize.x * textureSize.y * 4);
+
+	const HAL::TextureHandle gfxHwTexture = gfxHwDevice.createTexture(
+		HAL::TextureDesc::Create2D(textureSize.x, textureSize.y, HAL::TextureFormat::R8G8B8A8, 1));
+
+	const HAL::TextureRegion gfxHwTextureRegion =
+	{
+		.offset = uint16x3(0, 0, 0),
+		.size = uint16x3(textureSize.x, textureSize.y, 1),
+	};
+	GlobalUploader.uploadTexture(gfxHwTexture, HAL::TextureSubresource {}, gfxHwTextureRegion, textureData, textureSize.x * 4);
+
+	XLib::SystemHeapAllocator::Release(textureData);
+
+	return gfxHwTexture;
+}
+
 void Scene::initialize(HAL::Device& gfxHwDevice)
 {
 	XEAssert(!this->gfxHwDevice);
@@ -86,43 +116,9 @@ void Scene::initialize(HAL::Device& gfxHwDevice)
 	memoryCopy(vertexBuffer, CubeVertices, sizeof(CubeVertices));
 	memoryCopy(indexBuffer, CubeIndices, sizeof(CubeIndices));
 
-	{
-		XLib::File file;
-		file.open("../Content/wood-0.albedo.xerawtex", XLib::FileAccessMode::Read, XLib::FileOpenMode::OpenExisting);
-		XEAssert(file.isOpen());
+	gfxHwTestAlbedoTexture = LoadTexture(gfxHwDevice, "../Content/wood-0.albedo.xerawtex");
+	gfxHwTestNRMTexture = LoadTexture(gfxHwDevice, "../Content/wood-0.nrm.xerawtex");
 
-		uint16x2 textureSize ={};
-
-		file.read(&textureSize, sizeof(textureSize));
-
-		void* textureData = XLib::SystemHeapAllocator::Allocate(textureSize.x * textureSize.y * 4);
-		file.read(textureData, textureSize.x * textureSize.y * 4);
-
-		const HAL::TextureDesc gfxHwTestTextureDesc =
-			HAL::TextureDesc::Create2D(textureSize.x, textureSize.y, HAL::TextureFormat::R8G8B8A8, 1);
-
-		gfxHwTestTexture = gfxHwDevice.createTexture(gfxHwTestTextureDesc, HAL::TextureLayout::Common);
-
-		HAL::TextureRegion gfxHwTextureRegion =
-		{
-			.offset = uint16x3(0, 0, 0),
-			.size = uint16x3(textureSize.x, textureSize.y, 1),
-		};
-
-		GlobalUploader.uploadTexture(gfxHwTestTexture, HAL::TextureSubresource {}, gfxHwTextureRegion, textureData, textureSize.x * 4);
-
-		XLib::SystemHeapAllocator::Release(textureData);
-	}
-
-	{
-		HAL::ResourceView gfxHwTestTextureView = {};
-		gfxHwTestTextureView.textureHandle = gfxHwTestTexture;
-		gfxHwTestTextureView.texture.format = HAL::TexelViewFormat::R8G8B8A8_UNORM;
-		gfxHwTestTextureView.texture.writable = false;
-		gfxHwTestTextureView.texture.baseMipLevel = 0;
-		gfxHwTestTextureView.texture.mipLevelCount = 1;
-		gfxHwTestTextureView.type = HAL::ResourceViewType::Texture;
-
-		gfxHwDevice.writeBindlessDescriptor(0, gfxHwTestTextureView);
-	}
+	gfxHwDevice.writeBindlessDescriptor(0, HAL::ResourceView::CreateTexture2D(gfxHwTestAlbedoTexture, HAL::TexelViewFormat::R8G8B8A8_UNORM));
+	gfxHwDevice.writeBindlessDescriptor(1, HAL::ResourceView::CreateTexture2D(gfxHwTestNRMTexture, HAL::TexelViewFormat::R8G8B8A8_UNORM));
 }

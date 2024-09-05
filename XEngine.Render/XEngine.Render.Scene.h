@@ -13,7 +13,11 @@ namespace XEngine::Render
 		Gfx::HAL::BufferHandle gfxHwTestModel = {};
 		void* mappedTestModel = nullptr;
 
-		Gfx::HAL::TextureHandle gfxHwTestTexture = {};
+		Gfx::HAL::TextureHandle gfxHwTestAlbedoTexture = {};
+		Gfx::HAL::TextureHandle gfxHwTestNRMTexture = {};
+
+	private:
+		static Gfx::HAL::TextureHandle LoadTexture(Gfx::HAL::Device& gfxHwDevice, const char* path);
 
 	public:
 		Scene() = default;
