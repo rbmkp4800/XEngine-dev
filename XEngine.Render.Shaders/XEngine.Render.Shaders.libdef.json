@@ -39,9 +39,10 @@
 	"GBufferTexturesDSL" : {
 		"type": "descriptor_set_layout",
 		"bindings": {
-			"gbuffer_a": { "type": "read_only_texture_descriptor" },
-			"gbuffer_b": { "type": "read_only_texture_descriptor" },
-			"gbuffer_c": { "type": "read_only_texture_descriptor" },
+			"depth":		{ "type": "read_only_texture_descriptor" },
+			"gbuffer_a":	{ "type": "read_only_texture_descriptor" },
+			"gbuffer_b":	{ "type": "read_only_texture_descriptor" },
+			"gbuffer_c":	{ "type": "read_only_texture_descriptor" },
 		}
 	},
 

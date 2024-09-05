@@ -62,8 +62,8 @@ void Game0::onMouseMove(sint32 deltaX, sint32 deltaY)
 
 void Game0::run()
 {
-	outputWidth = 1280;
-	outputHeight = 720;
+	outputWidth = 1600;
+	outputHeight = 900;
 
 	window.create(outputWidth, outputHeight);
 

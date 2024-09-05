@@ -11,6 +11,8 @@ struct ViewConstantBuffer
 {
 	XLib::Matrix4x4 worldToViewTransform;
 	XLib::Matrix4x4 worldToClipTransform;
+	XLib::Matrix4x4 viewToWorldTransform;
+	float32x4 ndcDeprojectionCoefs;
 };
 
 struct DeferredLightingConstantBuffer
@@ -20,7 +22,7 @@ struct DeferredLightingConstantBuffer
 
 struct TonemappingConstantBuffer
 {
-	float32 exposureScaler;
+	float32 exposure;
 	uint32 _padding[3];
 };
 
@@ -85,14 +87,17 @@ void SceneRenderer::sceneGeometryPassExecutor(Scheduler::TaskExecutionContext& g
 void SceneRenderer::deferredLightingPassExecutor(Gfx::Scheduler::TaskExecutionContext& gfxSchExecutionContext,
 	Gfx::HAL::Device& gfxHwDevice, Gfx::HAL::CommandList& gfxHwCommandList, CommonParams& params) const
 {
+	const HAL::TextureHandle gfxHwDepthTexture = gfxSchExecutionContext.resolveTexture(params.gfxSchDepthTexture);
 	const HAL::TextureHandle gfxHwGBufferATexture = gfxSchExecutionContext.resolveTexture(params.gfxSchGBufferATexture);
 	const HAL::TextureHandle gfxHwGBufferBTexture = gfxSchExecutionContext.resolveTexture(params.gfxSchGBufferBTexture);
 	const HAL::TextureHandle gfxHwGBufferCTexture = gfxSchExecutionContext.resolveTexture(params.gfxSchGBufferCTexture);
 	const HAL::TextureHandle gfxHwLuminanceTexture = gfxSchExecutionContext.resolveTexture(params.gfxSchLuminanceTexture);
 
 	const HAL::DescriptorSet gfxHwGBufferTexturesDS = gfxSchExecutionContext.allocateTransientDescriptorSet(gfxHwGBufferTexturesDSL);
+	gfxHwDevice.writeDescriptorSet(gfxHwGBufferTexturesDS, "depth"_xsh,
+		HAL::ResourceView::CreateTexture2D(gfxHwDepthTexture, HAL::TexelViewFormat::R32_FLOAT));
 	gfxHwDevice.writeDescriptorSet(gfxHwGBufferTexturesDS, "gbuffer_a"_xsh,
-		HAL::ResourceView::CreateTexture2D(gfxHwGBufferATexture, HAL::TexelViewFormat::R8G8B8A8_UNORM));
+		HAL::ResourceView::CreateTexture2D(gfxHwGBufferATexture, HAL::TexelViewFormat::R8G8B8A8_SRGB));
 	gfxHwDevice.writeDescriptorSet(gfxHwGBufferTexturesDS, "gbuffer_b"_xsh,
 		HAL::ResourceView::CreateTexture2D(gfxHwGBufferBTexture, HAL::TexelViewFormat::R16G16B16A16_FLOAT));
 	gfxHwDevice.writeDescriptorSet(gfxHwGBufferTexturesDS, "gbuffer_c"_xsh,
@@ -222,14 +227,23 @@ void SceneRenderer::render(const Scene& scene, const CameraDesc& cameraDesc,
 
 	const UploadBufferPointer gfxViewConstantBufferPtr = gfxSchTaskGraph.allocateTransientUploadMemory(sizeof(ViewConstantBuffer));
 	{
-		const XLib::Matrix4x4 cameraViewMatrix = XLib::Matrix4x4::LookAtCentered(cameraDesc.position, cameraDesc.direction, cameraDesc.up);
-		const XLib::Matrix4x4 cameraProjectionMatrix = XLib::Matrix4x4::Perspective(cameraDesc.fov, float32(targetWidth) / float32(targetHeight), cameraDesc.zNear, cameraDesc.zFar);
+		const float32 tanHalfFov = XLib::Math::Tan(cameraDesc.fov / 2.0f);
+		const float32 aspect = float32(targetWidth) / float32(targetHeight);
+
+		const float32 depthDeprojectB = cameraDesc.zFar / (cameraDesc.zFar - cameraDesc.zNear);
+		const float32 depthDeprojectA = depthDeprojectB * cameraDesc.zNear;
+
+		const XLib::Matrix4x4 worldToViewTransform = XLib::Matrix4x4::LookAtCentered(cameraDesc.position, cameraDesc.direction, cameraDesc.up);
+		const XLib::Matrix4x4 viewToWorldTransform = XLib::Matrix4x4::Inverse(worldToViewTransform);
+		const XLib::Matrix4x4 projectionMatrix = XLib::Matrix4x4::Perspective(cameraDesc.fov, aspect, cameraDesc.zNear, cameraDesc.zFar);
 
 		ViewConstantBuffer& viewConstantBuffer = *(ViewConstantBuffer*)gfxViewConstantBufferPtr.ptr;
 		viewConstantBuffer =
 		{
-			.worldToViewTransform = cameraViewMatrix,
-			.worldToClipTransform = cameraViewMatrix * cameraProjectionMatrix,
+			.worldToViewTransform = worldToViewTransform,
+			.worldToClipTransform = worldToViewTransform * projectionMatrix,
+			.viewToWorldTransform = viewToWorldTransform,
+			.ndcDeprojectionCoefs = float32x4(tanHalfFov * aspect, tanHalfFov, depthDeprojectA, depthDeprojectB),
 		};
 	}
 
@@ -237,7 +251,7 @@ void SceneRenderer::render(const Scene& scene, const CameraDesc& cameraDesc,
 	{
 		static float a = 0.0f;
 		a += 0.03f;
-		const float32x3 lightDirection = XLib::VectorMath::Normalize(float32x3(XLib::Math::Sin(a), XLib::Math::Cos(a), 0.3f));
+		const float32x3 lightDirection = XLib::VectorMath::Normalize(float32x3(XLib::Math::Sin(a), XLib::Math::Cos(a), 0.5f));
 
 		DeferredLightingConstantBuffer& deferredLightingConstantBuffer = *(DeferredLightingConstantBuffer*)gfxDeferredLightingConstantBufferPtr.ptr;
 		deferredLightingConstantBuffer =
@@ -251,7 +265,7 @@ void SceneRenderer::render(const Scene& scene, const CameraDesc& cameraDesc,
 		TonemappingConstantBuffer& tonemappingConstantBuffer = *(TonemappingConstantBuffer*)gfxTonemappingConstantBufferPtr.ptr;
 		tonemappingConstantBuffer =
 		{
-			.exposureScaler = 1.0f,
+			.exposure = 1.0f,
 		};
 	}
 
