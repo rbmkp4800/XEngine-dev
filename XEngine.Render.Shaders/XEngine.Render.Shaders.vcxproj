@@ -38,7 +38,7 @@
     <None Include="DeferredLighting.hlsl" />
     <None Include="FullScreenQuad.hlsl" />
     <None Include="SceneGeometry.hlsl" />
-    <None Include="TestGraphics.hlsl" />
+    <None Include="Tonemapping.hlsl" />
   </ItemGroup>
 
   <ItemGroup>

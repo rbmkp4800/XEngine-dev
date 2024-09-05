@@ -561,7 +561,7 @@ bool LibraryDefinitionLoader::readPipelineLayoutSetupProperty(
 {
 	StringViewASCII pipelineLayoutName = {};
 	const Cursor jsonPipelineLayoutNameCursor = getJSONCursor();
-	IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("layout", pipelineLayoutName));
+	IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("pipeline_layout", pipelineLayoutName));
 
 	const uint64 pipelineLayoutNameXSH = XSH::Compute(pipelineLayoutName);
 

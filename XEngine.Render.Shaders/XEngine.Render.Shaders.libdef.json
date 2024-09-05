@@ -21,14 +21,14 @@
 
 	"SceneGeometry.DefaultVS" : {
 		"type" : "vs",
-		"layout" : "SceneGeometry.PipelineLayout",
+		"pipeline_layout" : "SceneGeometry.PipelineLayout",
 		"src" : "SceneGeometry.hlsl",
 		"entry_point" : "MainVS",
 	},
 
 	"SceneGeometry.DefaultPS" : {
 		"type" : "ps",
-		"layout" : "SceneGeometry.PipelineLayout",
+		"pipeline_layout" : "SceneGeometry.PipelineLayout",
 		"src" : "SceneGeometry.hlsl",
 		"entry_point" : "MainPS",
 	},
@@ -39,91 +39,63 @@
 	"GBufferTexturesDSL" : {
 		"type": "descriptor_set_layout",
 		"bindings": {
-			"gbuffer_a" : { "type": "read_only_texture_descriptor" },
-			"gbuffer_b" : { "type": "read_only_texture_descriptor" },
-			"gbuffer_c" : { "type": "read_only_texture_descriptor" },
+			"gbuffer_a": { "type": "read_only_texture_descriptor" },
+			"gbuffer_b": { "type": "read_only_texture_descriptor" },
+			"gbuffer_c": { "type": "read_only_texture_descriptor" },
 		}
 	},
 
 	"DeferredLighting.PipelineLayout" : {
 		"type": "pipeline_layout",
-		"bindings" : {
+		"bindings": {
 			"view_constant_buffer": { "type": "constant_buffer" },
 			"gbuffer_descriptors": { "type": "descriptor_set", "dsl": "GBufferTexturesDSL" },
 		},
 	},
 
 	"DeferredLighting.VS" : {
-		"type" : "vs",
-		"layout" : "DeferredLighting.PipelineLayout",
-		"src" : "FullScreenQuad.hlsl",
-		"entry_point" : "MainVS",
-	},
-
-	"DeferredLighting.PS" : {
-		"type" : "ps",
-		"layout" : "DeferredLighting.PipelineLayout",
-		"src" : "DeferredLighting.hlsl",
-		"entry_point" : "MainPS",
-	},
-
-
-	////////////////////////////////////////////////////////////////////////////////////////////////
-	////////////////////////////////////////////////////////////////////////////////////////////////
-
-	"Test.Sampler": {
-		"type": "static_sampler",
-		"filter": "linear",
-		"reduction": "weighted_avg",
-		"address": "wrap",
-		//"lod_min": 0,
-		//"lod_max": 1,
-		//"lod_bias": 0
-	},
-
-	"Test.DescriptorSetLayout": {
-		"type": "descriptor_set_layout",
-		"bindings": {
-			"TEST_TEXTURE" : { "type": "read_only_texture_descriptor" }
-		}
-	},
-
-	"Test.PipelineLayout" : {
-		"type": "pipeline_layout",
-		"bindings": {
-			"SOME_CONSTANT_BUFFER":	{ "type": "constant_buffer" },
-			"SOME_BUFFER":			{ "type": "read_only_buffer" },
-			"SOME_RW_BUFFER" :		{ "type": "read_write_buffer" },
-			"TEST_DS" :				{ "type": "descriptor_set", "dsl": "Test.DescriptorSetLayout" },
-			"TEST_SAMPLER":			{ "type": "static_sampler", "sampler": "Test.Sampler" }
-		}
-	},
-
-	"TestTriangleVS": {
-		"type": "vertex_shader",
-		"layout": "Test.PipelineLayout",
-		"src": "TestGraphics.hlsl",
-		"entry_point": "TestTriangleVS",
-	},
-
-	"TestTrianglePS": {
-		"type": "pixel_shader",
-		"layout": "Test.PipelineLayout",
-		"src": "TestGraphics.hlsl",
-		"entry_point": "TestTrianglePS",
-	},
-
-	"TestVS": {
-		"type": "vertex_shader",
-		"layout": "Test.PipelineLayout",
-		"src": "TestGraphics.hlsl",
+		"type": "vs",
+		"pipeline_layout": "DeferredLighting.PipelineLayout",
+		"src": "FullScreenQuad.hlsl",
 		"entry_point": "MainVS",
 	},
 
-	"TestPS": {
-		"type": "pixel_shader",
-		"layout": "Test.PipelineLayout",
-		"src": "TestGraphics.hlsl",
+	"DeferredLighting.PS" : {
+		"type": "ps",
+		"pipeline_layout": "DeferredLighting.PipelineLayout",
+		"src": "DeferredLighting.hlsl",
+		"entry_point": "MainPS",
+	},
+
+
+	// Tonemapping /////////////////////////////////////////////////////////////////////////////////
+
+	"Tonemapping.InputDSL": {
+		"type": "descriptor_set_layout",
+		"bindings": {
+			"luminance": { "type": "read_only_texture_descriptor" },
+		}
+	},
+
+	"Tonemapping.PipelineLayout": {
+		"type": "pipeline_layout",
+		"bindings": {
+			"tonemapping_constant_buffer": { "type": "constant_buffer" },
+			"tonemapping_input_descriptors": { "type": "descriptor_set", "dsl": "Tonemapping.InputDSL" },
+		},
+	},
+
+	"Tonemapping.VS": {
+		"type": "vs",
+		"pipeline_layout": "Tonemapping.PipelineLayout",
+		"src": "FullScreenQuad.hlsl",
+		"entry_point": "MainVS",
+	},
+
+	"Tonemapping.PS": {
+		"type": "ps",
+		"pipeline_layout": "Tonemapping.PipelineLayout",
+		"src": "Tonemapping.hlsl",
 		"entry_point": "MainPS",
 	},
 }

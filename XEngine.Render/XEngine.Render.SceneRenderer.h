@@ -27,17 +27,22 @@ namespace XEngine::Render
 
 	private:
 		Gfx::HAL::DescriptorSetLayoutHandle gfxHwGBufferTexturesDSL = {};
+		Gfx::HAL::DescriptorSetLayoutHandle gfxHwTonemappingInputDSL = {};
 
 		Gfx::HAL::PipelineLayoutHandle gfxHwSceneGeometryPipelineLayout = {};
 		Gfx::HAL::PipelineLayoutHandle gfxHwDeferredLightingPipelineLayout = {};
+		Gfx::HAL::PipelineLayoutHandle gfxHwTonemappingPipelineLayout = {};
 
 		Gfx::HAL::GraphicsPipelineHandle gfxHwSceneGeometryPipeline = {};
 		Gfx::HAL::GraphicsPipelineHandle gfxHwDeferredLightingPipeline = {};
+		Gfx::HAL::GraphicsPipelineHandle gfxHwTonemappingPipeline = {};
 
 	private:
 		void sceneGeometryPassExecutor(Gfx::Scheduler::TaskExecutionContext& gfxSchExecutionContext,
 			Gfx::HAL::Device& gfxHwDevice, Gfx::HAL::CommandList& gfxHwCommandList, CommonParams& params) const;
 		void deferredLightingPassExecutor(Gfx::Scheduler::TaskExecutionContext& gfxSchExecutionContext,
+			Gfx::HAL::Device& gfxHwDevice, Gfx::HAL::CommandList& gfxHwCommandList, CommonParams& params) const;
+		void tonemappingPassExecutor(Gfx::Scheduler::TaskExecutionContext& gfxSchExecutionContext,
 			Gfx::HAL::Device& gfxHwDevice, Gfx::HAL::CommandList& gfxHwCommandList, CommonParams& params) const;
 
 	public:

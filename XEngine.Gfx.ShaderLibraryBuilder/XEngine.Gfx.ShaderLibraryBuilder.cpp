@@ -351,7 +351,7 @@ int main(int argc, char* argv[])
 		Shader& shader = *shadersToCompile[i];
 
 		InplaceStringASCIIx256 messageHeader;
-		FmtPrintStr(messageHeader, " [", i + 1, "/", shadersToCompile.getSize(), "] ", shader.getName());
+		FmtPrintStr(messageHeader, " [", i + 1, "/", shadersToCompile.getSize(), "] Compiling shader '", shader.getName(), '\'');
 		FmtPrintStdOut(messageHeader, "\n");
 
 		InplaceStringASCIIx1024 mainSourceFilePath;
@@ -366,12 +366,17 @@ int main(int argc, char* argv[])
 				mainSourceFilePath, shader.getCompilationArgs(), shader.getPipelineLayout(),
 				&ResolveSource, &sourceCache);
 
+		const bool compilationFailed = compilationResult->getStatus() != HAL::ShaderCompiler::ShaderCompilationStatus::Success;
+
+		if (compilationFailed)
+			FmtPrintStdOut(messageHeader, ": compilation failed\n");
+
 		if (compilationResult->getPreprocessingOuput().getLength() > 0)
 			FmtPrintStdOut(compilationResult->getPreprocessingOuput(), "\n");
 		if (compilationResult->getCompilationOutput().getLength() > 0)
 			FmtPrintStdOut(compilationResult->getCompilationOutput(), "\n");
 
-		if (compilationResult->getStatus() != HAL::ShaderCompiler::ShaderCompilationStatus::Success)
+		if (compilationFailed)
 			return 1;
 
 		shader.setCompiledBlob(compilationResult->getBytecodeBlob());

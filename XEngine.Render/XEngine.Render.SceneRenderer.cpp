@@ -13,6 +13,12 @@ struct ViewConstantBuffer
 	XLib::Matrix4x4 worldToClipTransform;
 };
 
+struct TonemappingConstantBuffer
+{
+	float32 exposureScaler;
+	uint32 _padding[3];
+};
+
 struct SceneRenderer::CommonParams
 {
 	const SceneRenderer* sceneRenderer;
@@ -21,11 +27,13 @@ struct SceneRenderer::CommonParams
 	uint16 targetHeight;
 
 	HAL::BufferPointer gfxHwViewConstantBufferPtr;
-	Scheduler::TextureHandle gfxSchTargetTexture;
+	HAL::BufferPointer gfxHwTonemappingConstantBufferPtr;
 	Scheduler::TextureHandle gfxSchDepthTexture;
 	Scheduler::TextureHandle gfxSchGBufferATexture;
 	Scheduler::TextureHandle gfxSchGBufferBTexture;
 	Scheduler::TextureHandle gfxSchGBufferCTexture;
+	Scheduler::TextureHandle gfxSchLuminanceTexture;
+	Scheduler::TextureHandle gfxSchTargetTexture;
 };
 
 void SceneRenderer::sceneGeometryPassExecutor(Scheduler::TaskExecutionContext& gfxSchExecutionContext,
@@ -74,6 +82,7 @@ void SceneRenderer::deferredLightingPassExecutor(Gfx::Scheduler::TaskExecutionCo
 	const HAL::TextureHandle gfxHwGBufferATexture = gfxSchExecutionContext.resolveTexture(params.gfxSchGBufferATexture);
 	const HAL::TextureHandle gfxHwGBufferBTexture = gfxSchExecutionContext.resolveTexture(params.gfxSchGBufferBTexture);
 	const HAL::TextureHandle gfxHwGBufferCTexture = gfxSchExecutionContext.resolveTexture(params.gfxSchGBufferCTexture);
+	const HAL::TextureHandle gfxHwLuminanceTexture = gfxSchExecutionContext.resolveTexture(params.gfxSchLuminanceTexture);
 
 	const HAL::DescriptorSet gfxHwGBufferTexturesDS = gfxSchExecutionContext.allocateTransientDescriptorSet(gfxHwGBufferTexturesDSL);
 	{
@@ -95,8 +104,7 @@ void SceneRenderer::deferredLightingPassExecutor(Gfx::Scheduler::TaskExecutionCo
 		gfxHwDevice.writeDescriptorSet(gfxHwGBufferTexturesDS, "gbuffer_c"_xsh, gfxHwTextureView);
 	}
 
-	const HAL::TextureHandle gfxHwTargetTexture = gfxSchExecutionContext.resolveTexture(params.gfxSchTargetTexture);
-	gfxHwCommandList.bindRenderTargets(HAL::ColorRenderTarget::Create(gfxHwTargetTexture, HAL::TexelViewFormat::R8G8B8A8_UNORM));
+	gfxHwCommandList.bindRenderTargets(HAL::ColorRenderTarget::Create(gfxHwLuminanceTexture, HAL::TexelViewFormat::R16G16B16A16_FLOAT));
 
 	gfxHwCommandList.setViewport(0.0f, 0.0f, float32(params.targetWidth), float32(params.targetHeight));
 	gfxHwCommandList.setScissor(0, 0, params.targetWidth, params.targetHeight);
@@ -111,12 +119,47 @@ void SceneRenderer::deferredLightingPassExecutor(Gfx::Scheduler::TaskExecutionCo
 	gfxHwCommandList.draw(3);
 }
 
+void SceneRenderer::tonemappingPassExecutor(Gfx::Scheduler::TaskExecutionContext& gfxSchExecutionContext,
+	Gfx::HAL::Device& gfxHwDevice, Gfx::HAL::CommandList& gfxHwCommandList, CommonParams& params) const
+{
+	const HAL::TextureHandle gfxHwLuminanceTexture = gfxSchExecutionContext.resolveTexture(params.gfxSchLuminanceTexture);
+	const HAL::TextureHandle gfxHwTargetTexture = gfxSchExecutionContext.resolveTexture(params.gfxSchTargetTexture);
+
+	const HAL::DescriptorSet gfxHwTonemappingInputDS = gfxSchExecutionContext.allocateTransientDescriptorSet(gfxHwTonemappingInputDSL);
+	{
+		HAL::ResourceView gfxHwTextureView = {};
+		gfxHwTextureView.textureHandle = gfxHwLuminanceTexture;
+		gfxHwTextureView.texture.format = HAL::TexelViewFormat::R16G16B16A16_FLOAT;
+		gfxHwTextureView.texture.writable = false;
+		gfxHwTextureView.texture.baseMipLevel = 0;
+		gfxHwTextureView.texture.mipLevelCount = 1;
+		gfxHwTextureView.type = HAL::ResourceViewType::Texture;
+		gfxHwDevice.writeDescriptorSet(gfxHwTonemappingInputDS, "luminance"_xsh, gfxHwTextureView);
+	}
+
+	gfxHwCommandList.bindRenderTargets(HAL::ColorRenderTarget::Create(gfxHwTargetTexture, HAL::TexelViewFormat::R8G8B8A8_UNORM));
+
+	gfxHwCommandList.setViewport(0.0f, 0.0f, float32(params.targetWidth), float32(params.targetHeight));
+	gfxHwCommandList.setScissor(0, 0, params.targetWidth, params.targetHeight);
+
+	gfxHwCommandList.setPipelineType(HAL::PipelineType::Graphics);
+	gfxHwCommandList.setPipelineLayout(gfxHwTonemappingPipelineLayout);
+	gfxHwCommandList.setGraphicsPipeline(gfxHwTonemappingPipeline);
+
+	gfxHwCommandList.bindConstantBuffer("tonemapping_constant_buffer"_xsh, params.gfxHwTonemappingConstantBufferPtr);
+	gfxHwCommandList.bindDescriptorSet("tonemapping_input_descriptors"_xsh, gfxHwTonemappingInputDS);
+
+	gfxHwCommandList.draw(3);
+}
+
 void SceneRenderer::initialize(HAL::Device& gfxHwDevice)
 {
 	gfxHwGBufferTexturesDSL = GlobalShaderLibraryLoader.getDescriptorSetLayout("GBufferTexturesDSL"_xsh);
+	gfxHwTonemappingInputDSL = GlobalShaderLibraryLoader.getDescriptorSetLayout("Tonemapping.InputDSL"_xsh);
 
 	gfxHwSceneGeometryPipelineLayout = GlobalShaderLibraryLoader.getPipelineLayout("SceneGeometry.PipelineLayout"_xsh);
 	gfxHwDeferredLightingPipelineLayout = GlobalShaderLibraryLoader.getPipelineLayout("DeferredLighting.PipelineLayout"_xsh);
+	gfxHwTonemappingPipelineLayout = GlobalShaderLibraryLoader.getPipelineLayout("Tonemapping.PipelineLayout"_xsh);
 
 	{
 		Gfx::HAL::VertexAttribute attributes[] =
@@ -146,9 +189,18 @@ void SceneRenderer::initialize(HAL::Device& gfxHwDevice)
 		Gfx::HAL::GraphicsPipelineDesc gfxHwPipelineDesc = {};
 		gfxHwPipelineDesc.vsHandle = GlobalShaderLibraryLoader.getShader("DeferredLighting.VS"_xsh);
 		gfxHwPipelineDesc.psHandle = GlobalShaderLibraryLoader.getShader("DeferredLighting.PS"_xsh);
-		gfxHwPipelineDesc.colorRenderTargetFormats[0] = Gfx::HAL::TexelViewFormat::R8G8B8A8_UNORM;
+		gfxHwPipelineDesc.colorRenderTargetFormats[0] = Gfx::HAL::TexelViewFormat::R16G16B16A16_FLOAT;
 
 		gfxHwDeferredLightingPipeline = gfxHwDevice.createGraphicsPipeline(gfxHwDeferredLightingPipelineLayout, gfxHwPipelineDesc);
+	}
+
+	{
+		Gfx::HAL::GraphicsPipelineDesc gfxHwPipelineDesc = {};
+		gfxHwPipelineDesc.vsHandle = GlobalShaderLibraryLoader.getShader("Tonemapping.VS"_xsh);
+		gfxHwPipelineDesc.psHandle = GlobalShaderLibraryLoader.getShader("Tonemapping.PS"_xsh);
+		gfxHwPipelineDesc.colorRenderTargetFormats[0] = Gfx::HAL::TexelViewFormat::R8G8B8A8_UNORM;
+
+		gfxHwTonemappingPipeline = gfxHwDevice.createGraphicsPipeline(gfxHwTonemappingPipelineLayout, gfxHwPipelineDesc);
 	}
 }
 
@@ -175,6 +227,11 @@ void SceneRenderer::render(const Scene& scene, const CameraDesc& cameraDesc,
 	const Scheduler::TextureHandle gfxSchGBufferCTexture =
 		gfxSchTaskGraph.createTransientTexture(gfxHwGBufferCTextureDesc, "GBufferC"_xsh);
 
+	const HAL::TextureDesc gfxHwLuminanceTextureDesc =
+		HAL::TextureDesc::Create2DRT(targetWidth, targetHeight, HAL::TextureFormat::R16G16B16A16, 1);
+	const Scheduler::TextureHandle gfxSchLuminanceTexture =
+		gfxSchTaskGraph.createTransientTexture(gfxHwLuminanceTextureDesc, "Luminance"_xsh);
+
 	const UploadBufferPointer gfxViewConstantBufferPointer = gfxSchTaskGraph.allocateTransientUploadMemory(sizeof(ViewConstantBuffer));
 	{
 		const XLib::Matrix4x4 cameraViewMatrix = XLib::Matrix4x4::LookAtCentered(cameraDesc.position, cameraDesc.direction, cameraDesc.up);
@@ -188,6 +245,20 @@ void SceneRenderer::render(const Scene& scene, const CameraDesc& cameraDesc,
 		};
 	}
 
+	const UploadBufferPointer gfxTonemappingConstantBufferPointer = gfxSchTaskGraph.allocateTransientUploadMemory(sizeof(TonemappingConstantBuffer));
+	{
+		static float a = 0.0f;
+		a += 0.01f;
+		if (a > 1.0f)
+			a = 0.0f;
+
+		TonemappingConstantBuffer* viewConstantBuffer = (TonemappingConstantBuffer*)gfxTonemappingConstantBufferPointer.ptr;
+		*viewConstantBuffer =
+		{
+			.exposureScaler = a,
+		};
+	}
+
 	CommonParams* commonParams = (CommonParams*)gfxSchTaskGraph.allocateUserData(sizeof(CommonParams));
 	*commonParams =
 	{
@@ -196,39 +267,60 @@ void SceneRenderer::render(const Scene& scene, const CameraDesc& cameraDesc,
 		.targetWidth = targetWidth,
 		.targetHeight = targetHeight,
 		.gfxHwViewConstantBufferPtr = gfxViewConstantBufferPointer.hwPtr,
-		.gfxSchTargetTexture = gfxSchTargetTexture,
+		.gfxHwTonemappingConstantBufferPtr = gfxTonemappingConstantBufferPointer.hwPtr,
 		.gfxSchDepthTexture = gfxSchDepthTexture,
 		.gfxSchGBufferATexture = gfxSchGBufferATexture,
 		.gfxSchGBufferBTexture = gfxSchGBufferBTexture,
 		.gfxSchGBufferCTexture = gfxSchGBufferCTexture,
+		.gfxSchLuminanceTexture = gfxSchLuminanceTexture,
+		.gfxSchTargetTexture = gfxSchTargetTexture,
 	};
 
 
-	auto SceneGeometryPassExecutor = [](Scheduler::TaskExecutionContext& gfxSchExecutionContext,
-		HAL::Device& gfxHwDevice, HAL::CommandList& gfxHwCommandList, void* userData) -> void
+	// Scene geometry pass.
 	{
-		CommonParams& params = *(CommonParams*)userData;
-		params.sceneRenderer->sceneGeometryPassExecutor(gfxSchExecutionContext, gfxHwDevice, gfxHwCommandList, params);
-	};
+		auto SceneGeometryPassExecutor = [](Scheduler::TaskExecutionContext& gfxSchExecutionContext,
+			HAL::Device& gfxHwDevice, HAL::CommandList& gfxHwCommandList, void* userData) -> void
+		{
+			CommonParams& params = *(CommonParams*)userData;
+			params.sceneRenderer->sceneGeometryPassExecutor(gfxSchExecutionContext, gfxHwDevice, gfxHwCommandList, params);
+		};
 
-	gfxSchTaskGraph.addTask(Scheduler::TaskType::Graphics, SceneGeometryPassExecutor, commonParams)
-		.addColorRenderTarget(gfxSchGBufferATexture)
-		.addColorRenderTarget(gfxSchGBufferBTexture)
-		.addColorRenderTarget(gfxSchGBufferCTexture)
-		.addDepthStencilRenderTarget(gfxSchDepthTexture);
+		gfxSchTaskGraph.addTask(Scheduler::TaskType::Graphics, SceneGeometryPassExecutor, commonParams)
+			.addColorRenderTarget(gfxSchGBufferATexture)
+			.addColorRenderTarget(gfxSchGBufferBTexture)
+			.addColorRenderTarget(gfxSchGBufferCTexture)
+			.addDepthStencilRenderTarget(gfxSchDepthTexture);
+	}
 
-
-	auto DeferredLightingPassExecutor = [](Scheduler::TaskExecutionContext& gfxSchExecutionContext,
-		HAL::Device& gfxHwDevice, HAL::CommandList& gfxHwCommandList, void* userData) -> void
+	// Deferred ligting pass.
 	{
-		CommonParams& params = *(CommonParams*)userData;
-		params.sceneRenderer->deferredLightingPassExecutor(gfxSchExecutionContext, gfxHwDevice, gfxHwCommandList, params);
-	};
+		auto DeferredLightingPassExecutor = [](Scheduler::TaskExecutionContext& gfxSchExecutionContext,
+			HAL::Device& gfxHwDevice, HAL::CommandList& gfxHwCommandList, void* userData) -> void
+		{
+			CommonParams& params = *(CommonParams*)userData;
+			params.sceneRenderer->deferredLightingPassExecutor(gfxSchExecutionContext, gfxHwDevice, gfxHwCommandList, params);
+		};
 
-	gfxSchTaskGraph.addTask(Scheduler::TaskType::Graphics, DeferredLightingPassExecutor, commonParams)
-		.addTextureShaderRead(gfxSchGBufferATexture, Scheduler::ResourceShaderAccessStage::Pixel)
-		.addTextureShaderRead(gfxSchGBufferBTexture, Scheduler::ResourceShaderAccessStage::Pixel)
-		.addTextureShaderRead(gfxSchGBufferCTexture, Scheduler::ResourceShaderAccessStage::Pixel)
-		.addTextureShaderRead(gfxSchDepthTexture, Scheduler::ResourceShaderAccessStage::Pixel)
-		.addColorRenderTarget(gfxSchTargetTexture);
+		gfxSchTaskGraph.addTask(Scheduler::TaskType::Graphics, DeferredLightingPassExecutor, commonParams)
+			.addTextureShaderRead(gfxSchGBufferATexture, Scheduler::ResourceShaderAccessStage::Pixel)
+			.addTextureShaderRead(gfxSchGBufferBTexture, Scheduler::ResourceShaderAccessStage::Pixel)
+			.addTextureShaderRead(gfxSchGBufferCTexture, Scheduler::ResourceShaderAccessStage::Pixel)
+			.addTextureShaderRead(gfxSchDepthTexture, Scheduler::ResourceShaderAccessStage::Pixel)
+			.addColorRenderTarget(gfxSchLuminanceTexture);
+	}
+
+	// Tonemapping pass.
+	{
+		auto TonemappingPassExecutor = [](Scheduler::TaskExecutionContext& gfxSchExecutionContext,
+			HAL::Device& gfxHwDevice, HAL::CommandList& gfxHwCommandList, void* userData) -> void
+		{
+			CommonParams& params = *(CommonParams*)userData;
+			params.sceneRenderer->tonemappingPassExecutor(gfxSchExecutionContext, gfxHwDevice, gfxHwCommandList, params);
+		};
+
+		gfxSchTaskGraph.addTask(Scheduler::TaskType::Graphics, TonemappingPassExecutor, commonParams)
+			.addTextureShaderRead(gfxSchLuminanceTexture, Scheduler::ResourceShaderAccessStage::Pixel)
+			.addColorRenderTarget(gfxSchTargetTexture);
+	}
 }
