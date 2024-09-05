@@ -338,7 +338,7 @@ void CommandList::bindRenderTargets(uint8 colorRenderTargetCount, const ColorRen
 		{
 			const ColorRenderTarget& rt = colorRenderTargets[colorRenderTargetIndex];
 
-			const Device::Resource& resource = device->resourcePool.resolveHandle(uint32(rt.texture));
+			const Device::Resource& resource = device->resourcePool.resolveHandle(uint32(rt.textureHandle));
 			XEAssert(resource.type == ResourceType::Texture && resource.d3dResource);
 			XEAssert(resource.textureDesc.dimension == TextureDimension::Texture2D);
 			XEAssert(resource.textureDesc.enableRenderTargetUsage);
@@ -362,7 +362,7 @@ void CommandList::bindRenderTargets(uint8 colorRenderTargetCount, const ColorRen
 	{
 		const DepthStencilRenderTarget& rt = *depthStencilRenderTarget;
 
-		const Device::Resource& resource = device->resourcePool.resolveHandle(uint32(rt.texture));
+		const Device::Resource& resource = device->resourcePool.resolveHandle(uint32(rt.textureHandle));
 		XEAssert(resource.type == ResourceType::Texture && resource.d3dResource);
 		XEAssert(resource.textureDesc.dimension == TextureDimension::Texture2D);
 		XEAssert(resource.textureDesc.enableRenderTargetUsage);
@@ -1137,7 +1137,7 @@ void Device::writeDescriptor(uint32 descriptorIndex, const ResourceView& resourc
 			d3dSRVDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 			d3dSRVDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 			d3dSRVDesc.Texture2D.MostDetailedMip = resourceView.texture.baseMipLevel;
-			d3dSRVDesc.Texture2D.MipLevels = resourceView.texture.mipLevelCount;
+			d3dSRVDesc.Texture2D.MipLevels = resourceView.texture.mipLevelCount > 0 ? resourceView.texture.mipLevelCount : -1;
 			d3dSRVDesc.Texture2D.PlaneSlice = 0;
 			d3dSRVDesc.Texture2D.ResourceMinLODClamp = 0.0f;
 

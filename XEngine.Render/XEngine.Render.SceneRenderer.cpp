@@ -85,24 +85,12 @@ void SceneRenderer::deferredLightingPassExecutor(Gfx::Scheduler::TaskExecutionCo
 	const HAL::TextureHandle gfxHwLuminanceTexture = gfxSchExecutionContext.resolveTexture(params.gfxSchLuminanceTexture);
 
 	const HAL::DescriptorSet gfxHwGBufferTexturesDS = gfxSchExecutionContext.allocateTransientDescriptorSet(gfxHwGBufferTexturesDSL);
-	{
-		HAL::ResourceView gfxHwTextureView = {};
-		gfxHwTextureView.textureHandle = gfxHwGBufferATexture;
-		gfxHwTextureView.texture.format = HAL::TexelViewFormat::R8G8B8A8_UNORM;
-		gfxHwTextureView.texture.writable = false;
-		gfxHwTextureView.texture.baseMipLevel = 0;
-		gfxHwTextureView.texture.mipLevelCount = 1;
-		gfxHwTextureView.type = HAL::ResourceViewType::Texture;
-		gfxHwDevice.writeDescriptorSet(gfxHwGBufferTexturesDS, "gbuffer_a"_xsh, gfxHwTextureView);
-
-		gfxHwTextureView.textureHandle = gfxHwGBufferBTexture;
-		gfxHwTextureView.texture.format = HAL::TexelViewFormat::R16G16B16A16_FLOAT;
-		gfxHwDevice.writeDescriptorSet(gfxHwGBufferTexturesDS, "gbuffer_b"_xsh, gfxHwTextureView);
-
-		gfxHwTextureView.textureHandle = gfxHwGBufferCTexture;
-		gfxHwTextureView.texture.format = HAL::TexelViewFormat::R8G8_UNORM;
-		gfxHwDevice.writeDescriptorSet(gfxHwGBufferTexturesDS, "gbuffer_c"_xsh, gfxHwTextureView);
-	}
+	gfxHwDevice.writeDescriptorSet(gfxHwGBufferTexturesDS, "gbuffer_a"_xsh,
+		HAL::ResourceView::CreateTexture2D(gfxHwGBufferATexture, HAL::TexelViewFormat::R8G8B8A8_UNORM));
+	gfxHwDevice.writeDescriptorSet(gfxHwGBufferTexturesDS, "gbuffer_b"_xsh,
+		HAL::ResourceView::CreateTexture2D(gfxHwGBufferBTexture, HAL::TexelViewFormat::R16G16B16A16_FLOAT));
+	gfxHwDevice.writeDescriptorSet(gfxHwGBufferTexturesDS, "gbuffer_c"_xsh,
+		HAL::ResourceView::CreateTexture2D(gfxHwGBufferCTexture, HAL::TexelViewFormat::R8G8_UNORM));
 
 	gfxHwCommandList.bindRenderTargets(HAL::ColorRenderTarget::Create(gfxHwLuminanceTexture, HAL::TexelViewFormat::R16G16B16A16_FLOAT));
 
@@ -126,16 +114,8 @@ void SceneRenderer::tonemappingPassExecutor(Gfx::Scheduler::TaskExecutionContext
 	const HAL::TextureHandle gfxHwTargetTexture = gfxSchExecutionContext.resolveTexture(params.gfxSchTargetTexture);
 
 	const HAL::DescriptorSet gfxHwTonemappingInputDS = gfxSchExecutionContext.allocateTransientDescriptorSet(gfxHwTonemappingInputDSL);
-	{
-		HAL::ResourceView gfxHwTextureView = {};
-		gfxHwTextureView.textureHandle = gfxHwLuminanceTexture;
-		gfxHwTextureView.texture.format = HAL::TexelViewFormat::R16G16B16A16_FLOAT;
-		gfxHwTextureView.texture.writable = false;
-		gfxHwTextureView.texture.baseMipLevel = 0;
-		gfxHwTextureView.texture.mipLevelCount = 1;
-		gfxHwTextureView.type = HAL::ResourceViewType::Texture;
-		gfxHwDevice.writeDescriptorSet(gfxHwTonemappingInputDS, "luminance"_xsh, gfxHwTextureView);
-	}
+	gfxHwDevice.writeDescriptorSet(gfxHwTonemappingInputDS, "luminance"_xsh,
+		HAL::ResourceView::CreateTexture2D(gfxHwLuminanceTexture, HAL::TexelViewFormat::R16G16B16A16_FLOAT));
 
 	gfxHwCommandList.bindRenderTargets(HAL::ColorRenderTarget::Create(gfxHwTargetTexture, HAL::TexelViewFormat::R8G8B8A8_UNORM));
 

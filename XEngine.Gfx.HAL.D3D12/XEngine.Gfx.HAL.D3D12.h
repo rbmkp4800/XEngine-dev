@@ -178,6 +178,9 @@ namespace XEngine::Gfx::HAL
 		};
 
 		ResourceViewType type;
+
+		static inline ResourceView CreateTexture2D(TextureHandle textureHandle, TexelViewFormat format, uint8 baseMipLevel = 0, uint8 mipLevelCount = 0);
+		static inline ResourceView CreateRWTexture2D(TextureHandle textureHandle, TexelViewFormat format, uint8 mipLevel = 0);
 	};
 
 	enum class PipelineType : uint8
@@ -319,21 +322,21 @@ namespace XEngine::Gfx::HAL
 
 	struct ColorRenderTarget
 	{
-		TextureHandle texture;
+		TextureHandle textureHandle;
 		TexelViewFormat format;
 		uint8 mipLevel;
 		uint16 arrayIndex;
 
-		static inline ColorRenderTarget Create(TextureHandle texture, TexelViewFormat format, uint8 mipLevel = 0, uint16 arrayIndex = 0);
+		static inline ColorRenderTarget Create(TextureHandle textureHandle, TexelViewFormat format, uint8 mipLevel = 0, uint16 arrayIndex = 0);
 	};
 
 	struct DepthStencilRenderTarget
 	{
-		TextureHandle texture;
+		TextureHandle textureHandle;
 		uint8 mipLevel;
 		uint16 arrayIndex;
 
-		static inline DepthStencilRenderTarget Create(TextureHandle texture, uint8 mipLevel = 0, uint16 arrayIndex = 0);
+		static inline DepthStencilRenderTarget Create(TextureHandle textureHandle, uint8 mipLevel = 0, uint16 arrayIndex = 0);
 	};
 
 	enum class IndexBufferFormat : uint8
@@ -839,20 +842,32 @@ namespace XEngine::Gfx::HAL
 		return desc;
 	}
 
-	inline ColorRenderTarget ColorRenderTarget::Create(TextureHandle texture, TexelViewFormat format, uint8 mipLevel, uint16 arrayIndex)
+	inline ResourceView ResourceView::CreateTexture2D(TextureHandle textureHandle, TexelViewFormat format, uint8 baseMipLevel, uint8 mipLevelCount)
+	{
+		ResourceView view = {};
+		view.textureHandle = textureHandle;
+		view.texture.format = format;
+		view.texture.writable = false;
+		view.texture.baseMipLevel = baseMipLevel;
+		view.texture.mipLevelCount = mipLevelCount;
+		view.type = HAL::ResourceViewType::Texture;
+		return view;
+	}
+
+	inline ColorRenderTarget ColorRenderTarget::Create(TextureHandle textureHandle, TexelViewFormat format, uint8 mipLevel, uint16 arrayIndex)
 	{
 		ColorRenderTarget rt = {};
-		rt.texture = texture;
+		rt.textureHandle = textureHandle;
 		rt.format = format;
 		rt.mipLevel = mipLevel;
 		rt.arrayIndex = arrayIndex;
 		return rt;
 	}
 
-	inline DepthStencilRenderTarget DepthStencilRenderTarget::Create(TextureHandle texture, uint8 mipLevel, uint16 arrayIndex)
+	inline DepthStencilRenderTarget DepthStencilRenderTarget::Create(TextureHandle textureHandle, uint8 mipLevel, uint16 arrayIndex)
 	{
 		DepthStencilRenderTarget rt = {};
-		rt.texture = texture;
+		rt.textureHandle = textureHandle;
 		rt.mipLevel = mipLevel;
 		rt.arrayIndex = arrayIndex;
 		return rt;
