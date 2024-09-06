@@ -530,7 +530,7 @@ bool HLSLPatcher::processVariableDefinitionForBinding(const BindingInfo& binding
 	ResourceType actualResourceType = ResourceType::Undefined;
 	if (resourceTypeLexeme.string == "ConstantBuffer")
 		actualResourceType = ResourceType::ConstantBuffer;
-	else if (resourceTypeLexeme.string == "Buffer")
+	else if (resourceTypeLexeme.string == "Buffer" || resourceTypeLexeme.string == "StructuredBuffer")
 		actualResourceType = ResourceType::Buffer;
 	else if (resourceTypeLexeme.string == "RWBuffer")
 		actualResourceType = ResourceType::RWBuffer;

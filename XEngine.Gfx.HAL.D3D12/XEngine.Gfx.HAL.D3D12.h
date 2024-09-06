@@ -358,6 +358,8 @@ namespace XEngine::Gfx::HAL
 	{
 		BufferHandle buffer;
 		uint32 offset;
+
+		static inline BufferPointer Create(BufferHandle buffer, uint32 offset = 0) { return BufferPointer { .buffer = buffer, .offset = offset }; }
 	};
 
 	enum class TextureAspect : uint8

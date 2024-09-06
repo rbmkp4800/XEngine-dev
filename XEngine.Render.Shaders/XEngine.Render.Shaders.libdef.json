@@ -14,8 +14,10 @@
 	"SceneGeometry.PipelineLayout" : {
 		"type": "pipeline_layout",
 		"bindings" : {
-			"view_constant_buffer":	{ "type":  "constant_buffer" },
-			"default_sampler":		{ "type": "static_sampler", "sampler": "SceneGeometry.DefaultSampler" },
+			"per_instance_constant_buffer":	{ "type": "constant_buffer" },
+			"view_constant_buffer":			{ "type": "constant_buffer" },
+			"scene_transforms_buffer":		{ "type": "read_only_buffer" },
+			"default_sampler":				{ "type": "static_sampler", "sampler": "SceneGeometry.DefaultSampler" },
 		},
 	},
 

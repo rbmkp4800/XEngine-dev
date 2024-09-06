@@ -4,7 +4,7 @@ using namespace XEngine::Gfx;
 
 static constexpr uint32 UploadBufferSize = 128 * 1024 * 1024;
 
-Uploader XEngine::Gfx::GlobalUploader;
+Uploader XEngine::Gfx::GUploader;
 
 void Uploader::initialize(HAL::Device& hwDevice)
 {

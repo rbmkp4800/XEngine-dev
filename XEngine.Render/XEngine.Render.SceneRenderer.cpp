@@ -2,6 +2,9 @@
 #include <XEngine.Gfx.ShaderLibraryLoader.h>
 #include <XEngine.XStringHash.h>
 
+#include "XEngine.Render.GeometryHeap.h"
+#include "XEngine.Render.Scene.h"
+
 #include "XEngine.Render.SceneRenderer.h"
 
 using namespace XEngine::Gfx;
@@ -23,6 +26,12 @@ struct DeferredLightingConstantBuffer
 struct TonemappingConstantBuffer
 {
 	float32 exposure;
+	uint32 _padding[3];
+};
+
+struct PerInstanceConstantBuffer
+{
+	uint32 transformIndex;
 	uint32 _padding[3];
 };
 
@@ -77,11 +86,36 @@ void SceneRenderer::sceneGeometryPassExecutor(Scheduler::TaskExecutionContext& g
 	gfxHwCommandList.setPipelineLayout(gfxHwSceneGeometryPipelineLayout);
 	gfxHwCommandList.setGraphicsPipeline(gfxHwSceneGeometryPipeline);
 
-	gfxHwCommandList.bindIndexBuffer(Gfx::HAL::BufferPointer { params.scene->gfxHwTestModel, 4096 }, Gfx::HAL::IndexBufferFormat::U16, 4096);
-	gfxHwCommandList.bindVertexBuffer(0, Gfx::HAL::BufferPointer { params.scene->gfxHwTestModel, 0 }, 44, 4096);
 	gfxHwCommandList.bindConstantBuffer("view_constant_buffer"_xsh, params.gfxHwViewConstantBufferPtr);
+	gfxHwCommandList.bindBuffer("scene_transforms_buffer"_xsh, HAL::BufferBindType::ReadOnly,
+		HAL::BufferPointer::Create(params.scene->gfxHwTransformsBuffer));
 
-	gfxHwCommandList.drawIndexed(36);
+	for (uint16 i = 0; i < params.scene->geometryInstanceCount; i++)
+	{
+		const Scene::GeometryInstance& geometryInstance = params.scene->geometryInstances[i];
+		const GeometryHeap::Entry& geometry = GGeometryHeap.entries[uint16(geometryInstance.geometryHandle)];
+
+		const UploadBufferPointer gfxPerInstanceConstantBufferPtr = gfxSchExecutionContext.allocateTransientUploadMemory(sizeof(PerInstanceConstantBuffer));
+		{
+			PerInstanceConstantBuffer& perInstanceConstantBuffer = *(PerInstanceConstantBuffer*)gfxPerInstanceConstantBufferPtr.ptr;
+			perInstanceConstantBuffer =
+			{
+				.transformIndex = geometryInstance.baseTransformIndex,
+			};
+		}
+
+		gfxHwCommandList.bindConstantBuffer("per_instance_constant_buffer"_xsh, gfxPerInstanceConstantBufferPtr.hwPtr);
+
+		gfxHwCommandList.bindIndexBuffer(
+			Gfx::HAL::BufferPointer::Create(GGeometryHeap.gfxHwGeometryPool, geometry.indexBufferOffset),
+			Gfx::HAL::IndexBufferFormat::U16, geometry.indexCount * 2);
+
+		gfxHwCommandList.bindVertexBuffer(0,
+			Gfx::HAL::BufferPointer::Create(GGeometryHeap.gfxHwGeometryPool, geometry.vertexBufferOffset),
+			geometry.vertexStride, geometry.vertexCount * geometry.vertexStride);
+
+		gfxHwCommandList.drawIndexed(geometry.indexCount);
+	}
 }
 
 void SceneRenderer::deferredLightingPassExecutor(Gfx::Scheduler::TaskExecutionContext& gfxSchExecutionContext,
@@ -146,12 +180,12 @@ void SceneRenderer::tonemappingPassExecutor(Gfx::Scheduler::TaskExecutionContext
 
 void SceneRenderer::initialize(HAL::Device& gfxHwDevice)
 {
-	gfxHwGBufferTexturesDSL = GlobalShaderLibraryLoader.getDescriptorSetLayout("GBufferTexturesDSL"_xsh);
-	gfxHwTonemappingInputDSL = GlobalShaderLibraryLoader.getDescriptorSetLayout("Tonemapping.InputDSL"_xsh);
+	gfxHwGBufferTexturesDSL = GShaderLibraryLoader.getDescriptorSetLayout("GBufferTexturesDSL"_xsh);
+	gfxHwTonemappingInputDSL = GShaderLibraryLoader.getDescriptorSetLayout("Tonemapping.InputDSL"_xsh);
 
-	gfxHwSceneGeometryPipelineLayout = GlobalShaderLibraryLoader.getPipelineLayout("SceneGeometry.PipelineLayout"_xsh);
-	gfxHwDeferredLightingPipelineLayout = GlobalShaderLibraryLoader.getPipelineLayout("DeferredLighting.PipelineLayout"_xsh);
-	gfxHwTonemappingPipelineLayout = GlobalShaderLibraryLoader.getPipelineLayout("Tonemapping.PipelineLayout"_xsh);
+	gfxHwSceneGeometryPipelineLayout = GShaderLibraryLoader.getPipelineLayout("SceneGeometry.PipelineLayout"_xsh);
+	gfxHwDeferredLightingPipelineLayout = GShaderLibraryLoader.getPipelineLayout("DeferredLighting.PipelineLayout"_xsh);
+	gfxHwTonemappingPipelineLayout = GShaderLibraryLoader.getPipelineLayout("Tonemapping.PipelineLayout"_xsh);
 
 	{
 		Gfx::HAL::VertexAttribute attributes[] =
@@ -165,8 +199,8 @@ void SceneRenderer::initialize(HAL::Device& gfxHwDevice)
 		Gfx::HAL::GraphicsPipelineDesc gfxHwPipelineDesc = {};
 		gfxHwPipelineDesc.vertexAttributes = attributes;
 		gfxHwPipelineDesc.vertexAttributeCount = countOf(attributes);
-		gfxHwPipelineDesc.vsHandle = GlobalShaderLibraryLoader.getShader("SceneGeometry.DefaultVS"_xsh);
-		gfxHwPipelineDesc.psHandle = GlobalShaderLibraryLoader.getShader("SceneGeometry.DefaultPS"_xsh);
+		gfxHwPipelineDesc.vsHandle = GShaderLibraryLoader.getShader("SceneGeometry.DefaultVS"_xsh);
+		gfxHwPipelineDesc.psHandle = GShaderLibraryLoader.getShader("SceneGeometry.DefaultPS"_xsh);
 		gfxHwPipelineDesc.colorRenderTargetFormats[0] = Gfx::HAL::TexelViewFormat::R8G8B8A8_UNORM;
 		gfxHwPipelineDesc.colorRenderTargetFormats[1] = Gfx::HAL::TexelViewFormat::R16G16B16A16_FLOAT;
 		gfxHwPipelineDesc.colorRenderTargetFormats[2] = Gfx::HAL::TexelViewFormat::R8G8_UNORM;
@@ -180,8 +214,8 @@ void SceneRenderer::initialize(HAL::Device& gfxHwDevice)
 
 	{
 		Gfx::HAL::GraphicsPipelineDesc gfxHwPipelineDesc = {};
-		gfxHwPipelineDesc.vsHandle = GlobalShaderLibraryLoader.getShader("DeferredLighting.VS"_xsh);
-		gfxHwPipelineDesc.psHandle = GlobalShaderLibraryLoader.getShader("DeferredLighting.PS"_xsh);
+		gfxHwPipelineDesc.vsHandle = GShaderLibraryLoader.getShader("DeferredLighting.VS"_xsh);
+		gfxHwPipelineDesc.psHandle = GShaderLibraryLoader.getShader("DeferredLighting.PS"_xsh);
 		gfxHwPipelineDesc.colorRenderTargetFormats[0] = Gfx::HAL::TexelViewFormat::R16G16B16A16_FLOAT;
 
 		gfxHwDeferredLightingPipeline = gfxHwDevice.createGraphicsPipeline(gfxHwDeferredLightingPipelineLayout, gfxHwPipelineDesc);
@@ -189,8 +223,8 @@ void SceneRenderer::initialize(HAL::Device& gfxHwDevice)
 
 	{
 		Gfx::HAL::GraphicsPipelineDesc gfxHwPipelineDesc = {};
-		gfxHwPipelineDesc.vsHandle = GlobalShaderLibraryLoader.getShader("Tonemapping.VS"_xsh);
-		gfxHwPipelineDesc.psHandle = GlobalShaderLibraryLoader.getShader("Tonemapping.PS"_xsh);
+		gfxHwPipelineDesc.vsHandle = GShaderLibraryLoader.getShader("Tonemapping.VS"_xsh);
+		gfxHwPipelineDesc.psHandle = GShaderLibraryLoader.getShader("Tonemapping.PS"_xsh);
 		gfxHwPipelineDesc.colorRenderTargetFormats[0] = Gfx::HAL::TexelViewFormat::R8G8B8A8_UNORM;
 
 		gfxHwTonemappingPipeline = gfxHwDevice.createGraphicsPipeline(gfxHwTonemappingPipelineLayout, gfxHwPipelineDesc);
@@ -250,7 +284,6 @@ void SceneRenderer::render(const Scene& scene, const CameraDesc& cameraDesc,
 	const UploadBufferPointer gfxDeferredLightingConstantBufferPtr = gfxSchTaskGraph.allocateTransientUploadMemory(sizeof(DeferredLightingConstantBuffer));
 	{
 		static float a = 0.0f;
-		a += 0.03f;
 		const float32x3 lightDirection = XLib::VectorMath::Normalize(float32x3(XLib::Math::Sin(a), XLib::Math::Cos(a), 0.5f));
 
 		DeferredLightingConstantBuffer& deferredLightingConstantBuffer = *(DeferredLightingConstantBuffer*)gfxDeferredLightingConstantBufferPtr.ptr;

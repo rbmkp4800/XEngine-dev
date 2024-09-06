@@ -7,7 +7,10 @@
 #include <XEngine.Gfx.Allocation.h>
 #include <XEngine.Gfx.ShaderLibraryLoader.h>
 #include <XEngine.Gfx.Uploader.h>
+#include <XEngine.Render.GeometryHeap.h>
+#include <XEngine.Render.Scene.h>
 #include <XEngine.Render.SceneRenderer.h>
+#include <XEngine.Render.TextureHeap.h>
 #include <XEngine.System.h>
 
 using namespace XLib;
@@ -27,8 +30,12 @@ private:
 	Gfx::Scheduler::TransientResourceCache gfxSchTransientResourceCache;
 	Gfx::Scheduler::TaskGraph gfxSchTaskGraph;
 
-	Render::Scene scene;
-	Render::SceneRenderer sceneRenderer;
+	Render::GeometryHandle rndTestCubeGeometry = {};
+	Render::TextureHandle rndSampleAlbedoTexture = {};
+	Render::TextureHandle rndSampleNrmTexture = {};
+
+	Render::Scene rndScene;
+	Render::SceneRenderer rndSceneRenderer;
 
 	uint16 outputWidth = 0;
 	uint16 outputHeight = 0;
@@ -79,11 +86,23 @@ void Game0::run()
 	gfxSchTransientResourceCache.initialize(gfxHwDevice);
 	gfxSchTaskGraph.initialize();
 
-	Gfx::GlobalUploader.initialize(gfxHwDevice);
-	Gfx::GlobalShaderLibraryLoader.load("XEngine.Render.Shaders.xeslib", gfxHwDevice);
+	Gfx::GUploader.initialize(gfxHwDevice);
+	Gfx::GShaderLibraryLoader.load("XEngine.Render.Shaders.xeslib", gfxHwDevice);
 
-	scene.initialize(gfxHwDevice);
-	sceneRenderer.initialize(gfxHwDevice);
+	Render::GTextureHeap.initialize(gfxHwDevice);
+	Render::GGeometryHeap.initialize(gfxHwDevice);
+
+	rndTestCubeGeometry = Render::GGeometryHeap.createTestCube();
+	rndSampleAlbedoTexture = Render::GTextureHeap.loadFromFile("../Content/wood-0.albedo.xerawtex");
+	rndSampleNrmTexture = Render::GTextureHeap.loadFromFile("../Content/wood-0.nrm.xerawtex");
+
+	rndScene.initialize(gfxHwDevice);
+	rndSceneRenderer.initialize(gfxHwDevice);
+
+	const Render::TransformSetHandle rndTransformSetA = rndScene.allocateTransformSet();
+	const Render::TransformSetHandle rndTransformSetB = rndScene.allocateTransformSet();
+	const Render::GeometryInstanceHandle rndGeometryInstanceA = rndScene.createGeometryInstance(rndTestCubeGeometry, rndTransformSetA);
+	const Render::GeometryInstanceHandle rndGeometryInstanceB = rndScene.createGeometryInstance(rndTestCubeGeometry, rndTransformSetB);
 
 	cameraPosition = { -4.0f, -4.0f, 3.0f };
 	cameraRotation = { 0.785f, -0.4f };
@@ -127,6 +146,14 @@ void Game0::run()
 		}
 
 		{
+			static float32 aa = 0.0f;
+			aa += 0.01f;
+
+			rndScene.updateTransform(rndTransformSetA, 0, Matrix4x4::RotationZ(aa));
+			rndScene.updateTransform(rndTransformSetB, 0, Matrix4x4::RotationZ(-aa) * Matrix4x4::Translation(0.0f, 0.0f, -3.0f));
+		}
+
+		{
 			gfxSchTaskGraph.open(gfxHwDevice, gfxHwCommandAllocator, gfxHwDescriptorAllocator,
 				gfxUploadMemoryAllocator, gfxSchTransientResourceCache);
 
@@ -135,7 +162,7 @@ void Game0::run()
 				gfxSchTaskGraph.importExternalTexture(gfxHwCurrentBackBuffer,
 					Gfx::HAL::TextureLayout::Present, Gfx::HAL::TextureLayout::Present);
 
-			sceneRenderer.render(scene, cameraDesc, gfxSchTaskGraph, gfxSchCurrentBackBuffer, outputWidth, outputHeight);
+			rndSceneRenderer.render(rndScene, cameraDesc, gfxSchTaskGraph, gfxSchCurrentBackBuffer, outputWidth, outputHeight);
 
 			gfxSchTaskGraph.execute();
 		}

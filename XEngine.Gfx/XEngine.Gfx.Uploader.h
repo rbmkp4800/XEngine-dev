@@ -47,5 +47,5 @@ namespace XEngine::Gfx
 #endif
 	};
 
-	extern Uploader GlobalUploader;
+	extern Uploader GUploader;
 }

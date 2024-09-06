@@ -33,13 +33,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ClInclude Include="XEngine.Render.GeometryHeap.h" />
     <ClInclude Include="XEngine.Render.Scene.h" />
     <ClInclude Include="XEngine.Render.SceneRenderer.h" />
+    <ClInclude Include="XEngine.Render.TextureHeap.h" />
   </ItemGroup>
 
   <ItemGroup>
+    <ClCompile Include="XEngine.Render.GeometryHeap.cpp" />
     <ClCompile Include="XEngine.Render.Scene.cpp" />
     <ClCompile Include="XEngine.Render.SceneRenderer.cpp" />
+    <ClCompile Include="XEngine.Render.TextureHeap.cpp" />
   </ItemGroup>
 
   <ItemGroup>

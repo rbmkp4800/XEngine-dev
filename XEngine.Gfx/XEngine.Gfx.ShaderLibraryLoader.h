@@ -36,5 +36,5 @@ namespace XEngine::Gfx
 		HAL::ShaderHandle getShader(uint64 nameXSH) const;
 	};
 
-	extern ShaderLibraryLoader GlobalShaderLibraryLoader;
+	extern ShaderLibraryLoader GShaderLibraryLoader;
 }

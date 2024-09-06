@@ -6,7 +6,7 @@
 #include <XEngine.Gfx.HAL.D3D12.h>
 #include <XEngine.Gfx.Scheduler.h>
 
-#include "XEngine.Render.Scene.h"
+namespace XEngine::Render { class Scene; }
 
 namespace XEngine::Render
 {

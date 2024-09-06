@@ -77,11 +77,11 @@ struct PSIntput
 
 float3 DeprojectNDCPositionToViewSpacePosition(float3 ndcPosition, float4 deprojectionCoefs)
 {
-	const float depthDeprojectA = deprojectionCoefs.z; // (zFar * zNear) / (zFar - zNear)
-	const float depthDeprojectB = deprojectionCoefs.w; // zFar / (zFar - zNear)
-	const float linearDepth = depthDeprojectA / (depthDeprojectB - ndcPosition.z); // (zFar * zNear) / (zFar - ndcDepth * (zFar - zNear));
-
-	// deprojectionCoefs.xy - horizontal&vertical tan(FOV/2)
+	// deprojectionCoefs.x = horizontal tan(FOV/2)
+	// deprojectionCoefs.y = vertical tan(FOV/2)
+	// deprojectionCoefs.z = (zFar * zNear) / (zFar - zNear)
+	// deprojectionCoefs.w = zFar / (zFar - zNear)
+	const float linearDepth = deprojectionCoefs.z / (deprojectionCoefs.w - ndcPosition.z); // (zFar * zNear) / (zFar - ndcDepth * (zFar - zNear));
 	return float3(ndcPosition.xy * linearDepth * deprojectionCoefs.xy, linearDepth);
 }
 

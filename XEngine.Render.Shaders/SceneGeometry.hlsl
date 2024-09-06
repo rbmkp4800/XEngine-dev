@@ -4,9 +4,17 @@ struct ViewConstantBuffer
 	float4x4 worldToClipTransform;
 };
 
-[[xe::binding(view_constant_buffer)]] ConstantBuffer<ViewConstantBuffer> bnd_ViewConstantBuffer;
-[[xe::binding(default_sampler)]] SamplerState bnd_DefaultSampler;
-//[[xe::binding(scene_transform_buffer)]] Buffer<float4> bnd_SceneTransformBuffer;
+struct PerInstanceConstantBuffer
+{
+	uint transformIndex;
+};
+
+
+[[xe::binding( per_instance_constant_buffer )]] ConstantBuffer<PerInstanceConstantBuffer> bnd_PerInstanceConstantBuffer;
+[[xe::binding( view_constant_buffer )]] ConstantBuffer<ViewConstantBuffer> bnd_ViewConstantBuffer;
+[[xe::binding( scene_transforms_buffer )]] StructuredBuffer<float4x4> bnd_SceneTransformsBuffer;
+
+[[xe::binding( default_sampler )]] SamplerState bnd_DefaultSampler;
 
 struct VSInput
 {
@@ -35,17 +43,16 @@ struct PSOutput
 
 VSOutput MainVS(VSInput input)
 {
-	//const float4x4 localToWorldSpaceTransform = bnd_ViewConstantBuffer.localToWorldSpaceTransform;
-	//const float3 worldSpacePosition = mul(float4(input.position, 1.0f), localToWorldSpaceTransform).xyz;
-	//const float3 worldSpaceNormal = mul(input.normal, (float3x3) localToWorldSpaceTransform);
-	//const float3 worldSpaceTangent = mul(input.tangent, (float3x3) localToWorldSpaceTransform);
-	
-	const float3 worldSpacePosition = input.position;
-	const float3 worldSpaceNormal = input.normal;
+	const uint tranformIndex = bnd_PerInstanceConstantBuffer.transformIndex;
+
+	const float4x4 localToWorldSpaceTransform = bnd_SceneTransformsBuffer[tranformIndex];
+	const float3 worldSpacePosition = mul(float4(input.position, 1.0f), localToWorldSpaceTransform).xyz;
+	const float3 worldSpaceNormal = mul(input.normal, (float3x3) localToWorldSpaceTransform);
+	float3 worldSpaceTangent = mul(input.tangent, (float3x3) localToWorldSpaceTransform);
 	
 	// https://learnopengl.com/Advanced-Lighting/Normal-Mapping "One last thing"
 	// TODO: I copypasted this line and do not understand what is going on here.
-	const float3 worldSpaceTangent = normalize(input.tangent - dot(input.tangent, worldSpaceNormal) * worldSpaceNormal);
+	worldSpaceTangent = normalize(worldSpaceTangent - dot(worldSpaceTangent, worldSpaceNormal) * worldSpaceNormal);
 	
 	const float3 worldSpaceBitangent = cross(worldSpaceNormal, worldSpaceTangent);
 	

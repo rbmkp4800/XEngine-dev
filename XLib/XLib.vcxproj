@@ -80,7 +80,6 @@
     <ClInclude Include="Source\XLib.Platform.D3D11.Helpers.h" />
     <ClInclude Include="Source\XLib.Platform.D3D12.Helpers.h" />
     <ClInclude Include="Source\XLib.Platform.DXGI.Helpers.h" />
-    <ClInclude Include="Source\XLib.Program.h" />
     <ClInclude Include="Source\XLib.Random.h" />
     <ClInclude Include="Source\XLib.RefCounted.h" />
     <ClInclude Include="Source\XLib.String.h" />
@@ -114,7 +113,6 @@
     <ClCompile Include="Source\XLib.Math.cpp" />
     <ClCompile Include="Source\XLib.Path.cpp" />
     <ClCompile Include="Source\XLib.Platform.COMPtr.cpp" />
-    <ClCompile Include="Source\XLib.Program.cpp" />
     <ClCompile Include="Source\XLib.Random.cpp" />
     <ClCompile Include="Source\XLib.String.cpp" />
     <ClCompile Include="Source\XLib.System.AsyncIO.cpp" />
