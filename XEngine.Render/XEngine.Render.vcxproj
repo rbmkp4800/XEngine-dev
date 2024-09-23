@@ -33,6 +33,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ClInclude Include="XEngine.Render.Color32.h" />
+    <ClInclude Include="XEngine.Render.DebugOverlay.h" />
+    <ClInclude Include="XEngine.Render.DebugOverlayRenderer.h" />
     <ClInclude Include="XEngine.Render.GeometryHeap.h" />
     <ClInclude Include="XEngine.Render.Scene.h" />
     <ClInclude Include="XEngine.Render.SceneRenderer.h" />
@@ -40,6 +43,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ClCompile Include="XEngine.Render.DebugOverlay.cpp" />
+    <ClCompile Include="XEngine.Render.DebugOverlayRenderer.cpp" />
     <ClCompile Include="XEngine.Render.GeometryHeap.cpp" />
     <ClCompile Include="XEngine.Render.Scene.cpp" />
     <ClCompile Include="XEngine.Render.SceneRenderer.cpp" />
