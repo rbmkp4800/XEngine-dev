@@ -62,6 +62,11 @@ namespace XLib
 		inline const char* getEndPtr() const { return end; }
 		inline const char* getCurrentPtr() const { return current; }
 
+		inline const char* getData() const { return begin; }
+		inline uintptr getLength() const { return end - begin; }
+
+		inline uintptr getOffset() const { return current - begin; }
+
 		inline char peek() const { return current < end ? *current : 0; }
 		inline char peek(uint32 offset) const;
 		inline char get() { return (current < end && *current != 0) ? *current++ : 0; }

@@ -31,15 +31,6 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 	using BlobRef = XLib::RefCountedPtr<Blob>;
 	using ShaderCompilationResultRef = XLib::RefCountedPtr<ShaderCompilationResult>;
 
-	enum class Platform : uint8
-	{
-		Undefined = 0,
-		D3D12,
-		Vulkan,
-		//Scarlett,
-		//Prospero,
-	};
-
 	struct GenericErrorMessage
 	{
 		XLib::InplaceStringASCIIx256 text;

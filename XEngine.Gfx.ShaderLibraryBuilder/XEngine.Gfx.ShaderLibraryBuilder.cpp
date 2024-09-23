@@ -376,12 +376,12 @@ int main(int argc, char* argv[])
 		if (compilationResult->getCompilationOutput().getLength() > 0)
 			FmtPrintStdOut(compilationResult->getCompilationOutput(), "\n");
 
+		StoreShaderCompilationResultIntermediates(cmdArgs, shader, *compilationResult);
+
 		if (compilationFailed)
 			return 1;
 
 		shader.setCompiledBlob(compilationResult->getBytecodeBlob());
-
-		StoreShaderCompilationResultIntermediates(cmdArgs, shader, *compilationResult);
 	}
 
 	if (!StoreShaderLibrary(cmdArgs, libraryDefinition))

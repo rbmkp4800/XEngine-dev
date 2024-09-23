@@ -12,7 +12,7 @@
 #include <XEngine.XStringHash.h>
 
 #include "XEngine.Gfx.HAL.ShaderCompiler.h"
-#include "XEngine.Gfx.HAL.ShaderCompiler.HLSLPatcher.h"
+#include "XEngine.Gfx.HAL.ShaderCompiler.ExtPreproc.h"
 
 using namespace XLib;
 using namespace XEngine::Gfx::HAL;
@@ -1020,25 +1020,18 @@ ShaderCompilationResultRef ShaderCompiler::CompileShader(XLib::StringViewASCII m
 	}
 
 
-	// Patch source ////////////////////////////////////////////////////////////////////////////////
-	DynamicStringASCII patchedSource;
+	// Preprocess source via XE extended preprocessor //////////////////////////////////////////////
+	DynamicStringASCII xePreprocessedSource;
 	{
 		StringViewASCII preprocessedSource(
 			dxcPreprocessedSourceBlob->GetStringPointer(), dxcPreprocessedSourceBlob->GetStringLength());
 
-		HLSLPatcher::Error hlslPatcherError = {};
-		if (!HLSLPatcher::Patch(preprocessedSource, pipelineLayout, patchedSource, hlslPatcherError))
+		InplaceStringASCIIx1024 xeExtPreprocessorOutput;
+		if (!ExtPreproc::Preprocess(preprocessedSource, mainSourceFilename, pipelineLayout, xePreprocessedSource, xeExtPreprocessorOutput))
 		{
-			XTODO(__FUNCTION__": HLSL patching: cursor location is invalid due to preprocessing. Parse #line directives");
-
-			InplaceStringASCIIx2048 xePreprocessorOutput;
-			FmtPrintStr(xePreprocessorOutput, mainSourceFilename, ":",
-				hlslPatcherError.location.lineNumber, ":", hlslPatcherError.location.columnNumber,
-				": XE HLSL patcher: error: ", hlslPatcherError.message);
-
 			ShaderCompilationResult::ComposerSource resultComposerSrc = {};
 			resultComposerSrc.status = ShaderCompilationStatus::PreprocessingError;
-			resultComposerSrc.preprocessingOuputStr = xePreprocessorOutput;
+			resultComposerSrc.preprocessingOuputStr = xeExtPreprocessorOutput;
 			return ShaderCompilationResult::Compose(resultComposerSrc);
 		}
 	}
@@ -1075,8 +1068,8 @@ ShaderCompilationResultRef ShaderCompiler::CompileShader(XLib::StringViewASCII m
 		}
 
 		DxcBuffer dxcSourceBuffer = {};
-		dxcSourceBuffer.Ptr = patchedSource.getData();
-		dxcSourceBuffer.Size = patchedSource.getLength();
+		dxcSourceBuffer.Ptr = xePreprocessedSource.getData();
+		dxcSourceBuffer.Size = xePreprocessedSource.getLength();
 		dxcSourceBuffer.Encoding = CP_UTF8;
 
 		Microsoft::WRL::ComPtr<IDxcResult> dxcResult;
@@ -1108,10 +1101,10 @@ ShaderCompilationResultRef ShaderCompiler::CompileShader(XLib::StringViewASCII m
 		dxcCompilationErrorsBlob->GetStringPointer(), dxcCompilationErrorsBlob->GetStringLength());
 
 	BlobRef preprocessedSourceBlob = nullptr;
-	if (!patchedSource.isEmpty())
+	if (!xePreprocessedSource.isEmpty())
 	{
-		preprocessedSourceBlob = Blob::Create(patchedSource.getLength());
-		memoryCopy((void*)preprocessedSourceBlob->getData(), patchedSource.getData(), patchedSource.getLength());
+		preprocessedSourceBlob = Blob::Create(xePreprocessedSource.getLength());
+		memoryCopy((void*)preprocessedSourceBlob->getData(), xePreprocessedSource.getData(), xePreprocessedSource.getLength());
 
 		resultComposerSrc.preprocessedSourceBlob = preprocessedSourceBlob.get();
 	}
