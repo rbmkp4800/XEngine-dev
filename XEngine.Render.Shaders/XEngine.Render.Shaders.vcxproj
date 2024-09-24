@@ -28,8 +28,14 @@
 
   <PropertyGroup>
     <NMakeBuildCommandLine>
-      $(SolutionDir)Build\XEngine.Gfx.ShaderLibraryBuilder_x64.Debug.exe -libdef="$(ProjectDir)$(ProjectName).libdef.json" -out="$(OutDir)$(ProjectName).xeslib"
+$(SolutionDir)Build\XEngine.Gfx.ShaderLibraryBuilder_x64.Debug.exe --libdef="$(ProjectDir)$(ProjectName).libdef.json" --out="$(OutDir)$(ProjectName).xeslib" --cache="$(IntDir)cache"
     </NMakeBuildCommandLine>
+
+    <NMakeCleanCommandLine>
+IF EXIST "$(OutDir)$(ProjectName).xeslib" del /q "$(OutDir)$(ProjectName).xeslib"
+IF EXIST "$(IntDir)cache\" del /q /s "$(IntDir)cache\*.*"
+    </NMakeCleanCommandLine>
+
   </PropertyGroup>
 
   <ItemGroup>

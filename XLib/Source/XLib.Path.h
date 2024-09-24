@@ -8,8 +8,6 @@ namespace XLib
 	class Path abstract final
 	{
 	public:
-		static void GetCurrentPath(VirtualStringRefASCII resultPath);
-
 		static void Normalize(StringViewASCII path, VirtualStringRefASCII resultPath);
 		static void Normalize(const char* pathCStr, VirtualStringRefASCII resultPath);
 		static void Normalize(VirtualStringRefASCII path);

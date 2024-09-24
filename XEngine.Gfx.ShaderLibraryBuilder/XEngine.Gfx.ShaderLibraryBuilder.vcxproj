@@ -39,10 +39,15 @@
     <ClInclude Include="XEngine.Gfx.ShaderLibraryBuilder.LibraryDefinitionLoader.h" />
     <ClInclude Include="XEngine.Gfx.ShaderLibraryBuilder.Shader.h" />
     <ClInclude Include="XEngine.Gfx.ShaderLibraryBuilder.SourceCache.h" />
+    <ClInclude Include="XEngine.Utils.CmdLineArgsParser.h" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ClCompile Include="XEngine.Gfx.ShaderLibraryBuilder.cpp" />
     <ClCompile Include="XEngine.Gfx.ShaderLibraryBuilder.LibraryDefinitionLoader.cpp" />
     <ClCompile Include="XEngine.Gfx.ShaderLibraryBuilder.Shader.cpp" />
     <ClCompile Include="XEngine.Gfx.ShaderLibraryBuilder.SourceCache.cpp" />
+    <ClCompile Include="XEngine.Utils.CmdLineArgsParser.cpp" />
   </ItemGroup>
 
   <ItemGroup>

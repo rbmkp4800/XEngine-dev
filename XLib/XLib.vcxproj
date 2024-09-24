@@ -84,6 +84,7 @@
     <ClInclude Include="Source\XLib.RefCounted.h" />
     <ClInclude Include="Source\XLib.String.h" />
     <ClInclude Include="Source\XLib.System.AsyncIO.h" />
+    <ClInclude Include="Source\XLib.System.Environment.h" />
     <ClInclude Include="Source\XLib.System.File.h" />
     <ClInclude Include="Source\XLib.System.NamedPipe.h" />
     <ClInclude Include="Source\XLib.System.Network.h" />
@@ -116,6 +117,7 @@
     <ClCompile Include="Source\XLib.Random.cpp" />
     <ClCompile Include="Source\XLib.String.cpp" />
     <ClCompile Include="Source\XLib.System.AsyncIO.cpp" />
+    <ClCompile Include="Source\XLib.System.Environment.cpp" />
     <ClCompile Include="Source\XLib.System.File.cpp" />
     <ClCompile Include="Source\XLib.System.NamedPipe.cpp" />
     <ClCompile Include="Source\XLib.System.Network.cpp" />

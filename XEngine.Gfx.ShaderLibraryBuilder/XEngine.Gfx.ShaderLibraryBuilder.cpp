@@ -7,6 +7,7 @@
 #include <XLib.Fmt.h>
 #include <XLib.Path.h>
 #include <XLib.String.h>
+#include <XLib.System.Environment.h>
 #include <XLib.System.File.h>
 
 #include <XEngine.Gfx.ShaderLibraryFormat.h>
@@ -14,67 +15,102 @@
 #include "XEngine.Gfx.ShaderLibraryBuilder.LibraryDefinition.h"
 #include "XEngine.Gfx.ShaderLibraryBuilder.LibraryDefinitionLoader.h"
 #include "XEngine.Gfx.ShaderLibraryBuilder.SourceCache.h"
+#include "XEngine.Utils.CmdLineArgsParser.h"
 
 // TODO: Implement `FileSystem::CreateDirs()` and create output and intermediate dirs.
 
 using namespace XLib;
 using namespace XEngine::Gfx;
 using namespace XEngine::Gfx::ShaderLibraryBuilder;
+using namespace XEngine::Utils;
 
 struct CmdArgs
 {
 	InplaceStringASCIIx1024 libraryDefinitionFilePath;
 	InplaceStringASCIIx1024 outLibraryFilePath;
-	InplaceStringASCIIx1024 intermediateDirPath;
+	InplaceStringASCIIx1024 buildCacheDirPath;
 };
 
-static bool ParseCmdArgs(int argc, char* argv[], CmdArgs& cmdArgs)
+static bool ParseCmdArgs(CmdArgs& resultCmdArgs)
 {
-	const char* libdefArg = nullptr;
-	const char* outArg = nullptr;
-	const char* imdirArg = nullptr;
+	static constexpr StringViewASCII LibraryDefinitionFilePathArgKey = StringViewASCII::FromCStr("--libdef");
+	static constexpr StringViewASCII OutLibraryFilePathArgKey = StringViewASCII::FromCStr("--out");
+	static constexpr StringViewASCII BuildCacheDirPathArgKey = StringViewASCII::FromCStr("--cache");
 
-	for (int i = 1; i < argc; i++)
+	StringViewASCII libraryDefinitionFilePathArgValue;
+	StringViewASCII outLibraryFilePathArgValue;
+	StringViewASCII buildCacheDirPathArgValue;
+
+	const char* cmdLine = Environment::GetCommandLineCStr();
+	CmdLineArgsParser parser(cmdLine);
+
+	// Skip first argument.
+	if (!parser.advance())
+		return false;
+
+	for (;;)
 	{
-		if (String::StartsWith(argv[i], "-libdef="))
-			libdefArg = argv[i] + 8;
-		else if (String::StartsWith(argv[i], "-out="))
-			outArg = argv[i] + 5;
-		else if (String::StartsWith(argv[i], "-imdir="))
-			imdirArg = argv[i] + 7;
+		if (!parser.advance())
+			return false;
+
+		if (parser.getCurentArgType() == CmdLineArgType::None)
+			break;
+
+		bool invalidArg = false;
+		if (parser.getCurentArgType() == CmdLineArgType::KeyValuePair)
+		{
+			if (parser.getCurrentArgKey() == LibraryDefinitionFilePathArgKey)
+				libraryDefinitionFilePathArgValue = parser.getCurrentArgValue();
+			else if (parser.getCurrentArgKey() == OutLibraryFilePathArgKey)
+				outLibraryFilePathArgValue = parser.getCurrentArgValue();
+			else if (parser.getCurrentArgKey() == BuildCacheDirPathArgKey)
+				buildCacheDirPathArgValue = parser.getCurrentArgValue();
+			else
+			{
+				FmtPrintStdOut("error: invalid command line argument key '", parser.getCurrentArgKey(), "'\n");
+				return false;
+			}
+		}
+		else
+		{
+			FmtPrintStdOut("error: invalid command line argument '", parser.getCurrentArgRawString(), "'\n");
+			return false;
+		}
 	}
 
-	Path::MakeAbsolute(libdefArg, cmdArgs.libraryDefinitionFilePath);
-	Path::Normalize(cmdArgs.libraryDefinitionFilePath);
+	// TODO: Check that all pathes are valid.
 
-	Path::MakeAbsolute(outArg, cmdArgs.outLibraryFilePath);
-	Path::Normalize(cmdArgs.outLibraryFilePath);
-
-	Path::MakeAbsolute(imdirArg, cmdArgs.intermediateDirPath);
-	Path::Normalize(cmdArgs.intermediateDirPath);
-	Path::AddTrailingDirectorySeparator(cmdArgs.intermediateDirPath);
-
-	if (cmdArgs.libraryDefinitionFilePath.isEmpty())
+	if (libraryDefinitionFilePathArgValue.isEmpty())
 	{
-		FmtPrintStdOut("error: missing library definition file path (-libdef=XXX)\n");
+		FmtPrintStdOut("error: missing library definition file path. Use '", LibraryDefinitionFilePathArgKey, "=XXX'\n");
 		return false;
 	}
-	if (cmdArgs.outLibraryFilePath.isEmpty())
+	if (outLibraryFilePathArgValue.isEmpty())
 	{
-		FmtPrintStdOut("error: missing output library file path (-out=XXX)\n");
+		FmtPrintStdOut("error: missing output library file path. Use '", OutLibraryFilePathArgKey, "=XXX'\n");
 		return false;
 	}
-	if (cmdArgs.intermediateDirPath.isEmpty())
+	if (buildCacheDirPathArgValue.isEmpty())
 	{
-		FmtPrintStdOut("warning: missing intermediate dir path (-imdir=XXX). Incremental building is disabled\n");
+		FmtPrintStdOut("warning: missing build cache dir path. Use '", BuildCacheDirPathArgKey, "=XXX'. Incremental building is disabled\n");
 	}
 
-	if (!Path::HasFileName(cmdArgs.libraryDefinitionFilePath))
+	Path::MakeAbsolute(libraryDefinitionFilePathArgValue, resultCmdArgs.libraryDefinitionFilePath);
+	Path::Normalize(resultCmdArgs.libraryDefinitionFilePath);
+
+	Path::MakeAbsolute(outLibraryFilePathArgValue, resultCmdArgs.outLibraryFilePath);
+	Path::Normalize(resultCmdArgs.outLibraryFilePath);
+
+	Path::MakeAbsolute(buildCacheDirPathArgValue, resultCmdArgs.buildCacheDirPath);
+	Path::Normalize(resultCmdArgs.buildCacheDirPath);
+	Path::AddTrailingDirectorySeparator(resultCmdArgs.buildCacheDirPath);
+
+	if (!Path::HasFileName(resultCmdArgs.libraryDefinitionFilePath))
 	{
 		FmtPrintStdOut("error: library definition file path has no filename\n");
 		return false;
 	}
-	if (!Path::HasFileName(cmdArgs.outLibraryFilePath))
+	if (!Path::HasFileName(resultCmdArgs.outLibraryFilePath))
 	{
 		FmtPrintStdOut("error: output library file path has no filename\n");
 		return false;
@@ -83,12 +119,15 @@ static bool ParseCmdArgs(int argc, char* argv[], CmdArgs& cmdArgs)
 	return true;
 }
 
-static void StoreShaderIntermediateBlob(const CmdArgs& cmdArgs, const Shader& shader,
+static void StoreSingleShaderCompilationArtifactToBuildCache(const CmdArgs& cmdArgs, const Shader& shader,
 	const HAL::ShaderCompiler::Blob& blob, const char* filenameSuffix)
 {
+	if (cmdArgs.buildCacheDirPath.isEmpty())
+		return;
+
 	InplaceStringASCIIx1024 filePath;
-	FmtPrintStr(filePath, cmdArgs.intermediateDirPath,
-		"SH.", FmtArgHex64(shader.getNameXSH(), 16), ".", shader.getName(), filenameSuffix);
+	FmtPrintStr(filePath, cmdArgs.buildCacheDirPath,
+		shader.getName(), "__[", FmtArgHex64(shader.getNameXSH(), 16), ']', filenameSuffix);
 
 	File file;
 	file.open(filePath.getCStr(), FileAccessMode::Write, FileOpenMode::Override);
@@ -102,17 +141,14 @@ static void StoreShaderIntermediateBlob(const CmdArgs& cmdArgs, const Shader& sh
 	file.close();
 }
 
-static void StoreShaderCompilationResultIntermediates(const CmdArgs& cmdArgs,
+static void StoreShaderCompilationArtifactsToBuildCache(const CmdArgs& cmdArgs,
 	const Shader& shader, const HAL::ShaderCompiler::ShaderCompilationResult& compilationResult)
 {
-	if (cmdArgs.intermediateDirPath.isEmpty())
-		return;
-
 	if (const HAL::ShaderCompiler::Blob* bytecodeBlob = compilationResult.getBytecodeBlob())
-		StoreShaderIntermediateBlob(cmdArgs, shader, *bytecodeBlob, ".bin");
+		StoreSingleShaderCompilationArtifactToBuildCache(cmdArgs, shader, *bytecodeBlob, ".bin");
 
 	if (const HAL::ShaderCompiler::Blob* preprocBlob = compilationResult.getPreprocessedSourceBlob())
-		StoreShaderIntermediateBlob(cmdArgs, shader, *preprocBlob, ".PP.hlsl");
+		StoreSingleShaderCompilationArtifactToBuildCache(cmdArgs, shader, *preprocBlob, ".preproc.hlsl");
 }
 
 static bool StoreShaderLibrary(const CmdArgs& cmdArgs, const LibraryDefinition& libraryDefinition)
@@ -249,14 +285,14 @@ static bool StoreShaderLibrary(const CmdArgs& cmdArgs, const LibraryDefinition& 
 	return true;
 }
 
-static void StoreIncrementalBuildCacheIndex(const CmdArgs& cmdArgs, const LibraryDefinition& libraryDefinition)
+static void StoreBuildCacheIndex(const CmdArgs& cmdArgs, const LibraryDefinition& libraryDefinition)
 {
-	if (cmdArgs.intermediateDirPath.isEmpty())
+	if (cmdArgs.buildCacheDirPath.isEmpty())
 		return;
 
 	InplaceStringASCIIx1024 filePath;
-	filePath.append(cmdArgs.intermediateDirPath);
-	filePath.append("_IncrementalBuildCacheIndex.txt");
+	filePath.append(cmdArgs.buildCacheDirPath);
+	filePath.append("_BuildCacheIndex.txt");
 
 	FileCharStreamWriter fileWriter;
 	fileWriter.open(filePath.getCStr(), true);
@@ -312,10 +348,10 @@ static HAL::ShaderCompiler::SourceResolutionResult ResolveSource(void* context, 
 	return result;
 }
 
-int main(int argc, char* argv[])
+int main()
 {
 	CmdArgs cmdArgs;
-	if (!ParseCmdArgs(argc, argv, cmdArgs))
+	if (!ParseCmdArgs(cmdArgs))
 		return 1;
 
 	// Load library definition file.
@@ -376,7 +412,7 @@ int main(int argc, char* argv[])
 		if (compilationResult->getCompilationOutput().getLength() > 0)
 			FmtPrintStdOut(compilationResult->getCompilationOutput(), "\n");
 
-		StoreShaderCompilationResultIntermediates(cmdArgs, shader, *compilationResult);
+		StoreShaderCompilationArtifactsToBuildCache(cmdArgs, shader, *compilationResult);
 
 		if (compilationFailed)
 			return 1;
@@ -387,7 +423,7 @@ int main(int argc, char* argv[])
 	if (!StoreShaderLibrary(cmdArgs, libraryDefinition))
 		return 1;
 
-	StoreIncrementalBuildCacheIndex(cmdArgs, libraryDefinition);
+	StoreBuildCacheIndex(cmdArgs, libraryDefinition);
 
 	FmtPrintStdOut("Shader library build succeeded\n");
 

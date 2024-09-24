@@ -156,9 +156,6 @@ namespace XEngine::Gfx::HAL::ShaderCompiler::ExtPreproc
 		uint32 currentLexemeColumnNumber = 0;
 		LexemeType currentLexemeType = {};
 
-	private:
-		void setCurrentLexeme(LexemeType type, uint32 beginOffset, uint32 endOffset, uint32 lineNumber, uint32 columnNumber);
-
 	public:
 		Lexer(StringViewASCII source, StringViewASCII mainSourceFilename);
 		~Lexer() = default;
@@ -199,18 +196,18 @@ namespace XEngine::Gfx::HAL::ShaderCompiler::ExtPreproc
 Lexer::Lexer(StringViewASCII source, StringViewASCII mainSourceFilename)
 	: charsReader(source.getData(), uint32(source.getLength())), currentSourceFilename(mainSourceFilename) {}
 
-void Lexer::setCurrentLexeme(LexemeType type, uint32 beginOffset, uint32 endOffset, uint32 lineNumber, uint32 columnNumber)
-{
-	currentLexemeBeginOffset = beginOffset;
-	currentLexemeEndOffset = endOffset;
-	currentLexemeLineNumber = lineNumber;
-	currentLexemeColumnNumber = columnNumber;
-	currentLexemeType = type;
-}
-
 bool Lexer::advance(OutputCollector& outputCollector)
 {
-	auto getRealCurrentSourceLocation = [this]() -> SourceLocation
+	auto setCurrentLexeme = [this](LexemeType type, uint32 beginOffset, uint32 endOffset, uint32 lineNumber, uint32 columnNumber) -> void
+	{
+		currentLexemeBeginOffset = beginOffset;
+		currentLexemeEndOffset = endOffset;
+		currentLexemeLineNumber = lineNumber;
+		currentLexemeColumnNumber = columnNumber;
+		currentLexemeType = type;
+	};
+
+	auto getRealCurrentLocation = [this]() -> SourceLocation
 	{
 		return SourceLocation
 		{
@@ -246,7 +243,7 @@ bool Lexer::advance(OutputCollector& outputCollector)
 				}
 				if (charsReader.isEndOfStream())
 				{
-					outputCollector.appendMessageFmt(getRealCurrentSourceLocation(), "lexer: unexpected end-of-file in multiline comment");
+					outputCollector.appendMessageFmt(getRealCurrentLocation(), "lexer: unexpected end-of-file in multiline comment");
 					return false;
 				}
 			}
@@ -302,7 +299,7 @@ bool Lexer::advance(OutputCollector& outputCollector)
 		{
 			if (charsReader.isEndOfStream())
 			{
-				outputCollector.appendMessageFmt(getRealCurrentSourceLocation(), "lexer: unexpected end-of-file in string literal");
+				outputCollector.appendMessageFmt(getRealCurrentLocation(), "lexer: unexpected end-of-file in string literal");
 				return false;
 			}
 
@@ -328,7 +325,7 @@ bool Lexer::advance(OutputCollector& outputCollector)
 					escapeState = EscapeState::Normal;
 				else
 				{
-					outputCollector.appendMessageFmt(getRealCurrentSourceLocation(), "lexer: unexpected end-of-line in string literal");
+					outputCollector.appendMessageFmt(getRealCurrentLocation(), "lexer: unexpected end-of-line in string literal");
 					return false;
 				}
 			}
@@ -392,7 +389,7 @@ bool Lexer::advance(OutputCollector& outputCollector)
 		return true;
 	}
 
-	outputCollector.appendMessageFmt(getRealCurrentSourceLocation(), "lexer: invalid character (code=0x", FmtArgHex8(lexemeFirstChar), ")");
+	outputCollector.appendMessageFmt(getRealCurrentLocation(), "lexer: invalid character (code=0x", FmtArgHex8(lexemeFirstChar), ")");
 	return false;
 }
 
