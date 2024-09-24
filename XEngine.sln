@@ -15,7 +15,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.Shaders", "X
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Gfx.ShaderLibraryBuilder", "XEngine.Gfx.ShaderLibraryBuilder\XEngine.Gfx.ShaderLibraryBuilder.vcxproj", "{981D9FCB-69BD-47D9-8033-15F5B4621A85}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.GeometryCompiler", "XEngine.GeometryCompiler\XEngine.GeometryCompiler.vcxproj", "{15BB28E9-80FC-4CF4-9A4E-AB2DA05352FC}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.ContentShaderCompiler", "XEngine.Render.ContentShaderCompiler\XEngine.Render.ContentShaderCompiler.vcxproj", "{6CFE8F13-A41D-4ED1-84CF-1733F609AE15}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.Render.GeometryCompiler", "XEngine.Render.GeometryCompiler\XEngine.Render.GeometryCompiler.vcxproj", "{15BB28E9-80FC-4CF4-9A4E-AB2DA05352FC}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XEngine.GeometryImporter", "XEngine.GeometryImporter\XEngine.GeometryImporter.vcxproj", "{04B988B1-C7EA-4261-87E1-0A95B6630F95}"
 EndProject
@@ -79,6 +81,10 @@ Global
 		{981D9FCB-69BD-47D9-8033-15F5B4621A85}.Debug|x64.Build.0 = Debug|x64
 		{981D9FCB-69BD-47D9-8033-15F5B4621A85}.Release|x64.ActiveCfg = Release|x64
 		{981D9FCB-69BD-47D9-8033-15F5B4621A85}.Release|x64.Build.0 = Release|x64
+		{6CFE8F13-A41D-4ED1-84CF-1733F609AE15}.Debug|x64.ActiveCfg = Debug|x64
+		{6CFE8F13-A41D-4ED1-84CF-1733F609AE15}.Debug|x64.Build.0 = Debug|x64
+		{6CFE8F13-A41D-4ED1-84CF-1733F609AE15}.Release|x64.ActiveCfg = Release|x64
+		{6CFE8F13-A41D-4ED1-84CF-1733F609AE15}.Release|x64.Build.0 = Release|x64
 		{15BB28E9-80FC-4CF4-9A4E-AB2DA05352FC}.Debug|x64.ActiveCfg = Debug|x64
 		{15BB28E9-80FC-4CF4-9A4E-AB2DA05352FC}.Debug|x64.Build.0 = Debug|x64
 		{15BB28E9-80FC-4CF4-9A4E-AB2DA05352FC}.Release|x64.ActiveCfg = Release|x64

@@ -15,8 +15,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{15bb28e9-80fc-4cf4-9a4e-ab2da05352fc}</ProjectGuid>
-    <RootNamespace>XEngineGeometryCompiler</RootNamespace>
+    <ProjectGuid>{15BB28E9-80FC-4CF4-9A4E-AB2DA05352FC}</ProjectGuid>
+    <RootNamespace>XEngineRenderGeometryCompiler</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
 
