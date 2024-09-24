@@ -29,9 +29,14 @@
   <Import Project="$(ProjectDefaultsPropsPath)" />
 
   <ItemGroup>
-    <ClInclude Include="XC.Compiler.Tokenizer.h" />
-    <ClCompile Include="XC.Compiler.Main.cpp" />
-    <ClCompile Include="XC.Compiler.Tokenizer.cpp" />
+    <ClInclude Include="XC.Compiler.Lexer.h" />
+    <ClInclude Include="XC.Compiler.Parser.h" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ClCompile Include="XC.Compiler.cpp" />
+    <ClCompile Include="XC.Compiler.Lexer.cpp" />
+    <ClCompile Include="XC.Compiler.Parser.cpp" />
   </ItemGroup>
 
   <ItemGroup>
