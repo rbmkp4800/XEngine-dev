@@ -30,9 +30,10 @@ namespace XEngine::Utils
 
 		bool advance();
 
-		inline CmdLineArgType getCurentArgType() const { return currentArgType; }
+		inline CmdLineArgType getCurrentArgType() const { return currentArgType; }
+		inline XLib::StringViewASCII getCurrentArgRawString() const { return XLib::StringViewASCII(currentArgBegin, currentArgEnd); }
+
 		XLib::StringViewASCII getCurrentArgKey() const;
 		XLib::StringViewASCII getCurrentArgValue() const;
-		inline XLib::StringViewASCII getCurrentArgRawString() const { return XLib::StringViewASCII(currentArgBegin, currentArgEnd); }
 	};
 }

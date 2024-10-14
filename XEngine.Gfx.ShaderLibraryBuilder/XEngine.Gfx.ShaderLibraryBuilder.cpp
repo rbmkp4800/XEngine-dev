@@ -53,11 +53,11 @@ static bool ParseCmdArgs(CmdArgs& resultCmdArgs)
 		if (!parser.advance())
 			return false;
 
-		if (parser.getCurentArgType() == CmdLineArgType::None)
+		if (parser.getCurrentArgType() == CmdLineArgType::None)
 			break;
 
 		bool invalidArg = false;
-		if (parser.getCurentArgType() == CmdLineArgType::KeyValuePair)
+		if (parser.getCurrentArgType() == CmdLineArgType::KeyValuePair)
 		{
 			if (parser.getCurrentArgKey() == LibraryDefinitionFilePathArgKey)
 				libraryDefinitionFilePathArgValue = parser.getCurrentArgValue();
@@ -66,14 +66,17 @@ static bool ParseCmdArgs(CmdArgs& resultCmdArgs)
 			else if (parser.getCurrentArgKey() == BuildCacheDirPathArgKey)
 				buildCacheDirPathArgValue = parser.getCurrentArgValue();
 			else
-			{
-				FmtPrintStdOut("error: invalid command line argument key '", parser.getCurrentArgKey(), "'\n");
-				return false;
-			}
+				invalidArg = true;
 		}
 		else
+			invalidArg = true;
+
+		if (invalidArg)
 		{
-			FmtPrintStdOut("error: invalid command line argument '", parser.getCurrentArgRawString(), "'\n");
+			if (parser.getCurrentArgType() == CmdLineArgType::Key || parser.getCurrentArgType() == CmdLineArgType::KeyValuePair)
+				FmtPrintStdOut("error: invalid command line argument key '", parser.getCurrentArgKey(), "'\n");
+			else
+				FmtPrintStdOut("error: invalid command line argument '", parser.getCurrentArgRawString(), "'\n");
 			return false;
 		}
 	}
