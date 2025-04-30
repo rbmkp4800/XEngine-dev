@@ -8,7 +8,7 @@
 // TODO: Do something about million template methods compiled for `InplaceString` instances.
 // TODO: Profile cost of always supporting zero terminator. Probably we may put it only when calling `getCStr`/`getData` methods.
 // TODO: String container types should be in XLib.Containers.*** but we also have non-container utils here... Also StringView is certainly not a container. Decide what to do.
-//		We may split this file into XLib.String.h and XLib.Containers.String.h
+//		We may split this file into XLib.Strings.h and XLib.Containers.String.h
 
 namespace XLib
 {

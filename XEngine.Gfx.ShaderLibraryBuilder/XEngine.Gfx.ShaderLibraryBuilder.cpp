@@ -99,13 +99,8 @@ static bool ParseCmdArgs(CmdArgs& resultCmdArgs)
 	}
 
 	Path::MakeAbsolute(libraryDefinitionFilePathArgValue, resultCmdArgs.libraryDefinitionFilePath);
-	Path::Normalize(resultCmdArgs.libraryDefinitionFilePath);
-
 	Path::MakeAbsolute(outLibraryFilePathArgValue, resultCmdArgs.outLibraryFilePath);
-	Path::Normalize(resultCmdArgs.outLibraryFilePath);
-
 	Path::MakeAbsolute(buildCacheDirPathArgValue, resultCmdArgs.buildCacheDirPath);
-	Path::Normalize(resultCmdArgs.buildCacheDirPath);
 	Path::AddTrailingDirectorySeparator(resultCmdArgs.buildCacheDirPath);
 
 	if (!Path::HasFileName(resultCmdArgs.libraryDefinitionFilePath))
@@ -130,7 +125,7 @@ static void StoreSingleShaderCompilationArtifactToBuildCache(const CmdArgs& cmdA
 
 	InplaceStringASCIIx1024 filePath;
 	FmtPrintStr(filePath, cmdArgs.buildCacheDirPath,
-		shader.getName(), "__[", FmtArgHex64(shader.getNameXSH(), 16), ']', filenameSuffix);
+		shader.getName(), '#', FmtArgHex64(shader.getNameXSH(), 16), filenameSuffix);
 
 	File file;
 	file.open(filePath.getCStr(), FileAccessMode::Write, FileOpenMode::Override);
@@ -257,11 +252,6 @@ static bool StoreShaderLibrary(const CmdArgs& cmdArgs, const LibraryDefinition& 
 	header.blobsDataOffset = uint32(blobsDataOffset);
 	header.blobsDataSize = blobsDataSize;
 
-	// TODO:
-#if 0
-	FileSystem::CreateDirs(Path::RemoveFileName(cmdArgs.outLibraryFilePath));
-#endif
-
 	File file;
 	file.open(cmdArgs.outLibraryFilePath.getCStr(), FileAccessMode::Write, FileOpenMode::Override);
 	if (!file.isOpen())
@@ -333,11 +323,11 @@ static void StoreBuildCacheIndex(const CmdArgs& cmdArgs, const LibraryDefinition
 		const uint64 pipelineLayoutHash = shader->getPipelineLayout().getSourceHash();
 
 		FmtPrint(fileWriter,
-			"SH:", FmtArgHex64(shaderNameXSH, 16), '(', shaderName, ')', '|',
+			"SH:", FmtArgHex64(shaderNameXSH, 16), '/', shaderName, '|',
 			"T:", shaderTypeStr, '|',
 			"EP:", shaderEntryPointName, '|',
-			"PL:", FmtArgHex64(pipelineLayoutNameXSH, 16), '(', pipelineLayoutName, ')', '|',
-			"PLHash:", FmtArgHex64(pipelineLayoutHash, 16), '\n');
+			"PL:", FmtArgHex64(pipelineLayoutNameXSH, 16), '/', pipelineLayoutName, '|',
+			"PLHASH:", FmtArgHex64(pipelineLayoutHash, 16), '\n');
 	}
 
 	fileWriter.close();
@@ -357,16 +347,14 @@ int main()
 	if (!ParseCmdArgs(cmdArgs))
 		return 1;
 
+	FileSystem::CreateDirRecursive(Path::GetParent(cmdArgs.outLibraryFilePath.getCStr()));
+	FileSystem::CreateDirRecursive(cmdArgs.buildCacheDirPath.getCStr());
+
 	// Load library definition file.
 	LibraryDefinition libraryDefinition;
 	FmtPrintStdOut("Loading shader library definition file '", cmdArgs.libraryDefinitionFilePath, "'\n");
 	if (!LibraryDefinitionLoader::Load(libraryDefinition, cmdArgs.libraryDefinitionFilePath.getCStr()))
 		return 1;
-
-	// TODO:
-#if 0
-	FileSystem::CreateDirs(Path::RemoveFileName(cmdArgs.intermediateDirPath));
-#endif
 
 	// Sort pipelines by actual name, so log looks nice :sparkles:
 	ArrayList<Shader*> shadersToCompile;
@@ -379,7 +367,7 @@ int main()
 			[](const Shader* left, const Shader* right) -> bool { return String::IsLess(left->getName(), right->getName()); });
 	}
 
-	InplaceStringASCIIx1024 librarySourceRootPath = Path::RemoveFileName(cmdArgs.libraryDefinitionFilePath);
+	InplaceStringASCIIx1024 librarySourceRootPath = Path::GetParent(cmdArgs.libraryDefinitionFilePath);
 	XAssert(Path::HasTrailingDirectorySeparator(librarySourceRootPath));
 
 	SourceCache sourceCache;

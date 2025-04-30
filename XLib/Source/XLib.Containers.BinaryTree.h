@@ -291,12 +291,12 @@ namespace XLib
 	inline auto FlatBinaryTreeMap<Key, Value>::find(const Key& key) const -> Iterator
 	{
 		if (!size)
-			return Iterator;
+			return Iterator();
 
 		NodeAdapter nodeAdapter(buffer, size);
 		const NodeAdapter::NodeRef foundNodeRef = TreeLogic::Find(nodeAdapter, rootNodeIndex, key);
 		if (foundNodeRef == NodeAdapter::ZeroNodeRef)
-			return Iterator;
+			return Iterator();
 
 		XAssert(foundNodeRef < size);
 		return Iterator(this, foundNodeRef);
@@ -321,7 +321,7 @@ namespace XLib
 	inline auto FlatBinaryTreeMap<Key, Value>::begin() const -> Iterator
 	{
 		if (!size)
-			return Iterator;
+			return Iterator();
 
 		NodeAdapter nodeAdapter(buffer, size);
 		const NodeAdapter::NodeRef beginNodeRef = TreeLogic::FindExtreme(nodeAdapter, rootNodeIndex, 0);
@@ -332,7 +332,7 @@ namespace XLib
 	template <typename Key, typename Value>
 	inline auto FlatBinaryTreeMap<Key, Value>::end() const -> Iterator
 	{
-		return Iterator;
+		return Iterator();
 	}
 
 

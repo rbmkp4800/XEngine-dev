@@ -53,6 +53,7 @@ void Path::MakeAbsolute(StringViewASCII path, VirtualStringRefASCII resultPath)
 {
 	std::filesystem::path p(std::string_view(path.getData(), path.getLength()));
 	p = std::filesystem::absolute(p);
+	p = p.lexically_normal();
 	auto np = p.native();
 
 	// TODO: Revisit
@@ -111,10 +112,44 @@ StringViewASCII Path::GetFileName(StringViewASCII path)
 
 StringViewASCII Path::GetFileName(const char* pathCStr)
 {
-	return GetFileName(StringViewASCII::FromCStr(pathCStr));
+	return Path::GetFileName(StringViewASCII::FromCStr(pathCStr));
 }
 
-StringViewASCII Path::RemoveFileName(StringViewASCII path)
+StringViewASCII Path::GetRoot(StringViewASCII path)
+{
+	// Windows only implementation.
+	// Only two options here: "C:" and "//"
+	// I do not give a shit (yet) about "//server/share", "//./", "//?/" and friends.
+
+	if (path.getLength() < 2)
+		return StringViewASCII();
+
+	if (Char::IsLetter(path[0]) && path[1] == ':')
+		return StringViewASCII(path.getData(), 2);
+
+	if (Path::IsDirectorySeparatorChar(path[0]) &&
+		Path::IsDirectorySeparatorChar(path[1]))
+		return StringViewASCII(path.getData(), 2);
+
+	return StringViewASCII();
+}
+
+StringViewASCII Path::GetRoot(const char* pathCStr)
+{
+	// See `Path::GetRoot(StringViewASCII path)`.
+
+	if (Char::IsLetter(pathCStr[0]) && pathCStr[1] == ':')
+		return StringViewASCII(pathCStr, 2);
+
+	if (Path::IsDirectorySeparatorChar(pathCStr[0]) &&
+		Path::IsDirectorySeparatorChar(pathCStr[1]))
+		return StringViewASCII(pathCStr, 2);
+
+	return StringViewASCII();
+}
+
+
+StringViewASCII Path::GetParent(StringViewASCII path)
 {
 	const char* pathBegin = path.getData();
 	const char* pathEnd = path.getData() + path.getLength();
@@ -126,7 +161,7 @@ StringViewASCII Path::RemoveFileName(StringViewASCII path)
 	return StringViewASCII();
 }
 
-StringViewASCII Path::RemoveFileName(const char* pathCStr)
+StringViewASCII Path::GetParent(const char* pathCStr)
 {
-	return RemoveFileName(StringViewASCII::FromCStr(pathCStr));
+	return Path::GetParent(StringViewASCII::FromCStr(pathCStr));
 }

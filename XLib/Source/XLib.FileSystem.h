@@ -1,17 +1,60 @@
 #pragma once
 
 #include "XLib.h"
+#include "XLib.String.h"
 #include "XLib.Time.h"
 
 namespace XLib
 {
-	struct FileSystem abstract final
+	enum class FileSystemOpStatus : uint8
 	{
-		static bool RemoveFile(const char* path);
-		static bool FileExists(const char* path);
-		static TimePoint GetFileLastWriteTime(const char* path);
+		Success = 0,
+		FileNotFound,
+		PathNotFound,
+		AccessDenied,
 
-		static void CreateDirs(const char* path);
+		FileWithThisNameAlreadyExists,
+
+		// I'm lazy
+		Failure,
+	};
+
+	enum class FileSystemEntryType : uint8
+	{
+		None = 0,
+		File,
+		Directory,
+	};
+
+	template <typename ResultType>
+	struct FileSystemOpResult
+	{
+		ResultType value;
+		FileSystemOpStatus status;
+	};
+
+	class FileSystem abstract final
+	{
+	public:
+		// What this should return for "file.txt/"?
+		// What this should return for "file.txt/blabla"?
+
+		static FileSystemOpResult<FileSystemEntryType> GetEntryType(const char* pathCStr);
+
+		//static FileSystemOpResult<bool> FileExists(const char* pathCStr);
+		//static FileSystemOpResult<bool> DirExists(const char* pathCStr);
+
+		//static FileSystemOpResult<bool> IsFile(const char* pathCStr);
+		//static FileSystemOpResult<bool> IsDir(const char* pathCStr);
+
+		static FileSystemOpStatus RemoveFile(const char* pathCStr);
+		static FileSystemOpStatus RemoveDir(const char* pathCStr);
+
+		static FileSystemOpStatus CreateDirSingle(const char* pathCStr);
+		static FileSystemOpStatus CreateDirRecursive(const char* pathCStr);
+		static FileSystemOpStatus CreateDirRecursive(StringViewASCII path);
+
+		static FileSystemOpResult<TimePoint> GetFileLastWriteTime(const char* pathCStr);
 	};
 }
 

@@ -1199,9 +1199,9 @@ void TaskGraph::execute()
 
 		// TODO: Remove.
 		memorySet(resources, 0, sizeof(Resource) * resourceCount);
-		memorySet(tasks, 0, sizeof(Resource) * taskCount);
-		memorySet(dependencies, 0, sizeof(Resource) * dependencyCount);
-		memorySet(barriers, 0, sizeof(Resource) * barrierCount);
+		memorySet(tasks, 0, sizeof(Task) * taskCount);
+		memorySet(dependencies, 0, sizeof(Dependency) * dependencyCount);
+		memorySet(barriers, 0, sizeof(Barrier) * barrierCount);
 		memorySet(userDataPool, 0, userDataAllocatedSize);
 
 		resourceCount = 0;
