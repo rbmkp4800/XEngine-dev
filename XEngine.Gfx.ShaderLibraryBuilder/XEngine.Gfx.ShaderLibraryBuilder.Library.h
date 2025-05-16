@@ -7,11 +7,9 @@
 
 #include "XEngine.Gfx.ShaderLibraryBuilder.Shader.h"
 
-// TODO: Use hash maps in LibraryDefinition. Yes, I am retarded.
-
 namespace XEngine::Gfx::ShaderLibraryBuilder
 {
-	struct LibraryDefinition
+	struct Library
 	{
 		struct DescriptorSetLayout
 		{

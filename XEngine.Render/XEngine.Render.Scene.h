@@ -14,7 +14,7 @@ namespace XEngine::Render
 	enum class TransformSetHandle : uint32 {};
 	enum class GeometryInstanceHandle : uint32 {};
 
-	class Scene : XLib::NonCopyable
+	class Scene : public XLib::NonCopyable
 	{
 		friend SceneRenderer;
 

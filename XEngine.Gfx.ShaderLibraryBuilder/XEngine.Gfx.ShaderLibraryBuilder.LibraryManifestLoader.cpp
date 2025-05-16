@@ -4,7 +4,7 @@
 
 #include <XEngine.XStringHash.h>
 
-#include "XEngine.Gfx.ShaderLibraryBuilder.LibraryDefinitionLoader.h"
+#include "XEngine.Gfx.ShaderLibraryBuilder.LibraryManifestLoader.h"
 
 #define IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader) \
 	do { if ((jsonReader).getErrorCode() != JSONErrorCode::Success) { this->reportJSONError(); return false; } } while (false)
@@ -105,9 +105,9 @@ static bool ValidateShaderSourcePath(StringViewASCII path)
 }
 
 
-// LibraryDefinition utils /////////////////////////////////////////////////////////////////////////
+// Library utils ///////////////////////////////////////////////////////////////////////////////////
 
-static HAL::ShaderCompiler::DescriptorSetLayout* LibFindDescriptorSetLayout(LibraryDefinition& lib, uint64 nameXSH)
+static HAL::ShaderCompiler::DescriptorSetLayout* LibFindDescriptorSetLayout(Library& lib, uint64 nameXSH)
 {
 	for (const auto& descriptorSetLayout : lib.descriptorSetLayouts)
 	{
@@ -117,7 +117,7 @@ static HAL::ShaderCompiler::DescriptorSetLayout* LibFindDescriptorSetLayout(Libr
 	return nullptr;
 }
 
-static HAL::ShaderCompiler::PipelineLayout* LibFindPipelineLayout(LibraryDefinition& lib, uint64 nameXSH)
+static HAL::ShaderCompiler::PipelineLayout* LibFindPipelineLayout(Library& lib, uint64 nameXSH)
 {
 	for (const auto& pipelineLayout : lib.pipelineLayouts)
 	{
@@ -127,7 +127,7 @@ static HAL::ShaderCompiler::PipelineLayout* LibFindPipelineLayout(LibraryDefinit
 	return nullptr;
 }
 
-static Shader* LibFindShader(LibraryDefinition& lib, uint64 nameXSH)
+static Shader* LibFindShader(Library& lib, uint64 nameXSH)
 {
 	for (const ShaderRef& shader : lib.shaders)
 	{
@@ -138,16 +138,16 @@ static Shader* LibFindShader(LibraryDefinition& lib, uint64 nameXSH)
 }
 
 
-// LibraryDefinitionLoader /////////////////////////////////////////////////////////////////////////
+// LibraryManifestLoader /////////////////////////////////////////////////////////////////////////
 
-void LibraryDefinitionLoader::reportError(const char* message, Cursor jsonCursor)
+void LibraryManifestLoader::reportError(const char* message, Cursor jsonCursor)
 {
 	// TODO: Print absolute path.
 	FmtPrintStdOut(jsonPath, ':', jsonCursor.lineNumber, ':', jsonCursor.columnNumber,
 		": error: ", message, '\n');
 }
 
-void LibraryDefinitionLoader::reportJSONError()
+void LibraryManifestLoader::reportJSONError()
 {
 	const JSONErrorCode jsonError = jsonReader.getErrorCode();
 	XAssert(jsonError != JSONErrorCode::Success);
@@ -157,7 +157,7 @@ void LibraryDefinitionLoader::reportJSONError()
 		": error: JSON: ", JSONErrorCodeToString(jsonError), '\n');
 }
 
-bool LibraryDefinitionLoader::consumeKeyWithObjectValue(StringViewASCII& resultKey)
+bool LibraryManifestLoader::consumeKeyWithObjectValue(StringViewASCII& resultKey)
 {
 	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!jsonReader.isEndOfObject(), "property expected", getJSONCursor());
 
@@ -176,7 +176,7 @@ bool LibraryDefinitionLoader::consumeKeyWithObjectValue(StringViewASCII& resultK
 	return true;
 }
 
-bool LibraryDefinitionLoader::consumeSpecificKeyWithStringValue(const char* expectedKey, StringViewASCII& resultStringValue)
+bool LibraryManifestLoader::consumeSpecificKeyWithStringValue(const char* expectedKey, StringViewASCII& resultStringValue)
 {
 	InplaceStringASCIIx128 propertyExpectedErrorMessage;
 	FmtPrintStr(propertyExpectedErrorMessage, '\'', expectedKey, "' property expected");
@@ -200,7 +200,7 @@ bool LibraryDefinitionLoader::consumeSpecificKeyWithStringValue(const char* expe
 	return true;
 }
 
-bool LibraryDefinitionLoader::consumeSpecificKeyWithObjectValue(const char* expectedKey)
+bool LibraryManifestLoader::consumeSpecificKeyWithObjectValue(const char* expectedKey)
 {
 	InplaceStringASCIIx128 propertyExpectedErrorMessage;
 	FmtPrintStr(propertyExpectedErrorMessage, '\'', expectedKey, "' property expected");
@@ -223,7 +223,7 @@ bool LibraryDefinitionLoader::consumeSpecificKeyWithObjectValue(const char* expe
 	return true;
 }
 
-bool LibraryDefinitionLoader::consumeSpecificKeyWithArrayValue(const char* expectedKey)
+bool LibraryManifestLoader::consumeSpecificKeyWithArrayValue(const char* expectedKey)
 {
 	InplaceStringASCIIx128 propertyExpectedErrorMessage;
 	FmtPrintStr(propertyExpectedErrorMessage, '\'', expectedKey, "' property expected");
@@ -246,7 +246,7 @@ bool LibraryDefinitionLoader::consumeSpecificKeyWithArrayValue(const char* expec
 	return true;
 }
 
-bool LibraryDefinitionLoader::readStaticSampler(StringViewASCII staticSamplerName, Cursor jsonStaticSamplerNameCursor)
+bool LibraryManifestLoader::readStaticSampler(StringViewASCII staticSamplerName, Cursor jsonStaticSamplerNameCursor)
 {
 	for (StaticSamplerDesc& i : staticSamplers)
 	{
@@ -342,7 +342,7 @@ bool LibraryDefinitionLoader::readStaticSampler(StringViewASCII staticSamplerNam
 	return true;
 }
 
-bool LibraryDefinitionLoader::readDescriptorSetLayout(StringViewASCII descriptorSetLayoutName, Cursor jsonDescriptorSetLayoutNameCursor)
+bool LibraryManifestLoader::readDescriptorSetLayout(StringViewASCII descriptorSetLayoutName, Cursor jsonDescriptorSetLayoutNameCursor)
 {
 	IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithObjectValue("bindings"));
 
@@ -389,8 +389,8 @@ bool LibraryDefinitionLoader::readDescriptorSetLayout(StringViewASCII descriptor
 	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(descriptorSetLayoutNameXSH != 0,
 		"descriptor set layout name XSH = 0. This is not allowed", jsonDescriptorSetLayoutNameCursor);
 
-	//if (libraryDefinition.descriptorSetLayouts.find(descriptorSetLayoutNameXSH))
-	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!LibFindDescriptorSetLayout(libraryDefinition, descriptorSetLayoutNameXSH),
+	//if (library.descriptorSetLayouts.find(descriptorSetLayoutNameXSH))
+	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!LibFindDescriptorSetLayout(library, descriptorSetLayoutNameXSH),
 		"descriptor set layout redefinition", jsonDescriptorSetLayoutNameCursor);
 	// TODO: We may give separate error for hash collision (that will never happen).
 
@@ -401,14 +401,14 @@ bool LibraryDefinitionLoader::readDescriptorSetLayout(StringViewASCII descriptor
 
 	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(descriptorSetLayout, objectCreationErrorMessage.text.getCStr(), jsonDescriptorSetLayoutNameCursor);
 
-	//libraryDefinition.descriptorSetLayouts.insert(descriptorSetLayoutNameXSH, descriptorSetLayout);
-	libraryDefinition.descriptorSetLayouts.pushBack(
-		LibraryDefinition::DescriptorSetLayout { descriptorSetLayoutNameXSH, descriptorSetLayout });
+	//library.descriptorSetLayouts.insert(descriptorSetLayoutNameXSH, descriptorSetLayout);
+	library.descriptorSetLayouts.pushBack(
+		Library::DescriptorSetLayout { descriptorSetLayoutNameXSH, descriptorSetLayout });
 
 	return true;
 }
 
-bool LibraryDefinitionLoader::readPipelineLayout(StringViewASCII pipelineLayoutName, Cursor jsonPipelineLayoutNameCursor)
+bool LibraryManifestLoader::readPipelineLayout(StringViewASCII pipelineLayoutName, Cursor jsonPipelineLayoutNameCursor)
 {
 	IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithObjectValue("bindings"));
 
@@ -471,9 +471,9 @@ bool LibraryDefinitionLoader::readPipelineLayout(StringViewASCII pipelineLayoutN
 					IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("dsl", descriptorSetLayoutName));
 
 					//const HAL::ShaderCompiler::DescriptorSetLayoutRef* descriptorSetLayout =
-					//	libraryDefinition.descriptorSetLayouts.findValue(XSH::Compute(descriptorSetLayoutName));
+					//	library.descriptorSetLayouts.findValue(XSH::Compute(descriptorSetLayoutName));
 					const HAL::ShaderCompiler::DescriptorSetLayout* descriptorSetLayout =
-						LibFindDescriptorSetLayout(libraryDefinition, XSH::Compute(descriptorSetLayoutName));
+						LibFindDescriptorSetLayout(library, XSH::Compute(descriptorSetLayoutName));
 
 					IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(descriptorSetLayout, "undefined descriptor set layout", jsonDescriptorSetLayoutNameCursor);
 
@@ -500,8 +500,8 @@ bool LibraryDefinitionLoader::readPipelineLayout(StringViewASCII pipelineLayoutN
 	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(pipelineLayoutNameXSH != 0,
 		"pipeline layout name XSH = 0. This is not allowed", jsonPipelineLayoutNameCursor);
 
-	//if (libraryDefinition.pipelineLayouts.find(pipelineLayoutNameXSH))
-	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!LibFindPipelineLayout(libraryDefinition, pipelineLayoutNameXSH),
+	//if (library.pipelineLayouts.find(pipelineLayoutNameXSH))
+	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!LibFindPipelineLayout(library, pipelineLayoutNameXSH),
 		"pipeline layout redefinition", jsonPipelineLayoutNameCursor);
 	// TODO: We may give separate error for hash collision (that will never happen).
 
@@ -513,19 +513,28 @@ bool LibraryDefinitionLoader::readPipelineLayout(StringViewASCII pipelineLayoutN
 
 	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(pipelineLayout, objectCreationErrorMessage.text.getCStr(), jsonPipelineLayoutNameCursor);
 
-	//libraryDefinition.pipelineLayouts.insert(pipelineLayoutNameXSH, pipelineLayout);
-	libraryDefinition.pipelineLayouts.pushBack(
-		LibraryDefinition::PipelineLayout { pipelineLayoutNameXSH, pipelineLayout });
+	//library.pipelineLayouts.insert(pipelineLayoutNameXSH, pipelineLayout);
+	library.pipelineLayouts.pushBack(
+		Library::PipelineLayout { pipelineLayoutNameXSH, pipelineLayout });
 
 	return true;
 }
 
-bool LibraryDefinitionLoader::readShader(StringViewASCII shaderName, Cursor jsonShaderNameCursor, HAL::ShaderType shaderType)
+bool LibraryManifestLoader::readShader(StringViewASCII shaderName, Cursor jsonShaderNameCursor, HAL::ShaderType shaderType)
 {
-	HAL::ShaderCompiler::PipelineLayoutRef pipelineLayout = nullptr;
-	uint64 pipelineLayoutNameXSH = 0;
+	StringViewASCII pipelineLayoutName = {};
+	const Cursor jsonPipelineLayoutNameCursor = getJSONCursor();
+	IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("pipeline_layout", pipelineLayoutName));
 
-	IF_FALSE_RETURN_FALSE(readPipelineLayoutSetupProperty(pipelineLayout, pipelineLayoutNameXSH));
+	const uint64 pipelineLayoutNameXSH = XSH::Compute(pipelineLayoutName);
+
+	//const HAL::ShaderCompiler::PipelineLayoutRef* foundPipelineLayout =
+	//	library.pipelineLayouts.findValue(pipelineLayoutNameXSH);
+	HAL::ShaderCompiler::PipelineLayoutRef pipelineLayout =
+		LibFindPipelineLayout(library, pipelineLayoutNameXSH);
+	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(pipelineLayout.get() != nullptr,
+		"undefined pipeline layout", jsonPipelineLayoutNameCursor);
+	// TODO: Additionally compare actual names to check for hash collision (that will never happen).
 
 	StringViewASCII mainSourceFilename;
 	HAL::ShaderCompiler::ShaderCompilationArgs args = {};
@@ -544,44 +553,20 @@ bool LibraryDefinitionLoader::readShader(StringViewASCII shaderName, Cursor json
 	const uint64 shaderNameXSH = XSH::Compute(shaderName);
 	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(shaderNameXSH != 0, "shader name XSH = 0. This is not allowed", jsonShaderNameCursor);
 
-	//if (libraryDefinition.shaders.find(shaderNameXSH))
-	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!LibFindShader(libraryDefinition, shaderNameXSH), "shader redefinition", jsonShaderNameCursor);
+	//if (library.shaders.find(shaderNameXSH))
+	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(!LibFindShader(library, shaderNameXSH), "shader redefinition", jsonShaderNameCursor);
 	// TODO: We may give separate error for hash collision (that will never happen).
 
-	const ShaderRef shader = Shader::Create(shaderName, shaderNameXSH, pipelineLayout.get(), pipelineLayoutNameXSH, mainSourceFilename, args);
+	const ShaderRef shader = Shader::Create(shaderName, shaderNameXSH,
+		pipelineLayout.get(), pipelineLayoutName, pipelineLayoutNameXSH, mainSourceFilename, args);
 
 	XAssert(shader);
-	libraryDefinition.shaders.pushBack(shader);
+	library.shaders.pushBack(shader);
 
 	return true;
 }
 
-bool LibraryDefinitionLoader::readPipelineLayoutSetupProperty(
-	HAL::ShaderCompiler::PipelineLayoutRef& resultPipelineLayout, uint64& resultPipelineLayoutNameXSH)
-{
-	StringViewASCII pipelineLayoutName = {};
-	const Cursor jsonPipelineLayoutNameCursor = getJSONCursor();
-	IF_FALSE_RETURN_FALSE(consumeSpecificKeyWithStringValue("pipeline_layout", pipelineLayoutName));
-
-	const uint64 pipelineLayoutNameXSH = XSH::Compute(pipelineLayoutName);
-
-	//const HAL::ShaderCompiler::PipelineLayoutRef* foundPipelineLayout =
-	//	libraryDefinition.pipelineLayouts.findValue(pipelineLayoutNameXSH);
-	HAL::ShaderCompiler::PipelineLayout* foundPipelineLayout =
-		LibFindPipelineLayout(libraryDefinition, pipelineLayoutNameXSH);
-	IF_FALSE_REPORT_MESSAGE_AND_RETURN_FALSE(foundPipelineLayout != nullptr,
-		"undefined pipeline layout", jsonPipelineLayoutNameCursor);
-	// TODO: Additionally compare actual names to check for hash collision (that will never happen).
-
-	//resultPipelineLayout = *foundPipelineLayout;
-	resultPipelineLayout = foundPipelineLayout;
-	resultPipelineLayoutNameXSH = pipelineLayoutNameXSH;
-	XAssert(resultPipelineLayout);
-
-	return true;
-}
-
-bool LibraryDefinitionLoader::load(const char* jsonPath)
+bool LibraryManifestLoader::load(const char* jsonPath)
 {
 	XAssert(jsonPath && jsonPath[0]);
 	// TODO: Validate path.
@@ -596,7 +581,7 @@ bool LibraryDefinitionLoader::load(const char* jsonPath)
 		file.open(jsonPath, FileAccessMode::Read, FileOpenMode::OpenExisting);
 		if (!file.isOpen())
 		{
-			FmtPrintStdOut("Cannot open library definition file '", jsonPath, "'");
+			FmtPrintStdOut("Cannot open library manifest file '", jsonPath, "'");
 			return false;
 		}
 
@@ -669,11 +654,13 @@ bool LibraryDefinitionLoader::load(const char* jsonPath)
 	jsonReader.closeObject();
 	IF_JSON_ERROR_REPORT_AND_RETURN_FALSE(jsonReader);
 
+	// TODO: Sort items in order of XSH increase.
+
 	return true;
 }
 
-bool LibraryDefinitionLoader::Load(LibraryDefinition& libraryDefinition, const char* jsonPath)
+bool LibraryManifestLoader::Load(Library& library, const char* jsonPath)
 {
-	LibraryDefinitionLoader loader(libraryDefinition);
+	LibraryManifestLoader loader(library);
 	return loader.load(jsonPath);
 }

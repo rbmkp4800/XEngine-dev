@@ -7,11 +7,11 @@
 
 #include <XEngine.Gfx.HAL.ShaderCompiler.h>
 
-#include "XEngine.Gfx.ShaderLibraryBuilder.LibraryDefinition.h"
+#include "XEngine.Gfx.ShaderLibraryBuilder.Library.h"
 
 namespace XEngine::Gfx::ShaderLibraryBuilder
 {
-	class LibraryDefinitionLoader : public XLib::NonCopyable
+	class LibraryManifestLoader : public XLib::NonCopyable
 	{
 	private:
 		struct Cursor
@@ -27,7 +27,7 @@ namespace XEngine::Gfx::ShaderLibraryBuilder
 		};
 
 	private:
-		LibraryDefinition& libraryDefinition;
+		Library& library;
 
 		XLib::JSONReader jsonReader;
 		const char* jsonPath = nullptr;
@@ -48,17 +48,15 @@ namespace XEngine::Gfx::ShaderLibraryBuilder
 		bool readPipelineLayout(XLib::StringViewASCII pipelineLayoutName, Cursor jsonPipelineLayoutNameCursor);
 		bool readShader(XLib::StringViewASCII shaderName, Cursor jsonShaderNameCursor, HAL::ShaderType shaderType);
 
-		bool readPipelineLayoutSetupProperty(HAL::ShaderCompiler::PipelineLayoutRef& resultPipelineLayout, uint64& resultPipelineLayoutNameXSH);
-
 		inline Cursor getJSONCursor() const { return Cursor { jsonReader.getLineNumer(), jsonReader.getColumnNumer() }; };
 
 	private:
-		inline LibraryDefinitionLoader(LibraryDefinition& libraryDefinition) : libraryDefinition(libraryDefinition) {}
-		~LibraryDefinitionLoader() = default;
+		inline LibraryManifestLoader(Library& library) : library(library) {}
+		~LibraryManifestLoader() = default;
 
 		bool load(const char* jsonPath);
 
 	public:
-		static bool Load(LibraryDefinition& libraryDefinition, const char* jsonPath);
+		static bool Load(Library& library, const char* jsonPath);
 	};
 }

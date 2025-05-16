@@ -28,7 +28,7 @@
 
   <PropertyGroup>
     <NMakeBuildCommandLine>
-$(SolutionDir)Build\XEngine.Gfx.ShaderLibraryBuilder_x64.Debug.exe --libdef="$(ProjectDir)$(ProjectName).libdef.json" --out="$(OutDir)$(ProjectName).xeslib" --cache="$(IntDir)cache"
+$(SolutionDir)Build\XEngine.Gfx.ShaderLibraryBuilder_x64.Debug.exe --manifest="$(ProjectDir)$(ProjectName).manifest.json" --out="$(OutDir)$(ProjectName).xeslib" --cache="$(IntDir)cache"
     </NMakeBuildCommandLine>
 
     <NMakeCleanCommandLine>
@@ -39,7 +39,7 @@ IF EXIST "$(IntDir)cache\" del /q /s "$(IntDir)cache\*.*"
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="XEngine.Render.Shaders.libdef.json" />
+    <None Include="XEngine.Render.Shaders.manifest.json" />
 
     <None Include="DeferredLighting.hlsl" />
     <None Include="FullScreenQuad.hlsl" />

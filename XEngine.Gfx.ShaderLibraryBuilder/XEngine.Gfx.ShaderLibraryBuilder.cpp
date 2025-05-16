@@ -12,8 +12,8 @@
 
 #include <XEngine.Gfx.ShaderLibraryFormat.h>
 
-#include "XEngine.Gfx.ShaderLibraryBuilder.LibraryDefinition.h"
-#include "XEngine.Gfx.ShaderLibraryBuilder.LibraryDefinitionLoader.h"
+#include "XEngine.Gfx.ShaderLibraryBuilder.Library.h"
+#include "XEngine.Gfx.ShaderLibraryBuilder.LibraryManifestLoader.h"
 #include "XEngine.Gfx.ShaderLibraryBuilder.SourceCache.h"
 #include "XEngine.Utils.CmdLineArgsParser.h"
 
@@ -26,18 +26,18 @@ using namespace XEngine::Utils;
 
 struct CmdArgs
 {
-	InplaceStringASCIIx1024 libraryDefinitionFilePath;
+	InplaceStringASCIIx1024 libraryManifestFilePath;
 	InplaceStringASCIIx1024 outLibraryFilePath;
 	InplaceStringASCIIx1024 buildCacheDirPath;
 };
 
 static bool ParseCmdArgs(CmdArgs& resultCmdArgs)
 {
-	static constexpr StringViewASCII LibraryDefinitionFilePathArgKey = StringViewASCII::FromCStr("--libdef");
+	static constexpr StringViewASCII LibraryManifestFilePathArgKey = StringViewASCII::FromCStr("--manifest");
 	static constexpr StringViewASCII OutLibraryFilePathArgKey = StringViewASCII::FromCStr("--out");
 	static constexpr StringViewASCII BuildCacheDirPathArgKey = StringViewASCII::FromCStr("--cache");
 
-	StringViewASCII libraryDefinitionFilePathArgValue;
+	StringViewASCII libraryManifestFilePathArgValue;
 	StringViewASCII outLibraryFilePathArgValue;
 	StringViewASCII buildCacheDirPathArgValue;
 
@@ -59,8 +59,8 @@ static bool ParseCmdArgs(CmdArgs& resultCmdArgs)
 		bool invalidArg = false;
 		if (parser.getCurrentArgType() == CmdLineArgType::KeyValuePair)
 		{
-			if (parser.getCurrentArgKey() == LibraryDefinitionFilePathArgKey)
-				libraryDefinitionFilePathArgValue = parser.getCurrentArgValue();
+			if (parser.getCurrentArgKey() == LibraryManifestFilePathArgKey)
+				libraryManifestFilePathArgValue = parser.getCurrentArgValue();
 			else if (parser.getCurrentArgKey() == OutLibraryFilePathArgKey)
 				outLibraryFilePathArgValue = parser.getCurrentArgValue();
 			else if (parser.getCurrentArgKey() == BuildCacheDirPathArgKey)
@@ -83,9 +83,9 @@ static bool ParseCmdArgs(CmdArgs& resultCmdArgs)
 
 	// TODO: Check that all pathes are valid.
 
-	if (libraryDefinitionFilePathArgValue.isEmpty())
+	if (libraryManifestFilePathArgValue.isEmpty())
 	{
-		FmtPrintStdOut("error: missing library definition file path. Use '", LibraryDefinitionFilePathArgKey, "=XXX'\n");
+		FmtPrintStdOut("error: missing library manifest file path. Use '", LibraryManifestFilePathArgKey, "=XXX'\n");
 		return false;
 	}
 	if (outLibraryFilePathArgValue.isEmpty())
@@ -98,14 +98,14 @@ static bool ParseCmdArgs(CmdArgs& resultCmdArgs)
 		FmtPrintStdOut("warning: missing build cache dir path. Use '", BuildCacheDirPathArgKey, "=XXX'. Incremental building is disabled\n");
 	}
 
-	Path::MakeAbsolute(libraryDefinitionFilePathArgValue, resultCmdArgs.libraryDefinitionFilePath);
+	Path::MakeAbsolute(libraryManifestFilePathArgValue, resultCmdArgs.libraryManifestFilePath);
 	Path::MakeAbsolute(outLibraryFilePathArgValue, resultCmdArgs.outLibraryFilePath);
 	Path::MakeAbsolute(buildCacheDirPathArgValue, resultCmdArgs.buildCacheDirPath);
 	Path::AddTrailingDirectorySeparator(resultCmdArgs.buildCacheDirPath);
 
-	if (!Path::HasFileName(resultCmdArgs.libraryDefinitionFilePath))
+	if (!Path::HasFileName(resultCmdArgs.libraryManifestFilePath))
 	{
-		FmtPrintStdOut("error: library definition file path has no filename\n");
+		FmtPrintStdOut("error: library manifest file path has no filename\n");
 		return false;
 	}
 	if (!Path::HasFileName(resultCmdArgs.outLibraryFilePath))
@@ -115,6 +115,11 @@ static bool ParseCmdArgs(CmdArgs& resultCmdArgs)
 	}
 
 	return true;
+}
+
+static void LoadBuildCache(const CmdArgs& cmdArgs, Library& library)
+{
+
 }
 
 static void StoreSingleShaderCompilationArtifactToBuildCache(const CmdArgs& cmdArgs, const Shader& shader,
@@ -149,7 +154,7 @@ static void StoreShaderCompilationArtifactsToBuildCache(const CmdArgs& cmdArgs,
 		StoreSingleShaderCompilationArtifactToBuildCache(cmdArgs, shader, *preprocBlob, ".preproc.hlsl");
 }
 
-static bool StoreShaderLibrary(const CmdArgs& cmdArgs, const LibraryDefinition& libraryDefinition)
+static bool StoreShaderLibrary(const CmdArgs& cmdArgs, const Library& library)
 {
 	FmtPrintStdOut("Storing shader library '", cmdArgs.outLibraryFilePath, "'\n");
 
@@ -159,9 +164,9 @@ static bool StoreShaderLibrary(const CmdArgs& cmdArgs, const LibraryDefinition& 
 	ArrayList<ShaderLibraryFormat::PipelineLayoutRecord> pipelineLayoutRecords;
 	ArrayList<ShaderLibraryFormat::ShaderRecord> shaderRecords;
 
-	descriptorSetLayoutRecords.resize(libraryDefinition.descriptorSetLayouts.getSize());
-	pipelineLayoutRecords.resize(libraryDefinition.pipelineLayouts.getSize());
-	shaderRecords.resize(libraryDefinition.shaders.getSize());
+	descriptorSetLayoutRecords.resize(library.descriptorSetLayouts.getSize());
+	pipelineLayoutRecords.resize(library.pipelineLayouts.getSize());
+	shaderRecords.resize(library.shaders.getSize());
 
 	memorySet(descriptorSetLayoutRecords.getData(), 0, descriptorSetLayoutRecords.getByteSize());
 	memorySet(pipelineLayoutRecords.getData(), 0, pipelineLayoutRecords.getByteSize());
@@ -175,16 +180,16 @@ static bool StoreShaderLibrary(const CmdArgs& cmdArgs, const LibraryDefinition& 
 
 	ArrayList<BlobDataView> blobs;
 	blobs.reserve(
-		libraryDefinition.descriptorSetLayouts.getSize() +
-		libraryDefinition.pipelineLayouts.getSize() +
-		libraryDefinition.shaders.getSize());
+		library.descriptorSetLayouts.getSize() +
+		library.pipelineLayouts.getSize() +
+		library.shaders.getSize());
 
 	uint32 blobsDataSizeAccum = 0;
 
-	for (uint32 i = 0; i < libraryDefinition.descriptorSetLayouts.getSize(); i++)
+	for (uint32 i = 0; i < library.descriptorSetLayouts.getSize(); i++)
 	{
-		const uint64 nameXSH = libraryDefinition.descriptorSetLayouts[i].nameXSH;
-		const HAL::ShaderCompiler::DescriptorSetLayout& dsl = *libraryDefinition.descriptorSetLayouts[i].ref.get();
+		const uint64 nameXSH = library.descriptorSetLayouts[i].nameXSH;
+		const HAL::ShaderCompiler::DescriptorSetLayout& dsl = *library.descriptorSetLayouts[i].ref.get();
 		const uint32 blobCRC32 = CRC32::Compute(dsl.getBlobData(), dsl.getBlobSize());
 
 		ShaderLibraryFormat::DescriptorSetLayoutRecord& record = descriptorSetLayoutRecords[i];
@@ -198,10 +203,10 @@ static bool StoreShaderLibrary(const CmdArgs& cmdArgs, const LibraryDefinition& 
 		blobsDataSizeAccum += dsl.getBlobSize();
 	}
 
-	for (uint32 i = 0; i < libraryDefinition.pipelineLayouts.getSize(); i++)
+	for (uint32 i = 0; i < library.pipelineLayouts.getSize(); i++)
 	{
-		const uint64 nameXSH = libraryDefinition.pipelineLayouts[i].nameXSH;
-		const HAL::ShaderCompiler::PipelineLayout& pipelineLayout = *libraryDefinition.pipelineLayouts[i].ref.get();
+		const uint64 nameXSH = library.pipelineLayouts[i].nameXSH;
+		const HAL::ShaderCompiler::PipelineLayout& pipelineLayout = *library.pipelineLayouts[i].ref.get();
 		const uint32 blobCRC32 = CRC32::Compute(pipelineLayout.getBlobData(), pipelineLayout.getBlobSize());
 
 		ShaderLibraryFormat::PipelineLayoutRecord& record = pipelineLayoutRecords[i];
@@ -215,24 +220,25 @@ static bool StoreShaderLibrary(const CmdArgs& cmdArgs, const LibraryDefinition& 
 		blobsDataSizeAccum += pipelineLayout.getBlobSize();
 	}
 
-	for (uint32 i = 0; i < libraryDefinition.shaders.getSize(); i++)
+	for (uint32 i = 0; i < library.shaders.getSize(); i++)
 	{
-		const Shader& shader = *libraryDefinition.shaders[i].get();
+		const Shader& shader = *library.shaders[i].get();
 		const uint64 nameXSH = shader.getNameXSH();
-		const HAL::ShaderCompiler::Blob& shaderBlob = shader.getCompiledBlob();
-		const uint32 blobCRC32 = CRC32::Compute(shaderBlob.getData(), shaderBlob.getSize());
+		const HAL::ShaderCompiler::Blob* shaderBlob = shader.getCompiledBlob();
+		XAssert(shaderBlob);
+		const uint32 blobCRC32 = CRC32::Compute(shaderBlob->getData(), shaderBlob->getSize());
 
 		ShaderLibraryFormat::ShaderRecord& record = shaderRecords[i];
 		record.nameXSH0 = uint32(nameXSH);
 		record.nameXSH1 = uint32(nameXSH >> 32);
 		record.blobOffset = blobsDataSizeAccum;
-		record.blobSize = shaderBlob.getSize();
+		record.blobSize = shaderBlob->getSize();
 		record.blobCRC32 = blobCRC32;
 		record.pipelineLayoutNameXSH0 = uint32(shader.getPipelineLayoutNameXSH());
 		record.pipelineLayoutNameXSH1 = uint32(shader.getPipelineLayoutNameXSH() >> 32);
 
-		blobs.pushBack(BlobDataView{ shaderBlob.getData(), shaderBlob.getSize() });
-		blobsDataSizeAccum += shaderBlob.getSize();
+		blobs.pushBack(BlobDataView{ shaderBlob->getData(), shaderBlob->getSize() });
+		blobsDataSizeAccum += shaderBlob->getSize();
 	}
 
 	const uint32 blobsDataSize = blobsDataSizeAccum;
@@ -251,6 +257,8 @@ static bool StoreShaderLibrary(const CmdArgs& cmdArgs, const LibraryDefinition& 
 	header.shaderCount = XCheckedCastU16(shaderRecords.getSize());
 	header.blobsDataOffset = uint32(blobsDataOffset);
 	header.blobsDataSize = blobsDataSize;
+
+	FileSystem::CreateDirRecursive(Path::GetParent(cmdArgs.outLibraryFilePath.getCStr()));
 
 	File file;
 	file.open(cmdArgs.outLibraryFilePath.getCStr(), FileAccessMode::Write, FileOpenMode::Override);
@@ -278,7 +286,7 @@ static bool StoreShaderLibrary(const CmdArgs& cmdArgs, const LibraryDefinition& 
 	return true;
 }
 
-static void StoreBuildCacheIndex(const CmdArgs& cmdArgs, const LibraryDefinition& libraryDefinition)
+static void StoreBuildCacheIndex(const CmdArgs& cmdArgs, const Library& library)
 {
 	if (cmdArgs.buildCacheDirPath.isEmpty())
 		return;
@@ -308,26 +316,14 @@ static void StoreBuildCacheIndex(const CmdArgs& cmdArgs, const LibraryDefinition
 		return nullptr;
 	};
 
-	for (const ShaderRef& shader : libraryDefinition.shaders)
+	for (const ShaderRef& shader : library.shaders)
 	{
-		const uint64 shaderNameXSH = shader->getNameXSH();
-		const StringViewASCII shaderName = shader->getName();
-		const StringViewASCII shaderEntryPointName = shader->getCompilationArgs().entryPointName;
-		const char* shaderTypeStr = ShaderTypeToString(shader->getCompilationArgs().shaderType);
-
-		const uint64 pipelineLayoutNameXSH = shader->getPipelineLayoutNameXSH();
-		const StringViewASCII pipelineLayoutName = StringViewASCII::FromCStr("XXX");
-		// TODO: We should retrieve pipeline layout name from XSH reverse table.
-		// Probably we might use table local to pipeline layouts just in case.
-
-		const uint64 pipelineLayoutHash = shader->getPipelineLayout().getSourceHash();
-
 		FmtPrint(fileWriter,
-			"SH:", FmtArgHex64(shaderNameXSH, 16), '/', shaderName, '|',
-			"T:", shaderTypeStr, '|',
-			"EP:", shaderEntryPointName, '|',
-			"PL:", FmtArgHex64(pipelineLayoutNameXSH, 16), '/', pipelineLayoutName, '|',
-			"PLHASH:", FmtArgHex64(pipelineLayoutHash, 16), '\n');
+			"SH:", shader->getName(), '#', FmtArgHex64(shader->getNameXSH(), 16), '/',
+			"T:", ShaderTypeToString(shader->getCompilationArgs().shaderType), '/',
+			"PL:", shader->getPipelineLayoutName(), '#', FmtArgHex64(shader->getPipelineLayoutNameXSH(), 16), '/',
+			"PLHASH:", FmtArgHex64(shader->getPipelineLayout().getSourceHash(), 16), '/',
+			"EP:", shader->getCompilationArgs().entryPointName, '\n');
 	}
 
 	fileWriter.close();
@@ -347,27 +343,41 @@ int main()
 	if (!ParseCmdArgs(cmdArgs))
 		return 1;
 
-	FileSystem::CreateDirRecursive(Path::GetParent(cmdArgs.outLibraryFilePath.getCStr()));
-	FileSystem::CreateDirRecursive(cmdArgs.buildCacheDirPath.getCStr());
-
-	// Load library definition file.
-	LibraryDefinition libraryDefinition;
-	FmtPrintStdOut("Loading shader library definition file '", cmdArgs.libraryDefinitionFilePath, "'\n");
-	if (!LibraryDefinitionLoader::Load(libraryDefinition, cmdArgs.libraryDefinitionFilePath.getCStr()))
+	// Load library manifest file.
+	Library library;
+	FmtPrintStdOut("Loading shader library manifest file '", cmdArgs.libraryManifestFilePath, "'\n");
+	if (!LibraryManifestLoader::Load(library, cmdArgs.libraryManifestFilePath.getCStr()))
 		return 1;
 
-	// Sort pipelines by actual name, so log looks nice :sparkles:
-	ArrayList<Shader*> shadersToCompile;
+	if (!library.shaders.getSize())
 	{
-		shadersToCompile.reserve(libraryDefinition.shaders.getSize());
-		for (const ShaderRef& shader : libraryDefinition.shaders)
-			shadersToCompile.pushBack(shader.get());
-
-		QuickSort<Shader*>(shadersToCompile, shadersToCompile.getSize(),
-			[](const Shader* left, const Shader* right) -> bool { return String::IsLess(left->getName(), right->getName()); });
+		FmtPrintStdOut("No shaders declared in library manifest file. No shader library produced\n");
+		return 1;
 	}
 
-	InplaceStringASCIIx1024 librarySourceRootPath = Path::GetParent(cmdArgs.libraryDefinitionFilePath);
+	LoadBuildCache(cmdArgs, library);
+
+	// Gather shaders that were not loaded from build cache and need to be compiled.
+	ArrayList<Shader*> shadersToCompile;
+	for (const ShaderRef& shader : library.shaders)
+	{
+		if (!shader->getCompiledBlob())
+			shadersToCompile.pushBack(shader.get());
+	}
+
+#if 0
+	if (!shadersToCompile.getSize())
+	{
+		// All shaders are loaded from build cache.
+		// Check if we need to re-link shader library file.
+	}
+#endif
+
+	// Sort shaders by name to make the log look nice :sparkles:
+	QuickSort<Shader*>(shadersToCompile, shadersToCompile.getSize(),
+		[](const Shader* left, const Shader* right) -> bool { return String::IsLess(left->getName(), right->getName()); });
+
+	InplaceStringASCIIx1024 librarySourceRootPath = Path::GetParent(cmdArgs.libraryManifestFilePath);
 	XAssert(Path::HasTrailingDirectorySeparator(librarySourceRootPath));
 
 	SourceCache sourceCache;
@@ -411,10 +421,10 @@ int main()
 		shader.setCompiledBlob(compilationResult->getBytecodeBlob());
 	}
 
-	if (!StoreShaderLibrary(cmdArgs, libraryDefinition))
+	if (!StoreShaderLibrary(cmdArgs, library))
 		return 1;
 
-	StoreBuildCacheIndex(cmdArgs, libraryDefinition);
+	StoreBuildCacheIndex(cmdArgs, library);
 
 	FmtPrintStdOut("Shader library build succeeded\n");
 
