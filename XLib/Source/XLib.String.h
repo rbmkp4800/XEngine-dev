@@ -9,6 +9,7 @@
 // TODO: Profile cost of always supporting zero terminator. Probably we may put it only when calling `getCStr`/`getData` methods.
 // TODO: String container types should be in XLib.Containers.*** but we also have non-container utils here... Also StringView is certainly not a container. Decide what to do.
 //		We may split this file into XLib.Strings.h and XLib.Containers.String.h
+// TODO: For DynamicString move capacity and length counters to heap buffer. DynamicString object should contain just a single pointer.
 
 namespace XLib
 {

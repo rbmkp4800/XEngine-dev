@@ -9,8 +9,8 @@
 
 namespace XEngine::Gfx::HAL::ShaderCompiler { class PipelineLayout; }
 
-namespace XEngine::Gfx::HAL::ShaderCompiler::ExtPreproc
+namespace XEngine::Gfx::HAL::ShaderCompiler::ShaderRewriter
 {
-	bool Preprocess(XLib::StringViewASCII source, XLib::StringViewASCII mainSourceFilename,
-		const PipelineLayout& pipelineLayout, XLib::DynamicStringASCII& patchedSource, XLib::VirtualStringRefASCII output);
+	bool Rewrite(XLib::StringViewASCII source, XLib::StringViewASCII mainSourceFilename,
+		const PipelineLayout& pipelineLayout, XLib::DynamicStringASCII& rewrittenSource, XLib::VirtualStringRefASCII output);
 }

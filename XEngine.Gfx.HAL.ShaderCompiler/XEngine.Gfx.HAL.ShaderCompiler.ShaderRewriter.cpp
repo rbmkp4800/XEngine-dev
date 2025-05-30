@@ -2,14 +2,14 @@
 
 #include "XEngine.Gfx.HAL.ShaderCompiler.h"
 
-#include "XEngine.Gfx.HAL.ShaderCompiler.ExtPreproc.h"
+#include "XEngine.Gfx.HAL.ShaderCompiler.ShaderRewriter.h"
 
 using namespace XLib;
 using namespace XEngine::Gfx::HAL;
 using namespace XEngine::Gfx::HAL::ShaderCompiler;
-using namespace XEngine::Gfx::HAL::ShaderCompiler::ExtPreproc;
+using namespace XEngine::Gfx::HAL::ShaderCompiler::ShaderRewriter;
 
-namespace XEngine::Gfx::HAL::ShaderCompiler::ExtPreproc
+namespace XEngine::Gfx::HAL::ShaderCompiler::ShaderRewriter
 {
 	enum class LexemeType : uint8
 	{
@@ -123,7 +123,7 @@ namespace XEngine::Gfx::HAL::ShaderCompiler::ExtPreproc
 		{
 			FmtPrint(outputWriter,
 				sourceLocation.filename, ':', sourceLocation.lineNumber, ':', sourceLocation.columnNumber,
-				": XE ext shader preprocessor: error: ", fmtArgs ..., '\n');
+				": XE shader patcher: error: ", fmtArgs ..., '\n');
 		}
 	};
 
@@ -893,7 +893,7 @@ static bool ExtractBindingInfo(const PipelineLayout& pipelineLayout,
 	return true;
 }
 
-bool ExtPreproc::Preprocess(StringViewASCII source, StringViewASCII mainSourceFilename,
+bool ShaderRewriter::Rewrite(StringViewASCII source, StringViewASCII mainSourceFilename,
 	const PipelineLayout& pipelineLayout, DynamicStringASCII& patchedSource, VirtualStringRefASCII output)
 {
 	Lexer lexer(source, mainSourceFilename);

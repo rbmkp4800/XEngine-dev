@@ -64,12 +64,12 @@ xcopy /y $(SolutionDir)Externals\Microsoft.Direct3D.DXC\bin\$(Platform)\*.pdb $(
 
   <ItemGroup>
     <ClInclude Include="XEngine.Gfx.HAL.ShaderCompiler.h" />
-    <ClInclude Include="XEngine.Gfx.HAL.ShaderCompiler.ExtPreproc.h" />
+    <ClInclude Include="XEngine.Gfx.HAL.ShaderCompiler.ShaderRewriter.h" />
   </ItemGroup>
 
   <ItemGroup>
     <ClCompile Include="XEngine.Gfx.HAL.ShaderCompiler.cpp" />
-    <ClCompile Include="XEngine.Gfx.HAL.ShaderCompiler.ExtPreproc.cpp" />
+    <ClCompile Include="XEngine.Gfx.HAL.ShaderCompiler.ShaderRewriter.cpp" />
   </ItemGroup>
 
   <ItemGroup>

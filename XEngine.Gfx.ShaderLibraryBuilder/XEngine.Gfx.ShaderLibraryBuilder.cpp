@@ -329,10 +329,10 @@ static void StoreBuildCacheIndex(const CmdArgs& cmdArgs, const Library& library)
 	fileWriter.close();
 }
 
-static HAL::ShaderCompiler::SourceResolutionResult ResolveSource(void* context, StringViewASCII sourceFilename)
+static HAL::ShaderCompiler::IncludeResolutionResult ResolveInclude(void* context, StringViewASCII sourceFilename)
 {
 	SourceCache& sourceCache = *(SourceCache*)context;
-	HAL::ShaderCompiler::SourceResolutionResult result = {};
+	HAL::ShaderCompiler::IncludeResolutionResult result = {};
 	result.resolved = sourceCache.resolve(sourceFilename, result.text);
 	return result;
 }
@@ -377,8 +377,8 @@ int main()
 	QuickSort<Shader*>(shadersToCompile, shadersToCompile.getSize(),
 		[](const Shader* left, const Shader* right) -> bool { return String::IsLess(left->getName(), right->getName()); });
 
-	InplaceStringASCIIx1024 librarySourceRootPath = Path::GetParent(cmdArgs.libraryManifestFilePath);
-	XAssert(Path::HasTrailingDirectorySeparator(librarySourceRootPath));
+	const StringViewASCII libraryRootPath = Path::GetParent(cmdArgs.libraryManifestFilePath);
+	XAssert(Path::HasTrailingDirectorySeparator(libraryRootPath));
 
 	SourceCache sourceCache;
 
@@ -392,26 +392,31 @@ int main()
 		FmtPrintStdOut(messageHeader, "\n");
 
 		InplaceStringASCIIx1024 mainSourceFilePath;
-		mainSourceFilePath.append(librarySourceRootPath);
+		mainSourceFilePath.append(libraryRootPath);
 		mainSourceFilePath.append(shader.getMainSourceFilename());
-		// TODO: At this point `mainSourceFilePath` should be normalized (and it is not guaranteed to be normalized right now).
-		// We either need to do normalization here or we guarantee that shader `mainSourceFilename` is relative and does not
-		// point upward.
+
+		StringViewASCII mainSourceFileText;
+		if (!sourceCache.resolve(mainSourceFilePath, mainSourceFileText))
+		{
+			InplaceStringASCIIx1024 errorMessage;
+			FmtPrintStr(errorMessage, "error: cannot open file: ", mainSourceFilePath, "'");
+			return 1;
+		}
 
 		HAL::ShaderCompiler::ShaderCompilationResultRef compilationResult =
-			HAL::ShaderCompiler::CompileShader(
-				mainSourceFilePath, shader.getCompilationArgs(), shader.getPipelineLayout(),
-				&ResolveSource, &sourceCache);
+			HAL::ShaderCompiler::CompileShader(mainSourceFilePath, mainSourceFileText,
+				shader.getCompilationArgs(), shader.getPipelineLayout(),
+				&ResolveInclude, &sourceCache);
 
 		const bool compilationFailed = compilationResult->getStatus() != HAL::ShaderCompiler::ShaderCompilationStatus::Success;
 
 		if (compilationFailed)
 			FmtPrintStdOut(messageHeader, ": compilation failed\n");
 
-		if (compilationResult->getPreprocessingOuput().getLength() > 0)
-			FmtPrintStdOut(compilationResult->getPreprocessingOuput(), "\n");
-		if (compilationResult->getCompilationOutput().getLength() > 0)
-			FmtPrintStdOut(compilationResult->getCompilationOutput(), "\n");
+		if (compilationResult->getPreprocessorStdOut().getLength() > 0)
+			FmtPrintStdOut(compilationResult->getPreprocessorStdOut(), "\n");
+		if (compilationResult->getCompilerStdOut().getLength() > 0)
+			FmtPrintStdOut(compilationResult->getCompilerStdOut(), "\n");
 
 		StoreShaderCompilationArtifactsToBuildCache(cmdArgs, shader, *compilationResult);
 

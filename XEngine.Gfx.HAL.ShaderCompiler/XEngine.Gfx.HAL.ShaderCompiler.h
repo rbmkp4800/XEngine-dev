@@ -12,6 +12,7 @@
 // TODO: Pipeline bindings shader visibility.
 // TODO: `getSourceHash` -> `getHash`.
 // TODO: Remove `D3D12SerializeVersionedRootSignature` and all D3D12Core references.
+// TODO: Pass include directories list as an argument to `CompileShader()`.
 
 namespace XEngine::Gfx::HAL::ShaderCompiler
 {
@@ -174,8 +175,9 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 	class ShaderCompilationResult : public XLib::RefCounted
 	{
 	private:
-		XLib::StringViewASCII preprocessingOuputStr;
-		XLib::StringViewASCII compilationOutputStr;
+		XLib::StringViewASCII preprocessorStdOut;
+		XLib::StringViewASCII compilerStdOut;
+
 		XLib::StringViewASCII d3dShaderHashStr;
 
 		BlobRef preprocessedSourceBlob;
@@ -192,8 +194,9 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 	public:
 		inline ShaderCompilationStatus getStatus() const { return status; }
 
-		inline XLib::StringViewASCII getPreprocessingOuput() const { return preprocessingOuputStr; }
-		inline XLib::StringViewASCII getCompilationOutput() const { return compilationOutputStr; }
+		inline XLib::StringViewASCII getPreprocessorStdOut() const { return preprocessorStdOut; }
+		inline XLib::StringViewASCII getCompilerStdOut() const { return compilerStdOut; }
+
 		inline XLib::StringViewASCII getD3DShaderHash() const { return d3dShaderHashStr; }
 
 		inline const Blob* getPreprocessedSourceBlob() const { return preprocessedSourceBlob.get(); }
@@ -208,8 +211,8 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 		{
 			ShaderCompilationStatus status;
 
-			XLib::StringViewASCII preprocessingOuputStr;
-			XLib::StringViewASCII compilationOutputStr;
+			XLib::StringViewASCII preprocessorStdOut;
+			XLib::StringViewASCII compilerStdOut;
 
 			const Blob* preprocessedSourceBlob;
 			const Blob* bytecodeBlob;
@@ -220,19 +223,20 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 		static ShaderCompilationResultRef Compose(const ComposerSource& source);
 	};
 
-	struct SourceResolutionResult
+	struct IncludeResolutionResult
 	{
 		XLib::StringViewASCII text;
 		bool resolved;
 	};
 
-	using SourceResolverFunc = SourceResolutionResult(*)(void* context, XLib::StringViewASCII sourceFilename);
+	using IncludeResolverFunc = IncludeResolutionResult(*)(void* context, XLib::StringViewASCII includeFilePath);
 
 	bool ValidateDescriptorSetBindingName(XLib::StringViewASCII name);
 	bool ValidatePipelineBindingName(XLib::StringViewASCII name);
 	bool ValidateShaderEntryPointName(XLib::StringViewASCII name);
 
-	ShaderCompilationResultRef CompileShader(XLib::StringViewASCII mainSourceFilename,
+	ShaderCompilationResultRef CompileShader(
+		XLib::StringViewASCII mainSourceFilePath, XLib::StringViewASCII mainSourceFileText,
 		const ShaderCompilationArgs& args, const PipelineLayout& pipelineLayout,
-		SourceResolverFunc sourceResolverFunc, void* sourceResolverContext = nullptr);
+		IncludeResolverFunc includeResolverFunc, void* includeResolverContext = nullptr);
 }
