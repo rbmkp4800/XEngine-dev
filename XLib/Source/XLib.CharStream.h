@@ -5,6 +5,8 @@
 #include "XLib.String.h"
 #include "XLib.System.File.h"
 
+// TODO: Do we need to ignore '\0' in `CharStreamWriter::put(char c)` ?
+
 namespace XLib
 {
 	// CharStreamReader:
@@ -253,9 +255,6 @@ inline void XLib::MemoryCharStreamWriter::put(char c)
 
 inline void XLib::FileCharStreamWriter::put(char c)
 {
-	if (!c)
-		return;
-
 	buffer[bufferOffset] = c;
 	bufferOffset++;
 	if (bufferOffset == bufferSize)
@@ -264,12 +263,10 @@ inline void XLib::FileCharStreamWriter::put(char c)
 
 inline void XLib::VirtualStringWriter::put(char c)
 {
-	if (!c)
-		return;
-
 	const uint32 requiredBufferSize = bufferOffset + 2;
 	if (bufferSize < requiredBufferSize)
 	{
+		XAssert(maxBufferSize > 1); // Effectively checks if object is initialized.
 		if (bufferSize == maxBufferSize)
 			return;
 		growBufferExponentially(requiredBufferSize);

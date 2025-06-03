@@ -226,7 +226,7 @@ namespace XEngine::Gfx::HAL::ShaderCompiler
 	struct IncludeResolutionResult
 	{
 		XLib::StringViewASCII text;
-		bool resolved;
+		bool status;
 	};
 
 	using IncludeResolverFunc = IncludeResolutionResult(*)(void* context, XLib::StringViewASCII includeFilePath);

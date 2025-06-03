@@ -19,7 +19,7 @@ namespace XEngine::Gfx::ShaderLibraryBuilder
 		XLib::StringViewASCII pipelineLayoutName;
 		uint64 pipelineLayoutNameXSH = 0;
 
-		XLib::StringViewASCII mainSourceFilename;
+		XLib::StringViewASCII mainSourceFilePath;
 		HAL::ShaderCompiler::ShaderCompilationArgs compilationArgs = {};
 		HAL::ShaderCompiler::BlobRef compiledBlob = nullptr;
 
@@ -35,7 +35,7 @@ namespace XEngine::Gfx::ShaderLibraryBuilder
 		inline const XLib::StringViewASCII getPipelineLayoutName() const { return pipelineLayoutName; }
 		inline uint64 getPipelineLayoutNameXSH() const { return pipelineLayoutNameXSH; }
 
-		inline XLib::StringViewASCII getMainSourceFilename() const { return mainSourceFilename; }
+		inline XLib::StringViewASCII getMainSourceFilePath() const { return mainSourceFilePath; }
 		inline const HAL::ShaderCompiler::ShaderCompilationArgs& getCompilationArgs() const { return compilationArgs; }
 
 		inline void setCompiledBlob(const HAL::ShaderCompiler::Blob* blob) { compiledBlob = (HAL::ShaderCompiler::Blob*)blob; }
@@ -44,6 +44,6 @@ namespace XEngine::Gfx::ShaderLibraryBuilder
 	public:
 		static ShaderRef Create(XLib::StringViewASCII name, uint64 nameXSH,
 			HAL::ShaderCompiler::PipelineLayout* pipelineLayout, XLib::StringViewASCII pipelineLayoutName, uint64 pipelineLayoutNameXSH,
-			XLib::StringViewASCII mainSourceFilename, const HAL::ShaderCompiler::ShaderCompilationArgs& compilationArgs);
+			XLib::StringViewASCII mainSourceFilePath, const HAL::ShaderCompiler::ShaderCompilationArgs& compilationArgs);
 	};
 }

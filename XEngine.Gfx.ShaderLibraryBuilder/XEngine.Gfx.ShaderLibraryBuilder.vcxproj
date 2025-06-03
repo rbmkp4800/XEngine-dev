@@ -35,18 +35,20 @@
   </ItemDefinitionGroup>
 
   <ItemGroup>
+    <ClInclude Include="XEngine.Gfx.ShaderLibraryBuilder.BuildCacheIndex.h" />
     <ClInclude Include="XEngine.Gfx.ShaderLibraryBuilder.Library.h" />
     <ClInclude Include="XEngine.Gfx.ShaderLibraryBuilder.LibraryManifestLoader.h" />
     <ClInclude Include="XEngine.Gfx.ShaderLibraryBuilder.Shader.h" />
-    <ClInclude Include="XEngine.Gfx.ShaderLibraryBuilder.SourceCache.h" />
+    <ClInclude Include="XEngine.Gfx.ShaderLibraryBuilder.SourceFileCache.h" />
     <ClInclude Include="XEngine.Utils.CmdLineArgsParser.h" />
   </ItemGroup>
 
   <ItemGroup>
+    <ClCompile Include="XEngine.Gfx.ShaderLibraryBuilder.BuildCacheIndex.cpp" />
     <ClCompile Include="XEngine.Gfx.ShaderLibraryBuilder.cpp" />
     <ClCompile Include="XEngine.Gfx.ShaderLibraryBuilder.LibraryManifestLoader.cpp" />
     <ClCompile Include="XEngine.Gfx.ShaderLibraryBuilder.Shader.cpp" />
-    <ClCompile Include="XEngine.Gfx.ShaderLibraryBuilder.SourceCache.cpp" />
+    <ClCompile Include="XEngine.Gfx.ShaderLibraryBuilder.SourceFileCache.cpp" />
     <ClCompile Include="XEngine.Utils.CmdLineArgsParser.cpp" />
   </ItemGroup>
 

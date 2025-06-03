@@ -10,6 +10,7 @@
 // TODO: String container types should be in XLib.Containers.*** but we also have non-container utils here... Also StringView is certainly not a container. Decide what to do.
 //		We may split this file into XLib.Strings.h and XLib.Containers.String.h
 // TODO: For DynamicString move capacity and length counters to heap buffer. DynamicString object should contain just a single pointer.
+// TODO: ??? Probably remove `startsWith`, `endsWith` from string classes. There should be only `String::StartsWith` and `String::EndsWith`.
 
 namespace XLib
 {
@@ -96,6 +97,8 @@ namespace XLib
 
 		inline uint32 getMaxLength() const { return ((VirtualStringInterface<CharType>*)this)->getMaxLength(); }
 		inline void growBufferToFitLength(uint32 minRequiredLength) const { ((VirtualStringInterface<CharType>*)this)->growBufferToFitLength(minRequiredLength); }
+
+		inline bool isValid() const { return vtable && stringPtr; }
 	};
 
 	template <typename CharType>
@@ -534,6 +537,11 @@ template <typename CharType, typename AllocatorType>
 inline auto XLib::DynamicString<CharType, AllocatorType>::operator = (const CharType* thatCStr) -> DynamicString&
 {
 	const uint32 thatLength = XCheckedCastU32(String::GetCStrLength(thatCStr));
+	if (!thatLength)
+	{
+		clear();
+		return *this;
+	}
 
 	const uint32 requiredBufferSize = thatLength + 1;
 	if (bufferSize < requiredBufferSize)

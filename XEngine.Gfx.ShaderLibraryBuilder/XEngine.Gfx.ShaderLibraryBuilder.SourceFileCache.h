@@ -4,20 +4,23 @@
 #include <XLib.Containers.BinaryTree.h>
 #include <XLib.NonCopyable.h>
 #include <XLib.String.h>
-#include <XLib.Time.h>
 
 namespace XEngine::Gfx::ShaderLibraryBuilder
 {
-	class SourceCache : public XLib::NonCopyable
+	enum class SourceFileHandle : uint64 {};
+
+	class SourceFileCache : public XLib::NonCopyable
 	{
 	private:
+		enum class EntryTextState : uint8;
+
 		struct Entry
 		{
 			XLib::IntrusiveBinaryTreeNodeHook searchTreeHook;
 			XLib::DynamicStringASCII text;
 			XLib::StringViewASCII path; // Zero terminated. Stored after `Entry` itself.
-			//XLib::TimePoint writeTime;
-			bool textWasReadSuccessfully = false;
+			uint64 modTime;
+			EntryTextState textState = EntryTextState(0);
 		};
 
 		struct EntriesSearchTreeComparator abstract final
@@ -32,9 +35,12 @@ namespace XEngine::Gfx::ShaderLibraryBuilder
 		EntrySearchTree entrySearchTree;
 
 	public:
-		SourceCache() = default;
-		~SourceCache() = default;
+		SourceFileCache() = default;
+		~SourceFileCache() = default;
 
-		bool resolve(XLib::StringViewASCII path, XLib::StringViewASCII& resultText);
+		SourceFileHandle openFile(XLib::StringViewASCII path);
+
+		bool getFileText(SourceFileHandle fileHandle, XLib::StringViewASCII& resultText);
+		uint64 getFileModTime(SourceFileHandle fileHandle) const;
 	};
 }

@@ -962,7 +962,7 @@ ShaderCompilationResultRef ShaderCompiler::CompileShader(
 					filename.append(char(pFilename[i]));
 
 				IncludeResolutionResult resolutionResult = includeResolverFunc(includeResolverContext, filename);
-				if (!resolutionResult.resolved)
+				if (!resolutionResult.status)
 				{
 					*ppIncludeSource = nullptr;
 					return E_FAIL;

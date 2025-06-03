@@ -1,11 +1,21 @@
 #include <XLib.FileSystem.h>
+#include <XLib.Fmt.h>
 #include <XLib.Path.h>
 #include <XLib.System.File.h>
 
-#include "XEngine.Gfx.ShaderLibraryBuilder.SourceCache.h"
+#include "XEngine.Gfx.ShaderLibraryBuilder.SourceFileCache.h"
 
 using namespace XLib;
 using namespace XEngine::Gfx::ShaderLibraryBuilder;
+
+XTODO("Implement proper SourceFileHandle. For now it is just pointer to binary tree node");
+
+enum class SourceFileCache::EntryTextState : uint8
+{
+	NotLoaded = 0,
+	Loaded,
+	LoadingFailed,
+};
 
 static inline ordering CompareStringsOrderedCaseInsensitive(const StringViewASCII& left, const StringViewASCII& right)
 {
@@ -30,6 +40,8 @@ static inline ordering CompareStringsOrderedCaseInsensitive(const StringViewASCI
 
 static bool ReadTextFile(const char* path, DynamicStringASCII& resultText)
 {
+	resultText = {};
+
 	File file;
 	if (!file.open(path, FileAccessMode::Read, FileOpenMode::OpenExisting))
 		return false;
@@ -41,7 +53,6 @@ static bool ReadTextFile(const char* path, DynamicStringASCII& resultText)
 	text.setLength(fileSize);
 
 	const bool readResult = file.read(text.getData(), fileSize);
-
 	file.close();
 
 	if (!readResult)
@@ -51,53 +62,31 @@ static bool ReadTextFile(const char* path, DynamicStringASCII& resultText)
 	return true;
 }
 
-inline ordering SourceCache::EntriesSearchTreeComparator::Compare(const Entry& left, const Entry& right)
+inline ordering SourceFileCache::EntriesSearchTreeComparator::Compare(const Entry& left, const Entry& right)
 {
 	return CompareStringsOrderedCaseInsensitive(left.path, right.path);
 }
 
-inline ordering SourceCache::EntriesSearchTreeComparator::Compare(const Entry& left, const StringViewASCII& right)
+inline ordering SourceFileCache::EntriesSearchTreeComparator::Compare(const Entry& left, const StringViewASCII& right)
 {
 	return CompareStringsOrderedCaseInsensitive(left.path, right);
 }
 
-bool SourceCache::resolve(StringViewASCII path, StringViewASCII& resultText)
+SourceFileHandle SourceFileCache::openFile(StringViewASCII path)
 {
-	resultText = {};
-
-	// TODO: Proper path validation and normalization.
-
-	//if (!Path::IsValid(localPath)))
-	//	return false;
-	//if (!Path::IsRelative(localPath))
-	//	return false;
-	//if (!Path::HasFileName(localPath))
-	//	return false;
-
 	InplaceStringASCIIx1024 normalizedPath;
 	Path::MakeAbsolute(path, normalizedPath);
-	Path::Normalize(normalizedPath);
+
+	// TODO: Do propper uppercasing.
+	for (uint16 i = 0; i < normalizedPath.getLength(); i++)
+		normalizedPath[i] = Char::ToUpper(normalizedPath[i]);
 
 	if (Entry* existingEntry = entrySearchTree.find(normalizedPath.getView()))
-	{
-		if (existingEntry->textWasReadSuccessfully)
-			resultText = existingEntry->text;
-		return existingEntry->textWasReadSuccessfully;
-	}
+		return SourceFileHandle(uint64(existingEntry));
 
-	/*InplaceStringASCIIx1024 fullPath;
-	// TODO: Replace this shit with proper `Path::Combine`
-	fullPath.append(rootPath);
-	if (!fullPath.isEmpty())
-		fullPath.append('/');
-	fullPath.append(normalizedLocalPath);
-	XAssert(!fullPath.isFull());*/
-
-	DynamicStringASCII text;
-	const bool readTextResult = ReadTextFile(normalizedPath.getCStr(), text);
-
-	//if (!readTextResult)
-	//	TextWriteFmtStdOut("Cannot open file '", fullPath, "'\n");
+	const FileSystemOpResult<TimePoint> getModTimeResult = FileSystem::GetFileModificationTime(normalizedPath.getCStr());
+	if (getModTimeResult.status != FileSystemOpStatus::Success)
+		return SourceFileHandle(0);
 
 	const uintptr memoryBlockSize = sizeof(Entry) + normalizedPath.getLength() + 1;
 	void* memoryBlock = SystemHeapAllocator::Allocate(memoryBlockSize);
@@ -107,11 +96,34 @@ bool SourceCache::resolve(StringViewASCII path, StringViewASCII& resultText)
 
 	Entry& newEntry = *(Entry*)memoryBlock;
 	construct(newEntry);
-	newEntry.text = AsRValue(text);
 	newEntry.path = StringViewASCII((char*)memoryBlock + sizeof(Entry), normalizedPath.getLength());
-	newEntry.textWasReadSuccessfully = readTextResult;
+	newEntry.modTime = getModTimeResult.value;
+	newEntry.textState = EntryTextState::NotLoaded;
+
 	entrySearchTree.insert(newEntry);
 
-	resultText = newEntry.text;
-	return readTextResult;
+	return SourceFileHandle(uint64(memoryBlock));
+}
+
+bool SourceFileCache::getFileText(SourceFileHandle fileHandle, XLib::StringViewASCII& resultText)
+{
+	Entry* entry = (Entry*)uint64(fileHandle);
+
+	if (entry->textState == EntryTextState::NotLoaded)
+	{
+		const bool readTextResult = ReadTextFile(entry->path.getData(), entry->text);
+		if (!readTextResult)
+			FmtPrintStdOut("error: failed to read contents of a file '", entry->path, "' (but the file seems to exist)\n");	
+
+		entry->textState = readTextResult ? EntryTextState::Loaded : EntryTextState::LoadingFailed;
+	}
+
+	resultText = entry->text;
+	return entry->textState == EntryTextState::Loaded;
+}
+
+uint64 SourceFileCache::getFileModTime(SourceFileHandle fileHandle) const
+{
+	Entry* entry = (Entry*)uint64(fileHandle);
+	return entry->modTime;
 }

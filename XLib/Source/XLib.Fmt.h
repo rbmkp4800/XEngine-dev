@@ -114,7 +114,7 @@ namespace XLib
 	//void FmtGetDecU32();
 	//void FmtGetDecFP32();
 	//void FmtGetDecFP64();
-	//void FmtGetLine();
+	template <typename CharStreamReader> inline void FmtGetLine(CharStreamReader& reader, VirtualStringRefASCII resultString);
 	template <typename CharStreamReader> inline void FmtSkipToNewLine(CharStreamReader& reader);
 	template <typename CharStreamReader> inline void FmtSkipWhitespaces(CharStreamReader& reader);
 

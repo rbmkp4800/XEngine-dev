@@ -1,4 +1,5 @@
 #include <XLib.Fmt.h>
+#include <XLib.Path.h>
 #include <XLib.String.h>
 #include <XLib.System.File.h>
 
@@ -96,8 +97,8 @@ static bool ValidateShaderSourcePath(StringViewASCII path)
 {
 	if (path.isEmpty())
 		return false;
-	//if (!Path::HasFileName(path))
-	//	return false;
+	if (!Path::HasFileName(path))
+		return false;
 
 	// TODO: Add some actual validation here.
 
@@ -573,15 +574,14 @@ bool LibraryManifestLoader::load(const char* jsonPath)
 
 	this->jsonPath = jsonPath;
 
-	DynamicStringASCII text;
-
 	// Read text from file.
+	DynamicStringASCII text;
 	{
 		File file;
 		file.open(jsonPath, FileAccessMode::Read, FileOpenMode::OpenExisting);
 		if (!file.isOpen())
 		{
-			FmtPrintStdOut("Cannot open library manifest file '", jsonPath, "'");
+			FmtPrintStdOut("error: cannot open library manifest file '", jsonPath, "'\n");
 			return false;
 		}
 

@@ -93,3 +93,13 @@ FileSystemOpStatus FileSystem::CreateDirRecursive(const char* pathCStr)
 
 #endif
 }
+
+FileSystemOpResult<TimePoint> FileSystem::GetFileModificationTime(const char* pathCStr)
+{
+	WIN32_FILE_ATTRIBUTE_DATA winFileAttributeData = {};
+	if (!GetFileAttributesExA(pathCStr, GetFileExInfoStandard, &winFileAttributeData))
+		return FileSystemOpResult<TimePoint> { .value = InvalidTimePoint, .status = FileSystemOpStatus::Failure };
+
+	const uint64 modificationTime = (uint64(winFileAttributeData.ftLastWriteTime.dwHighDateTime) << 32) | uint64(winFileAttributeData.ftLastWriteTime.dwLowDateTime);
+	return FileSystemOpResult<TimePoint> { .value = TimePoint(modificationTime), .status = FileSystemOpStatus::Success };
+}

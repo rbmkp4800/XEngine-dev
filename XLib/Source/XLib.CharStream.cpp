@@ -209,6 +209,9 @@ void FileCharStreamWriter::write(const char* cstr)
 	XAssert(bufferOffset < bufferSize);
 }
 
+
+// Virtual string writer ///////////////////////////////////////////////////////////////////////////
+
 void VirtualStringWriter::growBufferExponentially(uint32 minRequiredBufferSize)
 {
 	if (minRequiredBufferSize <= bufferSize)
@@ -229,6 +232,21 @@ void VirtualStringWriter::growBufferExponentially(uint32 minRequiredBufferSize)
 	XAssert(bufferSize >= newBufferSize);
 }
 
+void VirtualStringWriter::open(VirtualStringRefASCII virtualStringRef)
+{
+	this->virtualStringRef = virtualStringRef;
+	buffer = virtualStringRef.getBuffer();
+	bufferSize = virtualStringRef.getBufferSize();
+	bufferOffset = virtualStringRef.getLength();
+	maxBufferSize = virtualStringRef.getMaxBufferSize();
+	XAssert(maxBufferSize > 1);
+}
+
+void VirtualStringWriter::flush()
+{
+	virtualStringRef.setLength(bufferOffset);
+}
+
 void VirtualStringWriter::write(const char* data, uintptr length)
 {
 	const uint32 lengthU32 = XCheckedCastU32(length);
@@ -237,6 +255,8 @@ void VirtualStringWriter::write(const char* data, uintptr length)
 	const uint32 requiredBufferSize = bufferOffset + lengthU32 + 1;
 	if (bufferSize < requiredBufferSize)
 	{
+		XAssert(maxBufferSize > 1); // Effectively checks if object is initialized.
+
 		const bool overflow = maxBufferSize < requiredBufferSize;
 		growBufferExponentially(overflow ? maxBufferSize : requiredBufferSize);
 
@@ -253,7 +273,7 @@ void VirtualStringWriter::write(const char* data, uintptr length)
 
 void VirtualStringWriter::write(const char* cstr)
 {
-	const char *srcIt = cstr;
+	const char* srcIt = cstr;
 	char* bufferIt = buffer + bufferOffset;
 	char* bufferEnd = buffer + bufferSize - 1;
 
@@ -261,6 +281,8 @@ void VirtualStringWriter::write(const char* cstr)
 	{
 		if (bufferIt == bufferEnd)
 		{
+			XAssert(maxBufferSize > 1); // Effectively checks if object is initialized.
+
 			bufferOffset = uint32(bufferIt - buffer);
 
 			if (bufferSize == maxBufferSize)
@@ -280,23 +302,6 @@ void VirtualStringWriter::write(const char* cstr)
 	}
 
 	bufferOffset = uint32(bufferIt - buffer);
-}
-
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void VirtualStringWriter::open(VirtualStringRefASCII virtualStringRef)
-{
-	this->virtualStringRef = virtualStringRef;
-	buffer = virtualStringRef.getBuffer();
-	bufferSize = virtualStringRef.getBufferSize();
-	bufferOffset = virtualStringRef.getLength();
-	maxBufferSize = virtualStringRef.getMaxBufferSize();
-}
-
-void VirtualStringWriter::flush()
-{
-	virtualStringRef.setLength(bufferOffset);
 }
 
 

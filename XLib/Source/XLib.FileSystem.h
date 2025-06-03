@@ -54,8 +54,6 @@ namespace XLib
 		static FileSystemOpStatus CreateDirRecursive(const char* pathCStr);
 		static FileSystemOpStatus CreateDirRecursive(StringViewASCII path);
 
-		static FileSystemOpResult<TimePoint> GetFileLastWriteTime(const char* pathCStr);
+		static FileSystemOpResult<TimePoint> GetFileModificationTime(const char* pathCStr);
 	};
 }
-
-// `GetFileLastWriteTime` returns InvalidTimePoint on failure
