@@ -2,6 +2,9 @@
 
 #include "XLib.h"
 
+// This code is broken (ref to pivot breaks quicksort).
+#if 0
+
 // TODO: Cleanup this mess... I wrote this code in 2015... Add rvalue support at least...
 
 namespace XLib
@@ -89,3 +92,5 @@ void QuickSort(BufferType& buffer, uint32 elementsCount)
 }
 
 */
+
+#endif

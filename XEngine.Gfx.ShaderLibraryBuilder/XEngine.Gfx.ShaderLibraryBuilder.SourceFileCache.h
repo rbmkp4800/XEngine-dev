@@ -40,7 +40,8 @@ namespace XEngine::Gfx::ShaderLibraryBuilder
 
 		SourceFileHandle openFile(XLib::StringViewASCII path);
 
-		bool getFileText(SourceFileHandle fileHandle, XLib::StringViewASCII& resultText);
+		XLib::StringViewASCII getFilePath(SourceFileHandle fileHandle) const;
 		uint64 getFileModTime(SourceFileHandle fileHandle) const;
+		bool getFileText(SourceFileHandle fileHandle, XLib::StringViewASCII& resultText);
 	};
 }

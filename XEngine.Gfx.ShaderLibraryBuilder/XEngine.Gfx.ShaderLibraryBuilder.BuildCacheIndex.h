@@ -23,6 +23,8 @@ namespace XEngine::Gfx::ShaderLibraryBuilder
 		// All sections are aligned to 8 bytes.
 		// StringTable stores offsets pointing to locations within the StringPool.
 		// String length is not stored explicitly; it is computed as the difference between the current and next string offsets stored in StringTable.
+		//
+		// Library file path & mod time can be invalid. This means that there was no library file produced during build.
 
 		static constexpr uint32 SectionsAlignment = 8;
 
@@ -37,9 +39,9 @@ namespace XEngine::Gfx::ShaderLibraryBuilder
 			uint32 stringPoolSize;
 
 			uint32 manifestFilePathStringIndex;
-			uint32 outLibraryFilePathStringIndex;
+			uint32 libraryFilePathStringIndex;
 			uint64 manifestFileModTime;
-			uint64 outLibraryFileModTime;
+			uint64 libraryFileModTime;
 		};
 
 		struct ShaderRecord // 32 bytes
@@ -85,11 +87,11 @@ namespace XEngine::Gfx::ShaderLibraryBuilder
 		inline uint16 getShaderCount() const { return header->shaderCount; }
 		inline uint16 getSourceFileCount() const { return header->sourceFileCount; }
 
-		XLib::StringViewASCII getManifestFilePath() const { return getString(header->manifestFilePathStringIndex); }
+		inline XLib::StringViewASCII getManifestFilePath() const { return getString(header->manifestFilePathStringIndex); }
 		inline uint64 getManifestFileModTime() const { return header->manifestFileModTime; }
 
-		XLib::StringViewASCII getOutLibraryFilePath() const { return getString(header->outLibraryFilePathStringIndex); }
-		inline uint64 getOutLibraryFileModTime() const { return header->outLibraryFileModTime; }
+		inline XLib::StringViewASCII getLibraryFilePath() const { return header->libraryFilePathStringIndex == uint32(-1) ? XLib::StringViewASCII() : getString(header->libraryFilePathStringIndex); }
+		inline uint64 getLibraryFileModTime() const { return header->libraryFileModTime; }
 
 		uint16 getShaderSourceFileCount(uint16 shaderIndex) const;
 		uint16 getShaderSourceFileGlobalIndex(uint16 shaderIndex, uint16 shaderSourceFileIndex) const;
@@ -134,7 +136,8 @@ namespace XEngine::Gfx::ShaderLibraryBuilder
 			const HAL::ShaderCompiler::ShaderCompilationArgs& compilationArgs,
 			const SourceFileHandle* sourceFiles, uint16 sourceFileCount);
 
-		void buildAndStoreToFile(const char* pathCStr) const;
+		void buildAndStoreToFile(const char* pathCStr, uint32 magic, const SourceFileCache& sourceFileCache,
+			const char* manifestFilePathCStr, const char* libraryFilePathCStr);
 
 		inline void reserveShaderCount(uint32 shaderCount) { shaders.reserve(shaderCount); }
 	};

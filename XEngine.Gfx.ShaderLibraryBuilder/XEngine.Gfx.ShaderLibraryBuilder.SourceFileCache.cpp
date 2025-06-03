@@ -105,6 +105,18 @@ SourceFileHandle SourceFileCache::openFile(StringViewASCII path)
 	return SourceFileHandle(uint64(memoryBlock));
 }
 
+StringViewASCII SourceFileCache::getFilePath(SourceFileHandle fileHandle) const
+{
+	Entry* entry = (Entry*)uint64(fileHandle);
+	return entry->path;
+}
+
+uint64 SourceFileCache::getFileModTime(SourceFileHandle fileHandle) const
+{
+	Entry* entry = (Entry*)uint64(fileHandle);
+	return entry->modTime;
+}
+
 bool SourceFileCache::getFileText(SourceFileHandle fileHandle, XLib::StringViewASCII& resultText)
 {
 	Entry* entry = (Entry*)uint64(fileHandle);
@@ -120,10 +132,4 @@ bool SourceFileCache::getFileText(SourceFileHandle fileHandle, XLib::StringViewA
 
 	resultText = entry->text;
 	return entry->textState == EntryTextState::Loaded;
-}
-
-uint64 SourceFileCache::getFileModTime(SourceFileHandle fileHandle) const
-{
-	Entry* entry = (Entry*)uint64(fileHandle);
-	return entry->modTime;
 }

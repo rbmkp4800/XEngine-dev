@@ -1,5 +1,6 @@
+#include <algorithm>
+
 #include <XLib.h>
-#include <XLib.Algorithm.QuickSort.h>
 #include <XLib.CharStream.h>
 #include <XLib.Containers.ArrayList.h>
 #include <XLib.CRC.h>
@@ -17,7 +18,6 @@
 #include "XEngine.Gfx.ShaderLibraryBuilder.LibraryManifestLoader.h"
 #include "XEngine.Gfx.ShaderLibraryBuilder.SourceFileCache.h"
 #include "XEngine.Utils.CmdLineArgsParser.h"
-#include "XEngine.Utils.StringInternPool.h"
 
 using namespace XLib;
 using namespace XEngine::Gfx;
@@ -30,11 +30,11 @@ private:
 	struct CmdArgs
 	{
 		InplaceStringASCIIx1024 libraryManifestFilePath;
-		InplaceStringASCIIx1024 outLibraryFilePath;
+		InplaceStringASCIIx1024 libraryFilePath;
 		InplaceStringASCIIx1024 buildCacheDirPath;
 	};
 
-	static constexpr StringViewASCII BuildCacheIndexFileName = StringViewASCII::FromCStr("_BuildCacheIndex.txt");
+	static constexpr StringViewASCII BuildCacheIndexFileName = StringViewASCII::FromCStr("_BuildCacheIndex");
 	static constexpr uint32 BuildCacheIndexMagic = 0X50E3D6BD; // Change this number to invalidate build caches after changing the compiler.
 
 private:
@@ -47,16 +47,16 @@ private:
 	BuildCacheIndexReader buildCacheIndexReader;
 	BuildCacheIndexWriter buildCacheIndexWriter;
 
-	ArrayList<SourceFileHandle> buildCacheIndexSourceFiles;
+	ArrayList<SourceFileHandle> cachedSourceFiles;
 
 private:
 	bool parseCmdArgs();
 	void loadBuildCacheIndex();
-	bool checkShaderLibraryFullyUpToDate();
+	bool loadCachedSourceFilesAndCheckShaderLibraryFullyUpToDate();
 	void loadBuildCache();
 	bool compileShaders();
-	bool storeShaderLibrary() const;
-	void storeBuildCacheIndex() const;
+	bool storeShaderLibrary();
+	void storeBuildCacheIndex(bool libraryIsFileUpToDate);
 
 	void composeShaderCompilationArtifactFilePath(VirtualStringRefASCII result, const Shader& shader, const char* filenameSuffix) const;
 	void storeShaderCompilationArtifactToBuildCache(const Shader& shader, const HAL::ShaderCompiler::Blob& blob, const char* filenameSuffix) const;
@@ -77,11 +77,11 @@ public:
 bool Program::parseCmdArgs()
 {
 	static constexpr StringViewASCII LibraryManifestFilePathArgKey = StringViewASCII::FromCStr("--manifest");
-	static constexpr StringViewASCII OutLibraryFilePathArgKey = StringViewASCII::FromCStr("--out");
+	static constexpr StringViewASCII LibraryFilePathArgKey = StringViewASCII::FromCStr("--out");
 	static constexpr StringViewASCII BuildCacheDirPathArgKey = StringViewASCII::FromCStr("--cache");
 
 	StringViewASCII libraryManifestFilePathArgValue;
-	StringViewASCII outLibraryFilePathArgValue;
+	StringViewASCII libraryFilePathArgValue;
 	StringViewASCII buildCacheDirPathArgValue;
 
 	const char* cmdLine = Environment::GetCommandLineCStr();
@@ -104,8 +104,8 @@ bool Program::parseCmdArgs()
 		{
 			if (parser.getCurrentArgKey() == LibraryManifestFilePathArgKey)
 				libraryManifestFilePathArgValue = parser.getCurrentArgValue();
-			else if (parser.getCurrentArgKey() == OutLibraryFilePathArgKey)
-				outLibraryFilePathArgValue = parser.getCurrentArgValue();
+			else if (parser.getCurrentArgKey() == LibraryFilePathArgKey)
+				libraryFilePathArgValue = parser.getCurrentArgValue();
 			else if (parser.getCurrentArgKey() == BuildCacheDirPathArgKey)
 				buildCacheDirPathArgValue = parser.getCurrentArgValue();
 			else
@@ -131,9 +131,9 @@ bool Program::parseCmdArgs()
 		FmtPrintStdOut("error: missing library manifest file path. Use '", LibraryManifestFilePathArgKey, "=XXX'\n");
 		return false;
 	}
-	if (outLibraryFilePathArgValue.isEmpty())
+	if (libraryFilePathArgValue.isEmpty())
 	{
-		FmtPrintStdOut("error: missing output library file path. Use '", OutLibraryFilePathArgKey, "=XXX'\n");
+		FmtPrintStdOut("error: missing output library file path. Use '", LibraryFilePathArgKey, "=XXX'\n");
 		return false;
 	}
 	if (buildCacheDirPathArgValue.isEmpty())
@@ -142,12 +142,12 @@ bool Program::parseCmdArgs()
 	}
 
 	Path::MakeAbsolute(libraryManifestFilePathArgValue, cmdArgs.libraryManifestFilePath);
-	Path::MakeAbsolute(outLibraryFilePathArgValue, cmdArgs.outLibraryFilePath);
+	Path::MakeAbsolute(libraryFilePathArgValue, cmdArgs.libraryFilePath);
 	Path::MakeAbsolute(buildCacheDirPathArgValue, cmdArgs.buildCacheDirPath);
 	Path::AddTrailingDirectorySeparator(cmdArgs.buildCacheDirPath);
 
 	XAssert(!cmdArgs.libraryManifestFilePath.isFull());
-	XAssert(!cmdArgs.outLibraryFilePath.isFull());
+	XAssert(!cmdArgs.libraryFilePath.isFull());
 	XAssert(!cmdArgs.buildCacheDirPath.isFull());
 
 	if (!Path::HasFileName(cmdArgs.libraryManifestFilePath))
@@ -155,7 +155,7 @@ bool Program::parseCmdArgs()
 		FmtPrintStdOut("error: library manifest file path has no filename\n");
 		return false;
 	}
-	if (!Path::HasFileName(cmdArgs.outLibraryFilePath))
+	if (!Path::HasFileName(cmdArgs.libraryFilePath))
 	{
 		FmtPrintStdOut("error: output library file path has no filename\n");
 		return false;
@@ -178,38 +178,43 @@ void Program::loadBuildCacheIndex()
 		FmtPrintStdOut("Build cache index file did not load. Incremental build is disabled\n");
 }
 
-bool Program::checkShaderLibraryFullyUpToDate()
+bool Program::loadCachedSourceFilesAndCheckShaderLibraryFullyUpToDate()
 {
 	if (!buildCacheIndexReader.isLoaded())
 		return false;
 
 	const uint64 manifestFileModTime = FileSystem::GetFileModificationTime(cmdArgs.libraryManifestFilePath.getCStr()).value;
-	const uint64 outLibraryFileModTime = FileSystem::GetFileModificationTime(cmdArgs.outLibraryFilePath.getCStr()).value;
+	const uint64 libraryFileModTime = FileSystem::GetFileModificationTime(cmdArgs.libraryFilePath.getCStr()).value;
 
-	bool manifiestFileIsOutdated = false;
-	manifiestFileIsOutdated |= cmdArgs.libraryManifestFilePath != buildCacheIndexReader.getManifestFilePath();
-	manifiestFileIsOutdated |= manifestFileModTime != buildCacheIndexReader.getManifestFileModTime();
+	const bool manifiestFileIsOutdated =
+		cmdArgs.libraryManifestFilePath != buildCacheIndexReader.getManifestFilePath() ||
+		manifestFileModTime != buildCacheIndexReader.getManifestFileModTime();
 
-	bool outLibraryFileIsOutdated = false;
-	outLibraryFileIsOutdated |= cmdArgs.outLibraryFilePath != buildCacheIndexReader.getOutLibraryFilePath();
-	outLibraryFileIsOutdated |= outLibraryFileModTime != buildCacheIndexReader.getOutLibraryFileModTime();
+	const bool libraryFileIsOutdated =
+		buildCacheIndexReader.getLibraryFilePath().isEmpty() ||
+		cmdArgs.libraryFilePath != buildCacheIndexReader.getLibraryFilePath() ||
+		libraryFileModTime != buildCacheIndexReader.getLibraryFileModTime();
 
 	bool someSourceFilesAreOutdated = false;
-	buildCacheIndexSourceFiles.resize(buildCacheIndexReader.getSourceFileCount());
+	cachedSourceFiles.resize(buildCacheIndexReader.getSourceFileCount());
 	for (uint16 i = 0; i < buildCacheIndexReader.getSourceFileCount(); i++)
 	{
 		const SourceFileHandle sourceFile = sourceFileCache.openFile(buildCacheIndexReader.getSourceFilePath(i));
-		buildCacheIndexSourceFiles[i] = sourceFile;
+		cachedSourceFiles[i] = sourceFile;
+
+		bool fileIsOutdated = false;
 
 		if (sourceFile == SourceFileHandle(0))
-			someSourceFilesAreOutdated = true;
+			fileIsOutdated = true;
 		else if (sourceFileCache.getFileModTime(sourceFile) != buildCacheIndexReader.getSourceFileModTime(i))
-			someSourceFilesAreOutdated = true;
+			fileIsOutdated = true;
+
+		someSourceFilesAreOutdated |= fileIsOutdated;
 	}
 
-	if (!manifiestFileIsOutdated && !outLibraryFileIsOutdated && !someSourceFilesAreOutdated)
+	if (!manifiestFileIsOutdated && !libraryFileIsOutdated && !someSourceFilesAreOutdated)
 	{
-		FmtPrintStdOut("Shader library '", cmdArgs.outLibraryFilePath, "' is up to date\n");
+		FmtPrintStdOut("Shader library '", cmdArgs.libraryFilePath, "' is up to date\n");
 		return true;
 	}
 
@@ -234,7 +239,7 @@ void Program::loadBuildCache()
 		const uint16 bciShaderIndex = buildCacheIndexReader.findShader(shader.getNameXSH());
 		if (bciShaderIndex == uint16(-1))
 			continue;
-		
+
 		const bool shaderDetailsMatch = buildCacheIndexReader.doShaderDetailsMatch(bciShaderIndex,
 			shader.getPipelineLayoutNameXSH(), shader.getPipelineLayout().getSourceHash(), shader.getCompilationArgs());
 		if (!shaderDetailsMatch)
@@ -244,7 +249,7 @@ void Program::loadBuildCache()
 		bool mainSourceFileMatches = false;
 		{
 			const uint32 bciShaderMainSourceFileIndex = buildCacheIndexReader.getShaderSourceFileGlobalIndex(bciShaderIndex, 0);
-			const SourceFileHandle bciShaderMainSourceFile = buildCacheIndexSourceFiles[bciShaderMainSourceFileIndex];
+			const SourceFileHandle bciShaderMainSourceFile = cachedSourceFiles[bciShaderMainSourceFileIndex];
 
 			InplaceStringASCIIx1024 mainSourceFilePath;
 			mainSourceFilePath.append(libraryRootPath);
@@ -257,23 +262,23 @@ void Program::loadBuildCache()
 			continue;
 
 		// Check if some source files are outdated.
-		bool someSourceFilesAreOutdated = false;
+		bool sourceFilesAreUpToDate = true;
 		shaderSourceFiles.clear();
 		for (uint16 i = 0; i < buildCacheIndexReader.getShaderSourceFileCount(bciShaderIndex); i++)
 		{
 			const uint16 bciSourceFileIndex = buildCacheIndexReader.getShaderSourceFileGlobalIndex(bciShaderIndex, i);
-			XAssert(bciSourceFileIndex < buildCacheIndexSourceFiles.getSize());
-			const SourceFileHandle sourceFile = buildCacheIndexSourceFiles[bciSourceFileIndex];
+			XAssert(bciSourceFileIndex < cachedSourceFiles.getSize());
+			const SourceFileHandle sourceFile = cachedSourceFiles[bciSourceFileIndex];
 			shaderSourceFiles.pushBack(sourceFile);
 
 			if (sourceFile == SourceFileHandle(0) ||
 				sourceFileCache.getFileModTime(sourceFile) != buildCacheIndexReader.getSourceFileModTime(bciSourceFileIndex))
 			{
-				someSourceFilesAreOutdated = true;
+				sourceFilesAreUpToDate = false;
 				break;
 			}
 		}
-		if (!someSourceFilesAreOutdated)
+		if (!sourceFilesAreUpToDate)
 			continue;
 
 		// Shader fully matches the one stored in build cache. Try load compiled blob from build cache.
@@ -309,7 +314,7 @@ bool Program::compileShaders()
 	FmtPrintStdOut("Compiling ", shadersToCompile.getSize(), " shaders\n");
 
 	// Sort shaders by name to make the log look nice :sparkles:
-	QuickSort<Shader*>(shadersToCompile, shadersToCompile.getSize(),
+	std::sort(shadersToCompile.begin(), shadersToCompile.end(),
 		[](const Shader* left, const Shader* right) -> bool { return String::IsLess(left->getName(), right->getName()); });
 
 	struct IncludeResolverContext
@@ -323,7 +328,7 @@ bool Program::compileShaders()
 		IncludeResolverContext* context = (IncludeResolverContext*)voidContext;
 
 		const SourceFileHandle includeFile = context->sourceFileCache.openFile(includeFilePath);
-		if (includeFile == SourceFileHandle(0))
+		if (includeFile != SourceFileHandle(0))
 		{
 			StringViewASCII includeFileText;
 			if (context->sourceFileCache.getFileText(includeFile, includeFileText))
@@ -402,9 +407,9 @@ bool Program::compileShaders()
 	return compilationSuccessful;
 }
 
-bool Program::storeShaderLibrary() const
+bool Program::storeShaderLibrary()
 {
-	FmtPrintStdOut("Storing shader library '", cmdArgs.outLibraryFilePath, "'\n");
+	FmtPrintStdOut("Storing shader library '", cmdArgs.libraryFilePath, "'\n");
 
 	XTODO("Sort objects in order of XSH increase");
 
@@ -506,13 +511,13 @@ bool Program::storeShaderLibrary() const
 	header.blobsDataOffset = uint32(blobsDataOffset);
 	header.blobsDataSize = blobsDataSize;
 
-	FileSystem::CreateDirRecursive(Path::GetParent(cmdArgs.outLibraryFilePath.getCStr()));
+	FileSystem::CreateDirRecursive(Path::GetParent(cmdArgs.libraryFilePath.getCStr()));
 
 	File file;
-	file.open(cmdArgs.outLibraryFilePath.getCStr(), FileAccessMode::Write, FileOpenMode::Override);
+	file.open(cmdArgs.libraryFilePath.getCStr(), FileAccessMode::Write, FileOpenMode::Override);
 	if (!file.isOpen())
 	{
-		FmtPrintStdOut("error: cannot open shader library for writing '", cmdArgs.outLibraryFilePath, "'\n");
+		FmtPrintStdOut("error: cannot open shader library for writing '", cmdArgs.libraryFilePath, "'\n");
 		return false;
 	}
 
@@ -534,7 +539,7 @@ bool Program::storeShaderLibrary() const
 	return true;
 }
 
-void Program::storeBuildCacheIndex() const
+void Program::storeBuildCacheIndex(bool libraryIsFileUpToDate)
 {
 	if (cmdArgs.buildCacheDirPath.isEmpty())
 		return;
@@ -544,7 +549,8 @@ void Program::storeBuildCacheIndex() const
 	buildCacheIndexFilePath.append(BuildCacheIndexFileName);
 	XAssert(!buildCacheIndexFilePath.isFull());
 
-	buildCacheIndexWriter.buildAndStoreToFile(buildCacheIndexFilePath.getCStr());
+	buildCacheIndexWriter.buildAndStoreToFile(buildCacheIndexFilePath.getCStr(), BuildCacheIndexMagic, sourceFileCache,
+		cmdArgs.libraryManifestFilePath.getCStr(), libraryIsFileUpToDate ? cmdArgs.libraryFilePath.getCStr() : nullptr);
 }
 
 void Program::composeShaderCompilationArtifactFilePath(VirtualStringRefASCII result, const Shader& shader, const char* filenameSuffix) const
@@ -611,7 +617,7 @@ int Program::main()
 
 	loadBuildCacheIndex();
 
-	if (checkShaderLibraryFullyUpToDate())
+	if (loadCachedSourceFilesAndCheckShaderLibraryFullyUpToDate())
 		return 0;
 
 	FmtPrintStdOut("Loading shader library manifest file '", cmdArgs.libraryManifestFilePath, "'\n");
@@ -633,16 +639,17 @@ int Program::main()
 
 	loadBuildCache();
 
-	bool isBuildSuccessful = true;
-	isBuildSuccessful &= compileShaders();
-	isBuildSuccessful &= storeShaderLibrary();
+	bool isBuildSuccessful = false;
+	if (compileShaders())
+		if (storeShaderLibrary())
+			isBuildSuccessful = true;
 
-	storeBuildCacheIndex();
+	storeBuildCacheIndex(isBuildSuccessful);
 
 	if (isBuildSuccessful)
-		FmtPrintStdOut("Shader library '", cmdArgs.outLibraryFilePath, "' was built succesfully\n");
+		FmtPrintStdOut("Shader library '", cmdArgs.libraryFilePath, "' was built succesfully\n");
 	else
-		FmtPrintStdOut("Shader library '", cmdArgs.outLibraryFilePath, "' build failed\n");
+		FmtPrintStdOut("Shader library '", cmdArgs.libraryFilePath, "' build failed\n");
 
 	return isBuildSuccessful ? 0 : 1;
 }
