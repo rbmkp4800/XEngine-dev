@@ -30,7 +30,7 @@ namespace XEngine::Gfx::ShaderLibraryBuilder
 		Library& library;
 
 		XLib::JSONReader jsonReader;
-		const char* jsonPath = nullptr;
+		const char* jsonPathCStr = nullptr;
 
 		XLib::ArrayList<StaticSamplerDesc> staticSamplers;	// TODO: Replace with FlatHashMap.
 
@@ -54,9 +54,9 @@ namespace XEngine::Gfx::ShaderLibraryBuilder
 		inline LibraryManifestLoader(Library& library) : library(library) {}
 		~LibraryManifestLoader() = default;
 
-		bool load(const char* jsonPath);
+		bool load(const char* jsonPathCStr);
 
 	public:
-		static bool Load(Library& library, const char* jsonPath);
+		static bool Load(Library& library, const char* jsonPathCStr);
 	};
 }

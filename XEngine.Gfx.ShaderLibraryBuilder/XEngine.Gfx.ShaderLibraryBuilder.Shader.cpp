@@ -33,7 +33,7 @@ ShaderRef Shader::Create(StringViewASCII name, uint64 nameXSH,
 	memoryCopy((char*)memoryBlock + entryPointNameStrOffset, compilationArgs.entryPointName.getData(), compilationArgs.entryPointName.getLength());
 
 	Shader& resultObject = *(Shader*)memoryBlock;
-	construct(resultObject);
+	XConstruct(resultObject);
 	resultObject.name = StringViewASCII((char*)memoryBlock + nameStrOffset, name.getLength());
 	resultObject.nameXSH = nameXSH;
 	resultObject.pipelineLayout = pipelineLayout;

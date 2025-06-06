@@ -311,7 +311,7 @@ DescriptorSetLayoutRef DescriptorSetLayout::Create(const DescriptorSetBindingDes
 
 	// Populate result object itself.
 	{
-		construct(resultObject);
+		XConstruct(resultObject);
 		resultObject.bindings = internalBindings;
 		resultObject.namesBuffer = StringViewASCII(namesBuffer, namesBufferSize);
 		resultObject.blobData = blobData;
@@ -748,7 +748,7 @@ PipelineLayoutRef PipelineLayout::Create(const PipelineBindingDesc* bindings, ui
 
 	// Populate result object itself.
 	{
-		construct(resultObject);
+		XConstruct(resultObject);
 		resultObject.bindings = internalBindings;
 		resultObject.staticSamplers = internalStaticSamplers;
 		resultObject.namesBuffer = StringViewASCII(namesBuffer, namesBufferSize);
@@ -824,7 +824,7 @@ BlobRef Blob::Create(uint32 size)
 	memorySet(memoryBlock, 0, memoryBlockSize); // Just in case.
 
 	Blob& resultObject = *(Blob*)memoryBlock;
-	construct(resultObject);
+	XConstruct(resultObject);
 	resultObject.size = size;
 
 	return BlobRef(&resultObject);
@@ -849,7 +849,7 @@ ShaderCompilationResultRef ShaderCompilationResult::Compose(const ComposerSource
 	memorySet(memoryBlock, 0, memoryBlockSize);
 
 	ShaderCompilationResult& resultObject = *(ShaderCompilationResult*)memoryBlock;
-	construct(resultObject);
+	XConstruct(resultObject);
 
 	memoryCopy((char*)memoryBlock + preprocessorStdOutStrOffset, source.preprocessorStdOut.getData(), source.preprocessorStdOut.getLength());
 	memoryCopy((char*)memoryBlock + compilerStdOutStrOffset, source.compilerStdOut.getData(), source.compilerStdOut.getLength());

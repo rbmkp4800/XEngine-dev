@@ -3,8 +3,13 @@
 #include "XLib.h"
 #include "XLib.NonCopyable.h"
 
+// TODO: Rename file to XLib.Allocation.Heap.h / XLib.HeapAllocation.h. Move linear stuff separately
+// TODO: Rename `DefaultAllocator` to `DefaultHeapAllocator`.
+// TODO: We sould have separate "Heap allocator" term.
+
 namespace XLib
 {
+	// TODO: HeapAllocatorAdapterBase
 	template <typename AllocatorType, bool AllocatorIsStatic = AllocatorType::IsStatic>
 	class AllocatorAdapterBase { };
 
@@ -52,6 +57,7 @@ namespace XLib
 	// VirtualMemoryBlockLinearAllocator
 	// VirtualMemoryBlockPoolAllocator
 
+	// TODO: DefaultHeapAllocator
 	class DefaultAllocator abstract final
 	{
 	public:
@@ -72,6 +78,12 @@ namespace XLib
 		static void Release(void* ptr);
 		static void* Reallocate(void* ptr, uintptr size);
 		static bool TryReallocateInplace(void* ptr, uintptr size);
+	};
+
+	template <typename Type, typename HeapAllocatorType>
+	class HeapPtr
+	{
+
 	};
 
 	class FixedBlockLinearAllocator : public XLib::NonCopyable

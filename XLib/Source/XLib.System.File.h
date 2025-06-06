@@ -3,7 +3,7 @@
 #include "XLib.h"
 #include "XLib.NonCopyable.h"
 
-// TODO: Introduce `XLib::SystemErrorCode` enum and return it everywhere instead of bool.
+// TODO: Introduce `FileOpStatus` and `FileOpResult` (same is done for FileSystem).
 
 namespace XLib
 {

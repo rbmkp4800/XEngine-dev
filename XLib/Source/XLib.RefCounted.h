@@ -140,7 +140,7 @@ namespace XLib
 		referenceCount--;
 		if (referenceCount == 0)
 		{
-			destruct(*this);
+			XDestruct(*this);
 			SystemHeapAllocator::Release((void*)this);
 		}
 	}

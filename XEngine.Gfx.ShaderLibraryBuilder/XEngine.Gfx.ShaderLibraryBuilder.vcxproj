@@ -35,7 +35,7 @@
   </ItemDefinitionGroup>
 
   <ItemGroup>
-    <ClInclude Include="XEngine.Gfx.ShaderLibraryBuilder.BuildCacheIndex.h" />
+    <ClInclude Include="XEngine.Gfx.ShaderLibraryBuilder.BuildDepsTrace.h" />
     <ClInclude Include="XEngine.Gfx.ShaderLibraryBuilder.Library.h" />
     <ClInclude Include="XEngine.Gfx.ShaderLibraryBuilder.LibraryManifestLoader.h" />
     <ClInclude Include="XEngine.Gfx.ShaderLibraryBuilder.Shader.h" />
@@ -44,7 +44,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ClCompile Include="XEngine.Gfx.ShaderLibraryBuilder.BuildCacheIndex.cpp" />
+    <ClCompile Include="XEngine.Gfx.ShaderLibraryBuilder.BuildDepsTrace.cpp" />
     <ClCompile Include="XEngine.Gfx.ShaderLibraryBuilder.cpp" />
     <ClCompile Include="XEngine.Gfx.ShaderLibraryBuilder.LibraryManifestLoader.cpp" />
     <ClCompile Include="XEngine.Gfx.ShaderLibraryBuilder.Shader.cpp" />

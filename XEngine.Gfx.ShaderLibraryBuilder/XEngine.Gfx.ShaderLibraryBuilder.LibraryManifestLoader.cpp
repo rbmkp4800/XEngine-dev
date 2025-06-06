@@ -139,12 +139,39 @@ static Shader* LibFindShader(Library& lib, uint64 nameXSH)
 }
 
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+bool LoadTextFile(const char* pathCStr, DynamicStringASCII& text)
+{
+	text = {};
+
+	File file;
+	file.open(pathCStr, FileAccessMode::Read, FileOpenMode::OpenExisting);
+	if (!file.isOpen())
+		return false;
+
+	const uint64 fileSize = file.getSize();
+	if (fileSize == uint64(-1))
+		return false;
+	if (fileSize > uint64(uint32(-1)))
+		return false;
+	const uint32 fileSizeU32 = uint32(fileSize);
+
+	text.growBufferToFitLength(fileSizeU32);
+	text.setLength(fileSizeU32);
+	if (!file.read(text.getData(), fileSizeU32))
+		return false;
+
+	return true;
+}
+
+
 // LibraryManifestLoader /////////////////////////////////////////////////////////////////////////
 
 void LibraryManifestLoader::reportError(const char* message, Cursor jsonCursor)
 {
 	// TODO: Print absolute path.
-	FmtPrintStdOut(jsonPath, ':', jsonCursor.lineNumber, ':', jsonCursor.columnNumber,
+	FmtPrintStdOut(jsonPathCStr, ':', jsonCursor.lineNumber, ':', jsonCursor.columnNumber,
 		": error: ", message, '\n');
 }
 
@@ -154,7 +181,7 @@ void LibraryManifestLoader::reportJSONError()
 	XAssert(jsonError != JSONErrorCode::Success);
 
 	// TODO: Print absolute path.
-	FmtPrintStdOut(jsonPath, ':', jsonReader.getLineNumer(), ':', jsonReader.getColumnNumer(),
+	FmtPrintStdOut(jsonPathCStr, ':', jsonReader.getLineNumer(), ':', jsonReader.getColumnNumer(),
 		": error: JSON: ", JSONErrorCodeToString(jsonError), '\n');
 }
 
@@ -567,29 +594,19 @@ bool LibraryManifestLoader::readShader(StringViewASCII shaderName, Cursor jsonSh
 	return true;
 }
 
-bool LibraryManifestLoader::load(const char* jsonPath)
+bool LibraryManifestLoader::load(const char* jsonPathCStr)
 {
-	XAssert(jsonPath && jsonPath[0]);
+	XAssert(jsonPathCStr && jsonPathCStr[0]);
 	// TODO: Validate path.
 
-	this->jsonPath = jsonPath;
+	this->jsonPathCStr = jsonPathCStr;
 
 	// Read text from file.
 	DynamicStringASCII text;
+	if (!LoadTextFile(jsonPathCStr, text))
 	{
-		File file;
-		file.open(jsonPath, FileAccessMode::Read, FileOpenMode::OpenExisting);
-		if (!file.isOpen())
-		{
-			FmtPrintStdOut("error: cannot open library manifest file '", jsonPath, "'\n");
-			return false;
-		}
-
-		const uint32 fileSize = XCheckedCastU32(file.getSize());
-		text.growBufferToFitLength(fileSize);
-		text.setLength(fileSize);
-		file.read(text.getData(), fileSize);
-		file.close();
+		FmtPrintStdOut("error: failed to load library manifest file '", jsonPathCStr, "'\n");
+		return false;
 	}
 
 	jsonReader.openDocument(text.getData(), text.getLength());
@@ -659,8 +676,8 @@ bool LibraryManifestLoader::load(const char* jsonPath)
 	return true;
 }
 
-bool LibraryManifestLoader::Load(Library& library, const char* jsonPath)
+bool LibraryManifestLoader::Load(Library& library, const char* jsonPathCStr)
 {
 	LibraryManifestLoader loader(library);
-	return loader.load(jsonPath);
+	return loader.load(jsonPathCStr);
 }

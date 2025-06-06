@@ -13,7 +13,7 @@
 
 #include <XEngine.Gfx.ShaderLibraryFormat.h>
 
-#include "XEngine.Gfx.ShaderLibraryBuilder.BuildCacheIndex.h"
+#include "XEngine.Gfx.ShaderLibraryBuilder.BuildDepsTrace.h"
 #include "XEngine.Gfx.ShaderLibraryBuilder.Library.h"
 #include "XEngine.Gfx.ShaderLibraryBuilder.LibraryManifestLoader.h"
 #include "XEngine.Gfx.ShaderLibraryBuilder.SourceFileCache.h"
@@ -34,8 +34,14 @@ private:
 		InplaceStringASCIIx1024 buildCacheDirPath;
 	};
 
-	static constexpr StringViewASCII BuildCacheIndexFileName = StringViewASCII::FromCStr("_BuildCacheIndex");
-	static constexpr uint32 BuildCacheIndexMagic = 0X50E3D6BD; // Change this number to invalidate build caches after changing the compiler.
+	enum class PrevBuildStatus : uint8
+	{
+		Outdated = 0,
+		UpToDate,
+	};
+
+	static constexpr StringViewASCII BuildDepsTraceFileName = StringViewASCII::FromCStr("_BuildDepsTrace");
+	static constexpr uint32 BuildDepsTraceFileMagic = 0x50E3D6BD; // Change this number to invalidate build cache after changing the compiler.
 
 private:
 	CmdArgs cmdArgs;
@@ -44,19 +50,19 @@ private:
 
 	Library library;
 
-	BuildCacheIndexReader buildCacheIndexReader;
-	BuildCacheIndexWriter buildCacheIndexWriter;
+	BuildDepsTrace::Reader prevBuildDepsTrace;
+	ArrayList<SourceFileHandle> prevBuildSourceFiles; // Source files mentioned in previous build's BuildDepsTrace file.
 
-	ArrayList<SourceFileHandle> cachedSourceFiles;
+	BuildDepsTrace::Writer currentBuildDepsTrace;
 
 private:
 	bool parseCmdArgs();
-	void loadBuildCacheIndex();
-	bool loadCachedSourceFilesAndCheckShaderLibraryFullyUpToDate();
-	void loadBuildCache();
+	PrevBuildStatus loadPrevBuildInfo();
+	void startWritingBuildDepsTrace();
+	void loadCachedShaders();
 	bool compileShaders();
 	bool storeShaderLibrary();
-	void storeBuildCacheIndex(bool libraryIsFileUpToDate);
+	void finishWritingBuildDepsTrace(bool isBuildSuccessful);
 
 	void composeShaderCompilationArtifactFilePath(VirtualStringRefASCII result, const Shader& shader, const char* filenameSuffix) const;
 	void storeShaderCompilationArtifactToBuildCache(const Shader& shader, const HAL::ShaderCompiler::Blob& blob, const char* filenameSuffix) const;
@@ -164,67 +170,90 @@ bool Program::parseCmdArgs()
 	return true;
 }
 
-void Program::loadBuildCacheIndex()
+auto Program::loadPrevBuildInfo() -> PrevBuildStatus
 {
 	if (cmdArgs.buildCacheDirPath.isEmpty())
-		return;
+		return PrevBuildStatus::Outdated;
 
-	InplaceStringASCIIx1024 buildCacheIndexFilePath;
-	buildCacheIndexFilePath.append(cmdArgs.buildCacheDirPath);
-	buildCacheIndexFilePath.append(BuildCacheIndexFileName);
-	XAssert(!buildCacheIndexFilePath.isFull());
+	InplaceStringASCIIx1024 buildDepsTraceFilePath;
+	buildDepsTraceFilePath.append(cmdArgs.buildCacheDirPath);
+	buildDepsTraceFilePath.append(BuildDepsTraceFileName);
+	XAssert(!buildDepsTraceFilePath.isFull());
 
-	if (!buildCacheIndexReader.loadFromFile(buildCacheIndexFilePath.getCStr(), BuildCacheIndexMagic))
-		FmtPrintStdOut("Build cache index file did not load. Incremental build is disabled\n");
-}
+	prevBuildDepsTrace.load(buildDepsTraceFilePath.getCStr(), BuildDepsTraceFileMagic);
+	if (!prevBuildDepsTrace.isLoaded())
+	{
+		FmtPrintStdOut("BuildDepsTrace file was not loaded. Incremental build is disabled\n");
+		return PrevBuildStatus::Outdated;
+	}
 
-bool Program::loadCachedSourceFilesAndCheckShaderLibraryFullyUpToDate()
-{
-	if (!buildCacheIndexReader.isLoaded())
-		return false;
+	// NOTE: If we can't retrieve mod time for a file, we consider it to be invalidated.
 
-	const uint64 manifestFileModTime = FileSystem::GetFileModificationTime(cmdArgs.libraryManifestFilePath.getCStr()).value;
-	const uint64 libraryFileModTime = FileSystem::GetFileModificationTime(cmdArgs.libraryFilePath.getCStr()).value;
-
+	const uint64 manifestFileModTime = FileSystem::GetFileModificationTime(cmdArgs.libraryManifestFilePath.getCStr());
 	const bool manifiestFileIsOutdated =
-		cmdArgs.libraryManifestFilePath != buildCacheIndexReader.getManifestFilePath() ||
-		manifestFileModTime != buildCacheIndexReader.getManifestFileModTime();
-
-	const bool libraryFileIsOutdated =
-		buildCacheIndexReader.getLibraryFilePath().isEmpty() ||
-		cmdArgs.libraryFilePath != buildCacheIndexReader.getLibraryFilePath() ||
-		libraryFileModTime != buildCacheIndexReader.getLibraryFileModTime();
+		!StringsASCII::IsEqualIgnoreCase(cmdArgs.libraryManifestFilePath, prevBuildDepsTrace.getManifestFilePath()) ||
+		manifestFileModTime != prevBuildDepsTrace.getManifestFileModTime() ||
+		manifestFileModTime == InvalidTimePoint;
 
 	bool someSourceFilesAreOutdated = false;
-	cachedSourceFiles.resize(buildCacheIndexReader.getSourceFileCount());
-	for (uint16 i = 0; i < buildCacheIndexReader.getSourceFileCount(); i++)
+	prevBuildSourceFiles.resize(prevBuildDepsTrace.getSourceFileCount());
+	for (uint16 i = 0; i < prevBuildDepsTrace.getSourceFileCount(); i++)
 	{
-		const SourceFileHandle sourceFile = sourceFileCache.openFile(buildCacheIndexReader.getSourceFilePath(i));
-		cachedSourceFiles[i] = sourceFile;
+		const SourceFileHandle sourceFile = sourceFileCache.openFile(prevBuildDepsTrace.getSourceFilePath(i));
+		prevBuildSourceFiles[i] = sourceFile;
 
 		bool fileIsOutdated = false;
-
 		if (sourceFile == SourceFileHandle(0))
 			fileIsOutdated = true;
-		else if (sourceFileCache.getFileModTime(sourceFile) != buildCacheIndexReader.getSourceFileModTime(i))
+		else if (sourceFileCache.getFileModTime(sourceFile) != prevBuildDepsTrace.getSourceFileModTime(i))
 			fileIsOutdated = true;
 
 		someSourceFilesAreOutdated |= fileIsOutdated;
 	}
 
-	if (!manifiestFileIsOutdated && !libraryFileIsOutdated && !someSourceFilesAreOutdated)
+	bool libraryFileNeedsToBeRebuilt = false;
+	if (prevBuildDepsTrace.wasBuildSuccessful())
+	{
+		const uint64 libraryFileModTime = FileSystem::GetFileModificationTime(cmdArgs.libraryFilePath.getCStr());
+		libraryFileNeedsToBeRebuilt =
+			!StringsASCII::IsEqualIgnoreCase(cmdArgs.libraryFilePath, prevBuildDepsTrace.getBuiltLibraryFilePath()) ||
+			libraryFileModTime != prevBuildDepsTrace.getBuiltLibraryFileModTime() ||
+			libraryFileModTime == InvalidTimePoint;
+	}
+	else
+		libraryFileNeedsToBeRebuilt = true;
+
+	if (!manifiestFileIsOutdated && !someSourceFilesAreOutdated && !libraryFileNeedsToBeRebuilt)
 	{
 		FmtPrintStdOut("Shader library '", cmdArgs.libraryFilePath, "' is up to date\n");
-		return true;
+		return PrevBuildStatus::UpToDate;
 	}
 
-	return false;
+	return PrevBuildStatus::Outdated;
 }
 
-void Program::loadBuildCache()
+void Program::startWritingBuildDepsTrace()
 {
-	if (!buildCacheIndexReader.isLoaded())
+	if (cmdArgs.buildCacheDirPath.isEmpty())
 		return;
+
+	InplaceStringASCIIx1024 buildDepsTraceFilePath;
+	buildDepsTraceFilePath.append(cmdArgs.buildCacheDirPath);
+	buildDepsTraceFilePath.append(BuildDepsTraceFileName);
+	XAssert(!buildDepsTraceFilePath.isFull());
+
+	// NOTE: Even if mod time is invalid, we still use it. This will simply cause the manifest file to be treated as invalidated during the next build.
+	const uint64 manifestFileModTime = FileSystem::GetFileModificationTime(cmdArgs.libraryManifestFilePath.getCStr());
+	currentBuildDepsTrace.openForWriting(buildDepsTraceFilePath.getCStr(), BuildDepsTraceFileMagic,
+		cmdArgs.libraryManifestFilePath, manifestFileModTime, sourceFileCache);
+}
+
+void Program::loadCachedShaders()
+{
+	if (!prevBuildDepsTrace.isLoaded())
+		return;
+
+	XAssert(prevBuildDepsTrace.getSourceFileCount() == prevBuildSourceFiles.getSize());
 
 	uint32 cachedShaderCount = 0;
 	ArrayList<SourceFileHandle> shaderSourceFiles;
@@ -236,11 +265,11 @@ void Program::loadBuildCache()
 
 		Shader& shader = *library.shaders[libraryShaderIndex].get();
 
-		const uint16 bciShaderIndex = buildCacheIndexReader.findShader(shader.getNameXSH());
-		if (bciShaderIndex == uint16(-1))
+		const uint16 bdtShaderIndex = prevBuildDepsTrace.findShader(shader.getNameXSH());
+		if (bdtShaderIndex == uint16(-1))
 			continue;
 
-		const bool shaderDetailsMatch = buildCacheIndexReader.doShaderDetailsMatch(bciShaderIndex,
+		const bool shaderDetailsMatch = prevBuildDepsTrace.doShaderDetailsMatch(bdtShaderIndex,
 			shader.getPipelineLayoutNameXSH(), shader.getPipelineLayout().getSourceHash(), shader.getCompilationArgs());
 		if (!shaderDetailsMatch)
 			continue;
@@ -248,51 +277,64 @@ void Program::loadBuildCache()
 		// Check if main source file matches.
 		bool mainSourceFileMatches = false;
 		{
-			const uint32 bciShaderMainSourceFileIndex = buildCacheIndexReader.getShaderSourceFileGlobalIndex(bciShaderIndex, 0);
-			const SourceFileHandle bciShaderMainSourceFile = cachedSourceFiles[bciShaderMainSourceFileIndex];
+			const uint32 bdtShaderMainSourceFileIndex = prevBuildDepsTrace.getShaderSourceFileIndex(bdtShaderIndex, 0);
+			const SourceFileHandle bdtShaderMainSourceFile = prevBuildSourceFiles[bdtShaderMainSourceFileIndex];
 
 			InplaceStringASCIIx1024 mainSourceFilePath;
 			mainSourceFilePath.append(libraryRootPath);
 			mainSourceFilePath.append(shader.getMainSourceFilePath());
 			const SourceFileHandle shaderMainSourceFile = sourceFileCache.openFile(mainSourceFilePath);
 
-			mainSourceFileMatches = (shaderMainSourceFile == bciShaderMainSourceFile);
+			mainSourceFileMatches = (shaderMainSourceFile == bdtShaderMainSourceFile);
 		}
 		if (!mainSourceFileMatches)
 			continue;
 
 		// Check if some source files are outdated.
 		bool sourceFilesAreUpToDate = true;
-		shaderSourceFiles.clear();
-		for (uint16 i = 0; i < buildCacheIndexReader.getShaderSourceFileCount(bciShaderIndex); i++)
+		if (prevBuildDepsTrace.getShaderSourceFileCount(bdtShaderIndex) == 0)
+			sourceFilesAreUpToDate = false;
+		else
 		{
-			const uint16 bciSourceFileIndex = buildCacheIndexReader.getShaderSourceFileGlobalIndex(bciShaderIndex, i);
-			XAssert(bciSourceFileIndex < cachedSourceFiles.getSize());
-			const SourceFileHandle sourceFile = cachedSourceFiles[bciSourceFileIndex];
-			shaderSourceFiles.pushBack(sourceFile);
-
-			if (sourceFile == SourceFileHandle(0) ||
-				sourceFileCache.getFileModTime(sourceFile) != buildCacheIndexReader.getSourceFileModTime(bciSourceFileIndex))
+			shaderSourceFiles.clear();
+			for (uint16 i = 0; i < prevBuildDepsTrace.getShaderSourceFileCount(bdtShaderIndex); i++)
 			{
-				sourceFilesAreUpToDate = false;
-				break;
+				const uint16 bdtSourceFileIndex = prevBuildDepsTrace.getShaderSourceFileIndex(bdtShaderIndex, i);
+				XAssert(bdtSourceFileIndex < prevBuildSourceFiles.getSize());
+				const SourceFileHandle sourceFile = prevBuildSourceFiles[bdtSourceFileIndex];
+				shaderSourceFiles.pushBack(sourceFile);
+
+				if (sourceFile == SourceFileHandle(0) ||
+					sourceFileCache.getFileModTime(sourceFile) != prevBuildDepsTrace.getSourceFileModTime(bdtSourceFileIndex))
+				{
+					sourceFilesAreUpToDate = false;
+					break;
+				}
 			}
 		}
 		if (!sourceFilesAreUpToDate)
 			continue;
 
+		InplaceStringASCIIx1024 compiledBlobFilePath;
+		composeShaderCompilationArtifactFilePath(compiledBlobFilePath, shader, ".bin");
+
+		// Check if compiled blob modification time matches.
+		const uint64 compiledBlobModTime = FileSystem::GetFileModificationTime(compiledBlobFilePath.getCStr());
+		const bool compiledBlobModTimeMatches =
+			compiledBlobModTime != InvalidTimePoint &&
+			compiledBlobModTime == prevBuildDepsTrace.getShaderCompiledBlobModTime(bdtShaderIndex);
+		if (!compiledBlobModTimeMatches)
+			continue;
+
 		// Shader fully matches the one stored in build cache. Try load compiled blob from build cache.
-		InplaceStringASCIIx1024 blobFilePath;
-		composeShaderCompilationArtifactFilePath(blobFilePath, shader, ".bin");
-		const HAL::ShaderCompiler::BlobRef blob = LoadShaderCompilerBlobFromFile(blobFilePath.getCStr());
+		const HAL::ShaderCompiler::BlobRef blob = LoadShaderCompilerBlobFromFile(compiledBlobFilePath.getCStr());
 		if (!blob)
 			continue;
 		shader.setCompiledBlob(blob.get());
 
-		// Add shader to new build cache index.
-		buildCacheIndexWriter.addShader(shader.getNameXSH(),
+		currentBuildDepsTrace.addShader(shader.getNameXSH(),
 			shader.getPipelineLayoutNameXSH(), shader.getPipelineLayout().getSourceHash(), shader.getCompilationArgs(),
-			shaderSourceFiles, XCheckedCastU16(shaderSourceFiles.getSize()));
+			shaderSourceFiles, XCheckedCastU16(shaderSourceFiles.getSize()), compiledBlobModTime);
 		cachedShaderCount++;
 	}
 
@@ -328,16 +370,14 @@ bool Program::compileShaders()
 		IncludeResolverContext* context = (IncludeResolverContext*)voidContext;
 
 		const SourceFileHandle includeFile = context->sourceFileCache.openFile(includeFilePath);
-		if (includeFile != SourceFileHandle(0))
-		{
-			StringViewASCII includeFileText;
-			if (context->sourceFileCache.getFileText(includeFile, includeFileText))
-			{
-				context->shaderSourceFiles.pushBack(includeFile);
-				return HAL::ShaderCompiler::IncludeResolutionResult{ .text = includeFileText, .status = true, };
-			}
-		}
-		return HAL::ShaderCompiler::IncludeResolutionResult{ .status = false, };
+		if (includeFile == SourceFileHandle(0))
+			return HAL::ShaderCompiler::IncludeResolutionResult{ .status = false, };
+		StringViewASCII includeFileText;
+		if (!context->sourceFileCache.getFileText(includeFile, includeFileText))
+			return HAL::ShaderCompiler::IncludeResolutionResult{ .status = false, };
+
+		context->shaderSourceFiles.pushBack(includeFile);
+		return HAL::ShaderCompiler::IncludeResolutionResult{ .text = includeFileText, .status = true, };
 	};
 
 	bool compilationSuccessful = true;
@@ -367,7 +407,7 @@ bool Program::compileShaders()
 
 		if (!mainSourceFileTextLoaded)
 		{
-			FmtPrintStdOut(messageHeader, ": error: cannot open file '", mainSourceFilePath, "'\n");
+			FmtPrintStdOut(messageHeader, ": error: failed to open file '", mainSourceFilePath, "'\n");
 			compilationSuccessful = false;
 			break;
 		}
@@ -399,9 +439,19 @@ bool Program::compileShaders()
 
 		shader.setCompiledBlob(compilationResult->getBytecodeBlob());
 
-		buildCacheIndexWriter.addShader(shader.getNameXSH(),
+		uint64 compiledBlobModTime = InvalidTimePoint;
+		{
+			InplaceStringASCIIx1024 compiledBlobFilePath;
+			composeShaderCompilationArtifactFilePath(compiledBlobFilePath, shader, ".bin");
+
+			// NOTE: Even if mod time is invalid, we still use it. This will simply cause the shader to be treated as invalidated during the next build.
+			// We can't skip putting this shader to the BuildDepsTrace, as it’s still a dependency that may invalidate the built library.
+			compiledBlobModTime = FileSystem::GetFileModificationTime(compiledBlobFilePath.getCStr());
+		}
+
+		currentBuildDepsTrace.addShader(shader.getNameXSH(),
 			shader.getPipelineLayoutNameXSH(), shader.getPipelineLayout().getSourceHash(), shader.getCompilationArgs(),
-			shaderSourceFiles, XCheckedCastU16(shaderSourceFiles.getSize()));
+			shaderSourceFiles, XCheckedCastU16(shaderSourceFiles.getSize()), compiledBlobModTime);
 	}
 
 	return compilationSuccessful;
@@ -517,7 +567,7 @@ bool Program::storeShaderLibrary()
 	file.open(cmdArgs.libraryFilePath.getCStr(), FileAccessMode::Write, FileOpenMode::Override);
 	if (!file.isOpen())
 	{
-		FmtPrintStdOut("error: cannot open shader library for writing '", cmdArgs.libraryFilePath, "'\n");
+		FmtPrintStdOut("error: failed to open shader library for writing '", cmdArgs.libraryFilePath, "'\n");
 		return false;
 	}
 
@@ -539,18 +589,16 @@ bool Program::storeShaderLibrary()
 	return true;
 }
 
-void Program::storeBuildCacheIndex(bool libraryIsFileUpToDate)
+void Program::finishWritingBuildDepsTrace(bool isBuildSuccessful)
 {
-	if (cmdArgs.buildCacheDirPath.isEmpty())
-		return;
-
-	InplaceStringASCIIx1024 buildCacheIndexFilePath;
-	buildCacheIndexFilePath.append(cmdArgs.buildCacheDirPath);
-	buildCacheIndexFilePath.append(BuildCacheIndexFileName);
-	XAssert(!buildCacheIndexFilePath.isFull());
-
-	buildCacheIndexWriter.buildAndStoreToFile(buildCacheIndexFilePath.getCStr(), BuildCacheIndexMagic, sourceFileCache,
-		cmdArgs.libraryManifestFilePath.getCStr(), libraryIsFileUpToDate ? cmdArgs.libraryFilePath.getCStr() : nullptr);
+	if (isBuildSuccessful)
+	{
+		// NOTE: Even if mod time is invalid, we still use it. This will simply cause the library file to be treated as invalidated during the next build.
+		const uint64 libraryFileModTime = FileSystem::GetFileModificationTime(cmdArgs.libraryFilePath.getCStr());
+		currentBuildDepsTrace.closeAfterSuccessfulBuild(cmdArgs.libraryFilePath, libraryFileModTime);
+	}
+	else
+		currentBuildDepsTrace.closeAfterFailedBuild();
 }
 
 void Program::composeShaderCompilationArtifactFilePath(VirtualStringRefASCII result, const Shader& shader, const char* filenameSuffix) const
@@ -571,7 +619,7 @@ void Program::storeShaderCompilationArtifactToBuildCache(const Shader& shader, c
 	file.open(filePath.getCStr(), FileAccessMode::Write, FileOpenMode::Override);
 	if (!file.isOpen())
 	{
-		FmtPrintStdOut("warning: Cannot open file '", filePath, "' for writing\n");
+		FmtPrintStdOut("warning: failed to open file '", filePath, "' for writing\n");
 		return;
 	}
 
@@ -596,6 +644,8 @@ HAL::ShaderCompiler::BlobRef Program::LoadShaderCompilerBlobFromFile(const char*
 		return nullptr;
 
 	const uint64 fileSize = file.getSize();
+	if (fileSize == uint64(-1))
+		return nullptr;
 	if (fileSize > uint64(uint32(-1)))
 		return nullptr;
 
@@ -615,9 +665,8 @@ int Program::main()
 	XAssert(Path::HasTrailingDirectorySeparator(libraryRootPath));
 	FileSystem::CreateDirRecursive(cmdArgs.buildCacheDirPath);
 
-	loadBuildCacheIndex();
-
-	if (loadCachedSourceFilesAndCheckShaderLibraryFullyUpToDate())
+	const PrevBuildStatus prevBuildStatus = loadPrevBuildInfo();
+	if (prevBuildStatus == PrevBuildStatus::UpToDate)
 		return 0;
 
 	FmtPrintStdOut("Loading shader library manifest file '", cmdArgs.libraryManifestFilePath, "'\n");
@@ -635,16 +684,16 @@ int Program::main()
 		library.pipelineLayouts.getSize(), " pipeline layouts, ",
 		library.descriptorSetLayouts.getSize(), " descriptor set layouts\n");
 
-	buildCacheIndexWriter.reserveShaderCount(library.shaders.getSize());
+	startWritingBuildDepsTrace();
 
-	loadBuildCache();
+	loadCachedShaders();
 
 	bool isBuildSuccessful = false;
 	if (compileShaders())
 		if (storeShaderLibrary())
 			isBuildSuccessful = true;
 
-	storeBuildCacheIndex(isBuildSuccessful);
+	finishWritingBuildDepsTrace(isBuildSuccessful);
 
 	if (isBuildSuccessful)
 		FmtPrintStdOut("Shader library '", cmdArgs.libraryFilePath, "' was built succesfully\n");

@@ -9,8 +9,9 @@
 // TODO: Profile cost of always supporting zero terminator. Probably we may put it only when calling `getCStr`/`getData` methods.
 // TODO: String container types should be in XLib.Containers.*** but we also have non-container utils here... Also StringView is certainly not a container. Decide what to do.
 //		We may split this file into XLib.Strings.h and XLib.Containers.String.h
-// TODO: For DynamicString move capacity and length counters to heap buffer. DynamicString object should contain just a single pointer.
+// TODO: For DynamicString move capacity and length counters to heap buffer. DynamicString object should contain just a single pointer. Capacity and length should be uintptr not uint32.
 // TODO: ??? Probably remove `startsWith`, `endsWith` from string classes. There should be only `String::StartsWith` and `String::EndsWith`.
+// TODO: `DynamicString::growBuffer`, `DynamicString::growBufferToFitLength` and friends. WTF is this???
 
 namespace XLib
 {
@@ -284,6 +285,7 @@ namespace XLib
 
 	////////////////////////////////////////////////////////////////////////////////////////////////
 
+	// TODO: Cleanup this mess...
 	class String abstract final
 	{
 	public:
@@ -308,6 +310,16 @@ namespace XLib
 		template <typename CharType> static inline bool EndsWith(const StringView<CharType>& string, const CharType* suffixCStr);
 		template <typename CharType> static inline bool EndsWith(const CharType* cstr, const StringView<CharType>& suffix);
 		template <typename CharType> static inline bool EndsWith(const CharType* cstr, const CharType* suffixCStr);
+	};
+
+	class StringsASCII abstract final
+	{
+	public:
+		static inline bool IsEqual(const StringViewASCII& a, const StringViewASCII& b);
+		static inline bool IsEqual(const StringViewASCII& a, const char* bCStr);
+
+		static inline bool IsEqualIgnoreCase(const StringViewASCII& a, const StringViewASCII& b);
+		static inline bool IsEqualIgnoreCase(const StringViewASCII& a, const char* bCStr);
 	};
 }
 
@@ -808,4 +820,28 @@ template <typename CharType>
 static inline bool XLib::String::EndsWith(const StringView<CharType>& string, const CharType* suffixCStr)
 {
 	return EndsWith(string, StringView<CharType>(suffixCStr, GetCStrLength(suffixCStr)));
+}
+
+inline bool XLib::StringsASCII::IsEqualIgnoreCase(const StringViewASCII& a, const StringViewASCII& b)
+{
+	if (a.getLength() != b.getLength())
+		return false;
+	for (uintptr i = 0; i < a.getLength(); i++)
+	{
+		if (Char::ToUpper(a[i]) != Char::ToUpper(b[i]))
+			return false;
+	}
+	return true;
+}
+
+inline bool XLib::StringsASCII::IsEqualIgnoreCase(const StringViewASCII& a, const char* bCStr)
+{
+	for (uintptr i = 0; i < a.getLength(); i++)
+	{
+		if (Char::ToUpper(a[i]) != Char::ToUpper(bCStr[i]))
+			return false;
+		if (bCStr[i] == 0)
+			return false;
+	}
+	return bCStr[a.getLength()] == 0;
 }

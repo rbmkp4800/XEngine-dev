@@ -90,8 +90,9 @@ namespace XLib::Internal
 inline void* operator new (size_t, XLib::Internal::PlacementNewToken, void* block) { return block; }
 inline void operator delete (void* block, XLib::Internal::PlacementNewToken, void*) {}
 
-#define construct(value, ...) (new (::XLib::Internal::PlacementNewToken(), &(value)) XLib::RemoveReference<decltype(value)>(__VA_ARGS__))
-#define destruct(value) { using XLibDestructHelperType = XLib::RemoveReference<decltype(value)>; (value).~XLibDestructHelperType(); }
+// TODO: Remove this.
+#define XConstruct(value, ...) (new (::XLib::Internal::PlacementNewToken(), &(value)) XLib::RemoveReference<decltype(value)>(__VA_ARGS__))
+#define XDestruct(value) { using XLibDestructHelperType = XLib::RemoveReference<decltype(value)>; (value).~XLibDestructHelperType(); }
 
 
 // Data utils //////////////////////////////////////////////////////////////////////////////////

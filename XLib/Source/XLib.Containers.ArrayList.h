@@ -13,6 +13,7 @@
 // TODO: Remove CounterType from DynamicArrayList and just use uint32.
 // TODO: Do for `DynamicArrayList` same thing I did for `DynamicString`: `growBuffer`, `growBufferExponentially` etc.
 // TODO: `InplaceArrayList` destructor currently automatically calls element desctructors for entire buffer in addition to existing manual destruction.
+// TODO: Remove `IsSafe` bullshit and do manual checks if object is trivially movable/destructible.
 
 #include "XLib.h"
 #include "XLib.Allocation.h"
@@ -42,10 +43,12 @@ namespace XLib
 
 	public:
 		ArrayList() = default;
-		inline ~ArrayList();
+		inline ~ArrayList() { destroy(); }
 
 		inline ArrayList(ArrayList&& that);
 		inline void operator = (ArrayList&& that);
+
+		inline void destroy();
 
 		template <typename ... ConstructorArgsTypes>
 		inline Type& emplaceBack(ConstructorArgsTypes&& ... constructorArgs);
@@ -307,7 +310,7 @@ namespace XLib
 		Type* newBuffer = (Type*)AllocatorBase::allocate(capacity * sizeof(Type));
 
 		for (CounterType i = 0; i < size; i++)
-			construct(newBuffer[i], AsRValue(buffer[i]));
+			XConstruct(newBuffer[i], AsRValue(buffer[i]));
 
 		if (buffer)
 			AllocatorBase::release(buffer);
@@ -315,13 +318,28 @@ namespace XLib
 	}
 
 	template <typename Type, typename CounterType, bool IsSafe, typename AllocatorType>
-	inline ArrayList<Type, CounterType, IsSafe, AllocatorType>::
-		~ArrayList()
+	inline auto ArrayList<Type, CounterType, IsSafe, AllocatorType>::
+		operator = (ArrayList&& that) -> void
+	{
+		destroy();
+
+		buffer = that.buffer;
+		capacity = that.capacity;
+		size = that.size;
+
+		that.buffer = nullptr;
+		that.capacity = 0;
+		that.size = 0;
+	}
+
+	template <typename Type, typename CounterType, bool IsSafe, typename AllocatorType>
+	inline auto ArrayList<Type, CounterType, IsSafe, AllocatorType>::
+		destroy() -> void
 	{
 		if (buffer)
 		{
 			for (CounterType i = 0; i < size; i++)
-				destruct(buffer[i]);
+				XDestruct(buffer[i]);
 			AllocatorBase::release(buffer);
 		}
 		buffer = nullptr;
@@ -331,13 +349,13 @@ namespace XLib
 
 	template <typename Type, typename CounterType, bool IsSafe, typename AllocatorType>
 	template <typename ... ConstructorArgsTypes>
-	inline Type& ArrayList<Type, CounterType, IsSafe, AllocatorType>::
-		emplaceBack(ConstructorArgsTypes&& ... constructorArgs)
+	inline auto ArrayList<Type, CounterType, IsSafe, AllocatorType>::
+		emplaceBack(ConstructorArgsTypes&& ... constructorArgs) -> Type&
 	{
 		ensureCapacity(size + 1);
 
 		Type& result = buffer[size];
-		construct(result, forwardRValue<ConstructorArgsTypes>(constructorArgs) ...);
+		XConstruct(result, forwardRValue<ConstructorArgsTypes>(constructorArgs) ...);
 		size++;
 
 		return result;
@@ -350,7 +368,7 @@ namespace XLib
 		ensureCapacity(size + 1);
 
 		Type& result = buffer[size];
-		construct(result, value);
+		XConstruct(result, value);
 		size++;
 
 		return result;
@@ -364,7 +382,7 @@ namespace XLib
 
 		const CounterType elementIndex = size - 1;
 		Type element = asRValue(buffer[elementIndex]);
-		destruct(buffer[elementIndex]);
+		XDestruct(buffer[elementIndex]);
 		size--;
 		return element;
 	}
@@ -380,12 +398,12 @@ namespace XLib
 			if (size < newSize)
 			{
 				for (CounterType i = size; i < newSize; i++)
-					construct(buffer[i]);
+					XConstruct(buffer[i]);
 			}
 			else
 			{
 				for (CounterType i = newSize; i < size; i++)
-					destruct(buffer[i]);
+					XDestruct(buffer[i]);
 			}
 		}
 
@@ -417,7 +435,7 @@ namespace XLib
 		~InplaceArrayList()
 	{
 		for (CounterType i = 0; i < size; i++)
-			destruct(buffer[i]);
+			XDestruct(buffer[i]);
 		size = 0;
 	}
 
@@ -428,7 +446,7 @@ namespace XLib
 	{
 		XAssert(!isFull());
 		Type& result = buffer[size];
-		construct(result, forwardRValue<ConstructorArgsTypes>(constructorArgs) ...);
+		XConstruct(result, forwardRValue<ConstructorArgsTypes>(constructorArgs) ...);
 		size++;
 
 		return result;
@@ -440,7 +458,7 @@ namespace XLib
 	{
 		XAssert(!isFull());
 		Type& result = buffer[size];
-		construct(result, value);
+		XConstruct(result, value);
 		size++;
 
 		return result;
@@ -452,7 +470,7 @@ namespace XLib
 	{
 		XAssert(!isFull());
 		Type& result = buffer[size];
-		construct(result, AsRValue(value));
+		XConstruct(result, AsRValue(value));
 		size++;
 
 		return result;
@@ -464,9 +482,18 @@ namespace XLib
 	{
 		XAssert(!isEmpty());
 		size--;
-		Type result = asRValue(buffer[size]);
+		return asRValue(buffer[size]);
+	}
 
-		return result;
+	template <typename Type, uintptr Capacity, typename CounterType, bool IsSafe>
+	inline auto InplaceArrayList<Type, Capacity, CounterType, IsSafe>::
+		resize(CounterType newSize) -> void
+	{
+		for (CounterType i = newSize; i < size; i++)
+			XDestruct(buffer[i]);
+		for (CounterType i = size; i < newSize; i++)
+			XConstruct(buffer[i]);
+		size = newSize;
 	}
 
 
@@ -538,7 +565,7 @@ namespace XLib
 		ensureCapacity(realIndex.segmentIndex + 1);
 		
 		Type& result = segments[realIndex.segmentIndex][realIndex.offset];
-		construct(result, forwardRValue<ConstructorArgsTypes>(args) ...);
+		XConstruct(result, forwardRValue<ConstructorArgsTypes>(args) ...);
 		size++;
 
 		return result;
@@ -553,7 +580,7 @@ namespace XLib
 
 		Type& result = segments[realIndex.segmentIndex][realIndex.offset];
 		if constexpr (IsSafe)
-			construct(result, value);
+			XConstruct(result, value);
 		else
 			result = value;
 		size++;

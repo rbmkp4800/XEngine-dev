@@ -46,16 +46,17 @@ static bool ReadTextFile(const char* path, DynamicStringASCII& resultText)
 	if (!file.open(path, FileAccessMode::Read, FileOpenMode::OpenExisting))
 		return false;
 
-	const uint32 fileSize = XCheckedCastU32(file.getSize());
+	const uint64 fileSize = file.getSize();
+	if (fileSize == uint64(-1))
+		return false;
+	if (fileSize >= uint64(uint32(-1)))
+		return false;
+	const uint32 fileSizeU32 = uint32(fileSize);
 
 	DynamicStringASCII text;
-	text.growBufferToFitLength(fileSize);
-	text.setLength(fileSize);
-
-	const bool readResult = file.read(text.getData(), fileSize);
-	file.close();
-
-	if (!readResult)
+	text.growBufferToFitLength(fileSizeU32);
+	text.setLength(fileSizeU32);
+	if (!file.read(text.getData(), fileSizeU32))
 		return false;
 
 	resultText = AsRValue(text);
@@ -74,8 +75,12 @@ inline ordering SourceFileCache::EntriesSearchTreeComparator::Compare(const Entr
 
 SourceFileHandle SourceFileCache::openFile(StringViewASCII path)
 {
+	XAssert(Path::IsAbsolute(path));
+	if (!Path::HasFileName(path))
+		return SourceFileHandle(0);
+
 	InplaceStringASCIIx1024 normalizedPath;
-	Path::MakeAbsolute(path, normalizedPath);
+	Path::Normalize(path, normalizedPath);
 
 	// TODO: Do propper uppercasing.
 	for (uint16 i = 0; i < normalizedPath.getLength(); i++)
@@ -84,8 +89,8 @@ SourceFileHandle SourceFileCache::openFile(StringViewASCII path)
 	if (Entry* existingEntry = entrySearchTree.find(normalizedPath.getView()))
 		return SourceFileHandle(uint64(existingEntry));
 
-	const FileSystemOpResult<TimePoint> getModTimeResult = FileSystem::GetFileModificationTime(normalizedPath.getCStr());
-	if (getModTimeResult.status != FileSystemOpStatus::Success)
+	const uint64 modTime = FileSystem::GetFileModificationTime(normalizedPath.getCStr());
+	if (modTime == InvalidTimePoint)
 		return SourceFileHandle(0);
 
 	const uintptr memoryBlockSize = sizeof(Entry) + normalizedPath.getLength() + 1;
@@ -95,9 +100,9 @@ SourceFileHandle SourceFileCache::openFile(StringViewASCII path)
 	memoryCopy((char*)memoryBlock + sizeof(Entry), normalizedPath.getData(), normalizedPath.getLength());
 
 	Entry& newEntry = *(Entry*)memoryBlock;
-	construct(newEntry);
+	XConstruct(newEntry);
 	newEntry.path = StringViewASCII((char*)memoryBlock + sizeof(Entry), normalizedPath.getLength());
-	newEntry.modTime = getModTimeResult.value;
+	newEntry.modTime = modTime;
 	newEntry.textState = EntryTextState::NotLoaded;
 
 	entrySearchTree.insert(newEntry);
@@ -107,12 +112,14 @@ SourceFileHandle SourceFileCache::openFile(StringViewASCII path)
 
 StringViewASCII SourceFileCache::getFilePath(SourceFileHandle fileHandle) const
 {
+	XAssert(fileHandle != SourceFileHandle(0));
 	Entry* entry = (Entry*)uint64(fileHandle);
 	return entry->path;
 }
 
 uint64 SourceFileCache::getFileModTime(SourceFileHandle fileHandle) const
 {
+	XAssert(fileHandle != SourceFileHandle(0));
 	Entry* entry = (Entry*)uint64(fileHandle);
 	return entry->modTime;
 }
