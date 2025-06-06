@@ -20,6 +20,7 @@ void MemoryCharStreamWriter::write(const char* data, uintptr length)
 {
 	const uintptr clippedLength = min<uintptr>(length, bufferSize - bufferOffset);
 	memoryCopy(buffer + bufferOffset, data, clippedLength);
+	bufferOffset += clippedLength;
 }
 
 void MemoryCharStreamWriter::write(const char* cstr)
